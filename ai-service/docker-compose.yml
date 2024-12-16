@@ -1,0 +1,29 @@
+services:
+  ai-database:
+    image: pgvector/pgvector:pg16
+    container_name: ai-database
+    healthcheck:
+      test: pg_isready -U $POSTGRES_USER
+      start_interval: 1s
+      start_period: 5s
+      interval: 5s
+      retries: 5
+    env_file:
+      - .env
+    ports:
+      - "$POSTGRES_PORT:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+
+  migration:
+    image: python:3.11-slim
+    container_name: alembic_migration
+    depends_on:
+      ai-database:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./migrations:/migrations
+    entrypoint: >
+      sh -c "alembic upgrade head"

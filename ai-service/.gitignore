@@ -1,0 +1,47 @@
+.idea
+.vscode
+poetry.lock
+
+postgres-volume/
+
+# Vectorstore
+chroma_langchain_db/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+.virtualenv/
+.Python
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+
+# Logs
+*.log
+
+# Environment
+.env
+
+# database
+data/
+
+# private
+private/
+
+# log
+app.log
