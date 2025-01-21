@@ -30,7 +30,7 @@ COPY package*.json ./
 RUN npm install --only=production
 
 # Expose the application port
-EXPOSE 8101
+EXPOSE 8200
 
 # Define the default command
 CMD ["node", "dist/main.js"]
