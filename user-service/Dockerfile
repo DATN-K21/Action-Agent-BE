@@ -32,7 +32,7 @@ USER node
 COPY . .
 
 # Expose the port that the application listens on.
-EXPOSE 8080
+EXPOSE 8100
 
 # Run the application.
 CMD npm start
