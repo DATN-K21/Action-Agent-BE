@@ -1,0 +1,48 @@
+name: Trigger auto deployment for user-service
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ deployment-container-azure ]
+    paths:
+    - '**'
+    - '.github/workflows/user-service-AutoDeployTrigger-4b6ee5ff-01ae-4981-b53b-e98267a3365c.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.USERSERVICE_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.USERSERVICE_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.USERSERVICE_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          registryUrl: registry0001.azurecr.io
+          registryUsername: ${{ secrets.USERSERVICE_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.USERSERVICE_REGISTRY_PASSWORD }}
+          containerAppName: user-service
+          resourceGroup: DATN-RAG
+          imageToBuild: registry0001.azurecr.io/user-service:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
