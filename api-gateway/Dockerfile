@@ -14,7 +14,7 @@ RUN npm install --only=production
 COPY . .
 
 # Expose the application port
-EXPOSE 8300
+EXPOSE 80
 
 # Start the application
 CMD ["npm", "start"]

@@ -1,7 +1,5 @@
 const express = require('express');
 const passport = require('passport');
-const GoogleHelper = require('./helpers/google.helper');
-const FacebookHelper = require('./helpers/facebook.helper');
 require('dotenv').config();
 const cors = require('cors');
 
@@ -14,7 +12,6 @@ app.use(cors());
 // Initialize Passport
 app.use(passport.initialize());
 
-FacebookHelper.configureFacebookStrategy();
 
 const morgan = require('morgan');
 const { default: helmet } = require('helmet');
