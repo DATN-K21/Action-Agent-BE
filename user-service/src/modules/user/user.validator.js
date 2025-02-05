@@ -26,13 +26,6 @@ class UserValidator extends ValidatorConfig {
             return UserValidator.returnFailedError('Password must be at least 3 characters long', 1040104);
         }
 
-        // Role validation
-        if (validator.isEmpty(body.roleId ?? "")) {
-            return UserValidator.returnFailedError('Role ID is required', 1040105);
-        } else if (!validator.isMongoId(body.roleId)) {
-            return UserValidator.returnFailedError('Role ID is invalid', 1040106);
-        }
-
         // Email verification validation
         let emailVerified = body.email_verified;
         if (validator.isEmpty(emailVerified ?? "")) {
@@ -45,7 +38,6 @@ class UserValidator extends ValidatorConfig {
         return UserValidator.returnPassedData({
             email: body.email,
             password: body.password,
-            role: body.roleId,
             email_verified: emailVerified,
             username: body.username ?? "",
             fullname: body.fullname ?? "",

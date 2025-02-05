@@ -38,15 +38,10 @@ class UserService {
         return pipeline;
     }
 
-    async createNewUser({ username, email, password, fullname, role, email_verified, avatar }) {
+    async createNewUser({ username, email, password, fullname, email_verified, avatar }) {
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new ConflictResponse('Email already exists', 1040108);
-        }
-
-        const foundRole = await this.roleModel.findById(role);
-        if (!foundRole) {
-            throw new ConflictResponse('Role not found', 1040109);
         }
 
         const hashedPassword = await BcryptHelper.hash(password);
@@ -61,7 +56,6 @@ class UserService {
             email,
             password: hashedPassword,
             fullname,
-            role,
             email_verified,
             avatar,
             role: foundUserRole._id,

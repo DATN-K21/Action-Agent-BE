@@ -1,5 +1,5 @@
 const { BadRequestResponse } = require("../../response/error");
-const { OKSuccessResponse } = require("../../response/success");
+const { OKSuccessResponse, CreatedSuccessResponse } = require("../../response/success");
 const MongooseUtil = require("../../utils/mongoose.util");
 const UserService = require("./user.service");
 const UserValidator = require("./user.validator");
@@ -25,10 +25,10 @@ class UserController {
             throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
         }
 
-        const { username, email, password, fullname, role, email_verified, avatar } = validationResult?.data;
+        const { username, email, password, fullname, email_verified, avatar } = validationResult?.data;
         try {
-            const result = await this.userService.createNewUser({ username, email, password, fullname, role, email_verified, avatar });
-            return new OKSuccessResponse({
+            const result = await this.userService.createNewUser({ username, email, password, fullname, email_verified, avatar });
+            return new CreatedSuccessResponse({
                 message: 'Create new user success',
                 data: result,
                 code: 1040100
