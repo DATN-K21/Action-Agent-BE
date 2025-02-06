@@ -6,28 +6,28 @@ const router = require('express').Router();
 
 router.use(handleAsync(AccessMiddleware.checkAccess));
 
-router.get("/",
-    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds)),
-    handleAsync(profileController.getProfileList)
-);
-router.get("/:id",
-    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds)),
-    handleAsync(profileController.getProfileById)
-);
+// Other SUP-ROUTES imported here
+// For example: router.use('/avatar', require('./avatar.route'));
 
-router.post("/",
-    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds)),
-    handleAsync(profileController.createNewProfile)
-);
 
-router.patch("/:id",
-    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds)),
-    handleAsync(profileController.updateProfile)
-);
 
-router.delete("/:id",
-    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds)),
-    handleAsync(profileController.deleteProfile)
-);
+
+
+// IMPORTANT: Common routes middleware, sup-routes imported ABOVE this line
+router.use((req, res, next) => {
+    const id = req.path.split("/")[1];
+    req.params.id = id;
+
+    handleAsync(permissionMiddleware.checkPermission("Profile", profileController.getProfileOwnerIds))(req, res, next);
+});
+
+router.get("/", handleAsync(profileController.getProfileList));
+router.get("/:id", handleAsync(profileController.getProfileById));
+
+router.post("/", handleAsync(profileController.createNewProfile));
+
+router.patch("/:id", handleAsync(profileController.updateProfile));
+
+router.delete("/:id", handleAsync(profileController.deleteProfile));
 
 module.exports = router;

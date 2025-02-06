@@ -7,28 +7,28 @@ const handleAsync = require('../../utils/asyncHandler.util');
 
 router.use(handleAsync(AccessMiddleware.checkAccess));
 
-router.get("/",
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds)),
-    handleAsync(subSystemController.getSubSystemList)
-);
-router.get("/:id",
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds)),
-    handleAsync(subSystemController.getSubSystemById)
-);
+// Other SUP-ROUTES imported here
+// For example: router.use('/avatar', require('./avatar.route'));
 
-router.post("/",
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds)),
-    handleAsync(subSystemController.createNewSubSystem)
-);
 
-router.patch("/:id",
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds)),
-    handleAsync(subSystemController.updateSubSystem)
-);
 
-router.delete("/:id",
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds)),
-    handleAsync(subSystemController.deleteSubSystem)
-);
+
+
+// IMPORTANT: Common routes middleware, sup-routes imported ABOVE this line
+router.use((req, res, next) => {
+    const id = req.path.split("/")[1];
+    req.params.id = id;
+
+    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds))(req, res, next);
+})
+
+router.get("/", handleAsync(subSystemController.getSubSystemList));
+router.get("/:id", handleAsync(subSystemController.getSubSystemById));
+
+router.post("/", handleAsync(subSystemController.createNewSubSystem));
+
+router.patch("/:id", handleAsync(subSystemController.updateSubSystem));
+
+router.delete("/:id", handleAsync(subSystemController.deleteSubSystem));
 
 module.exports = router;

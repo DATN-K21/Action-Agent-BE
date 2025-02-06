@@ -2,7 +2,6 @@ const AccessController = require('../../modules/access/access.controller');
 const handleAsync = require('../../utils/asyncHandler.util');
 const passport = require('passport');
 const AccessMiddleware = require('../../middlewares/access.middleware');
-const permissionMiddleware = require('../../middlewares/permission.middleware');
 
 const router = require('express').Router();
 
