@@ -1,5 +1,3 @@
-const { reset } = require('nodemon');
-
 require('dotenv').config();
 
 const timeConfig = {
