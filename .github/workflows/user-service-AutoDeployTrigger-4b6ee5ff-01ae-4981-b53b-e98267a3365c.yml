@@ -3,7 +3,7 @@ name: CI/CD for Azure Container Apps
 on:
   push:
     branches:
-      - main # Chạy CI/CD khi push lên nhánh main
+      - deployment-container-azure # Chạy CI/CD khi push lên nhánh main
   workflow_dispatch: # Cho phép chạy thủ công từ GitHub Actions
 
 jobs:
