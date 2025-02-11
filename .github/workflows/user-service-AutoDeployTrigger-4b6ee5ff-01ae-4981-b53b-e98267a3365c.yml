@@ -1,49 +1,61 @@
-name: Trigger auto deployment for user-service
+name: CI/CD for Azure Container Apps
 
-# When this action will be executed
 on:
-  # Automatically trigger it when detected changes in repo
   push:
-    branches: [deployment-container-azure]
-    paths:
-      - "**"
-      - ".github/workflows/user-service-AutoDeployTrigger-4b6ee5ff-01ae-4981-b53b-e98267a3365c.yml"
-
-  # Allow manual trigger
-  workflow_dispatch:
+    branches:
+      - main # Chạy CI/CD khi push lên nhánh main
+  workflow_dispatch: # Cho phép chạy thủ công từ GitHub Actions
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write #This is required for requesting the OIDC JWT Token
-      contents: read #Required when GH token is used to authenticate with private repo
+      id-token: write
+      contents: read
 
     steps:
-      - name: Checkout to the branch
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Azure Login
         uses: azure/login@v1
         with:
-          client-id: ${{ secrets.USERSERVICE_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.USERSERVICE_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.USERSERVICE_AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push container image to registry
+      - name: Login to Azure Container Registry (ACR)
         run: |
-          az acr login --name registry0001
-          docker build -t registry0001.azurecr.io/user-service:${{ github.sha }} -f ./user-service/Dockerfile .
-          docker push registry0001.azurecr.io/user-service:${{ github.sha }}
+          az acr login --name registry0001.azurecr.io
 
-      - name: Deploy Container App
+      # Build và push user-service
+      - name: Build and push user-service image
+        run: |
+          docker build -t registry0001.azurecr.io/user-service:${{ github.sha }} -t registry0001.azurecr.io/user-service:latest ./user-service
+          docker push registry0001.azurecr.io/user-service:${{ github.sha }}
+          docker push registry0001.azurecr.io/user-service:latest
+
+      # Build và push api-gateway
+      - name: Build and push api-gateway image
+        run: |
+          docker build -t registry0001.azurecr.io/api-gateway:${{ github.sha }} -t registry0001.azurecr.io/api-gateway:latest ./api-gateway
+          docker push registry0001.azurecr.io/api-gateway:${{ github.sha }}
+          docker push registry0001.azurecr.io/api-gateway:latest
+
+      # Deploy user-service lên Azure Container Apps
+      - name: Deploy user-service to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
         with:
           containerAppName: user-service
           resourceGroup: DATN-RAG
           registryUrl: registry0001.azurecr.io
-          registryUsername: ${{ secrets.USERSERVICE_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.USERSERVICE_REGISTRY_PASSWORD }}
-          imageToBuild: registry0001.azurecr.io/user-service:${{ github.sha }}
-          dockerfilePath: ./user-service/Dockerfile
-          appSourcePath: ${{ github.workspace }}
+          imageToBuild: registry0001.azurecr.io/user-service:latest
+
+      # Deploy api-gateway lên Azure Container Apps
+      - name: Deploy api-gateway to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          containerAppName: api-gateway
+          resourceGroup: DATN-RAG
+          registryUrl: registry0001.azurecr.io
+          imageToBuild: registry0001.azurecr.io/api-gateway:latest
