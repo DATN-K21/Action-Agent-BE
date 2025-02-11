@@ -32,8 +32,9 @@ class AccessMiddleware {
         const accessToken = token.split(' ')[1];
 
         try {
-            const decodedToken = await JWTHelper.verifyToken(accessToken, foundAccess.public_key);
-
+            const decodedToken = JWTHelper.verifyToken(accessToken, foundAccess.public_key);
+            console.log('decodedToken: ');
+            console.log(decodedToken);
             if (!decodedToken) {
                 throw new UnauthorizedResponse('Unauthorized', 1000107);
             } else if (!decodedToken?.id || decodedToken?.id !== foundUser._id.toString()) {

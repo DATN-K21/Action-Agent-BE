@@ -2,20 +2,20 @@ const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();
-const userRoutes = require('../../routes/api_v1/user.route');
-const AccessMiddleware = require('../../middlewares/access.middleware');
-const permissionMiddleware = require('../../middlewares/permission.middleware');
+const userRoutes = require('../../../routes/api_v1/user.route');
+const AccessMiddleware = require('../../../middlewares/access.middleware');
+const permissionMiddleware = require('../../../middlewares/permission.middleware');
 
 // Mock middleware dependencies
-jest.mock('../../middlewares/access.middleware', () => ({
+jest.mock('../../../middlewares/access.middleware', () => ({
 	checkAccess: jest.fn((req, res, next) => next())
 }));
-jest.mock('../../middlewares/permission.middleware', () => ({
+jest.mock('../../../middlewares/permission.middleware', () => ({
 	checkPermission: jest.fn(() => (req, res, next) => next())
 }));
 
 // Mock the user controller module so that our routes return controlled responses.
-jest.mock('../../modules/user/user.controller', () => ({
+jest.mock('../../../modules/user/user.controller', () => ({
 	getUserList: jest.fn(async (req, res) =>
 		res.status(200).json({
 			data: [

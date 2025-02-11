@@ -1,11 +1,11 @@
-const UserController = require("../../modules/user/user.controller");
-const UserService = require("../../modules/user/user.service");
-const UserValidator = require("../../modules/user/user.validator");
-const { BadRequestResponse } = require("../../response/error");
+const UserController = require("../../../modules/user/user.controller");
+const UserService = require("../../../modules/user/user.service");
+const UserValidator = require("../../../modules/user/user.validator");
+const { BadRequestResponse } = require("../../../response/error");
 const { MongooseError } = require("mongoose");
 
-jest.mock("../../modules/user/user.service");
-jest.mock("../../modules/user/user.validator");
+jest.mock("../../../modules/user/user.service");
+jest.mock("../../../modules/user/user.validator");
 
 describe("UserController", () => {
   let userService;
