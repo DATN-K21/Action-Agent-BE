@@ -31,14 +31,14 @@ jobs:
       # Build và push user-service
       - name: Build and push user-service image
         run: |
-          docker build -t registry0001.azurecr.io/user-service:${{ github.sha }} -t registry0001.azurecr.io/user-service:latest ./user-service
+          docker build -f ./user-service/Dockerfile.prod -t registry0001.azurecr.io/user-service:${{ github.sha }} -t registry0001.azurecr.io/user-service:latest ./user-service
           docker push registry0001.azurecr.io/user-service:${{ github.sha }}
           docker push registry0001.azurecr.io/user-service:latest
 
       # Build và push api-gateway
       - name: Build and push api-gateway image
         run: |
-          docker build -t registry0001.azurecr.io/api-gateway:${{ github.sha }} -t registry0001.azurecr.io/api-gateway:latest ./api-gateway
+          docker build -f ./api-gateway/Dockerfile.prod -t registry0001.azurecr.io/api-gateway:${{ github.sha }} -t registry0001.azurecr.io/api-gateway:latest ./api-gateway
           docker push registry0001.azurecr.io/api-gateway:${{ github.sha }}
           docker push registry0001.azurecr.io/api-gateway:latest
 
