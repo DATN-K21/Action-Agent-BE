@@ -48,8 +48,7 @@ jobs:
         with:
           containerAppName: user-service
           resourceGroup: DATN-RAG
-          registryUrl: registry0001.azurecr.io
-          imageToBuild: registry0001.azurecr.io/user-service:latest
+          imageToDeploy: registry0001.azurecr.io/user-service:${{ github.sha }}
 
       # Deploy api-gateway lên Azure Container Apps
       - name: Deploy api-gateway to Azure Container Apps
@@ -57,5 +56,4 @@ jobs:
         with:
           containerAppName: api-gateway
           resourceGroup: DATN-RAG
-          registryUrl: registry0001.azurecr.io
-          imageToBuild: registry0001.azurecr.io/api-gateway:latest
+          imageToDeploy: registry0001.azurecr.io/api-gateway:${{ github.sha }}
