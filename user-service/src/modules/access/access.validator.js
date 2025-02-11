@@ -126,7 +126,7 @@ class AccessValidator extends ValidatorConfig {
         });
     }
 
-    static async validateVerifyEmail(req) {
+    static validateVerifyEmail(req) {
         if (validator.isEmpty(req.body?.email || '')) {
             return AccessValidator.returnFailedError('Email is required', 1010401);
         }
@@ -140,7 +140,7 @@ class AccessValidator extends ValidatorConfig {
         });
     }
 
-    static async validateVerifyOTP(req) {
+    static validateVerifyOTP(req) {
         // User identification
         if (validator.isEmpty(req.body?.email || '')) {
             return AccessValidator.returnFailedError('Email is required', 1010501);

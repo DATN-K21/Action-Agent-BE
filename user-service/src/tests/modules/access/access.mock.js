@@ -1,10 +1,18 @@
+const validGetAccessOwnerIdsRequest = {
+    params: { id: 'jest-client-id' }
+};
+const validGetAccessOwnerIdsResult = {
+    owners: ['jest-client-id', 'jest-client-id-2']
+}
 
 const validSignupPayload = {
     email: 'jest@test.com',
     password: '123456',
 }
+const validSignupResult = { ...validSignupPayload, id: '1' };
 
 const validLoginPayload = { ...validSignupPayload }
+const validLoginResult = { user: { ...validSignupResult }, accessToken: 'jest-access-token', refreshToken: 'jest-refresh-token' };
 
 const validInvokeNewTokenRequest = {
     headers: {
@@ -15,7 +23,6 @@ const validInvokeNewTokenRequest = {
         refreshToken: 'jest-refresh-token',
     }
 }
-
 const validInvokeNewTokenResult = {
     error: false,
     data: {
@@ -23,6 +30,23 @@ const validInvokeNewTokenResult = {
         refreshToken: 'jest-refresh-token',
         accessToken: 'jest-access-token',
     },
+}
+
+const validVerifyEmailPayload = {
+    email: 'jest@tester.com',
+}
+const validVerifyEmailResult = validVerifyEmailPayload;
+
+const validVerifyOTPPayload = {
+    email: 'jest@tester.com',
+    otp: '123456',
+}
+const validVerifyOTPResult = {
+    error: false,
+    data: {
+        userEmail: 'jest@tester.com',
+        otp: '123456'
+    }
 }
 
 const validateResetPasswordRequest = {
@@ -42,25 +66,20 @@ const validResetPasswordResult = {
     }
 }
 
-const validVerifyOTPPayload = {
-    email: 'jest@tester.com',
-    otp: '123456',
-}
-const validVerifyOTPResult = {
-    error: false,
-    data: {
-        userEmail: 'jest@tester.com',
-        otp: '123456'
-    }
-}
 
 const validLogoutRequest = {
     user: { id: 'jest-client-id' }
 }
 
 module.exports = {
+    validGetAccessOwnerIdsRequest,
+    validGetAccessOwnerIdsResult,
     validSignupPayload,
+    validSignupResult,
     validLoginPayload,
+    validLoginResult,
+    validVerifyEmailPayload,
+    validVerifyEmailResult,
     validInvokeNewTokenRequest,
     validInvokeNewTokenResult,
     validateResetPasswordRequest,

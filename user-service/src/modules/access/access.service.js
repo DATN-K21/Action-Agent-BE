@@ -19,6 +19,14 @@ class AccessService {
         this.roleModel = RoleModel;
     }
 
+    async getAccessById(accessId) {
+        const foundAccess = await this.accessModel.findById(MongooseUtil.convertToMongooseObjectIdType(accessId)).lean();
+        if (!foundAccess) {
+            throw new ConflictResponse('Access not found', 1010003);
+        }
+        return UserFilter.makeBasicFilter(foundAccess);
+    }
+
     async handleSignup(email, password) {
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
