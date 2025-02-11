@@ -4,8 +4,7 @@ const axios = require('axios');
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
 
 const serviceRegistry = {
-    'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
-    'log': ENDPOINT_CONFIGS.LOG_SERVICE_URL,
+    'user': ENDPOINT_CONFIGS.USER_SERVICE_URL
 };
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
     // router.use(`/${serviceName}/*`, (req, res, next) => {

@@ -6,13 +6,24 @@ const morgan = require('morgan');
 
 const app = express();
 
-// Middleware
+// Set trust proxy for Azure environment
+app.set('trust proxy', 1);
 
-app.use(morgan("dev"))
+// Rate limiter middleware
+const limiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 50, // 50 requests per minute
+    keyGenerator: (req) => req.ip, // Use req.ip instead of X-Forwarded-For
+    handler: (req, res) => {
+        res.status(429).json({ error: "Too many requests. Please try again later." });
+    }
+});
+
+// Middleware
+app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(rateLimit({ windowMs: 60 * 1000, max: 50 })); // 50 requests per minute
+app.use(limiter); // Apply rate limiter
 
 // Routes
 app.get('/', (req, res) => {
@@ -22,8 +33,12 @@ app.get('/health', (req, res) => {
     res.json({ status: 'UP!' });
 });
 
+// Main API routes
 app.use('/', require("./routes/index"));
 
-initRabbitMQ().catch(console.error);
+// Initialize RabbitMQ
+// initRabbitMQ().catch(err => {
+//     console.error("RabbitMQ initialization failed:", err);
+// });
 
 module.exports = app;
