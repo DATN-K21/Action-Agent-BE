@@ -81,7 +81,7 @@ const mockUserResponse = {
     email_verified: true,
     avatar: 'avatar.jpg',
     slug: 'test-slug',
-    save: jest.fn().mockImplementation(() => Promise.resolve({ _doc: mockUser }))
+    type_login: 'local',
 }
 
 const mockAccessResponse = {
@@ -90,8 +90,27 @@ const mockAccessResponse = {
     public_key: 'publicKey',
     private_key: 'privateKey',
     refresh_token: 'jest-refresh-token',
+    otp: {
+        code: '123456',
+        expiredAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+    },
     otp_count: 0,
     last_otp_sent: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+    otp_reset_password: {
+        code: '123456',
+        expiredAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+    },
+    reset_password_token: 'jest-reset-password-token',
+    otp_reset_password_count: 0,
+    last_otp_reset_password_sent: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+}
+
+const mockRoleResponse = {
+    _id: 'jest-role-id',
+    name: 'User',
+    description: 'User role',
+    status: 'active',
+    grants: [],
 }
 
 const mockInvokeNewTokenParameters = {
@@ -99,6 +118,14 @@ const mockInvokeNewTokenParameters = {
     refreshToken: 'jest-refresh-token',
     accessToken: 'jest-access-token',
     refresh_token_used: [{ token: 'jest-old-refresh-token-1' }, { token: 'jest-old-refresh-token-2' }]
+}
+
+
+const mockLoginWithFacebookParameters = {
+    facebook_id: 'jest-facebook-id',
+    email: mockUserResponse.email,
+    username: mockUserResponse.username,
+    type_login: 'facebook'
 }
 
 module.exports = {
@@ -118,7 +145,9 @@ module.exports = {
     validVerifyOTPResult,
     validLogoutRequest,
     mockInvokeNewTokenParameters,
+    mockLoginWithFacebookParameters,
 
     mockUserResponse,
     mockAccessResponse,
+    mockRoleResponse,
 }
