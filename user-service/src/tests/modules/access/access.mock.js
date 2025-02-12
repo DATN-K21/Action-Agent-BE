@@ -71,6 +71,36 @@ const validLogoutRequest = {
     user: { id: 'jest-client-id' }
 }
 
+const mockUserResponse = {
+    _id: 'jest-user-id',
+    email: 'jest@tester.com',
+    username: 'jest tester',
+    password: 'hashedPassword',
+    fullname: 'Jest Tester',
+    role: 'User',
+    email_verified: true,
+    avatar: 'avatar.jpg',
+    slug: 'test-slug',
+    save: jest.fn().mockImplementation(() => Promise.resolve({ _doc: mockUser }))
+}
+
+const mockAccessResponse = {
+    _id: 'jest-access-id',
+    user_id: 'jest-user-id',
+    public_key: 'publicKey',
+    private_key: 'privateKey',
+    refresh_token: 'jest-refresh-token',
+    otp_count: 0,
+    last_otp_sent: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+}
+
+const mockInvokeNewTokenParameters = {
+    userId: 'jest-client-id',
+    refreshToken: 'jest-refresh-token',
+    accessToken: 'jest-access-token',
+    refresh_token_used: [{ token: 'jest-old-refresh-token-1' }, { token: 'jest-old-refresh-token-2' }]
+}
+
 module.exports = {
     validGetAccessOwnerIdsRequest,
     validGetAccessOwnerIdsResult,
@@ -87,4 +117,8 @@ module.exports = {
     validVerifyOTPPayload,
     validVerifyOTPResult,
     validLogoutRequest,
+    mockInvokeNewTokenParameters,
+
+    mockUserResponse,
+    mockAccessResponse,
 }
