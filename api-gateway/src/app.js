@@ -24,6 +24,6 @@ app.get('/health', (req, res) => {
 
 app.use('/', require("./routes/index"));
 
-initRabbitMQ().catch(console.error);
+// initRabbitMQ().catch(console.error);
 
 module.exports = app;
