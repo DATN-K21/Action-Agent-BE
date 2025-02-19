@@ -22,7 +22,7 @@ COPY pyproject.toml poetry.lock ./
 
 # Install dependencies (including uvicorn)
 RUN poetry config virtualenvs.in-project true && \
-    poetry add uvicorn --without dev --no-interaction --no-ansi && \
+    poetry add uvicorn --no-interaction --no-ansi && \
     poetry install --no-interaction --no-ansi --only main
 
 # --- Final stage ---
