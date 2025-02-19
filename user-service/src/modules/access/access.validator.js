@@ -74,7 +74,7 @@ class AccessValidator extends ValidatorConfig {
 
         // Refresh token validation
         if (validator.isEmpty(req.body?.refreshToken || '')) {
-            return AccessValidator.returnFailedError('Authentication credential is required', 1010304);
+            return AccessValidator.returnFailedError('Refresh token is required', 1010304);
         }
         const refreshToken = req.body?.refreshToken;
 
@@ -126,7 +126,7 @@ class AccessValidator extends ValidatorConfig {
         });
     }
 
-    static async validateVerifyEmail(req) {
+    static validateVerifyEmail(req) {
         if (validator.isEmpty(req.body?.email || '')) {
             return AccessValidator.returnFailedError('Email is required', 1010401);
         }
@@ -140,7 +140,7 @@ class AccessValidator extends ValidatorConfig {
         });
     }
 
-    static async validateVerifyOTP(req) {
+    static validateVerifyOTP(req) {
         // User identification
         if (validator.isEmpty(req.body?.email || '')) {
             return AccessValidator.returnFailedError('Email is required', 1010501);
@@ -191,7 +191,10 @@ class AccessValidator extends ValidatorConfig {
     }
 
     static validateLogout(req) {
-        // Have checked the access token in the access middleware
+        // Request user validation
+        if (!req.user || !req.user.id) {
+            return AccessValidator.returnFailedError('Unauthorized', 1011001);
+        }
         // Validation passed
         return AccessValidator.returnPassedData({
             user: req.user,

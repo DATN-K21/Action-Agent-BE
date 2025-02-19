@@ -1,5 +1,11 @@
 const router = require('express').Router();
 
+
+
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "UP" });
+});
+
 router.use('/log', require('./log.route'));
 router.use('/user', require('./user.route'));
 router.use('/access', require('./access.route'));

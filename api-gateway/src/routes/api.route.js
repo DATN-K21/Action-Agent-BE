@@ -1,21 +1,16 @@
 const router = require('express').Router();
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
-const axios = require('axios');
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
+const currentUserMiddleware = require('../middlewares/currentUser.middleware');
 
 const serviceRegistry = {
-    'user': ENDPOINT_CONFIGS.USER_SERVICE_URL
+    'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
+    'log': ENDPOINT_CONFIGS.LOG_SERVICE_URL,
+    'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
 };
+
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
-    // router.use(`/${serviceName}/*`, (req, res, next) => {
-    //     console.log(`[DEBUG] Forwarding request to '${serviceName}' service`);
-    //     console.log(`  Target: ${target}`);
-    //     console.log(`  Path: ${req.originalUrl}`);
-    //     console.log(`  Method: ${req.method}`);
-    //     console.log(`  Headers: ${JSON.stringify(req.headers)}`);
-    //     console.log(`  Body: ${JSON.stringify(req.body)}`);
-    //     next();
-    // });
+    router.use(currentUserMiddleware);
 
     router.use(`/${serviceName}/*`,
         createProxyMiddleware({
@@ -23,7 +18,7 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
             changeOrigin: true, // Adjust the host header to match the target
             pathRewrite: (path, req) => {
                 const newPath = req.originalUrl;
-                const rewrittenPath = newPath.replace(new RegExp(`^/api/${serviceName}`), '');
+                const rewrittenPath = newPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
                 console.log(`[DEBUG] Rewritten path: ${rewrittenPath}`);
                 return rewrittenPath;
             },

@@ -8,6 +8,16 @@ class SubSystemController {
     constructor() {
         this.subSystemService = new SubSystemService();
     }
+    geSubSystemOwnerIds = async (req, res, next) => {
+        const subSystemId = req.params?.id;
+        if (!subSystemId) {
+            // The request is not for a specific access, so it does not have a specific owner
+            return [];
+        }
+        const foundSubSystem = await this.subSystemService.getSubSystemById(subSystemId);
+        return foundSubSystem?.owners?.map(x => x.toString()) ?? [];
+    }
+
     createNewSubSystem = async (req, res) => {
         const validationResult = SubSystemValidator.validateCreateNewSubSystem(req);
         if (validationResult?.error === true) {
@@ -60,6 +70,7 @@ class SubSystemController {
             throw error;
         }
     }
+
     updateSubSystem = async (req, res) => {
         const validationResult = SubSystemValidator.validateUpdateSubSystem(req);
         if (validationResult?.error === true) {
@@ -81,6 +92,7 @@ class SubSystemController {
             throw error;
         }
     }
+
     deleteSubSystem = async (req, res) => {
         const validationResult = SubSystemValidator.validateDeleteSubSystem(req);
         if (validationResult?.error === true) {

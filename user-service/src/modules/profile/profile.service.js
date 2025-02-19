@@ -185,7 +185,7 @@ class ProfileService {
         }
         if (profileData?.email) {
             if (foundUser?.email !== profileData?.email) {
-                const existingEmail = await this.userModel.findOne({ email: profileData?.emails[0] });
+                const existingEmail = await this.userModel.findOne({ email: profileData?.email });
                 if (existingEmail) {
                     throw new ConflictResponse("Email already in use", 1050405);
                 }

@@ -93,7 +93,8 @@ class ResourceService {
             foundResource.description = description;
         }
 
-        return await foundResource.save();
+        const result = await foundResource.save();
+        return result._doc;
     }
 
     async deleteResource(resourceId) {

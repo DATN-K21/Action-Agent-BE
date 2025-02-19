@@ -1,13 +1,13 @@
-const UserService = require('../../modules/user/user.service');
-const { ConflictResponse } = require('../../response/error');
-const BcryptHelper = require('../../helpers/bcrypt.helper');
-const { generateRandomString, generateRSAKeysForAccess } = require('../../utils/crypto.util');
-const MongooseUtil = require('../../utils/mongoose.util');
+const UserService = require('../../../modules/user/user.service');
+const { ConflictResponse } = require('../../../response/error');
+const BcryptHelper = require('../../../helpers/bcrypt.helper');
+const { generateRandomString, generateRSAKeysForAccess } = require('../../../utils/crypto.util');
+const MongooseUtil = require('../../../utils/mongoose.util');
 
 // Mock dependencies
-jest.mock('../../helpers/bcrypt.helper');
-jest.mock('../../utils/crypto.util');
-jest.mock('../../utils/mongoose.util');
+jest.mock('../../../helpers/bcrypt.helper');
+jest.mock('../../../utils/crypto.util');
+jest.mock('../../../utils/mongoose.util');
 
 describe('UserService', () => {
 	let userService;

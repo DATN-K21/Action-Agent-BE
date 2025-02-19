@@ -1,5 +1,5 @@
 const BcryptHelper = require('../../helpers/bcrypt.helper');
-const { ConflictResponse, InternalServerErrorResponse, BadRequestResponse } = require('../../response/error');
+const { ConflictResponse, InternalServerErrorResponse, BadRequestResponse, NotFoundResponse } = require('../../response/error');
 const UserFilter = require('../user/user.filter');
 const UserModel = require('../user/user.model');
 const AccessModel = require('./access.model');
@@ -10,13 +10,20 @@ const MongooseUtil = require('../../utils/mongoose.util')
 const EmailHelper = require('../../helpers/email.helper');
 const { generateOtpCode } = require('../../utils/otpCode.util');
 const GoogleHelper = require('../../helpers/google.helper');
-const { user } = require('../../configs/email.config');
 
 class AccessService {
     constructor() {
         this.userModel = UserModel;
         this.accessModel = AccessModel;
         this.roleModel = RoleModel;
+    }
+
+    async getAccessById(accessId) {
+        const foundAccess = await this.accessModel.findById(MongooseUtil.convertToMongooseObjectIdType(accessId)).lean();
+        if (!foundAccess) {
+            throw new NotFoundResponse('Access not found', 1010003);
+        }
+        return UserFilter.makeBasicFilter(foundAccess);
     }
 
     async handleSignup(email, password) {
@@ -108,6 +115,8 @@ class AccessService {
             if (JWTHelper.checkIfTokenExpiredError(error) === false) {
                 throw new InternalServerErrorResponse('Something went wrong', 1010309);
             }
+
+            // Error is thrown because token is expired, continue to verify refresh token
         }
 
         let decodedRefreshToken = {
@@ -129,6 +138,9 @@ class AccessService {
                 throw new BadRequestResponse('Invalid refresh token', 1010313);
             }
         } catch (error) {
+            if (error instanceof BadRequestResponse) {
+                throw error;
+            }
             throw new BadRequestResponse('Invalid refresh token', 1010314);
         }
 
@@ -163,14 +175,16 @@ class AccessService {
         }
 
         const foundAccess = await this.accessModel.findOne({
-            user_id: MongooseUtil.convertToMongooseObjectIdType(user.id)
+            user_id: MongooseUtil.convertToMongooseObjectIdType(user._id)
         });
         if (!foundAccess) {
-            throw new BadRequestResponse('User not found', 1010405);
+            throw new BadRequestResponse('Invalid access to account', 1010405);
         }
         const now = new Date();
         const otpCount = foundAccess.otp_count || 0;
-        const lastOtpSent = foundAccess.last_otp_sent;
+
+        // 5 day from now as default to avoid error
+        const lastOtpSent = foundAccess.last_otp_sent || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
         // Check số lần gửi OTP
         if (otpCount >= 5 && now - lastOtpSent < 3600000) {
@@ -184,17 +198,20 @@ class AccessService {
 
         try {
             await EmailHelper.sendEmail(user.email, otp.code);
-            let result = await this.saveOTP(user.id, otp, now, otpCount);
+            let result = await this.saveOTP(user._id, otp, now, otpCount);
             if (!result) {
                 throw new ConflictResponse('Something went wrong', 1010406);
             }
         } catch (emailError) {
+            if (emailError instanceof ConflictResponse || emailError instanceof BadRequestResponse) {
+                throw emailError;
+            }
             throw new InternalServerErrorResponse('Failed to send OTP via email', 1010407);
         }
 
     }
 
-    async saveOTP(userId, otp, now, otpCount) {
+    async saveOTP(userId, otp, now) {
         return await this.accessModel.updateOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(userId) }, {
             'otp.code': otp.code,
             'otp.expiredAt': otp.expiredAt,
@@ -202,7 +219,8 @@ class AccessService {
             $inc: { otp_count: 1 }
         });
     }
-    async saveOTPResetPassword(userId, otp, now, otpCount) {
+
+    async saveOTPResetPassword(userId, otp, now) {
         return await this.accessModel.updateOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(userId) }, {
             'otp_reset_password.code': otp.code,
             'otp_reset_password.expiredAt': otp.expiredAt,
@@ -219,9 +237,9 @@ class AccessService {
             throw new BadRequestResponse('Email is already verified', 1010506);
         }
 
-        const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user.id) });
+        const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user._id) });
         if (!foundAccess) {
-            throw new ConflictResponse('Something went wrong', 1010507);
+            throw new ConflictResponse('Invalid access to account', 1010507);
         } else if (!foundAccess?.otp?.code || !foundAccess?.otp?.expiredAt) {
             throw new ConflictResponse('OTP code not exists', 1010508);
         }
@@ -248,18 +266,16 @@ class AccessService {
             const user = await this.userModel.findOne({ email: userInfo.email }).populate('role').lean();
             if (!user) {
                 const foundRole = await this.roleModel.findOne({ name: "User" }).lean();
-                const newUser = await this.userModel.create(
-                    {
-                        email: userInfo?.email,
-                        username: userInfo?.email,
-                        google_id: userInfo?.googleId,
-                        type_login: 'google',
-                        email_verified: true,
-                        role: foundRole?._id
-                    });
+                const newUser = await this.userModel.create({
+                    email: userInfo?.email,
+                    username: userInfo?.email,
+                    google_id: userInfo?.googleId,
+                    type_login: 'google',
+                    email_verified: true,
+                    role: foundRole?._id
+                });
 
                 const { privateKey, publicKey } = generateRSAKeysForAccess();
-
                 await this.accessModel.create({
                     user_id: newUser?._id,
                     public_key: publicKey.toString(),
@@ -270,7 +286,6 @@ class AccessService {
                 await this.userModel.findByIdAndUpdate(newUser?._id, {
                     $push: { owners: newUser?._id }
                 }, { new: true });
-
 
                 // Generate tokens
                 const accessToken = JWTHelper.generateAccessToken(newUser, privateKey);
@@ -283,8 +298,7 @@ class AccessService {
                     accessToken,
                     refreshToken,
                 }
-            }
-            else {
+            } else {
                 const foundAccess = await this.accessModel.findOne({ user_id: user?._id });
                 if (!foundAccess) {
                     throw new ConflictResponse('Invalid access to account', 1010603);
@@ -305,11 +319,14 @@ class AccessService {
                     refreshToken,
                 }
             }
-        }
-        catch (error) {
+        } catch (error) {
+            if (error instanceof BadRequestResponse || error instanceof ConflictResponse) {
+                throw error;
+            }
             throw new InternalServerErrorResponse('Something went wrong', 1010605);
         }
     }
+
     async loginWithFacebook(rawData) {
         const user = await this.userModel.findOne({ facebook_id: rawData.facebook_id }).populate('role').lean();
         if (!user) {
@@ -389,14 +406,18 @@ class AccessService {
         }
 
         const foundAccess = await this.accessModel.findOne({
-            user_id: MongooseUtil.convertToMongooseObjectIdType(user.id)
+            user_id: MongooseUtil.convertToMongooseObjectIdType(user._id)
         });
         if (!foundAccess) {
-            throw new BadRequestResponse('User not found', 1011204);
+            throw new BadRequestResponse('Invalid access to account', 1011204);
+        } else if (!foundAccess?.otp_reset_password_count && !foundAccess?.last_otp_reset_password_sent) {
+            throw new BadRequestResponse('Invalid access to account', 1011204);
         }
         const now = new Date();
         const otpCount = foundAccess.otp_reset_password_count || 0;
-        const lastOtpSent = foundAccess.last_otp_reset_password_sent;
+
+        // 5 day from now as default to avoid error
+        const lastOtpSent = foundAccess.last_otp_reset_password_sent ?? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
         // Check số lần gửi OTP
         if (otpCount >= 5 && now - lastOtpSent < 3600000) {
@@ -410,23 +431,26 @@ class AccessService {
 
         try {
             await EmailHelper.sendResetPasswordEmail(user.email, otp.code);
-            let result = await this.saveOTPResetPassword(user.id, otp, now, otpCount);
+            let result = await this.saveOTPResetPassword(user._id, otp, now);
             if (!result) {
                 throw new ConflictResponse('Something went wrong', 1011207);
             }
-
         } catch (emailError) {
+            if (emailError instanceof ConflictResponse || emailError instanceof BadRequestResponse) {
+                throw emailError;
+            }
             throw new InternalServerErrorResponse('Failed to send OTP via email', 1011208);
         }
     }
+
     async confirmOTPToResetPassword(userEmail, otpCode) {
         const user = await this.userModel.findOne({ email: userEmail });
         if (!user) {
             throw new BadRequestResponse('User not found', 1011305);
         }
-        const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user.id) });
+        const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user._id) });
         if (!foundAccess) {
-            throw new ConflictResponse('Something went wrong', 1011306);
+            throw new ConflictResponse('Invalid access to account', 1011306);
         } else if (!foundAccess?.otp_reset_password?.code || !foundAccess?.otp_reset_password?.expiredAt) {
             throw new ConflictResponse('OTP code not exists', 1011307);
         }
@@ -451,6 +475,7 @@ class AccessService {
             resetPasswordToken,
         }
     }
+
     async resetPassword(userId, resetPasswordToken, newPassword) {
         const foundUser = await this.userModel.findById(MongooseUtil.convertToMongooseObjectIdType(userId)).populate('role').lean();
         if (!foundUser) {
@@ -481,16 +506,20 @@ class AccessService {
             //All conditions are met, update the password
             const hashedPassword = await BcryptHelper.hash(newPassword);
 
-            let result = await this.userModel.updateOne({ _id: MongooseUtil.convertToMongooseObjectIdType(userId) }, {
-                password: hashedPassword
-            });
+            let result = await this.userModel.updateOne(
+                { _id: MongooseUtil.convertToMongooseObjectIdType(userId) },
+                { password: hashedPassword },
+                { new: true },
+            );
 
             return UserFilter.makeBasicFilter(result);
-
         } catch (error) {
             if (JWTHelper.checkIfTokenExpiredError(error) === true) {
-                throw new InternalServerErrorResponse('Something went wrong', 1011414);
+                throw new BadRequestResponse('Reset password token is expired', 1011414);
+            } else if (error instanceof BadRequestResponse || error instanceof ConflictResponse) {
+                throw error;
             }
+            throw new InternalServerErrorResponse('Something went wrong', 1011415);
         }
     }
 }

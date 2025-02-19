@@ -2,20 +2,20 @@ const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();
-const userRoutes = require('../../routes/api_v1/user.route');
-const AccessMiddleware = require('../../middlewares/access.middleware');
-const permissionMiddleware = require('../../middlewares/permission.middleware');
+const userRoutes = require('../../../routes/api_v1/user.route');
+const AccessMiddleware = require('../../../middlewares/access.middleware');
+const permissionMiddleware = require('../../../middlewares/permission.middleware');
 
 // Mock middleware dependencies
-jest.mock('../../middlewares/access.middleware', () => ({
+jest.mock('../../../middlewares/access.middleware', () => ({
 	checkAccess: jest.fn((req, res, next) => next())
 }));
-jest.mock('../../middlewares/permission.middleware', () => ({
+jest.mock('../../../middlewares/permission.middleware', () => ({
 	checkPermission: jest.fn(() => (req, res, next) => next())
 }));
 
 // Mock the user controller module so that our routes return controlled responses.
-jest.mock('../../modules/user/user.controller', () => ({
+jest.mock('../../../modules/user/user.controller', () => ({
 	getUserList: jest.fn(async (req, res) =>
 		res.status(200).json({
 			data: [
@@ -98,41 +98,6 @@ describe('User Routes', () => {
 				.set('Authorization', `Bearer ${mockToken}`);
 			expect(response.status).toBe(500);
 		});
-
-		// it('should throw error if user lacks permission', async () => {
-		// 	// Override the permission middleware mock BEFORE re-importing the route module.
-		// 	const permissionMiddleware = require('../../middlewares/permission.middleware');
-		// 	permissionMiddleware.checkPermission.mockImplementation(() => (req, res, next) => next(new Error('Access denied')));
-
-		// 	// Reset modules so that the route file is re-imported with the new mock implementation.
-		// 	jest.resetModules();
-
-		// 	// Rebuild the Express app with the re-imported router.
-		// 	const express = require('express');
-		// 	const jwt = require('jsonwebtoken');
-		// 	const newApp = express();
-		// 	newApp.use(express.json());
-
-		// 	// Re-import your route file AFTER resetting modules.
-		// 	const userRoutes = require('../../routes/api_v1/user.route');
-		// 	newApp.use('/api/users', userRoutes);
-
-		// 	// Add your error-handling middleware.
-		// 	newApp.use((err, req, res, next) => {
-		// 		res.status(500).json({ error: err.message });
-		// 	});
-
-		// 	// Create a mock JWT token.
-		// 	const mockToken = jwt.sign({ userId: 'test-user123' }, 'your-secret-key');
-
-		// 	// Now make the request.
-		// 	const response = await request(newApp)
-		// 		.get('/api/users')
-		// 		.set('Authorization', `Bearer ${mockToken}`);
-
-		// 	// Expect the error to be caught and a 500 response returned.
-		// 	expect(response.status).toBe(500);
-		// });
 	});
 
 	describe('GET /api/users/:id', () => {

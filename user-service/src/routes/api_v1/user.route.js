@@ -16,13 +16,30 @@ router.use(handleAsync(AccessMiddleware.checkAccess));
 
 // IMPORTANT: Common routes middleware, sup-routes imported ABOVE this line
 router.use((req, res, next) => {
-    const id = req.path.split("/")[1];
-    req.params.id = id;
+	const id = req.path.split("/")[1];
+	req.params.id = id;
 
-    handleAsync(permissionMiddleware.checkPermission("User", userController.getUserOwnerIds))(req, res, next);
+	handleAsync(permissionMiddleware.checkPermission("User", userController.getUserOwnerIds))(req, res, next);
 })
 
+
 router.get("/", handleAsync(userController.getUserList));
+router.get("/me", handleAsync(userController.getCurrentUser));
+router.get("/current", handleAsync((req, res) => {
+	const id = req.headers['x-user-id'];
+	const email = req.headers['x-user-email'];
+	const role = req.headers['x-user-role'];
+	if (!id || !email || !role) {
+		return res.status(401).json({
+			message: 'Unauthorized',
+			data: { id, email, role }
+		});
+	}
+	return res.status(200).json({
+		message: 'Current user',
+		data: { id, email, role }
+	});
+}));
 router.get("/:id", handleAsync(userController.getUserById));
 
 router.post("/", handleAsync(userController.createNewUser));

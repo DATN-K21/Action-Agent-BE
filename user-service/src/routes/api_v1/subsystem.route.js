@@ -2,7 +2,7 @@ const router = require('express').Router();
 const AccessMiddleware = require("../../middlewares/access.middleware");
 const permissionMiddleware = require("../../middlewares/permission.middleware");
 const userController = require("../../modules/user/user.controller");
-const subSystemController = require("../../modules/subsystem_manage/subsystem.controller");
+const subSystemController = require("../../modules/subsystem/subsystem.controller");
 const handleAsync = require('../../utils/asyncHandler.util');
 
 router.use(handleAsync(AccessMiddleware.checkAccess));
@@ -19,7 +19,7 @@ router.use((req, res, next) => {
     const id = req.path.split("/")[1];
     req.params.id = id;
 
-    handleAsync(permissionMiddleware.checkPermission("SubSystem", userController.getUserOwnerIds))(req, res, next);
+    handleAsync(permissionMiddleware.checkPermission("SubSystem", subSystemController.geSubSystemOwnerIds))(req, res, next);
 })
 
 router.get("/", handleAsync(subSystemController.getSubSystemList));

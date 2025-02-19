@@ -1,4 +1,4 @@
-const UserValidator = require("../../modules/user/user.validator");
+const UserValidator = require("../../../modules/user/user.validator");
 
 describe("UserValidator", () => {
 	beforeEach(() => {

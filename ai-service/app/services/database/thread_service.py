@@ -1,0 +1,188 @@
+import traceback
+from datetime import datetime, timezone
+
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core import logging
+from app.models.thread import Thread
+from app.schemas.base import CursorPagingRequest, ResponseWrapper
+from app.schemas.thread import (
+    CreateThreadRequest,
+    CreateThreadResponse,
+    DeleteThreadResponse,
+    GetListThreadsResponse,
+    GetThreadResponse,
+    UpdateThreadRequest,
+    UpdateThreadResponse,
+)
+from app.utils.constants import SYSTEM
+
+logger = logging.get_logger(__name__)
+
+
+class ThreadService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    @logging.log_function_inputs(logger)
+    async def create_thread(self, request: CreateThreadRequest, user_id: str) -> ResponseWrapper[CreateThreadResponse]:
+        """Create a new thread in the database."""
+        try:
+            db_thread = Thread(
+                **request.model_dump(),
+                user_id=user_id,
+                created_by=user_id,
+            )
+            self.db.add(db_thread)
+            await self.db.commit()
+            await self.db.refresh(db_thread)
+
+            response_data = CreateThreadResponse.model_validate(db_thread)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def get_thread_by_id(self, user_id: str, thread_id: str) -> ResponseWrapper[GetThreadResponse]:
+        """Get a thread by user_id and thread_id."""
+        try:
+            stmt = (
+                select(
+                    Thread.id,
+                    Thread.user_id,
+                    Thread.title,
+                    Thread.created_at,
+                )
+                .where(
+                    Thread.user_id == user_id,
+                    Thread.id == thread_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+
+            result = await self.db.execute(stmt)
+            db_thread = result.scalar_one_or_none()
+
+            if not db_thread:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+            response_data = GetThreadResponse.model_validate(db_thread)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def get_all_threads(
+        self, user_id: str, paging: CursorPagingRequest
+    ) -> ResponseWrapper[GetListThreadsResponse]:
+        """Get all threads of a user."""
+        try:
+            stmt = (
+                select(
+                    Thread.id,
+                    Thread.user_id,
+                    Thread.title,
+                    Thread.created_at,
+                )
+                .where(
+                    Thread.user_id == user_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .order_by(Thread.created_at.desc())
+            )
+
+            if paging.cursor:
+                stmt = stmt.where(Thread.created_at < datetime.fromisoformat(paging.cursor))
+
+            stmt = stmt.limit(paging.maxPerPage)
+            result = await self.db.execute(stmt)
+            db_threads = result.scalars().all()
+
+            prev_cursor = db_threads[0].created_at.isoformat() if db_threads else None
+            next_cursor = db_threads[-1].created_at.isoformat() if db_threads else None
+
+            response_data = GetListThreadsResponse(
+                threads=[GetThreadResponse.model_validate(db_thread) for db_thread in db_threads],
+                cursor=paging.cursor,
+                nextCursor=next_cursor,
+                prevCursor=prev_cursor,
+            )
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.exception(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def update_thread(
+        self, user_id: str, thread_id: str, thread: UpdateThreadRequest
+    ) -> ResponseWrapper[UpdateThreadResponse]:
+        """Update a thread."""
+        try:
+            stmt = (
+                update(Thread)
+                .where(
+                    Thread.id == user_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .values(**thread.model_dump())
+                .returning(Thread)
+            )
+
+            result = await self.db.execute(stmt)
+            db_thread = result.scalar_one_or_none()
+            if not db_thread:
+                return ResponseWrapper.wrap(status=404, message="User not found")
+
+            await self.db.commit()
+            await self.db.refresh(db_thread)
+
+            response_data = CreateThreadResponse.model_validate(db_thread)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def delete_thread(
+        self, user_id: str, thread_id: str, deleted_by: str = SYSTEM
+    ) -> ResponseWrapper[DeleteThreadResponse]:
+        """Delete a thread."""
+        try:
+            stmt = (
+                update(Thread)
+                .where(
+                    Thread.user_id == user_id,
+                    Thread.id == thread_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .values(
+                    is_deleted=True,
+                    deleted_by=deleted_by,
+                    deleted_at=datetime.now(timezone.utc),
+                )
+                .returning(Thread.id, Thread.user_id)
+            )
+
+            result = await self.db.execute(stmt)
+            deleted_user_id = result.scalar_one_or_none()
+            if not deleted_user_id:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+            await self.db.commit()
+            response_data = DeleteThreadResponse.model_validate(deleted_user_id)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")

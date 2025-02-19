@@ -1,5 +1,5 @@
 const AccessService = require("./access.service");
-const { OKSuccessResponse } = require('../../response/success');
+const { OKSuccessResponse, CreatedSuccessResponse } = require('../../response/success');
 const { BadRequestResponse } = require('../../response/error');
 const AccessValidator = require("./access.validator");
 const MongooseUtil = require("../../utils/mongoose.util");
@@ -28,7 +28,7 @@ class AccessController {
         const { email, password } = validationResult?.data;
         try {
             const result = await this.accessService.handleSignup(email, password);
-            return new OKSuccessResponse({
+            return new CreatedSuccessResponse({
                 message: 'Signup success',
                 data: result,
                 code: 1010100
@@ -66,7 +66,7 @@ class AccessController {
     }
 
     handleInvokeNewTokens = async (req, res, next) => {
-        const validationResult = await AccessValidator.validateInvokeNewToken(req);
+        const validationResult = AccessValidator.validateInvokeNewToken(req);
         if (validationResult?.error === true) {
             throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
         }
@@ -88,7 +88,7 @@ class AccessController {
     }
 
     handleVerifyEmail = async (req, res, next) => {
-        const validationResult = await AccessValidator.validateVerifyEmail(req);
+        const validationResult = AccessValidator.validateVerifyEmail(req);
         if (validationResult?.error === true) {
             throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
         }
@@ -98,7 +98,9 @@ class AccessController {
             await this.accessService.sendOTPToVerifyEmail(userEmail);
             return new OKSuccessResponse({
                 message: 'Send email to user email success',
-                data: [],
+                data: {
+                    email: userEmail
+                },
                 code: 1010400
             }).send(res);
         } catch (error) {
@@ -110,7 +112,7 @@ class AccessController {
     }
 
     handleVerifyOTP = async (req, res, next) => {
-        const validationResult = await AccessValidator.validateVerifyOTP(req);
+        const validationResult = AccessValidator.validateVerifyOTP(req);
         if (validationResult?.error === true) {
             throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
         }
@@ -202,8 +204,9 @@ class AccessController {
             throw error;
         }
     }
+
     handleSendOTPToResetPassword = async (req, res, next) => {
-        const validationResult = await AccessValidator.validateVerifyEmail(req);
+        const validationResult = AccessValidator.validateVerifyEmail(req);
         if (validationResult.error) {
             throw new BadRequestResponse(validationResult.message, validationResult.code);
         }
@@ -212,7 +215,9 @@ class AccessController {
             await this.accessService.sendOTPToResetPassword(userEmail);
             return new OKSuccessResponse({
                 message: 'Send OTP to reset password success',
-                data: [],
+                data: {
+                    email: userEmail
+                },
                 code: 1011200
             }).send(res);
         } catch (error) {
@@ -222,8 +227,9 @@ class AccessController {
             throw error;
         }
     }
+
     handleConfirmOTPToResetPassword = async (req, res, next) => {
-        const validationResult = await AccessValidator.validateVerifyOTP(req);
+        const validationResult = AccessValidator.validateVerifyOTP(req);
         if (validationResult.error) {
             throw new BadRequestResponse(validationResult.message, validationResult.code);
         }
@@ -242,6 +248,7 @@ class AccessController {
             throw error;
         }
     }
+
     handleResetPassword = async (req, res, next) => {
         const validationResult = AccessValidator.validateResetPassword(req);
         if (validationResult.error) {
