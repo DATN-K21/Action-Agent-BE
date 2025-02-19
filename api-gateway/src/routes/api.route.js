@@ -6,7 +6,9 @@ const currentUserMiddleware = require('../middlewares/currentUser.middleware');
 const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
     'log': ENDPOINT_CONFIGS.LOG_SERVICE_URL,
+    'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
 };
+
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
     router.use(currentUserMiddleware);
 
@@ -16,7 +18,7 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
             changeOrigin: true, // Adjust the host header to match the target
             pathRewrite: (path, req) => {
                 const newPath = req.originalUrl;
-                const rewrittenPath = newPath.replace(new RegExp(`^/api/${serviceName}`), '');
+                const rewrittenPath = newPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
                 console.log(`[DEBUG] Rewritten path: ${rewrittenPath}`);
                 return rewrittenPath;
             },

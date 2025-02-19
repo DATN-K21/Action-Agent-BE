@@ -3,6 +3,6 @@ const router = require('express').Router();
 
 // router.use(ApiKeyMiddleware.validateApiKey);
 
-router.use('/api', require('./api.route'));
+router.use('/api/v1', require('./api.route'));
 
 module.exports = router;
