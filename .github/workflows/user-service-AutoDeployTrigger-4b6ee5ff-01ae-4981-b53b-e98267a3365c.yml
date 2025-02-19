@@ -43,6 +43,7 @@ jobs:
           docker push registry0001.azurecr.io/api-gateway:latest
 
       # Build và push AI-Service
+      - name: Build and push ai-service image
         run: |
           docker build -f ./ai-service/Dockerfile.prod -t registry0001.azurecr.io/ai-service:${{ github.sha }} -t registry0001.azurecr.io/ai-service:latest ./ai-service
           docker push registry0001.azurecr.io/ai-service:${{ github.sha }}
@@ -71,5 +72,3 @@ jobs:
           containerAppName: ai-service
           resourceGroup: DATN-RAG
           imageToDeploy: registry0001.azurecr.io/ai-service:${{ github.sha }}
-      
-
