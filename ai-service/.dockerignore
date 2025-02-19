@@ -1,0 +1,11 @@
+# Ignore unnecessary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+.vscode/
+.idea/
+.git/

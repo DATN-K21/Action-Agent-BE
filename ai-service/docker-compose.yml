@@ -1,0 +1,52 @@
+services:
+  ai-service:
+    image: ai-service
+    container_name: ai-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      ai-database:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=ai-database
+      - POSTGRES_PORT=5432
+    ports:
+      - "$PORT:$PORT"
+
+  ai-database:
+    image: pgvector/pgvector:pg16
+    container_name: ai-database
+    healthcheck:
+      test: pg_isready -U $POSTGRES_USER
+      start_interval: 1s
+      start_period: 5s
+      interval: 5s
+      retries: 5
+    environment:
+      - POSTGRES_DB=ai-database
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_HOST=ai-database
+      - POSTGRES_PORT=5432
+    ports:
+      - 5433:$POSTGRES_PORT
+    volumes:
+      - ./data:/var/lib/postgresql/data
+
+  migration:
+    image: migrate/migrate
+    depends_on:
+      ai-database:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: [
+      "-path",
+      "/migrations",
+      "-database",
+      "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable",
+      "up"
+    ]
