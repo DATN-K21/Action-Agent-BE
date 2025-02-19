@@ -132,7 +132,8 @@ class RoleService {
             foundRole.grants = grants.map(x => x);
         }
 
-        return await foundRole.save();
+        const result = await foundRole.save();
+        return result._doc;
     }
 
     async deleteRole(roleId) {
@@ -189,7 +190,8 @@ class RoleService {
         }
 
         foundRole.grants = [...foundRole.grants, newGrant];
-        return await foundRole.save();
+        const result = await foundRole.save();
+        return result._doc;
     }
 
     async getGrantsByRole(roleId) {
