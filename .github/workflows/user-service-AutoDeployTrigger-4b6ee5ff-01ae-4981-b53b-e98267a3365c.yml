@@ -69,6 +69,6 @@ jobs:
       - name: Deploy ai-service to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
         with:
-          containerAppName: ai-service
+          containerAppName: ai-service-app
           resourceGroup: DATN-RAG
           imageToDeploy: registry0001.azurecr.io/ai-service:${{ github.sha }}
