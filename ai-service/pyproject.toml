@@ -42,10 +42,10 @@ unstructured = { extras = ["local-inference"], version = "^0.16.20" }
 structlog = "^25.1.0"
 elasticsearch = "^8.17.1"
 pydantic-settings = "^2.7.1"
+uvicorn = { version = "0.34.0", extras = ["standard"] }
 
 
 [tool.poetry.group.dev.dependencies]
-uvicorn = { version = "0.34.0", extras = ["standard"] }
 
 
 [tool.poetry.group.lint.dependencies]
