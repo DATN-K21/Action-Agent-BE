@@ -42,6 +42,12 @@ jobs:
           docker push registry0001.azurecr.io/api-gateway:${{ github.sha }}
           docker push registry0001.azurecr.io/api-gateway:latest
 
+      # Build và push AI-Service
+        run: |
+          docker build -f ./ai-service/Dockerfile.prod -t registry0001.azurecr.io/ai-service:${{ github.sha }} -t registry0001.azurecr.io/ai-service:latest ./ai-service
+          docker push registry0001.azurecr.io/ai-service:${{ github.sha }}
+          docker push registry0001.azurecr.io/ai-service:latest
+
       # Deploy user-service lên Azure Container Apps
       - name: Deploy user-service to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
@@ -57,3 +63,13 @@ jobs:
           containerAppName: api-gateway
           resourceGroup: DATN-RAG
           imageToDeploy: registry0001.azurecr.io/api-gateway:${{ github.sha }}
+
+      # Deploy ai-service lên Azure Container Apps
+      - name: Deploy ai-service to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          containerAppName: ai-service
+          resourceGroup: DATN-RAG
+          imageToDeploy: registry0001.azurecr.io/ai-service:${{ github.sha }}
+      
+
