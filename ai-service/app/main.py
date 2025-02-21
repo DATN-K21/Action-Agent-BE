@@ -1,26 +1,9 @@
-import socket
-from contextlib import asynccontextmanager
-
-import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import router
-from app.core import logging
+from app.api.main import router
+from app.core.lifespan import lifespan
 from app.core.settings import env_settings
-from app.memory.checkpoint import AsyncPostgresCheckpoint
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    try:
-        logging.configure_logging()
-        # Force IPv4: increase the speed when fetching data from Composio server
-        urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
-        await AsyncPostgresCheckpoint.setup_async()
-        yield
-    finally:
-        await AsyncPostgresCheckpoint.teardown_async()
-
 
 app = FastAPI(
     debug=env_settings.DEBUG,
@@ -31,6 +14,14 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

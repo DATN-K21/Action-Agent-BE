@@ -11,6 +11,7 @@ from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
 
+
 class AsyncPostgresCheckpoint:
     _instance: Optional[AsyncPostgresSaver] = None
     _async_pool: Optional[AsyncConnectionPool[AsyncConnection[DictRow]]] = None
@@ -25,7 +26,7 @@ class AsyncPostgresCheckpoint:
                     cls._async_pool = AsyncConnectionPool(
                         conninfo=f"postgresql://{env_settings.POSTGRES_URL_PATH}",
                         kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
-                        open=True,
+                        open=False,
                         timeout=5,
                     )
                     logger.info("Async Postgres connection pool created.")
@@ -67,9 +68,3 @@ class AsyncPostgresCheckpoint:
             except Exception as e:
                 logger.exception("Error during async checkpoint teardown")
                 raise HTTPException(status_code=500, detail="Error during async checkpoint teardown") from e
-
-
-# Utility Dependencies
-def get_checkpointer() -> AsyncPostgresSaver:
-    """Get the checkpointer singleton."""
-    return AsyncPostgresCheckpoint.get_instance()

@@ -2,6 +2,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    class Config:
+        case_sensitive = False
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
     # FastAPI settings
     PORT: int = 5001
     HOST: str = "0.0.0.0"
@@ -49,10 +54,6 @@ class Settings(BaseSettings):
     @property
     def POSTGRES_URL_PATH(self) -> str:
         return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 env_settings = Settings()

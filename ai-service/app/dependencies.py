@@ -3,7 +3,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import get_db_session
-from app.memory.checkpoint import get_checkpointer
+from app.memory import get_checkpointer
 from app.services.chatbot_service import ChatbotService
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.thread_service import ThreadService

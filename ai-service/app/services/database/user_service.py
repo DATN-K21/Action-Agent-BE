@@ -97,6 +97,7 @@ class UserService:
     @logging.log_function_inputs(logger)
     async def get_all_users(self, paging: PagingRequest) -> ResponseWrapper[GetListUsersResponse]:
         """Get all users."""
+        logger.info(f"Get all users: {paging.model_dump()}")
         try:
             stmt = (
                 select(
