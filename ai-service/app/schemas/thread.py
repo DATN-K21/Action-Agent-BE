@@ -11,6 +11,7 @@ from app.schemas.base import BaseRequest, BaseResponse, CursorPagingResponse
 ##################################################
 class CreateThreadRequest(BaseRequest):
     id: Optional[str] = None
+    user_id: str = Field(..., min_length=3, max_length=50)
     title: str = Field(..., min_length=3, max_length=50)
 
 

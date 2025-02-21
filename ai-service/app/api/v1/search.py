@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sse_starlette import EventSourceResponse
 
 from app.core import logging
-from app.dependencies import get_identity_service, get_search_service
+from app.dependencies import get_search_service
 from app.schemas.base import ResponseWrapper
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.search_service import SearchService
@@ -17,10 +17,7 @@ router = APIRouter()
 async def chat(
     request: ChatRequest,
     search_service: SearchService = Depends(get_search_service),
-    identity_service=Depends(get_identity_service),
 ):
-    if identity_service.user_id() == "":
-        return ResponseWrapper.wrap(status=401, message="Unauthorized")
     response = await search_service.execute_search(request.threadId, request.input)
     return response.to_response()
 
@@ -28,9 +25,6 @@ async def chat(
 async def stream(
     request: ChatRequest,
     search_service: SearchService = Depends(get_search_service),
-    identity_service=Depends(get_identity_service),
 ):
-    if identity_service.user_id() == "":
-        return ResponseWrapper.wrap(status=401, message="Unauthorized")
     response = await search_service.stream_search(request.threadId, request.input)
     return EventSourceResponse(to_sse(response))

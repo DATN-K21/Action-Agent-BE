@@ -6,11 +6,10 @@ from langchain_core.runnables import RunnableConfig
 from sse_starlette import EventSourceResponse
 
 from app.core import logging
-from app.dependencies import get_identity_service, get_rag_service
+from app.dependencies import get_rag_service
 from app.schemas.base import ResponseWrapper
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.ingest import IngestResponse
-from app.services.identity_service import IdentityService
 from app.services.rag_service import RagService
 from app.utils.streaming import to_sse
 from app.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
@@ -24,7 +23,6 @@ router = APIRouter()
 async def ingest_files(
     files: list[UploadFile],
     threadId: str = Form(...),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     file_blobs: list[Blob] = [convert_ingestion_input_to_blob(file) for file in files]
     config = RunnableConfig(configurable={"thread_id": threadId})
@@ -37,7 +35,6 @@ async def ingest_files(
 async def chat(
     request: ChatRequest,
     rag_service: RagService = Depends(get_rag_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     response = await rag_service.execute_rag(request.threadId, request.input)
     return response.to_response()
@@ -47,7 +44,6 @@ async def chat(
 async def stream(
     request: ChatRequest,
     rag_service: RagService = Depends(get_rag_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     response = await rag_service.stream_rag(request.threadId, request.input)
     return EventSourceResponse(to_sse(response))

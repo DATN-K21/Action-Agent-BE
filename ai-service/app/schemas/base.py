@@ -41,15 +41,12 @@ T = TypeVar("T", bound=BaseResponse)
 
 
 class ResponseWrapper(BaseModel, Generic[T]):
-    def __init__(
-        self,
-        status: int,
-        data: Optional[T] = None,
-        message: Optional[str] = None,
-    ):
-        self.status = status
-        self.data = data
-        self.message = message
+    status: int = Field(500, description="HTTP status code")
+    data: Optional[T] = Field(None, description="Response data")
+    message: Optional[str] = Field(None, description="Response message")
+
+    def __init__(self, status: int = 500, data: Optional[T] = None, message: Optional[str] = None):
+        super().__init__(status=status, data=data, message=message)
 
     def to_response(self) -> JSONResponse:
         return JSONResponse(
@@ -59,7 +56,7 @@ class ResponseWrapper(BaseModel, Generic[T]):
 
     @classmethod
     def wrap(cls, status: int, data: Optional[T] = None, message: Optional[str] = None) -> "ResponseWrapper[T]":
-        return cls(status=status, data=data, message=message)
+        return ResponseWrapper(status=status, data=data, message=message)
 
     class Config:
         json_encoders = {

@@ -47,6 +47,6 @@ services:
       "-path",
       "/migrations",
       "-database",
-      "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable",
+      "postgres://postgres:123456@ai-database:5432/ai-database",
       "up"
     ]

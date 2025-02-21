@@ -3,12 +3,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core import logging
-from app.dependencies import get_connected_app_service, get_gmail_service, get_identity_service
+from app.dependencies import get_connected_app_service, get_gmail_service
 from app.schemas.base import ResponseWrapper
 from app.schemas.connection import ActiveAccountResponse, GetActionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.extensions.gmail_service import GmailService
-from app.services.identity_service import IdentityService
 from app.utils.enums import HumanAction
 from app.utils.streaming import to_sse
 
@@ -21,7 +20,6 @@ router = APIRouter()
 async def active(
     user_id: str,
     gmail_service: GmailService = Depends(get_gmail_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     try:
         connection_request = gmail_service.initialize_connection(str(user_id))
@@ -43,13 +41,12 @@ async def logout(
     user_id: str,
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
     gmail_service: GmailService = Depends(get_gmail_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     try:
         account_id = await connected_app_service.get_account_id(user_id, "gmail")
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-        response_data = await gmail_service.logout(account_id)
+        response_data = gmail_service.logout(account_id)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
         logger.error(f"[gmail_agent/logout] Error in logging out: {str(e)}")
