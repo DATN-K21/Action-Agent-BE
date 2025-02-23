@@ -20,7 +20,9 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
             pathRewrite: (path, req) => {
                 const isWs = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
                 let originalPath = isWs ? (req.url || path) : (req.originalUrl || path);
-                const rewrittenPath = originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
+                const rewrittenPath = serviceName == "ai"
+                    ? originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '')
+                    : originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
                 console.log("[HTTP] Rewritten path:", rewrittenPath);
                 return rewrittenPath;
             },

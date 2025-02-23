@@ -147,7 +147,7 @@ class GmailService:
             )
             response = await graph.ainvoke(Command(resume=action), config)
 
-            return (response["messages"][-1].content,)
+            return response["messages"][-1].content
         except Exception as e:
             logger.error(f"[gmail_service/handle_interrupt_execute_gmail] Error in executing graph: {str(e)}")
             raise e

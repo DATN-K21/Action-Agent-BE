@@ -13,6 +13,7 @@ logger = logging.get_logger(__name__)
 
 class AsyncPostgresPool:
     _async_pool: Optional[AsyncConnectionPool] = None
+    _is_initialized: bool = False
 
     @classmethod
     async def asetup(cls) -> None:
@@ -47,4 +48,8 @@ class AsyncPostgresPool:
     @classmethod
     async def get_checkpointer(cls) -> AsyncPostgresSaver:
         """Returns the singleton instance of the checkpoint."""
-        return AsyncPostgresSaver(cls._async_pool)  # type: ignore
+        checkpoint = AsyncPostgresSaver(cls._async_pool)  # type: ignore
+        if not cls._is_initialized:
+            await checkpoint.setup()
+            cls._is_initialized = True
+        return checkpoint
