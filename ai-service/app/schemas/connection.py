@@ -13,8 +13,8 @@ from app.schemas.base import BaseResponse
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 class ActiveAccountResponse(BaseResponse):
-    isExisted: bool = Field(..., title="Is existed", examples=[True])
-    redirectUrl: Optional[str] = Field(None, title="Redirect URL", examples=["https://example.com"])
+    is_existed: bool = Field(..., title="Is existed", examples=[False])
+    redirect_url: Optional[str] = Field(None, title="Redirect URL", examples=["https://example.com"])
 
 
 class GetActionsResponse(BaseResponse):
@@ -29,4 +29,4 @@ class DeleteConnectionResponse(BaseResponse):
     status: Literal["success", "failed"] = Field(..., title="Status of the delete operation", examples=["success"])
     count: Optional[int] = Field(None, title="Number of records deleted", examples=[1])
     message: Optional[str] = Field(None, title="Message", examples=["Connection deleted successfully"])
-    errorCode: Optional[int] = Field(None, title="Error code", examples=[400])
+    error_code: Optional[int] = Field(None, title="Error code", examples=[400])

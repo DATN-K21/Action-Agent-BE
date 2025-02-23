@@ -1,14 +1,15 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.core import logging
-from app.dependencies import get_connected_app_service, get_gmail_service, get_identity_service
+from app.dependencies import get_connected_app_service, get_gmail_service
+from app.memory.deps import get_checkpointer
 from app.schemas.base import ResponseWrapper
 from app.schemas.connection import ActiveAccountResponse, GetActionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.extensions.gmail_service import GmailService
-from app.services.identity_service import IdentityService
 from app.utils.enums import HumanAction
 from app.utils.streaming import to_sse
 
@@ -21,16 +22,15 @@ router = APIRouter()
 async def active(
     user_id: str,
     gmail_service: GmailService = Depends(get_gmail_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     try:
         connection_request = gmail_service.initialize_connection(str(user_id))
 
         if connection_request is None:
-            response_data = ActiveAccountResponse(isExisted=False, redirectUrl=None)
+            response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
             return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
-        response_data = ActiveAccountResponse(isExisted=True, redirectUrl=connection_request.redirectUrl)
+        response_data = ActiveAccountResponse(is_existed=False, redirect_url=connection_request.redirectUrl)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
@@ -43,13 +43,12 @@ async def logout(
     user_id: str,
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
     gmail_service: GmailService = Depends(get_gmail_service),
-    identity_service: IdentityService = Depends(get_identity_service),
 ):
     try:
         account_id = await connected_app_service.get_account_id(user_id, "gmail")
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-        response_data = await gmail_service.logout(account_id)
+        response_data = gmail_service.logout(account_id)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
         logger.error(f"[gmail_agent/logout] Error in logging out: {str(e)}")
@@ -75,6 +74,7 @@ async def execute_gmail(
     max_recursion: Optional[int] = 5,
     gmail_service: GmailService = Depends(get_gmail_service),
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
 ):
     try:
         logger.info("[Opened websocket connection]")
@@ -93,6 +93,7 @@ async def execute_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         await websocket.send_json(
@@ -114,6 +115,7 @@ async def execute_gmail(
                 thread_id=thread_id,
                 tools=tools,
                 max_recursion=max_recursion if max_recursion is not None else 5,
+                checkpointer=checkpointer,
             )
 
             await websocket.send_json(
@@ -144,6 +146,7 @@ async def stream_gmail(
     max_recursion: Optional[int] = 5,
     gmail_service: GmailService = Depends(get_gmail_service),
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
 ):
     try:
         logger.info("[Opened websocket connection]")
@@ -162,6 +165,7 @@ async def stream_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         async for dict_message in to_sse(response):
@@ -178,6 +182,7 @@ async def stream_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         async for dict_message in to_sse(result):

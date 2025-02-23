@@ -1,57 +1,44 @@
 import logging
+import sys
 from functools import wraps
-from typing import Any
 
 import structlog
-from elasticsearch import Elasticsearch
-from structlog.processors import TimeStamper, format_exc_info
+from structlog.stdlib import BoundLogger
 
-from app.core.settings import env_settings
 from app.utils.logging import is_async, is_method
 
 
 def configure_logging():
-    timestamper = TimeStamper(fmt="iso", utc=True)
+    """Configures structured logging with clean, colored, non-duplicated logs"""
 
-    shared_processors = [
-        timestamper,
-        format_exc_info,
-        structlog.processors.add_log_level,
-        structlog.processors.CallsiteParameterAdder(
-            {
-                structlog.processors.CallsiteParameter.FUNC_NAME,
-                structlog.processors.CallsiteParameter.LINENO,
-            }
-        ),
-    ]
+    # 🔥 Prevent FastAPI from adding duplicate logs
+    logging.root.handlers.clear()
 
     structlog.configure(
-        processors=shared_processors + [structlog.dev.ConsoleRenderer()],
-        context_class=dict,
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),  # Adds timestamp
+            structlog.stdlib.add_log_level,  # Adds log level (INFO, ERROR)
+            structlog.stdlib.add_logger_name,  # Adds logger name
+            structlog.processors.CallsiteParameterAdder(
+                parameters=[
+                    structlog.processors.CallsiteParameter.FILENAME,
+                    structlog.processors.CallsiteParameter.FUNC_NAME,
+                    structlog.processors.CallsiteParameter.LINENO,
+                ]
+            ),  # Optional: Keeps minimal file info without rich traceback
+            structlog.processors.ExceptionPrettyPrinter(),
+            structlog.dev.ConsoleRenderer(colors=True),
+        ],
         logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        context_class=dict,
     )
 
-    logging.basicConfig(level=getattr(logging, env_settings.LOG_LEVEL.upper()))
+    # Ensure standard logging uses structlog
+    logging.basicConfig(format="%(message)s", level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
 
-    if env_settings.LOG_TO_ELASTICSEARCH:
-        es_client = Elasticsearch(
-            env_settings.ELASTICSEARCH_URL,
-            basic_auth=(env_settings.ELASTICSEARCH_USER, env_settings.ELASTICSEARCH_PASSWORD),
-            verify_certs=False,
-        )
-
-        class ElasticsearchLogHandler(logging.Handler):
-            def emit(self, record):
-                log_entry = self.format(record)
-                log_entry_dict = {"message": log_entry}
-                es_client.index(index="app-logs", document=log_entry_dict)
-
-        es_handler = ElasticsearchLogHandler()
-        es_handler.setLevel(getattr(logging, env_settings.LOG_LEVEL.upper()))
-        es_handler.setFormatter(logging.Formatter("%(message)s"))
-        logging.getLogger().addHandler(es_handler)
+    # Redirect standard logging to structlog
+    logging.getLogger().handlers = [logging.StreamHandler(sys.stdout)]
 
 
 # Sanitize args and kwargs for logging
@@ -65,7 +52,7 @@ def sanitize_args(args, kwargs, skip_first_arg=False):
     }
 
 
-def get_logger(name: str) -> Any:
+def get_logger(name: str) -> BoundLogger:
     """Get a logger instance."""
     return structlog.get_logger(name)
 

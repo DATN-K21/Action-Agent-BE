@@ -2,11 +2,11 @@ from typing import Annotated, Callable, Sequence, TypedDict, Union
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.types import interrupt
 
 from app.core import logging
-from app.memory.checkpoint import get_checkpointer
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
@@ -15,7 +15,7 @@ from app.utils.messages import get_message_prefix, trimmer
 logger = logging.get_logger(__name__)
 
 
-def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
+def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]], checkpointer: AsyncPostgresSaver):
     class AgentState(TypedDict):
         messages: Annotated[Sequence[BaseMessage], add_messages]
         determine_tool_message: AIMessage
@@ -27,12 +27,7 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
         messages = await trimmer.ainvoke(state["messages"])
 
         docs = "#Previous Messages: "
-        docs += "\n\n".join(
-            [
-                f"##{get_message_prefix(message)}: \n {message.content}\n\n"
-                for message in messages
-            ]
-        )
+        docs += "\n\n".join([f"##{get_message_prefix(message)}: \n {message.content}\n\n" for message in messages])
 
         question = state["question"]
 
@@ -44,9 +39,7 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
         try:
             response = await chain.ainvoke({"question": question, "context": docs})
         except Exception as e:
-            logger.error(
-                f"[multi_tools_base/determining_tool_node] Error in calling model: {str(e)}"
-            )
+            logger.error(f"[multi_tools_base/determining_tool_node] Error in calling model: {str(e)}")
             raise e
 
         if response.content != "":
@@ -80,7 +73,6 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
         determine_tool_message = state["determine_tool_message"]
         messages = []
         for tool_call in determine_tool_message.tool_calls:
-
             selected_tool = None
             for tool in tools:
                 if tool.name == tool_call["name"]:
@@ -93,16 +85,12 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
             try:
                 tool_msg = await selected_tool.ainvoke(tool_call)
             except Exception as e:
-                logger.error(
-                    f"[multi_tools_base/tool_node] Error in calling tool: {str(e)}"
-                )
+                logger.error(f"[multi_tools_base/tool_node] Error in calling tool: {str(e)}")
                 raise e
 
             # Check tool_msg is AIMessage
             if isinstance(tool_msg, ToolMessage):
-                messages.append(
-                    AIMessage(content=tool_msg.content, name=MessageName.TOOL)
-                )
+                messages.append(AIMessage(content=tool_msg.content, name=MessageName.TOOL))
 
         return {"messages": messages, "next": "generate_node"}
 
@@ -135,9 +123,7 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
             }
 
         except Exception as e:
-            logger.error(
-                f"[multi_tools_base/generate_node] Error in calling model: {str(e)} "
-            )
+            logger.error(f"[multi_tools_base/generate_node] Error in calling model: {str(e)} ")
             raise e
 
     # Define a new graph
@@ -156,4 +142,4 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
     workflow.add_edge("generate_node", END)
 
     # Compile
-    return workflow.compile(checkpointer=get_checkpointer())
+    return workflow.compile(checkpointer=checkpointer)

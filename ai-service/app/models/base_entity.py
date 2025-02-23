@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy.orm import DeclarativeBase
@@ -14,7 +14,7 @@ class BaseEntity(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
     created_by = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(), nullable=False)
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
 

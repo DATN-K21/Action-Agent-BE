@@ -18,14 +18,14 @@ async def chat(
     request: ChatRequest,
     chatbot_service: ChatbotService = Depends(get_chatbot_service),
 ):
-    response = await chatbot_service.execute_chatbot(request.threadId, request.input)
+    response = await chatbot_service.execute_chatbot(request.thread_id, request.input)
     return response.to_response()
 
 
-@router.post("/stream", description="Stream chat with LLM model.", response_class=EventSourceResponse)
+@router.post("/stream", description="Stream chat with LLM model.", response_model=ResponseWrapper[ChatResponse])
 async def stream(
     request: ChatRequest,
     chatbot_service: ChatbotService = Depends(get_chatbot_service),
 ):
-    response = await chatbot_service.stream_chatbot(request.threadId, request.input)
+    response = await chatbot_service.stream_chatbot(request.thread_id, request.input)
     return EventSourceResponse(to_sse(response))

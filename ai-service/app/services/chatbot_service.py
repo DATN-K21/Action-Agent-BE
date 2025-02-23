@@ -66,7 +66,7 @@ class ChatbotService:
             if not content:
                 return ResponseWrapper.wrap(status=404, message="No response found")
 
-            response_data = ChatResponse(threadId=thread_id, output=content)
+            response_data = ChatResponse(thread_id=thread_id, output=content)
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:

@@ -11,6 +11,7 @@ from app.schemas.base import BaseRequest, BaseResponse, CursorPagingResponse
 ##################################################
 class CreateThreadRequest(BaseRequest):
     id: Optional[str] = None
+    user_id: str = Field(..., min_length=3, max_length=50)
     title: str = Field(..., min_length=3, max_length=50)
 
 
@@ -23,16 +24,16 @@ class UpdateThreadRequest(BaseRequest):
 ##################################################
 class CreateThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class GetThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class GetListThreadsResponse(CursorPagingResponse):
@@ -41,11 +42,11 @@ class GetListThreadsResponse(CursorPagingResponse):
 
 class UpdateThreadResponse(CreateThreadResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class DeleteThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str
