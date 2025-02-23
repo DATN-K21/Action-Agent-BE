@@ -1,5 +1,5 @@
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,10 +51,10 @@ class ThreadService:
         try:
             stmt = (
                 select(
-                    Thread.id,
-                    Thread.user_id,
-                    Thread.title,
-                    Thread.created_at,
+                    Thread.id.label("id"),
+                    Thread.user_id.label("user_id"),
+                    Thread.title.label("title"),
+                    Thread.created_at.label("created_at"),
                 )
                 .where(
                     Thread.user_id == user_id,
@@ -65,7 +65,7 @@ class ThreadService:
             )
 
             result = await self.db.execute(stmt)
-            db_thread = result.scalar_one_or_none()
+            db_thread = result.mappings().first()
 
             if not db_thread:
                 return ResponseWrapper.wrap(status=404, message="Thread not found")
@@ -85,10 +85,10 @@ class ThreadService:
         try:
             stmt = (
                 select(
-                    Thread.id,
-                    Thread.user_id,
-                    Thread.title,
-                    Thread.created_at,
+                    Thread.id.label("id"),
+                    Thread.user_id.label("user_id"),
+                    Thread.title.label("title"),
+                    Thread.created_at.label("created_at"),
                 )
                 .where(
                     Thread.user_id == user_id,
@@ -100,9 +100,9 @@ class ThreadService:
             if paging.cursor:
                 stmt = stmt.where(Thread.created_at < datetime.fromisoformat(paging.cursor))
 
-            stmt = stmt.limit(paging.maxPerPage)
+            stmt = stmt.limit(paging.max_per_page)
             result = await self.db.execute(stmt)
-            db_threads = result.scalars().all()
+            db_threads = result.mappings().all()
 
             prev_cursor = db_threads[0].created_at.isoformat() if db_threads else None
             next_cursor = db_threads[-1].created_at.isoformat() if db_threads else None
@@ -110,8 +110,8 @@ class ThreadService:
             response_data = GetListThreadsResponse(
                 threads=[GetThreadResponse.model_validate(db_thread) for db_thread in db_threads],
                 cursor=paging.cursor,
-                nextCursor=next_cursor,
-                prevCursor=prev_cursor,
+                next_cursor=next_cursor,
+                prev_cursor=prev_cursor,
             )
             return ResponseWrapper.wrap(status=200, data=response_data)
 
@@ -128,17 +128,18 @@ class ThreadService:
             stmt = (
                 update(Thread)
                 .where(
-                    Thread.id == user_id,
+                    Thread.user_id == user_id,
+                    Thread.id == thread_id,
                     Thread.is_deleted.is_(False),
                 )
-                .values(**thread.model_dump())
+                .values(**thread.model_dump(exclude_unset=True))
                 .returning(Thread)
             )
 
             result = await self.db.execute(stmt)
             db_thread = result.scalar_one_or_none()
             if not db_thread:
-                return ResponseWrapper.wrap(status=404, message="User not found")
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
 
             await self.db.commit()
             await self.db.refresh(db_thread)
@@ -166,19 +167,18 @@ class ThreadService:
                 )
                 .values(
                     is_deleted=True,
-                    deleted_by=deleted_by,
-                    deleted_at=datetime.now(timezone.utc),
+                    deleted_at=datetime.now(),
                 )
-                .returning(Thread.id, Thread.user_id)
+                .returning(Thread.id.label("id"), Thread.user_id.label("user_id"))
             )
 
             result = await self.db.execute(stmt)
-            deleted_user_id = result.scalar_one_or_none()
-            if not deleted_user_id:
+            deleted_thread = result.mappings().first()
+            if not deleted_thread:
                 return ResponseWrapper.wrap(status=404, message="Thread not found")
 
             await self.db.commit()
-            response_data = DeleteThreadResponse.model_validate(deleted_user_id)
+            response_data = DeleteThreadResponse.model_validate(deleted_thread)
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:

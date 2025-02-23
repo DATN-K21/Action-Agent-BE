@@ -27,7 +27,7 @@ async def ingest_files(
     file_blobs: list[Blob] = [convert_ingestion_input_to_blob(file) for file in files]
     config = RunnableConfig(configurable={"thread_id": threadId})
     ingest_runnable.batch(cast(list[BinaryIO], file_blobs), config)
-    response_data = IngestResponse(threadId=threadId, isSuccess=True, output="Files ingested successfully")
+    response_data = IngestResponse(thread_id=threadId, is_success=True, output="Files ingested successfully")
     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
@@ -36,7 +36,7 @@ async def chat(
     request: ChatRequest,
     rag_service: RagService = Depends(get_rag_service),
 ):
-    response = await rag_service.execute_rag(request.threadId, request.input)
+    response = await rag_service.execute_rag(request.thread_id, request.input)
     return response.to_response()
 
 
@@ -45,5 +45,5 @@ async def stream(
     request: ChatRequest,
     rag_service: RagService = Depends(get_rag_service),
 ):
-    response = await rag_service.stream_rag(request.threadId, request.input)
+    response = await rag_service.stream_rag(request.thread_id, request.input)
     return EventSourceResponse(to_sse(response))

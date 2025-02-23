@@ -42,7 +42,7 @@ class AsyncPostgresCheckpoint:
         """Asynchronously sets up the checkpoint."""
         if not cls._initialized:
             try:
-                cls.get_instance()  # Ensure the instance is created
+                cls.get_instance()
                 if cls._async_pool is not None:
                     await cls._async_pool.open()
                     logger.info(f"Connection pool opened: {env_settings.POSTGRES_URL_PATH}")

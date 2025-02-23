@@ -43,7 +43,7 @@ class RagService:
             )
             response = await graph.ainvoke(state, config)
             content = response["messages"][-1].content
-            response_data = ChatResponse(threadId=thread_id, output=content) if content else None
+            response_data = ChatResponse(thread_id=thread_id, output=content) if content else None
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:

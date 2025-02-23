@@ -2,8 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.main import router
+from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
+
+logging.configure_logging()
+
+logger = logging.get_logger(__name__)
+logger.info("Starting FastAPI server...")
+logger.info(f"DEBUG: {env_settings.DEBUG}")
 
 app = FastAPI(
     debug=env_settings.DEBUG,
@@ -24,5 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+swagger.set_custom_openapi(app)
+exceptions.register_exception_handlers(app)
 
 app.include_router(router)

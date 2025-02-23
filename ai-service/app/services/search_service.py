@@ -29,7 +29,7 @@ class SearchService:
             )
             response = await graph.ainvoke(state, config)
             last_message = response["messages"][-1].content
-            response_data = ChatResponse(threadId=thread_id, output=last_message) if last_message else None
+            response_data = ChatResponse(thread_id=thread_id, output=last_message) if last_message else None
 
             if response_data is None:
                 return ResponseWrapper.wrap(status=404, message="No response found")

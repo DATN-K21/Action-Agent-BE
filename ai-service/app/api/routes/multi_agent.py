@@ -18,7 +18,7 @@ async def chat(
     request: ChatRequest,
     multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
 ):
-    response = await multi_agent_service.execute_multi_agent(request.threadId, request.input)
+    response = await multi_agent_service.execute_multi_agent(request.thread_id, request.input)
     return response.to_response()
 
 
@@ -27,5 +27,5 @@ async def stream(
     request: ChatRequest,
     multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
 ):
-    response = await multi_agent_service.stream_multi_agent(request.threadId, request.input)
+    response = await multi_agent_service.stream_multi_agent(request.thread_id, request.input)
     return EventSourceResponse(to_sse(response))

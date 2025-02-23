@@ -85,12 +85,12 @@ class ComposioService:
                 status="success",
                 count=data["count"],
                 message=None,
-                errorCode=None,
+                error_code=None,
             )
 
         return DeleteConnectionResponse(
             status="failed",
             message=data["message"],
-            errorCode=response.status_code,
+            error_code=response.status_code,
             count=None,
         )

@@ -24,16 +24,16 @@ class UpdateThreadRequest(BaseRequest):
 ##################################################
 class CreateThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class GetThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class GetListThreadsResponse(CursorPagingResponse):
@@ -42,11 +42,11 @@ class GetListThreadsResponse(CursorPagingResponse):
 
 class UpdateThreadResponse(CreateThreadResponse):
     id: str
-    userId: str
+    user_id: str
     title: str
-    createdAt: datetime
+    created_at: datetime
 
 
 class DeleteThreadResponse(BaseResponse):
     id: str
-    userId: str
+    user_id: str

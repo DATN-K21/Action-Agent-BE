@@ -20,12 +20,9 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(lambda connection: None)  # Test connection
-            logger.info("Database connection established successfully.")
             yield session
         except (IntegrityError, OperationalError, SQLAlchemyError) as e:
             await session.rollback()
-            logger.error(f"Database error occurred: {e}")
-            raise
+            raise e
         finally:
             await session.close()
-            logger.info("Database session closed.")

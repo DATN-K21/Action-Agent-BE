@@ -18,7 +18,7 @@ async def chat(
     request: ChatRequest,
     search_service: SearchService = Depends(get_search_service),
 ):
-    response = await search_service.execute_search(request.threadId, request.input)
+    response = await search_service.execute_search(request.thread_id, request.input)
     return response.to_response()
 
 @router.post("/stream", description="Stream chat with the search assistant.", response_class=EventSourceResponse)
@@ -26,5 +26,5 @@ async def stream(
     request: ChatRequest,
     search_service: SearchService = Depends(get_search_service),
 ):
-    response = await search_service.stream_search(request.threadId, request.input)
+    response = await search_service.stream_search(request.thread_id, request.input)
     return EventSourceResponse(to_sse(response))

@@ -1,7 +1,6 @@
-import traceback
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
@@ -57,7 +56,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -67,12 +66,12 @@ class UserService:
         try:
             stmt = (
                 select(
-                    User.id,
-                    User.username,
-                    User.email,
-                    User.first_name,
-                    User.last_name,
-                    User.created_at,
+                    User.id.label("id"),
+                    User.username.label("username"),
+                    User.email.label("email"),
+                    User.first_name.label("first_name"),
+                    User.last_name.label("last_name"),
+                    User.created_at.label("created_at"),
                 )
                 .where(
                     User.id == user_id,
@@ -82,7 +81,8 @@ class UserService:
             )
 
             result = await self.db.execute(stmt)
-            db_user = result.scalar_one_or_none()
+            db_user = result.mappings().one_or_none()
+            logger.info(f"db_user: {db_user}")
 
             if not db_user:
                 return ResponseWrapper.wrap(status=404, message="User not found")
@@ -91,39 +91,63 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}")
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def get_all_users(self, paging: PagingRequest) -> ResponseWrapper[GetListUsersResponse]:
         """Get all users."""
-        logger.info(f"Get all users: {paging.model_dump()}")
         try:
+            page_number = paging.page_number
+            max_per_page = paging.max_per_page
+
+            # COUNT total users
+            count_stmt = select(func.count(User.id)).where(User.is_deleted.is_(False))
+            count_result = await self.db.execute(count_stmt)
+            total_users = count_result.scalar_one()
+            logger.info(f"total_users: {total_users}")
+            if total_users == 0:
+                response_data = GetListUsersResponse(
+                    users=[],
+                    page_number=page_number,
+                    max_per_page=max_per_page,
+                    total_page=0,
+                )
+                return ResponseWrapper.wrap(status=200, data=response_data)
+            total_pages = (total_users + max_per_page - 1) // max_per_page
+
+            # GET users
             stmt = (
                 select(
-                    User.id,
-                    User.username,
-                    User.email,
-                    User.first_name,
-                    User.last_name,
-                    User.created_at,
+                    User.id.label("id"),
+                    User.username.label("username"),
+                    User.email.label("email"),
+                    User.first_name.label("first_name"),
+                    User.last_name.label("last_name"),
+                    User.created_at.label("created_at"),
                 )
                 .where(
                     User.is_deleted.is_(False),
                 )
-                .offset(paging.pageNumber * paging.maxPerPage)
-                .limit(paging.maxPerPage)
+                .offset((page_number - 1) * max_per_page)
+                .limit(paging.max_per_page)
                 .order_by(User.created_at.desc())
             )
 
             result = await self.db.execute(stmt)
-            db_users = result.scalars().all()
+            db_users = result.mappings().all()
 
-            response_data = [GetUserResponse.model_validate(db_user) for db_user in db_users]
+            users = [GetUserResponse.model_validate(db_user) for db_user in db_users]
+            response_data = GetListUsersResponse(
+                users=users,
+                page_number=paging.page_number,
+                max_per_page=paging.max_per_page,
+                total_page=total_pages,
+            )
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}")
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -136,7 +160,7 @@ class UserService:
                     User.id == user_id,
                     User.is_deleted.is_(False),
                 )
-                .values(**user.model_dump())
+                .values(**user.model_dump(exclude_unset=True))
                 .returning(User)
             )
 
@@ -152,7 +176,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -168,8 +192,7 @@ class UserService:
                 )
                 .values(
                     is_deleted=True,
-                    deleted_by=deleted_by,
-                    deleted_at=datetime.now(timezone.utc),
+                    deleted_at=datetime.now(),
                 )
                 .returning(User.id)
             )
@@ -183,6 +206,6 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=DeleteUserResponse(id=deleted_user_id))
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")

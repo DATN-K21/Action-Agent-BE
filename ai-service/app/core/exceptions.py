@@ -1,41 +1,27 @@
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import ValidationError
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 
 from app.core import logging
 from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
-app = FastAPI()
 
+def register_exception_handlers(app: FastAPI):
+    """Register all custom exception handlers."""
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    logger.error(
-        "HTTP exception occurred", method=request.method, url=request.url.path, status_code=exc.status_code, detail=exc.detail
-    )
-    return ResponseWrapper(status=500, message=exc.detail, data=None).to_response()
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Custom validation error response"""
+        first_error = exc.errors()[0]
+        field = ".".join(str(x) for x in first_error["loc"])
+        message = first_error["msg"]
+        formatted_message = f'Validation error - "{field}": {message}'
+        logger.error(f"Validation error in {request.method} {request.url.path}", errors=exc.errors())
+        return ResponseWrapper.wrap(status=400, message=formatted_message, data=None).to_response()
 
-
-# Global Exception Handler for ValidationError (from Pydantic)
-@app.exception_handler(ValidationError)
-async def validation_exception_handler(request: Request, exc: ValidationError):
-    logger.error("Validation error", method=request.method, url=request.url.path, errors=exc.errors())
-    return ResponseWrapper(status=400, message="Validation error", data=None).to_response()
-
-
-# Global Catch-all Exception Handler
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    logger.error(
-        "Unhandled exception",
-        method=request.method,
-        url=request.url.path,
-        exception=str(exc),
-    )
-    return ResponseWrapper(status=500, message="Internal server error", data=None).to_response()
-
-
-@app.get("/error")
-def raise_error():
-    raise Exception("This is an exception")
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        """Custom global exception handler"""
+        logger.exception(f"Global exception in {request.method} {request.url.path}: {str(exc)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error", data=None).to_response()
