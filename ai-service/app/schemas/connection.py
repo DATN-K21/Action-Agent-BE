@@ -13,7 +13,7 @@ from app.schemas.base import BaseResponse
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 class ActiveAccountResponse(BaseResponse):
-    is_existed: bool = Field(..., title="Is existed", examples=[True])
+    is_existed: bool = Field(..., title="Is existed", examples=[False])
     redirect_url: Optional[str] = Field(None, title="Redirect URL", examples=["https://example.com"])
 
 

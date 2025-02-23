@@ -14,7 +14,7 @@ class BaseRequest(BaseModel):
         alias_generator = to_camel  # Converts field names to snake_case
         populate_by_name = True  # Allows field name population even if alias is used
         max_number_errors = 1  # Maximum number of errors to display in case of validation error
-        validate_asignment = True  # Validate assignment of values to fields
+        validate_assignment = True  # Validate assignment of values to fields
         cache_strings = "all"
 
 

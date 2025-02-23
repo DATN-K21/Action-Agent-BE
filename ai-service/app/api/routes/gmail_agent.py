@@ -25,10 +25,10 @@ async def active(
         connection_request = gmail_service.initialize_connection(str(user_id))
 
         if connection_request is None:
-            response_data = ActiveAccountResponse(is_existed=False, redirect_url=None)
+            response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
             return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
-        response_data = ActiveAccountResponse(is_existed=True, redirect_url=connection_request.redirectUrl)
+        response_data = ActiveAccountResponse(is_existed=False, redirect_url=connection_request.redirectUrl)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
