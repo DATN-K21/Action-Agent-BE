@@ -2,11 +2,11 @@ from typing import Annotated, Callable, Sequence, TypedDict, Union
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.types import interrupt
 
 from app.core import logging
-from app.memory import get_checkpointer
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
@@ -15,7 +15,7 @@ from app.utils.messages import get_message_prefix, trimmer
 logger = logging.get_logger(__name__)
 
 
-def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
+def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]], checkpointer: AsyncPostgresSaver):
     class AgentState(TypedDict):
         messages: Annotated[Sequence[BaseMessage], add_messages]
         determine_tool_message: AIMessage
@@ -142,4 +142,4 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]]):
     workflow.add_edge("generate_node", END)
 
     # Compile
-    return workflow.compile(checkpointer=get_checkpointer())
+    return workflow.compile(checkpointer=checkpointer)

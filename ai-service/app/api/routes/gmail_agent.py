@@ -1,9 +1,11 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.core import logging
 from app.dependencies import get_connected_app_service, get_gmail_service
+from app.memory.deps import get_checkpointer
 from app.schemas.base import ResponseWrapper
 from app.schemas.connection import ActiveAccountResponse, GetActionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
@@ -72,6 +74,7 @@ async def execute_gmail(
     max_recursion: Optional[int] = 5,
     gmail_service: GmailService = Depends(get_gmail_service),
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
 ):
     try:
         logger.info("[Opened websocket connection]")
@@ -90,6 +93,7 @@ async def execute_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         await websocket.send_json(
@@ -111,6 +115,7 @@ async def execute_gmail(
                 thread_id=thread_id,
                 tools=tools,
                 max_recursion=max_recursion if max_recursion is not None else 5,
+                checkpointer=checkpointer,
             )
 
             await websocket.send_json(
@@ -141,6 +146,7 @@ async def stream_gmail(
     max_recursion: Optional[int] = 5,
     gmail_service: GmailService = Depends(get_gmail_service),
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
 ):
     try:
         logger.info("[Opened websocket connection]")
@@ -159,6 +165,7 @@ async def stream_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         async for dict_message in to_sse(response):
@@ -175,6 +182,7 @@ async def stream_gmail(
             thread_id=thread_id,
             tools=tools,
             max_recursion=max_recursion if max_recursion is not None else 5,
+            checkpointer=checkpointer,
         )
 
         async for dict_message in to_sse(result):

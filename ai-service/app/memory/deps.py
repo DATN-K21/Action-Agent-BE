@@ -1,8 +1,8 @@
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from app.memory.checkpoint import AsyncPostgresCheckpoint
+from app.memory.checkpoint import AsyncPostgresPool
 
 
-def get_checkpointer() -> AsyncPostgresSaver:
+async def get_checkpointer() -> AsyncPostgresSaver:
     """Get the checkpointer singleton."""
-    return AsyncPostgresCheckpoint.get_instance()
+    return await AsyncPostgresPool.get_checkpointer()

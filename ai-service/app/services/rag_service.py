@@ -35,7 +35,7 @@ class RagService:
     async def execute_rag(self, thread_id: str, user_input: str, max_recursion: int = 5) -> ResponseWrapper[ChatResponse]:
         try:
             retriever_tool = self.get_retriever_tool(thread_id)
-            graph = create_workflow(tool=retriever_tool, tool_name="retriever_tool")
+            graph = create_workflow(tool=retriever_tool, tool_name="retriever_tool", checkpointer=self.checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,
@@ -54,7 +54,7 @@ class RagService:
     async def stream_rag(self, thread_id: str, user_input: str, max_recursion: int = 5) -> MessagesStream:
         try:
             retriever_tool = self.get_retriever_tool(thread_id)
-            graph = create_workflow(tool=retriever_tool, tool_name="retriever_tool")
+            graph = create_workflow(tool=retriever_tool, tool_name="retriever_tool", checkpointer=self.checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,

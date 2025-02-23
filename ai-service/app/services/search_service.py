@@ -3,6 +3,7 @@ import traceback
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.core import logging
 from app.schemas.base import ResponseWrapper
@@ -14,14 +15,15 @@ logger = logging.get_logger(__name__)
 
 
 class SearchService:
-    def __init__(self):
+    def __init__(self, checkpointer: AsyncPostgresSaver):
         self.tavily_tool = TavilySearchResults(max_results=5, name="tavily_search_tool")
+        self.checkpointer = checkpointer
 
     @logging.log_function_inputs(logger)
     async def execute_search(self, thread_id: str, user_input: str, max_recursion: int = 5) -> ResponseWrapper[ChatResponse]:
         """Chat with the search tool."""
         try:
-            graph = create_workflow(tool=self.tavily_tool, tool_name="tavily_search_tool")
+            graph = create_workflow(tool=self.tavily_tool, tool_name="tavily_search_tool", checkpointer=self.checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,
@@ -43,7 +45,7 @@ class SearchService:
     @logging.log_function_inputs(logger)
     async def stream_search(self, thread_id: str, user_input: str, max_recursion: int = 5) -> MessagesStream:
         try:
-            graph = create_workflow(tool=self.tavily_tool, tool_name="tavily_search_tool")
+            graph = create_workflow(tool=self.tavily_tool, tool_name="tavily_search_tool", checkpointer=self.checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,

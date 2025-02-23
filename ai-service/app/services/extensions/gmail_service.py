@@ -4,6 +4,7 @@ from composio_langgraph import Action
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 
 from app.core import logging
@@ -100,10 +101,11 @@ class GmailService:
         user_input: str,
         thread_id: str,
         tools: Sequence[Union[BaseTool, Callable]],
+        checkpointer: AsyncPostgresSaver,
         max_recursion: int = 5,
     ):
         try:
-            graph = create_multiple_tools_workflow(tools)
+            graph = create_multiple_tools_workflow(tools, checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,
@@ -134,10 +136,11 @@ class GmailService:
         action: HumanAction,
         thread_id: str,
         tools: Sequence[Union[BaseTool, Callable]],
+        checkpointer: AsyncPostgresSaver,
         max_recursion: int = 5,
     ):
         try:
-            graph = create_multiple_tools_workflow(tools)
+            graph = create_multiple_tools_workflow(tools, checkpointer)
             config = RunnableConfig(
                 recursion_limit=max_recursion,
                 configurable={"thread_id": thread_id},
@@ -155,10 +158,11 @@ class GmailService:
         user_input: str,
         thread_id: str,
         tools: Sequence[Union[BaseTool, Callable]],
+        checkpointer: AsyncPostgresSaver,
         max_recursion: int = 5,
     ):
         try:
-            graph = create_multiple_tools_workflow(tools)
+            graph = create_multiple_tools_workflow(tools, checkpointer)
             state = {"messages": [HumanMessage(user_input)], "question": user_input}
             config = RunnableConfig(
                 recursion_limit=max_recursion,
@@ -175,10 +179,11 @@ class GmailService:
         action: HumanAction,
         thread_id: str,
         tools: Sequence[Union[BaseTool, Callable]],
+        checkpointer: AsyncPostgresSaver,
         max_recursion: int = 5,
     ):
         try:
-            graph = create_multiple_tools_workflow(tools)
+            graph = create_multiple_tools_workflow(tools, checkpointer)
             config = RunnableConfig(
                 recursion_limit=max_recursion,
                 configurable={"thread_id": thread_id},

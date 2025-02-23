@@ -9,3 +9,9 @@ __pycache__/
 .vscode/
 .idea/
 .git/
+.venv/
+ruff.toml
+.env.example
+README.md
+docs/
+migrations/

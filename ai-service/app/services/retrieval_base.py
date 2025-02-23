@@ -2,21 +2,19 @@ from typing import Annotated, Sequence, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from app.core import logging
-from app.memory import get_checkpointer
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.services.model_service import get_openai_model
 from app.utils.messages import get_message_prefix, trimmer
 
-CHECKPOINTER = get_checkpointer()
-
 logger = logging.get_logger(__name__)
 
 
-def create_workflow(tool: BaseTool, tool_name: str):
+def create_workflow(tool: BaseTool, tool_name: str, checkpointer: AsyncPostgresSaver):
     # Define the retriever tool
     tools = [tool]
 
@@ -103,4 +101,4 @@ def create_workflow(tool: BaseTool, tool_name: str):
     workflow.add_edge("generate", END)
 
     # Compile
-    return workflow.compile(checkpointer=CHECKPOINTER)
+    return workflow.compile(checkpointer=checkpointer)
