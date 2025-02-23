@@ -489,7 +489,7 @@ A computer is a programmable digital electronic device capable of performing a v
 ...
 
 ## 6. Gmail extension APIs
-### 6.1. Execute gmail extension API (ws - /chat/{user_id}/{thread_id}/{max_recursion})
+### 6.1. Execute gmail extension API (ws - /gmail/ws/chat/{user_id}/{thread_id}/{max_recursion})
 * Example code to handle Gmail extension API response
 ```python
 import websockets
@@ -500,7 +500,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 async def connect_to_server():
-    uri = "ws://localhost:5001/gmail/chat/3fa85f64-5717-4562-b3fc-2c963f66afa6/abc/5"
+    uri = "ws://localhost:5001/gmail/ws/chat/3fa85f64-5717-4562-b3fc-2c963f66afa6/abc/5"
     async with websockets.connect(uri) as websocket:
         # Send query to server
         await websocket.send("Summary latest emails by fetch emails tool")
@@ -535,7 +535,7 @@ asyncio.run(main())
 
 [Output] ['The latest emails retrieved include a security alert from Google about Composio accessing a Google account, a LinkedIn notification about two new messages, another security alert from Google, a LinkedIn News Asia post about professional boundaries, and a Google Developer Program email about new features in Android Studio.']
 ```
-### 6.2. Stream gmail extension API (ws - /stream/{user_id}/{thread_id}/{max_recursion})
+### 6.2. Stream gmail extension API (ws - /gmail/ws/stream/{user_id}/{thread_id}/{max_recursion})
 * Example code to handle Stream Gmail extension API response
 ```python
 import websockets
@@ -546,7 +546,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 async def connect_to_server():
-    uri = "ws://localhost:5001/gmail/stream/3fa85f64-5717-4562-b3fc-2c963f66afa6/abcdefghi/5"
+    uri = "ws://localhost:5001/gmail/ws/stream/3fa85f64-5717-4562-b3fc-2c963f66afa6/abcdefghi/5"
     async with websockets.connect(uri) as websocket:
         # Send query to server
         await websocket.send("Summary latest emails by fetch emails tool")

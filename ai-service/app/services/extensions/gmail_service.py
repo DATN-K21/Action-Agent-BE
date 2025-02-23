@@ -26,7 +26,7 @@ def _send_email_schema_processor(schema: dict) -> dict:
 def _fetch_emails_post_processor(output_data: dict) -> dict:
     # Abbreviate the output data
     if output_data["successfull"]:
-        for message in output_data["data"]["response_data"]["messages"]:
+        for message in output_data["data"]["messages"]:
             del message["attachmentList"]
             del message["payload"]
 
