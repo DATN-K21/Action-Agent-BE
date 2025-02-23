@@ -16,10 +16,12 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
         createProxyMiddleware({
             target,
             changeOrigin: true, // Adjust the host header to match the target
+            ws: true, // Proxy websockets
             pathRewrite: (path, req) => {
-                const newPath = req.originalUrl;
-                const rewrittenPath = newPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
-                console.log(`[DEBUG] Rewritten path: ${rewrittenPath}`);
+                const isWs = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
+                let originalPath = isWs ? (req.url || path) : (req.originalUrl || path);
+                const rewrittenPath = originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
+                console.log("[HTTP] Rewritten path:", rewrittenPath);
                 return rewrittenPath;
             },
             logLevel: 'debug', // Enable debug-level logging in the proxy
@@ -27,17 +29,15 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
             proxyTimeout: 5000, // 5 seconds
             on: {
                 proxyReq: fixRequestBody,
-                proxyRes(proxyRes, req, res) {
-                    proxyRes.on('end', () => {
-                        if (!res.headersSent) {
-                            res.status(500).json({ error: `Failed to process request for service '${serviceName}'.` });
-                        }
-                    });
-                }
             },
-            onError(err, req, res) {
+            onError(err, req, resOrSocket) {
                 console.error(`Proxy error for service '${serviceName}':`, err.message);
-                res.status(500).json({ error: `Failed to process request for service '${serviceName}'.` });
+                const isWs = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
+                if (isWs) {
+                    resOrSocket.end('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+                } else {
+                    resOrSocket.status(500).json({ error: `Failed to process request for service "${serviceName}".` });
+                }
             },
         })
     );

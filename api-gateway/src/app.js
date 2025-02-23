@@ -1,5 +1,5 @@
 const express = require('express');
-const { initRabbitMQ } = require('./services/rabbitmq.service');
+// const { initRabbitMQ } = require('./services/rabbitmq.service');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const morgan = require('morgan');
