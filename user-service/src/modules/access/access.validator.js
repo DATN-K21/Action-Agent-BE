@@ -24,10 +24,26 @@ class AccessValidator extends ValidatorConfig {
             return AccessValidator.returnFailedError('Password must be at least 3 characters long', 1010104);
         }
 
+        // Username validation
+        if (validator.isEmpty(req.body?.username || '')) {
+            return AccessValidator.returnFailedError('Username is required', 1010105);
+        }
+        //First name validation
+        if (validator.isEmpty(req.body?.firstName || '')) {
+            return AccessValidator.returnFailedError('First name is required', 1010106);
+        }
+        //Last name validation
+        if (validator.isEmpty(req.body?.lastName || '')) {
+            return AccessValidator.returnFailedError('Last name is required', 1010107);
+        }
+
         // Validation passed
         return AccessValidator.returnPassedData({
             email: req.body?.email,
             password: req.body?.password,
+            username: req.body?.username,
+            firstName: req.body?.firstName,
+            lastName: req.body?.lastName
         });
     }
 

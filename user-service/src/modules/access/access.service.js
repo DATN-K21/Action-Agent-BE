@@ -26,7 +26,7 @@ class AccessService {
         return UserFilter.makeBasicFilter(foundAccess);
     }
 
-    async handleSignup(email, password) {
+    async handleSignup(email, password, username, firstName, lastName) {
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new ConflictResponse('Email already exists', 1010105);
@@ -38,7 +38,16 @@ class AccessService {
         if (!foundUserRole) {
             throw new ConflictResponse("User role not found", 1010106);
         }
-        let user = await this.userModel.create({ email, password: hashedPassword, role: foundUserRole._id });
+        let user = await this.userModel.create({
+            email,
+            password: hashedPassword,
+            role: foundUserRole._id,
+            username: username,
+            firstname: firstName,
+            lastname: lastName,
+            fullname: `${firstName} ${lastName
+                }`
+        });
         const { privateKey, publicKey } = generateRSAKeysForAccess();
         await this.accessModel.create({
             user_id: user?._id,
