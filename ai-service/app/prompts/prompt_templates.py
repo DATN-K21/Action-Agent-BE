@@ -1,10 +1,84 @@
 from langchain import hub
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 
+
+def get_simple_agent_prompt_template():
+    return ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a helpful assistant. 
+                
+                Please generate a detailed response based on the context above. Use Markdown formatting for better readability, including:
+                - Bullet points
+                - Numbered lists
+                - Code blocks (if applicable)
+                - Headings and subheadings for structure
+                - Tables (if necessary)
+                
+                Ensure that the response is **well-structured and informative** rather than a brief summary
+                
+                Answer the following question: """,
+            ),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
 
 def get_retriever_prompt_template():
     return hub.pull("rlm/rag-prompt")
+
+
+def get_markdown_answer_generating_prompt_template():
+    return PromptTemplate(
+        template="""You are an expert assistant that provides detailed answers in Markdown format.
+
+        ## Question:
+        {question}
+        
+        ## Context:
+        {context}
+        
+        ## Answer:
+        Please generate a detailed response based on the context above. Use Markdown formatting for better readability, including:
+        - Bullet points
+        - Numbered lists
+        - Code blocks (if applicable)
+        - Headings and subheadings for structure
+        - Tables (if necessary)
+        
+        Ensure that the response is **well-structured and informative** rather than a brief summary.
+        
+        ---
+        
+        Examples:
+        
+        # Benefits of Using LangChain for RAG
+        
+        LangChain provides several advantages when building Retrieval-Augmented Generation (RAG) systems:
+        
+        ## 1. Modularity
+        - Supports multiple retrievers (e.g., FAISS, Pinecone, Weaviate).
+        - Easily integrates with different LLMs.
+        
+        ## 2. Custom Prompting
+        - Allows fine-tuning prompt templates to improve answer quality.
+        - Supports structured response formatting.
+        
+        ## 3. Memory and Context Management
+        - Can track conversations across multiple queries.
+        - Helps maintain relevant context for better responses.
+        
+        ## 4. Tool Integration
+        | Feature  | Description |
+        |----------|------------|
+        | **Agents** | Enables dynamic tool usage based on queries. |
+        | **Chains** | Supports sequential processing for complex workflows. |
+        
+        By leveraging LangChain, developers can build **more accurate, context-aware AI systems** for various applications.
+        """,
+        input_variables=["question", "context"],
+    )
 
 
 def get_tools_determining_prompt_template():
