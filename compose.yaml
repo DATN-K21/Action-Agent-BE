@@ -1,7 +1,13 @@
+version: "3.8"
+
+networks:
+  app-network:
+
+
 services:
   user-service:
     build:
-      context: ./user-service # Path to the user service code
+      context: ./user-service
     container_name: user-service
     depends_on:
       - log-service
@@ -15,6 +21,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - app-network
 
   log-service:
     build:
@@ -40,13 +48,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - app-network
 
   api-gateway:
     build:
-      context: ./api-gateway # Path to the API Gateway code
+      context: ./api-gateway
     container_name: api-gateway
     ports:
-      - 8300:8300 # Expose API Gateway
+      - 8300:8300
     env_file: ./api-gateway/.env
     environment:
       NODE_ENV: production
@@ -64,16 +74,17 @@ services:
       elasticsearch:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8300/health" ] # Replace `/health` with your actual health endpoint
+      test: [ "CMD", "curl", "-f", "http://localhost:8300/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - app-network
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
     container_name: elasticsearch
     environment:
-      - discovery.type=single-node
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
       - xpack.security.enabled=false
@@ -83,27 +94,30 @@ services:
     ports:
       - "9200:9200"
     volumes:
-      - es_data:/usr/share/elasticsearch/data # Persistent data storage
+      - es_data:/usr/share/elasticsearch/data
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - app-network
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.16.1
     container_name: logstash
     ports:
-      - "5044:5044" # Logstash listening for log inputs
+      - "5044:5044"
     volumes:
       - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-      - logstash_data:/usr/share/logstash/data # Optional: Persist data logs
+      - logstash_data:/usr/share/logstash/data
     healthcheck:
-      # test: ["CMD-SHELL", "curl -f http://localhost:5044 || exit 1"]
       test: [ "CMD-SHELL", "curl -s -H 'Content-Type: application/json' -X POST -d '{\"health\": \"check\"}' http://localhost:5044 || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - app-network
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.16.1
@@ -111,9 +125,11 @@ services:
     environment:
       ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
       SERVER_NAME: "kibana"
-      XPACK_SECURITY_ENABLED: "false" # Disable security for local development
+      XPACK_SECURITY_ENABLED: "false"
     ports:
       - "5601:5601"
+    networks:
+      - app-network
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -121,7 +137,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-      - "15692:15692" # Prometheus metrics
+      - "15692:15692"
     environment:
       RABBITMQ_DEFAULT_USER: myuser
       RABBITMQ_DEFAULT_PASS: mypassword
@@ -132,37 +148,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # centralized-message-producer:
-  #   build:
-  #     context: ./centralized-message-producer
-  #   container_name: centralized-message-producer
-  #   ports:
-  #     - "8102:8102"
-  #   env_file:
-  #     ./centralized-message-producer/.env
-  #   environment:
-  #     RABBITMQ_HOST: rabbitmq
-  #     RABBITMQ_PORT: 5672
-  #     RABBITMQ_USER: myuser
-  #     RABBITMQ_PASSWORD: mypassword
+    networks:
+      - app-network
 
   ####################################################
   ############ AI Service ###########################
   ####################################################
 
   ai-service:
-    image: ai-service
+    image: nguyendinhanhvlqt/ai-service
     container_name: ai-service
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
     env_file: ./ai-service/.env
     environment:
       - POSTGRES_HOST=ai-database
       - POSTGRES_PORT=5432
     ports:
       - "5001:5001"
+    networks:
+      - app-network
 
   ai-database:
     image: pgvector/pgvector:pg16
@@ -183,6 +186,8 @@ services:
       - 5433:5432
     volumes:
       - ai-database:/var/lib/postgresql/data
+    networks:
+      - app-network
 
   migration:
     image: migrate/migrate
@@ -192,6 +197,8 @@ services:
     volumes:
       - ./ai-service/migrations:/migrations
     command: [ "-path", "/migrations", "-database", "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable", "up" ]
+    networks:
+      - app-network
 
 volumes:
   es_data:
