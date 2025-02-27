@@ -39,7 +39,6 @@ class AccessController {
                 lastName: lastName
             }
             let response = await syncData('/user/create', userInfo);
-            console.log(response);
             if (response.error) {
                 throw new BadRequestResponse("Something went sync data", 1010107);
             }
@@ -49,7 +48,6 @@ class AccessController {
                 data: result,
                 code: 1010100
             }).send(res);
-
         } catch (error) {
             if (MongooseUtil.isMongooseError(error)) {
                 throw new BadRequestResponse("Something went wrong", 1010106);
