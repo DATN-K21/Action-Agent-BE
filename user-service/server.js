@@ -1,7 +1,7 @@
 const app = require("./src/app");
 require('dotenv').config();
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8100;
 const backend_url = process.env.BACKEND_URL || "https://my-ai-agent.azurewebsites.net"
 
 const server = app.listen(PORT, () => {

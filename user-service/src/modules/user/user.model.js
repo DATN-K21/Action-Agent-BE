@@ -6,6 +6,8 @@ const userSchema = new mongoose.Schema({
     email: { type: String, default: '' },
     password: { type: String, default: '' },
     username: { type: String, default: '' },
+    firstname: { type: String, default: '' },
+    lastname: { type: String, default: '' },
     fullname: { type: String, default: '' },
     avatar: { type: String, default: '' },
     role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },

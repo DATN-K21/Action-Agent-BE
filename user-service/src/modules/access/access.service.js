@@ -26,7 +26,7 @@ class AccessService {
         return UserFilter.makeBasicFilter(foundAccess);
     }
 
-    async handleSignup(email, password) {
+    async handleSignup(email, password, username, firstName, lastName) {
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new ConflictResponse('Email already exists', 1010105);
@@ -38,7 +38,16 @@ class AccessService {
         if (!foundUserRole) {
             throw new ConflictResponse("User role not found", 1010106);
         }
-        let user = await this.userModel.create({ email, password: hashedPassword, role: foundUserRole._id });
+        let user = await this.userModel.create({
+            email,
+            password: hashedPassword,
+            role: foundUserRole._id,
+            username: username,
+            firstname: firstName,
+            lastname: lastName,
+            fullname: `${firstName} ${lastName
+                }`
+        });
         const { privateKey, publicKey } = generateRSAKeysForAccess();
         await this.accessModel.create({
             user_id: user?._id,
@@ -183,11 +192,11 @@ class AccessService {
         const now = new Date();
         const otpCount = foundAccess.otp_count || 0;
 
-        // 5 day from now as default to avoid error
-        const lastOtpSent = foundAccess.last_otp_sent || new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+        //30 seconds from now as default to avoid error
+        const lastOtpSent = foundAccess.last_otp_sent;
 
         // Check số lần gửi OTP
-        if (otpCount >= 5 && now - lastOtpSent < 3600000) {
+        if (otpCount >= 5 && lastOtpSent && now - lastOtpSent < 3600000) {
             throw new BadRequestResponse('Reached the maximum number of OTP requests per hour', 1010409);
         }
 
@@ -410,14 +419,12 @@ class AccessService {
         });
         if (!foundAccess) {
             throw new BadRequestResponse('Invalid access to account', 1011204);
-        } else if (!foundAccess?.otp_reset_password_count && !foundAccess?.last_otp_reset_password_sent) {
-            throw new BadRequestResponse('Invalid access to account', 1011204);
         }
         const now = new Date();
         const otpCount = foundAccess.otp_reset_password_count || 0;
 
         // 5 day from now as default to avoid error
-        const lastOtpSent = foundAccess.last_otp_reset_password_sent ?? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+        const lastOtpSent = foundAccess.last_otp_reset_password_sent ?? null;
 
         // Check số lần gửi OTP
         if (otpCount >= 5 && now - lastOtpSent < 3600000) {

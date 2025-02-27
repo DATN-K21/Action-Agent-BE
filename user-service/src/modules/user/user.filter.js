@@ -5,6 +5,9 @@ class UserFilter {
             id: user?._id,
             email: user?.email,
             username: user?.username,
+            firstname: user?.firstname,
+            lastname: user?.lastname,
+            fullname: user?.fullname,
         };
     }
 

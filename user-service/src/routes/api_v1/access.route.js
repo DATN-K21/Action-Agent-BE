@@ -21,13 +21,12 @@ router.get('/facebook/verify',
 
 router.post("/reset-password/send-otp", handleAsync(AccessController.handleSendOTPToResetPassword));
 router.post("/reset-password/confirm-otp", handleAsync(AccessController.handleConfirmOTPToResetPassword))
-
+router.post("/reset-password", handleAsync(AccessController.handleResetPassword));
 
 // Check access
 router.use(handleAsync(AccessMiddleware.checkAccess))
 
 router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTokens));
-router.post("/reset-password", handleAsync(AccessController.handleResetPassword));
 router.post("/logout", handleAsync(AccessController.handleLogout));
 
 module.exports = router;

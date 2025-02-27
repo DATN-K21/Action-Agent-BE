@@ -3,6 +3,8 @@ const { OKSuccessResponse, CreatedSuccessResponse } = require('../../response/su
 const { BadRequestResponse } = require('../../response/error');
 const AccessValidator = require("./access.validator");
 const MongooseUtil = require("../../utils/mongoose.util");
+const { GoogleAuthExceptionMessages } = require("google-auth-library/build/src/auth/googleauth");
+const { syncData } = require("../../helpers/sync.helper");
 
 class AccessController {
     constructor() {
@@ -25,14 +27,29 @@ class AccessController {
             throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
         }
 
-        const { email, password } = validationResult?.data;
+        const { email, password, username, firstName, lastName } = validationResult?.data;
         try {
-            const result = await this.accessService.handleSignup(email, password);
+            const result = await this.accessService.handleSignup(email, password, username, firstName, lastName);
+            //Sync signup data with ai-service
+            const userInfo = {
+                id: result.id,
+                email: email,
+                username: username,
+                firstName: firstName,
+                lastName: lastName
+            }
+            let response = await syncData('/user/create', userInfo);
+            console.log(response);
+            if (response.error) {
+                throw new BadRequestResponse("Something went sync data", 1010107);
+            }
+
             return new CreatedSuccessResponse({
                 message: 'Signup success',
                 data: result,
                 code: 1010100
             }).send(res);
+
         } catch (error) {
             if (MongooseUtil.isMongooseError(error)) {
                 throw new BadRequestResponse("Something went wrong", 1010106);
