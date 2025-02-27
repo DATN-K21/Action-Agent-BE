@@ -34,7 +34,7 @@ class BaseAgent(ABC):
 
 
     @abstractmethod
-    async def async_handle_interrupt_execute(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def async_handle_execution_interrupt(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the agent's graph with given input"""
         pass
 

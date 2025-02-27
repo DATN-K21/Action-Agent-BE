@@ -45,4 +45,3 @@ def get_gmail_agent(
     graph = builder.build_graph()
     gmail_agent = Agent(graph, name="gmail_agent")
     return gmail_agent
-

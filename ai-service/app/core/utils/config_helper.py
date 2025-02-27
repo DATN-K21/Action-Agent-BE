@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from langchain_core.runnables import RunnableConfig
 
 
-def get_invoking_config(
+def get_invocation_config(
         thread_id: Optional[str] = None,
         user_id: Optional[str] = None,
         connected_account_id: Optional[str] = None,

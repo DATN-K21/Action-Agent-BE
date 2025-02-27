@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.core import logging
-from app.dependencies import get_connected_app_service
 from app.services.database.connected_app_service import ConnectedAppService
+from app.services.deps import get_connected_app_service
 
 logger = logging.get_logger(__name__)
 

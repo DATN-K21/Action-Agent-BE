@@ -122,7 +122,7 @@ class ThreadService:
     @logging.log_function_inputs(logger)
     async def update_thread(
         self, user_id: str, thread_id: str, thread: UpdateThreadRequest
-    ) -> ResponseWrapper[UpdateThreadResponse]:
+    ) -> ResponseWrapper[CreateThreadResponse]:
         """Update a thread."""
         try:
             stmt = (

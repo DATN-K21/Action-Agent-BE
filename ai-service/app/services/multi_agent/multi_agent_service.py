@@ -8,7 +8,7 @@ from app.core import logging
 from app.memory.checkpoint import AsyncPostgresSaver
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.schemas.base import ResponseWrapper
-from app.schemas.chat import ChatResponse
+from app.schemas.chat import AgentResponse
 from app.services.model_service import get_openai_model
 from app.services.multi_agent.teams_management import team_management_node
 from app.services.multi_agent.utils.helpers import AgentState
@@ -65,7 +65,7 @@ class MultiAgentService:
     @logging.log_function_inputs(logger)
     async def execute_multi_agent(
         self, thread_id: str, user_input: str, max_recursion: int = 10
-    ) -> ResponseWrapper[ChatResponse]:
+    ) -> ResponseWrapper[AgentResponse]:
         try:
             config = RunnableConfig(
                 recursion_limit=max_recursion,
@@ -77,7 +77,7 @@ class MultiAgentService:
             content = result["messages"][-1].content
             if not content:
                 return ResponseWrapper.wrap(status=404, message="No response found")
-            response_data = ChatResponse(thread_id=thread_id, output=content)
+            response_data = AgentResponse(thread_id=thread_id, output=content)
             return ResponseWrapper.wrap(status=200, data=response_data)
         except Exception as e:
             logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())

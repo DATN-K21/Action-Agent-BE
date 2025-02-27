@@ -1,17 +1,16 @@
 from typing import Optional, Dict, Any
 
 from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from structlog.stdlib import BoundLogger
 
 from app.core import logging
 from app.core.agents.base import BaseAgent
-from app.core.utils.config_helper import get_invoking_config
+from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
+from app.core.utils.config_helper import get_invocation_config
 from app.utils.enums import HumanAction
-from app.utils.streaming import astream_state
-
+from app.utils.streaming import astream_state, MessagesStream
 
 
 class Agent(BaseAgent):
@@ -38,10 +37,10 @@ class Agent(BaseAgent):
             user_id: Optional[str] = None,
             connected_account_id: Optional[str] = None,
             max_recursion: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
-            config = get_invoking_config(
+            config = get_invocation_config(
                 thread_id=thread_id,
                 user_id=user_id,
                 connected_account_id=connected_account_id,
@@ -54,29 +53,31 @@ class Agent(BaseAgent):
                 task = state.tasks[-1]
                 if len(task.interrupts) > 0:
                     interrupt = task.interrupts[-1]
-                    return {
-                        "interrupted": True,
-                        "output": interrupt.value,
-                    }
-            return {
-                "interrupted": False,
-                "output": response["messages"][-1].content,
-            }
+                    return AgentExecutionResult(
+                        interrupted=True,
+                        output=interrupt.value,
+                    )
+
+            return AgentExecutionResult(
+                interrupted=False,
+                output=response["messages"][-1].content,
+            )
         except Exception as e:
             self.logger.error(f"[async_execute] Error in executing graph: {str(e)}")
             raise
 
 
-    async def async_handle_interrupt_execute(
+
+    async def async_handle_execution_interrupt(
             self,
             action: HumanAction,
             thread_id: Optional[str] = None,
             user_id: Optional[str] = None,
             connected_account_id: Optional[str] = None,
             max_recursion: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> AgentInterruptHandlingResult:
         try:
-            config = get_invoking_config(
+            config = get_invocation_config(
                 thread_id=thread_id,
                 user_id=user_id,
                 connected_account_id=connected_account_id,
@@ -84,9 +85,12 @@ class Agent(BaseAgent):
             )
             response = await self.graph.ainvoke(Command(resume=action), config)
 
-            return response["messages"][-1].content
+            return AgentInterruptHandlingResult(
+                output=response["messages"][-1].content,
+            )
+
         except Exception as e:
-            self.logger.error(f"[async_handle_interrupt_execute] Error in executing graph: {str(e)}")
+            self.logger.error(f"[async_handle_execution_interrupt] Error in executing graph: {str(e)}")
             raise
 
 
@@ -97,10 +101,10 @@ class Agent(BaseAgent):
             user_id: Optional[str] = None,
             connected_account_id: Optional[str] = None,
             max_recursion: int = 10
-    ):
+    )-> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
-            config = get_invoking_config(
+            config = get_invocation_config(
                 thread_id=thread_id,
                 user_id=user_id,
                 connected_account_id=connected_account_id,
@@ -119,9 +123,9 @@ class Agent(BaseAgent):
             user_id: Optional[str] = None,
             connected_account_id: Optional[str] = None,
             max_recursion: int = 10,
-    ):
+    )-> MessagesStream:
         try:
-            config = get_invoking_config(
+            config = get_invocation_config(
                 thread_id=thread_id,
                 user_id=user_id,
                 connected_account_id=connected_account_id,
