@@ -9,19 +9,24 @@ def get_invocation_config(
         connected_account_id: Optional[str] = None,
         recursion_limit: int = 10,
 ) -> RunnableConfig:
-    configurable: Dict[str, Any] = {}
+    # configurable: Dict[str, Any] = {}
+    #
+    # if thread_id is not None:
+    #     configurable["thread_id"] = thread_id
+    #     configurable["search_kwargs"] = {"filter": {"namespace": {"$in": [thread_id]}}}
+    #
+    # if user_id is not None:
+    #     configurable["user_id"] = user_id
+    #
+    # if connected_account_id is not None:
+    #     configurable["connected_account_id"] = connected_account_id
+    #
+    # return RunnableConfig(
+    #     recursion_limit=recursion_limit,
+    #     configurable=configurable,
+    # )
 
-    if thread_id is not None:
-        configurable["thread_id"] = thread_id
-        configurable["search_kwargs"] = {"filter": {"namespace": {"$in": [thread_id]}}}
-
-    if user_id is not None:
-        configurable["user_id"] = user_id
-
-    if connected_account_id is not None:
-        configurable["connected_account_id"] = connected_account_id
-
-    return RunnableConfig(
+    return   RunnableConfig(
         recursion_limit=recursion_limit,
-        configurable=configurable,
+        configurable={"thread_id": thread_id},
     )

@@ -11,8 +11,8 @@ from app.schemas.thread import (
     UpdateThreadRequest,
     UpdateThreadResponse,
 )
+from app.services.database.deps import get_thread_service
 from app.services.database.thread_service import ThreadService
-from app.services.deps import get_thread_service
 
 logger = logging.get_logger(__name__)
 

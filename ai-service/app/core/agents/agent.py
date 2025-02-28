@@ -1,3 +1,4 @@
+import traceback
 from typing import Optional, Dict, Any
 
 from langchain_core.messages import HumanMessage
@@ -46,9 +47,9 @@ class Agent(BaseAgent):
                 connected_account_id=connected_account_id,
                 recursion_limit=max_recursion,
             )
-            response = await self.graph.ainvoke(state, config)
+            response = await self.graph.ainvoke(input=state, config=config)
 
-            state = await self.graph.aget_state(config)
+            state = await self.graph.aget_state(config=config)
             if len(state.tasks) > 0:
                 task = state.tasks[-1]
                 if len(task.interrupts) > 0:
@@ -64,6 +65,7 @@ class Agent(BaseAgent):
             )
         except Exception as e:
             self.logger.error(f"[async_execute] Error in executing graph: {str(e)}")
+            print(traceback.format_exc())
             raise
 
 
@@ -83,7 +85,7 @@ class Agent(BaseAgent):
                 connected_account_id=connected_account_id,
                 recursion_limit=max_recursion,
             )
-            response = await self.graph.ainvoke(Command(resume=action), config)
+            response = await self.graph.ainvoke(Command(resume=action), config=config)
 
             return AgentInterruptHandlingResult(
                 output=response["messages"][-1].content,
@@ -110,7 +112,7 @@ class Agent(BaseAgent):
                 connected_account_id=connected_account_id,
                 recursion_limit=max_recursion,
             )
-            return astream_state(self.graph, state, config)
+            return astream_state(app=self.graph, input_=state, config=config)
         except Exception as e:
             self.logger.error(f"[async_stream] Error in executing graph: {str(e)}")
             raise
@@ -131,7 +133,7 @@ class Agent(BaseAgent):
                 connected_account_id=connected_account_id,
                 recursion_limit=max_recursion,
             )
-            return astream_state(self.graph, Command(resume=action), config)
+            return astream_state(app=self.graph, input_=Command(resume=action), config=config)
         except Exception as e:
             self.logger.error(f"[async_stream] Error in executing graph: {str(e)}")
             raise

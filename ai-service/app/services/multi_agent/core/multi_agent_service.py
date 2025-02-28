@@ -8,9 +8,9 @@ from app.core import logging
 from app.memory.checkpoint import AsyncPostgresSaver
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.schemas.base import ResponseWrapper
-from app.schemas.chat import AgentResponse
+from app.schemas.agent import AgentResponse
 from app.services.model_service import get_openai_model
-from app.services.multi_agent.teams_management import team_management_node
+from app.services.multi_agent.core.teams_management import team_management_node
 from app.services.multi_agent.utils.helpers import AgentState
 from app.utils.messages import get_message_prefix, trimmer
 from app.utils.streaming import MessagesStream, astream_state

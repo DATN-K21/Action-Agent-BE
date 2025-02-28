@@ -1,13 +1,11 @@
-from tkinter import END
-
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.constants import START
-from langgraph.graph import StateGraph, add_messages
+from langgraph.graph import StateGraph, add_messages, START, END
 from typing import Dict, Any, Annotated, Sequence, TypedDict, Union, Callable, Optional
 
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 from structlog.stdlib import BoundLogger
 
@@ -19,7 +17,7 @@ from app.utils.messages import get_message_prefix, trimmer
 from app.core import logging
 
 
-class GraphState(TypedDict):
+class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     determine_tool_message: AIMessage
     question: str
@@ -40,7 +38,8 @@ class GraphBuilder:
         self.name = name
         self.config = config
 
-    async def __async_agent_node(self, state: GraphState):
+    async def _async_agent_node(self, state: State):
+        print("---AGENT NODE---")
         model = get_openai_model()
         messages = trimmer.invoke(state["messages"])
         prompt = get_simple_agent_prompt_template()
@@ -54,8 +53,7 @@ class GraphBuilder:
 
         return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
 
-
-    async def _async_determining_tool_node(self, state: GraphState):
+    async def _async_determining_tool_node(self, state: State):
         print("---DETERMINE TOOL NODE---")
         messages = await trimmer.ainvoke(state["messages"])
 
@@ -84,8 +82,7 @@ class GraphBuilder:
         # We return a list, because this will get added to the existing list
         return {"determine_tool_message": response, "next": "human_review_node"}
 
-
-    def _human_review_node(self, state: GraphState):
+    def _human_review_node(self, state: State):
         print("---HUMAN REVIEW NODE---")
 
         try:
@@ -97,7 +94,7 @@ class GraphBuilder:
                 }
             )
         except Exception as e:
-            self.logger.error(f"[_human_review_node] Error in interrupting workflow : {str(e)}")
+            self.logger.error(f"[human_review_node] Error in interrupting workflow : {str(e)}")
             raise e
 
         # Approve the tool call and continue
@@ -107,8 +104,7 @@ class GraphBuilder:
         # Reject the tool call and generate a response
         return {"next": END}
 
-
-    async def _async_tool_node(self, state: GraphState, config: RunnableConfig):
+    async def _async_tool_node(self, state: State, config: RunnableConfig):
         print("---TOOL NODE---")
         determine_tool_message = state["determine_tool_message"]
         messages = []
@@ -134,8 +130,7 @@ class GraphBuilder:
 
         return {"messages": messages, "next": "generate_node"}
 
-
-    async def _async_generate_node(self, state: GraphState):
+    async def _async_generate_node(self, state: State):
         print("---GENERATE NODE---")
         try:
             messages = await trimmer.ainvoke(state["messages"])
@@ -156,7 +151,6 @@ class GraphBuilder:
             rag_chain = prompt | llm
 
             # Run
-
             response = await rag_chain.ainvoke({"context": docs, "question": question})
             return {
                 "messages": [AIMessage(response.content, name=MessageName.AI)],
@@ -172,12 +166,12 @@ class GraphBuilder:
             self,
             perform_action: Optional[bool] = False,
             has_human_acceptance_flow:Optional[bool] = False
-    ):
+    )-> CompiledStateGraph:
         # Define a new graph
-        workflow = StateGraph(GraphState)
+        workflow = StateGraph(State)
 
         if self.tools is None or len(self.tools) == 0 or not perform_action:
-            workflow.add_node("agent_node", self.__async_agent_node)
+            workflow.add_node("agent_node", self._async_agent_node)
             workflow.add_edge(START, "agent_node")
             workflow.add_edge("agent_node", END)
         elif not has_human_acceptance_flow:

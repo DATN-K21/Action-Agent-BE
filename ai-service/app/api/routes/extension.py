@@ -1,24 +1,67 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core import logging
+from app.core.agents.agent_manager import AgentManager
+from app.core.agents.deps import get_agent_manager
 from app.schemas.base import ResponseWrapper
-from app.schemas.connection import ActiveAccountResponse
+from app.schemas.agent import AgentResponse
+from app.schemas.extension import ActiveAccountResponse, GetActionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
-from app.services.deps import get_gmail_service, get_connected_app_service
-from app.services.extensions.extension_service import ExtensionService
-from app.services.extensions.gmail_service import GmailService
+from app.services.database.deps import get_connected_app_service
+from app.services.extensions.deps import get_extension_service_manager
+from app.services.extensions.extension_service_manager import ExtensionServiceManager
+from app.utils.enums import HumanAction
+from app.utils.streaming import to_sse
 
 logger = logging.get_logger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/active", tags=["Extension"],description="Initialize the connection.", response_model=ResponseWrapper[ActiveAccountResponse])
-async def active(
-    user_id: str,
-    extension_service: ExtensionService = Depends(get_gmail_service),
+@router.get(
+    path= "/{extension_name}/actions",
+    tags=["Extension"],
+    description="Get the list of actions available for the extension.",
+    response_model=ResponseWrapper[GetActionsResponse]
+)
+async def get_actions(
+        extension_name: str,
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
 ):
     try:
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+
+        if extension_service is None:
+            return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
+
+        extension_service.get_actions()
+
+        actions = extension_service.get_action_names()
+        response_data = GetActionsResponse(actions=list(actions))
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    except Exception as e:
+        logger.error(f"[gmail_agent/get_actions] Error fetching actions: {str(e)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+@router.post(
+    path="/active}",
+    tags=["Extension"],
+    description="Initialize the connection.",
+    response_model=ResponseWrapper[ActiveAccountResponse]
+)
+async def active(
+        user_id: str,
+        extension_name: str,
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+):
+    try:
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+
+        if extension_service is None:
+            return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
+
         connection_request = extension_service.initialize_connection(str(user_id))
 
         if connection_request is None:
@@ -33,13 +76,25 @@ async def active(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/disconnect", tags=["Extension"], description="Disconnect the account.")
+@router.post(
+    path="/disconnect",
+    tags=["Extension"],
+    description="Disconnect the account.",
+    response_model=ResponseWrapper
+)
 async def logout(
-    user_id: str,
-    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-    extension_service: GmailService = Depends(get_gmail_service),
+        user_id: str,
+        extension_name: str,
+        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
 ):
     try:
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+
+        if extension_service is None:
+            return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
+
+
         account_id = await connected_app_service.get_account_id(user_id, "gmail")
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
@@ -48,3 +103,194 @@ async def logout(
     except Exception as e:
         logger.error(f"[extension/logout] Error in logging out: {str(e)}")
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get("/ws-info")
+async def get_info():
+    return ResponseWrapper.wrap(status=200, data=AgentResponse(
+        output=
+"""
+1. Chat Endpoint:
+    URL: http://hostdomain/agent/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+    Description: This WebSocket endpoint enables agent communication through message-based chatting.
+
+2. Stream Endpoint:
+   URL: http://dostdomain/agent/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+   Description: This WebSocket endpoint facilitates agent communication through message streaming.
+"""
+    )).to_response()
+
+
+# noinspection DuplicatedCode
+@router.websocket("/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}")
+async def execute(
+        websocket: WebSocket,
+        user_id: str,
+        thread_id: str,
+        agent_name: Optional[str] = None,
+        max_recursion: Optional[int] = 5,
+        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+        agent_manager: AgentManager = Depends(get_agent_manager),
+):
+    is_connected = False
+
+    try:
+        agent_name = "gmail-agent" if agent_name is None else agent_name
+        agent = agent_manager.get_agent(agent_name)
+
+        if agent is None:
+            return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
+
+        await websocket.accept()
+        logger.info("[Opened websocket connection]")
+
+        is_connected = True
+
+        connected_account_id = await connected_app_service.get_account_id(user_id, "gmail")
+        if connected_account_id is None:
+            return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
+
+        user_input = await websocket.receive_text()
+
+        response = await agent.async_execute(
+            question=user_input,
+            thread_id=thread_id,
+            user_id=user_id,
+            connected_account_id=connected_account_id,
+            max_recursion=max_recursion if max_recursion is not None else 5,
+        )
+
+        #TODO: Create schema for response
+        await websocket.send_json(
+            {
+                "threadID": thread_id,
+                "interrupted": response.interrupted,
+                "output": response.output,
+            }
+        )
+
+        if response.interrupted:
+            data = await websocket.receive_text()
+            if data == "continue":
+                action = HumanAction.CONTINUE
+                result = await agent.async_handle_execution_interrupt(
+                    action=action,
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    connected_account_id=connected_account_id,
+                    max_recursion=max_recursion if max_recursion is not None else 5,
+                )
+
+                # TODO: Create schema for response
+                await websocket.send_json(
+                    {
+                        "threadID": thread_id,
+                        "output": result.output,
+                    }
+                )
+
+            return ResponseWrapper.wrap(status=200, data=AgentResponse(
+                thread_id=thread_id,
+                output="Successfull",
+            )).to_response()
+
+    except WebSocketDisconnect:
+        logger.info("[WebSocketDisconnect] websocket disconnected")
+        is_connected = False
+        return ResponseWrapper.wrap(status=200, data=AgentResponse(
+                thread_id=thread_id,
+                output="Successfull",
+            )
+        ).to_response()
+
+    except Exception as e:
+        logger.error("Error in executing Gmail API: %s", str(e))
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+    finally:
+        if is_connected:
+            await websocket.close()
+            logger.info("[Close socket manually] Closed websocket connection")
+
+
+# noinspection DuplicatedCode
+@router.websocket("/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}")
+async def stream(
+        websocket: WebSocket,
+        user_id: str,
+        thread_id: str,
+        agent_name: Optional[str] = None,
+        max_recursion: Optional[int] = 5,
+        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+        agent_manager: AgentManager = Depends(get_agent_manager),
+):
+    is_connected = False
+
+    try:
+        agent_name = "gmail-agent" if agent_name is None else agent_name
+        agent = agent_manager.get_agent(agent_name)
+
+        if agent is None:
+            return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
+
+        await websocket.accept()
+        logger.info("[Opened websocket connection]")
+
+        is_connected = True
+
+        connected_account_id = await connected_app_service.get_account_id(user_id, "gmail")
+        if connected_account_id is None:
+            return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
+
+
+        user_input = await websocket.receive_text()
+        response = await agent.async_stream(
+            question=user_input,
+            thread_id=thread_id,
+            user_id=user_id,
+            connected_account_id=connected_account_id,
+            max_recursion=max_recursion if max_recursion is not None else 5,
+        )
+
+        async for dict_message in to_sse(response):
+            await websocket.send_json(dict_message)
+
+        data = await websocket.receive_text()
+        if data == "continue":
+
+            action = HumanAction.CONTINUE
+
+            result = await agent.async_handle_interrupt_stream(
+                action=action,
+                thread_id=thread_id,
+                user_id=user_id,
+                connected_account_id=connected_account_id,
+                max_recursion=max_recursion if max_recursion is not None else 5,
+            )
+
+            async for dict_message in to_sse(result):
+                await websocket.send_json(dict_message)
+
+        return ResponseWrapper.wrap(status=200, data=AgentResponse(
+                thread_id=thread_id,
+                output="Successfull",
+            )
+        ).to_response()
+
+    except WebSocketDisconnect:
+        logger.info("[WebSocketDisconnect] websocket disconnected")
+        is_connected = False
+        return ResponseWrapper.wrap(status=200, data=AgentResponse(
+                thread_id=thread_id,
+                output="Successfull",
+            )
+        ).to_response()
+
+    except Exception as e:
+        logger.error("Error executing Gmail API: %s", str(e))
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+    finally:
+        if is_connected:
+            await websocket.close()
+            logger.info("[Close socket manually] Closed websocket connection")

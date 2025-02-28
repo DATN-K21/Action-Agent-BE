@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
+from uuid import uuid4
+
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from structlog.stdlib import BoundLogger
@@ -15,6 +17,7 @@ class BaseAgent(ABC):
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
     ):
+        self.id = str(uuid4())
         self.graph = graph
         self.logger = logging.get_logger(self.__class__.__name__) if logger is None else logger
         self.name = name

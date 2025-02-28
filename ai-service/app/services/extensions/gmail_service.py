@@ -32,28 +32,26 @@ def _fetch_emails_post_processor(output_data: dict) -> dict:
 
 
 class GmailService(ExtensionService):
-    _name = "gmail"
-    _app_enum = ComposioService.get_app_enum("GMAIL")
-    _supported_actions = [
-        Action.GMAIL_SEND_EMAIL,
-        Action.GMAIL_FETCH_EMAILS,
-        Action.GMAIL_REPLY_TO_THREAD,
-        Action.GMAIL_SEARCH_PEOPLE,
-        Action.GMAIL_GET_CONTACTS,
-        Action.GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID,
-    ]
+    def __init__(self):
+        name = "gmail"
+        app_enum = ComposioService.get_app_enum("GMAIL")
+        supported_actions = [
+            Action.GMAIL_SEND_EMAIL,
+            Action.GMAIL_FETCH_EMAILS,
+            Action.GMAIL_REPLY_TO_THREAD,
+            Action.GMAIL_SEARCH_PEOPLE,
+            Action.GMAIL_GET_CONTACTS,
+            Action.GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID,
+        ]
+
+        super().__init__(
+            name=name,
+            app_enum=app_enum,
+            supported_actions=supported_actions,
+        )
 
 
-    @classmethod
-    def get_actions(cls):
-        toolset = ComposioService.get_toolset()
-        tools = toolset.get_tools(actions=cls._supported_actions)
-        tool_names = [tool.name for tool in tools]
-        return tool_names
-
-
-    @classmethod
-    def get_tools(cls):
+    def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_toolset()
         tools = toolset.get_tools(
             processors={
@@ -64,16 +62,20 @@ class GmailService(ExtensionService):
                     Action.GMAIL_FETCH_EMAILS: _fetch_emails_post_processor,
                 },
             },
-            actions=cls._supported_actions,
+            actions=self._supported_actions,
         )
         return tools
 
 
-    @classmethod
-    def get_authed_tools(cls, user_id: str, connected_account_id: str):
+    def get_authed_tools(
+            self,
+            user_id: str,
+            connected_account_id: str
+    )-> Sequence[Union[BaseTool, Callable]]:
+
         toolset = ComposioService.get_connected_account_toolset(
             user_id=user_id,
-            app_enum=cls._app_enum,
+            app_enum=self._app_enum,
             connected_account_id=connected_account_id,
         )
 
@@ -86,7 +88,7 @@ class GmailService(ExtensionService):
                     Action.GMAIL_FETCH_EMAILS: _fetch_emails_post_processor,
                 },
             },
-            actions=cls._supported_actions,
+            actions=self._supported_actions,
         )
 
         return tools

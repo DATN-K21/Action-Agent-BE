@@ -6,7 +6,7 @@ from composio_langgraph import App, ComposioToolSet
 
 from app.core import logging
 from app.core.settings import env_settings
-from app.schemas.connection import DeleteConnectionResponse
+from app.schemas.extension import DeleteConnectionResponse
 
 logger = logging.get_logger(__name__)
 

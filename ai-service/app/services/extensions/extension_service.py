@@ -1,4 +1,11 @@
 from abc import ABC, abstractmethod
+from typing import Sequence, Union, Callable
+from uuid import uuid4
+from composio_langgraph import Action
+
+
+from composio import App
+from langchain_core.tools import BaseTool
 
 from app.core import logging
 from app.core.settings import env_settings
@@ -7,55 +14,60 @@ from app.services.extensions.composio_service import ComposioService
 logger = logging.get_logger(__name__)
 
 
+# noinspection PyMethodMayBeStatic
 class ExtensionService(ABC):
-    _redirect_url = env_settings.COMPOSIO_REDIRECT_URL
-    _name = None
-    _app_enum = None
-    _supported_actions = None
+    def __init__(self, name: str, app_enum: App, supported_actions: Sequence[Action]):
+        self._name = name
+        self._app_enum = app_enum
+        self._supported_actions = supported_actions
+        self._id = str(uuid4)
+        self._redirect_url = env_settings.COMPOSIO_REDIRECT_URL
 
 
-    @classmethod
-    def initialize_connection(cls, user_id: str):
-        if cls._app_enum is None:
+    def initialize_connection(self, user_id: str):
+        if self._app_enum is None:
             raise ValueError("App enum is not set")
-        if cls._redirect_url is None:
+        if self._redirect_url is None:
             raise ValueError("Redirect URL is not set")
 
-        result = ComposioService.initialize_app_connection(user_id, cls._app_enum, cls._redirect_url)
+        result = ComposioService.initialize_app_connection(user_id, self._app_enum, self._redirect_url)
         return result
 
 
-    @classmethod
-    def logout(cls, connected_account_id: str):
+    def logout(self, connected_account_id: str):
         return ComposioService.delete_connection(connected_account_id)
 
 
-    @classmethod
-    def get_name(cls):
-        return cls._name
+    def get_name(self) -> str:
+        return self._name
 
 
-    @classmethod
-    def get_app_enum(cls):
-        return cls._app_enum
+    def get_app_enum(self) -> App:
+        return self._app_enum
 
 
-    @classmethod
+    def get_actions(self) -> Sequence[Action]:
+        return self._supported_actions
+
+
+    def get_action_names(self) -> Sequence[str]:
+        toolset = ComposioService.get_toolset()
+        tools = toolset.get_tools(actions=self._supported_actions)
+        tool_names = [tool.name for tool in tools]
+        return tool_names
+
+
     @abstractmethod
-    def get_actions(cls):
-        """ Get the actions """
-        pass
-
-
-    @classmethod
-    @abstractmethod
-    def get_tools(cls):
+    def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         """ Get the tools """
         pass
 
 
-    @classmethod
     @abstractmethod
-    def get_authed_tools(cls, user_id: str, connected_account_id: str):
+    def get_authed_tools(
+            self,
+            user_id: str,
+            connected_account_id: str
+    ) -> Sequence[Union[BaseTool, Callable]]:
         """ Get the tools with the auth parameters """
         pass
