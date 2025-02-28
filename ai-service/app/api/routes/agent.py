@@ -28,7 +28,6 @@ async def execute(
         response = await agent.async_execute(
             question=request.input,
             thread_id=request.thread_id,
-            user_id=request.user_id,
             max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
         )
 
@@ -57,7 +56,6 @@ async def stream(
         response = await agent.async_stream(
             question=request.input,
             thread_id=request.thread_id,
-            user_id=request.user_id,
             max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
         )
 

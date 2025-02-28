@@ -1,14 +1,9 @@
 from typing import Callable, Sequence, Union
 
 from composio_langgraph import Action
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.types import Command
 
 from app.core import logging
-from app.core.settings import env_settings
 from app.services.extensions.composio_service import ComposioService
 from app.services.extensions.extension_service import ExtensionService
 
@@ -69,15 +64,10 @@ class GmailService(ExtensionService):
 
     def get_authed_tools(
             self,
-            user_id: str,
-            connected_account_id: str
+            user_id: str
     )-> Sequence[Union[BaseTool, Callable]]:
 
-        toolset = ComposioService.get_connected_account_toolset(
-            user_id=user_id,
-            app_enum=self._app_enum,
-            connected_account_id=connected_account_id,
-        )
+        toolset = ComposioService.get_user_toolset(user_id=user_id)
 
         tools = toolset.get_tools(
             processors={

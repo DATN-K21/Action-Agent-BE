@@ -1,6 +1,5 @@
 from typing import Sequence
 
-from langchain_community.docstore import Wikipedia
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.tools import TavilySearchResults
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
@@ -9,12 +8,11 @@ from langchain_core.tools import create_retriever_tool, Tool, BaseTool
 from pydantic import SecretStr
 
 from app.core.settings import env_settings
-from app.core.tools.composio_adapter import ComposioAdapter
 from app.services.extensions.gmail_service import GmailService
 from app.utils.uploading import vstore
 
 
-def get_search_tools(max_results: int = 5, name="tavily_search_tool") -> Sequence[BaseTool]:
+def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:
     api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TAVILY_API_KEY))
     tavily_tool = TavilySearchResults(
         max_results=max_results,
@@ -55,13 +53,11 @@ def get_rag_tools() -> Sequence[BaseTool]:
 
 
 def get_gmail_tools() -> Sequence[BaseTool]:
-    tools = GmailService.get_tools()
-    wrapped_tools = []
+    tools = GmailService().get_tools()
 
     for tool in tools:
-        config_tool = ComposioAdapter(tool)
-        config_tool.set_composio_extension_service(GmailService)
-        config_tool.configurable_fields(
+        tool.set_composio_extension_service(GmailService)
+        tool.configurable_fields(
             user_id=ConfigurableField(
                 id="user_id",
                 name="User ID",
@@ -73,5 +69,4 @@ def get_gmail_tools() -> Sequence[BaseTool]:
                 description="The connected account ID to use",
             )
         )
-        wrapped_tools.append(ComposioAdapter(tool))
-    return wrapped_tools
+    return tools

@@ -37,37 +37,6 @@ class ComposioService:
     def get_toolset(cls):
         return ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
 
-    @classmethod
-    def get_connected_account_toolset(cls, user_id: str, app_enum: App, connected_account_id: str):
-        try:
-            toolset = ComposioService.get_user_toolset(user_id)
-
-            auth_params = toolset.get_auth_params(connection_id=connected_account_id)
-            auth_value = ""
-
-            if not auth_params:
-                return toolset
-
-            for parameter in auth_params.parameters:
-                if parameter.name == "Authorization":
-                    auth_value = parameter.value
-                    break
-
-            toolset.add_auth(
-                app=app_enum,
-                parameters=[
-                    CustomAuthParameter(
-                        name="Authorization",
-                        in_="header",
-                        value=auth_value,
-                    )
-                ],
-            )
-
-            return toolset
-        except Exception as e:
-            logger.error(f"Error fetching authorization value: {str(e)}")
-            raise
 
     @classmethod
     def get_app_enum(cls, app_type: str) -> App:

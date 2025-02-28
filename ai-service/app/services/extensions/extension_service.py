@@ -3,7 +3,6 @@ from typing import Sequence, Union, Callable
 from uuid import uuid4
 from composio_langgraph import Action
 
-
 from composio import App
 from langchain_core.tools import BaseTool
 
@@ -12,7 +11,6 @@ from app.core.settings import env_settings
 from app.services.extensions.composio_service import ComposioService
 
 logger = logging.get_logger(__name__)
-
 
 # noinspection PyMethodMayBeStatic
 class ExtensionService(ABC):
@@ -66,8 +64,7 @@ class ExtensionService(ABC):
     @abstractmethod
     def get_authed_tools(
             self,
-            user_id: str,
-            connected_account_id: str
+            user_id: str
     ) -> Sequence[Union[BaseTool, Callable]]:
         """ Get the tools with the auth parameters """
         pass

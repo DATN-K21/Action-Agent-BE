@@ -10,7 +10,6 @@ from app.schemas.base import BaseRequest, BaseResponse
 ##################################################
 class AgentRequest(BaseRequest):
     input: str = Field(ge=1, le=5000, title="Input", examples=["Hello!"])
-    user_id: str = Field(ge=1, le=100, title="User ID", examples=["userid123"])
     thread_id: str = Field(ge=1, le=100, title="Thread ID", examples=["threadid123"])
     agent_name: str = Field(ge=1, le=100, title="Agent Name", examples=["chat-agent"])
     recursion_limit: Optional[int] = Field(None, title="Recursion Limit", examples=[5])

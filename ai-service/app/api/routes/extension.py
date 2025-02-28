@@ -3,8 +3,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core import logging
+from app.core.agents.agent import Agent
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
+from app.core.graph.deps import get_extension_builder_manager
+from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.schemas.base import ResponseWrapper
 from app.schemas.agent import AgentResponse
 from app.schemas.extension import ActiveAccountResponse, GetActionsResponse
@@ -46,7 +49,7 @@ async def get_actions(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 @router.post(
-    path="/active}",
+    path="/active",
     tags=["Extension"],
     description="Initialize the connection.",
     response_model=ResponseWrapper[ActiveAccountResponse]
@@ -111,52 +114,54 @@ async def get_info():
         output=
 """
 1. Chat Endpoint:
-    URL: http://hostdomain/agent/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+    URL: http://hostdomain/extension/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}
     Description: This WebSocket endpoint enables agent communication through message-based chatting.
 
 2. Stream Endpoint:
-   URL: http://dostdomain/agent/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+   URL: http://dostdomain/extension/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}
    Description: This WebSocket endpoint facilitates agent communication through message streaming.
 """
     )).to_response()
 
 
 # noinspection DuplicatedCode
-@router.websocket("/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}")
+@router.websocket("/ws/chat/{user_id}/{thread_id}/{extension_name}/{max_recursion}")
 async def execute(
         websocket: WebSocket,
         user_id: str,
         thread_id: str,
-        agent_name: Optional[str] = None,
+        extension_name: str,
         max_recursion: Optional[int] = 5,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-        agent_manager: AgentManager = Depends(get_agent_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
 ):
     is_connected = False
 
     try:
-        agent_name = "gmail-agent" if agent_name is None else agent_name
-        agent = agent_manager.get_agent(agent_name)
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+        builder_manager.update_builder_tools(
+            builder_name=extension_name,
+            tools=extension_service.get_authed_tools(user_id)
+        )
 
-        if agent is None:
+        builder = builder_manager.get_extension_builder(extension_name)
+
+        if builder is None:
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
+
+        graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
+        agent = Agent(graph)
 
         await websocket.accept()
         logger.info("[Opened websocket connection]")
 
         is_connected = True
 
-        connected_account_id = await connected_app_service.get_account_id(user_id, "gmail")
-        if connected_account_id is None:
-            return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-
         user_input = await websocket.receive_text()
 
         response = await agent.async_execute(
             question=user_input,
             thread_id=thread_id,
-            user_id=user_id,
-            connected_account_id=connected_account_id,
             max_recursion=max_recursion if max_recursion is not None else 5,
         )
 
@@ -176,8 +181,6 @@ async def execute(
                 result = await agent.async_handle_execution_interrupt(
                     action=action,
                     thread_id=thread_id,
-                    user_id=user_id,
-                    connected_account_id=connected_account_id,
                     max_recursion=max_recursion if max_recursion is not None else 5,
                 )
 
@@ -219,36 +222,37 @@ async def stream(
         websocket: WebSocket,
         user_id: str,
         thread_id: str,
-        agent_name: Optional[str] = None,
+        extension_name: str,
         max_recursion: Optional[int] = 5,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-        agent_manager: AgentManager = Depends(get_agent_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
 ):
     is_connected = False
 
     try:
-        agent_name = "gmail-agent" if agent_name is None else agent_name
-        agent = agent_manager.get_agent(agent_name)
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+        builder_manager.update_builder_tools(
+            builder_name=extension_name,
+            tools=extension_service.get_authed_tools(user_id)
+        )
 
-        if agent is None:
+        builder = builder_manager.get_extension_builder(extension_name)
+
+        if builder is None:
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
+
+        graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
+        agent = Agent(graph)
 
         await websocket.accept()
         logger.info("[Opened websocket connection]")
 
         is_connected = True
 
-        connected_account_id = await connected_app_service.get_account_id(user_id, "gmail")
-        if connected_account_id is None:
-            return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-
-
         user_input = await websocket.receive_text()
         response = await agent.async_stream(
             question=user_input,
             thread_id=thread_id,
-            user_id=user_id,
-            connected_account_id=connected_account_id,
             max_recursion=max_recursion if max_recursion is not None else 5,
         )
 
@@ -263,8 +267,6 @@ async def stream(
             result = await agent.async_handle_interrupt_stream(
                 action=action,
                 thread_id=thread_id,
-                user_id=user_id,
-                connected_account_id=connected_account_id,
                 max_recursion=max_recursion if max_recursion is not None else 5,
             )
 

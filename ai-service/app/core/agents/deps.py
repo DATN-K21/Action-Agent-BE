@@ -1,8 +1,6 @@
-from typing import Sequence, Union, Callable
-
 from fastapi import Depends
-from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from functools import lru_cache
 
 from app.core.agents.agent import Agent
 from app.core.agents.agent_manager import AgentManager
@@ -11,6 +9,7 @@ from app.core.tools.tools import get_search_tools, get_rag_tools, get_gmail_tool
 from app.memory.deps import get_checkpointer
 
 
+@lru_cache()
 def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
     manager = AgentManager()
 
@@ -39,6 +38,8 @@ def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointe
     manager.register_agent(gmail_agent)
 
     return manager
+
+
 
 
 

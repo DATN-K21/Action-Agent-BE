@@ -10,6 +10,12 @@ class AgentManager:
 
 
     def register_agent(self, agent: Agent):
+        if agent.id is None:
+            raise ValueError("Agent id is not set")
+
+        if agent.name is None:
+            raise ValueError("Agent name is not set")
+
         if agent.id in self.id_to_agent:
             raise ValueError(f"Agent '{agent.id} already exists")
 
@@ -19,7 +25,7 @@ class AgentManager:
         self.id_to_agent[agent.id] = agent
         self.name_to_id[agent.name] = agent.id
 
-
+    # noinspection DuplicatedCode
     def remove_agent(self, name: Optional[str] = None, id_: Optional[str]= None ):
         if name is None and id_ is None:
           raise ValueError("Either name or id_ must be provided")
