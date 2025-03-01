@@ -3,8 +3,8 @@ const { OKSuccessResponse, CreatedSuccessResponse } = require('../../response/su
 const { BadRequestResponse } = require('../../response/error');
 const AccessValidator = require("./access.validator");
 const MongooseUtil = require("../../utils/mongoose.util");
-const { GoogleAuthExceptionMessages } = require("google-auth-library/build/src/auth/googleauth");
 const { syncData } = require("../../helpers/sync.helper");
+require('dotenv').config();
 
 class AccessController {
     constructor() {
@@ -245,6 +245,53 @@ class AccessController {
         }
     }
 
+    handleSendLinkToActivateAccount = async (req, res, next) => {
+        const validationResult = AccessValidator.validateVerifyEmail(req);
+        if (validationResult.error) {
+            throw new BadRequestResponse(validationResult.message, validationResult.code);
+        }
+        const { userEmail } = validationResult?.data;
+        try {
+            await this.accessService.sendLinkToActivateAccount(userEmail);
+            return new OKSuccessResponse({
+                message: 'Send link to activate account success',
+                data: {
+                    email: userEmail
+                },
+                code: 1011100
+            }).send(res);
+        } catch (error) {
+            if (MongooseUtil.isMongooseError(error)) {
+                throw new BadRequestResponse("Something went wrong", 1011109);
+            }
+            throw error;
+        }
+    }
+
+    handleActivateAccount = async (req, res, next) => {
+
+        const validationResult = AccessValidator.validateActivateAccount(req);
+
+        if (validationResult.error) {
+            throw new BadRequestResponse(validationResult.message, validationResult.code);
+        }
+
+        const { activationToken } = validationResult?.data;
+
+        try {
+            await this.accessService.activateAccount(activationToken);
+            const redirectUrl = process.env.CLIENT_URL + '/login';
+
+            res.render('activate-account', { redirectUrl });
+
+        } catch (error) {
+            if (MongooseUtil.isMongooseError(error)) {
+                throw new BadRequestResponse("Something went wrong", 1011215);
+            }
+            throw error;
+        }
+    }
+
     handleConfirmOTPToResetPassword = async (req, res, next) => {
         const validationResult = AccessValidator.validateVerifyOTP(req);
         if (validationResult.error) {
@@ -287,5 +334,4 @@ class AccessController {
         }
     }
 }
-
 module.exports = new AccessController();

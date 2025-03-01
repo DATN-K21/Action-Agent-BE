@@ -10,6 +10,10 @@ router.post("/login", handleAsync(AccessController.handleLogin));
 router.post("/verify/send-otp", handleAsync(AccessController.handleVerifyEmail));
 router.post("/verify/confirm-otp", handleAsync(AccessController.handleVerifyOTP));
 
+//New activate method
+router.post("/activate/send-link", handleAsync(AccessController.handleSendLinkToActivateAccount));
+router.get("/activate", handleAsync(AccessController.handleActivateAccount));
+
 router.post('/google/auth', handleAsync(AccessController.handleLoginWithGoogle));
 
 router.get('/facebook/auth', passport.authenticate('facebook'));
