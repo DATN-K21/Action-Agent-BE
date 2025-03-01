@@ -5,7 +5,7 @@ from functools import lru_cache
 from app.core.agents.agent import Agent
 from app.core.agents.agent_manager import AgentManager
 from app.core.graph.base import GraphBuilder
-from app.core.tools.tools import get_search_tools, get_rag_tools, get_gmail_tools
+from app.core.tools.tools import get_search_tools, get_rag_tools
 from app.memory.deps import get_checkpointer
 
 
@@ -30,12 +30,6 @@ def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointe
     rag_graph = rag_builder.build_graph(perform_action=True, has_human_acceptance_flow=False)
     rag_agent = Agent(rag_graph, name="rag-agent")
     manager.register_agent(rag_agent)
-
-    # Register gmail agent
-    gmail_builder = GraphBuilder(checkpointer=checkpointer, tools=get_gmail_tools())
-    gmail_graph = gmail_builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
-    gmail_agent = Agent(gmail_graph, name="gmail-agent")
-    manager.register_agent(gmail_agent)
 
     return manager
 

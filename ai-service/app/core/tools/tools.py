@@ -50,23 +50,3 @@ def get_rag_tools() -> Sequence[BaseTool]:
     )
 
     return [retrieve_tool]
-
-
-def get_gmail_tools() -> Sequence[BaseTool]:
-    tools = GmailService().get_tools()
-
-    for tool in tools:
-        tool.set_composio_extension_service(GmailService)
-        tool.configurable_fields(
-            user_id=ConfigurableField(
-                id="user_id",
-                name="User ID",
-                description="The user ID to use",
-            ),
-            connected_account_id=ConfigurableField(
-                id="connected_account_id",
-                name="Connected Account ID",
-                description="The connected account ID to use",
-            )
-        )
-    return tools

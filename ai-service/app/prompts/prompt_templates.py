@@ -8,18 +8,7 @@ def get_simple_agent_prompt_template():
         [
             (
                 "system",
-                """You are a helpful assistant. 
-                
-                Please generate a detailed response based on the context above. Use Markdown formatting for better readability, including:
-                - Bullet points
-                - Numbered lists
-                - Code blocks (if applicable)
-                - Headings and subheadings for structure
-                - Tables (if necessary)
-                
-                Ensure that the response is **well-structured and informative** rather than a brief summary
-                
-                Answer the following question: """,
+                "You are a helpful assistant. Answer the following question: ",
             ),
             MessagesPlaceholder(variable_name="messages"),
         ]
@@ -51,7 +40,7 @@ def get_markdown_answer_generating_prompt_template():
         
         ---
         
-        Examples:
+        Few-show learning examples:
         
         # Benefits of Using LangChain for RAG
         

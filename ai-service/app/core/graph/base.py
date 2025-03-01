@@ -73,7 +73,7 @@ class GraphBuilder:
             self.logger.error(f"[_determining_tool_node] Error in invoking chain: {str(e)}")
             raise
 
-        if response.content != "":
+        if not response.content is None and response.content != "":
             return {
                 "messages": [AIMessage(content=response.content, name=MessageName.AI)],
                 "next": END,
@@ -174,6 +174,7 @@ class GraphBuilder:
             workflow.add_node("agent_node", self._async_agent_node)
             workflow.add_edge(START, "agent_node")
             workflow.add_edge("agent_node", END)
+
         elif not has_human_acceptance_flow:
             workflow.add_node("determining_tool_node", self._async_determining_tool_node)  # agent
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
@@ -183,6 +184,7 @@ class GraphBuilder:
             workflow.add_edge("determining_tool_node", "tool_node")
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
+
         else:
             workflow.add_node("determining_tool_node", self._async_determining_tool_node)  # agent
             workflow.add_node("human_review_node", self._human_review_node)  # human review
