@@ -1,5 +1,3 @@
-import traceback
-
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -80,7 +78,7 @@ class MultiAgentService:
             response_data = AgentResponse(thread_id=thread_id, output=content)
             return ResponseWrapper.wrap(status=200, data=response_data)
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -95,9 +93,10 @@ class MultiAgentService:
             state = {"messages": [query], "question": user_input}
             return astream_state(graph, state, config)
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return self.error_stream()
 
+    # noinspection PyMethodMayBeStatic
     async def error_stream(self) -> MessagesStream:
         error_message = AIMessage("An error occurred. Please try again later.")
         yield [error_message]

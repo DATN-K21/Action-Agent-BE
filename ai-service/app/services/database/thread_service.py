@@ -41,7 +41,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -74,7 +74,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -116,7 +116,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -148,7 +148,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -182,6 +182,6 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")

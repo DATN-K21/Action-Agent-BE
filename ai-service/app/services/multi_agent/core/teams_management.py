@@ -52,6 +52,6 @@ async def team_management_node(state: AgentState, config: RunnableConfig):
         return {"retrival_doc": result["messages"][-1].content}
     except Exception as e:
         logger.error(
-            f"[teams_management/teams_management_node] Error in executing graph: {e}"
+            f"Error in executing graph: {e}"
         )
         raise

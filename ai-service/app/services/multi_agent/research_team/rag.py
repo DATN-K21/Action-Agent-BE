@@ -56,5 +56,5 @@ async def rag_node(state: AgentState, config: RunnableConfig):
 
         return {"messages": [messages[-1].content]}
     except Exception as e:
-        logger.error(f"[rag/rag_node]Error in executing rag_node: {str(e)}")
+        logger.error(f"Error in executing rag_node: {str(e)}")
         raise

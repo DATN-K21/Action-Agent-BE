@@ -10,7 +10,7 @@ from app.core.graph.deps import get_extension_builder_manager
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.schemas.base import ResponseWrapper
 from app.schemas.agent import AgentResponse
-from app.schemas.extension import ActiveAccountResponse, GetActionsResponse
+from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
@@ -21,6 +21,24 @@ from app.utils.streaming import to_sse
 logger = logging.get_logger(__name__)
 
 router = APIRouter()
+
+
+@router.get(
+    path="/all",
+    tags=["Extension"],
+    description="Get the list of extensions available.",
+    response_model=ResponseWrapper[GetExtensionsResponse]
+)
+async def get_extensions(
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
+):
+    try:
+        extensions = extension_service_manager.get_all_extension_service_names()
+        response_data = GetExtensionsResponse(extensions=list(extensions))
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    except Exception as e:
+        logger.error(f"[extension/get_extensions] Error fetching extensions: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
 @router.get(
@@ -45,7 +63,7 @@ async def get_actions(
         response_data = GetActionsResponse(actions=list(actions))
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
-        logger.error(f"[gmail_agent/get_actions] Error fetching actions: {str(e)}")
+        logger.error(f"[gmail_agent/get_actions] Error fetching actions: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 @router.post(
@@ -75,7 +93,7 @@ async def active(
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"[extension/active] Error in activating account: {str(e)}")
+        logger.error(f"[extension/active] Error in activating account: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -104,7 +122,7 @@ async def logout(
         response_data = extension_service.logout(account_id)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
-        logger.error(f"[extension/logout] Error in logging out: {str(e)}")
+        logger.error(f"[extension/logout] Error in logging out: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -207,7 +225,7 @@ async def execute(
         ).to_response()
 
     except Exception as e:
-        logger.error("Error in executing Gmail API: %s", str(e))
+        logger.error(f"Error in executing Gmail API: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
     finally:
@@ -289,7 +307,7 @@ async def stream(
         ).to_response()
 
     except Exception as e:
-        logger.error("Error executing Gmail API: %s", str(e))
+        logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
     finally:

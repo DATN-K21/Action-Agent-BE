@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.routes import callback, general, multi_agent, thread, user, agent, extension
+from app.api.routes import callback, general, multi_agent, thread, user, agent, extension, history, upload
 
 
 class ValidationErrorResponse(BaseModel):
@@ -31,6 +31,11 @@ router.include_router(agent.router, prefix="/agent", tags=["Agent"])
 
 router.include_router(multi_agent.router, prefix="/multi_agent", tags=["Multi agent"])
 
+router.include_router(history.router, prefix="/history", tags=["History"])
+
+router.include_router(upload.router, prefix="/upload", tags=["Upload"])
+
 router.include_router(user.router, prefix="/user", tags=["User"])
 
 router.include_router(thread.router, prefix="/thread", tags=["Thread"])
+

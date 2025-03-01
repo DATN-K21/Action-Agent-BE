@@ -1,3 +1,5 @@
+from sys import exc_info
+
 from fastapi import APIRouter, Depends
 from sse_starlette import EventSourceResponse
 
@@ -5,13 +7,26 @@ from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
 from app.schemas.base import ResponseWrapper
-from app.schemas.agent import AgentResponse, AgentRequest
+from app.schemas.agent import AgentResponse, AgentRequest, GetAgentsResponse
 from app.utils.streaming import to_sse
 
 logger = logging.get_logger(__name__)
 
 
 router = APIRouter()
+
+
+@router.get("/all", tags=["Agent"], description="Endpoint to get all agent names.")
+async def get_agents(
+    agent_manager: AgentManager = Depends(get_agent_manager)
+):
+    try:
+        agents = agent_manager.get_all_agent_names()
+        response_data = GetAgentsResponse(agent_names=list(agents))
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    except Exception as e:
+        logger.error(f"Error fetching agents: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
 @router.post("/chat")
@@ -37,7 +52,7 @@ async def execute(
         )).to_response()
 
     except Exception as e:
-        logger.error("Error in executing Gmail API: %s", str(e))
+        logger.error(f"Error in executing Gmail API: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -62,5 +77,5 @@ async def stream(
         return EventSourceResponse(to_sse(response))
 
     except Exception as e:
-        logger.error("Error executing Gmail API: %s", str(e))
+        logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

@@ -9,8 +9,8 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 from structlog.stdlib import BoundLogger
 
-from app.prompts.prompt_templates import get_retriever_prompt_template, get_markdown_answer_generating_prompt_template, \
-    get_simple_agent_prompt_template
+from app.prompts.prompt_templates import get_markdown_answer_generating_prompt_template, \
+    get_simple_agent_prompt_template, get_tools_determining_prompt_template
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
 from app.utils.messages import get_message_prefix, trimmer
@@ -63,7 +63,7 @@ class GraphBuilder:
         question = state["question"]
 
         model = get_openai_model()
-        prompt = get_retriever_prompt_template()
+        prompt = get_tools_determining_prompt_template()
         model = model.bind_tools(self.tools)
         chain = prompt | model
 
@@ -181,7 +181,7 @@ class GraphBuilder:
             workflow.add_node("generate_node", self._async_generate_node)
 
             workflow.add_edge(START, "determining_tool_node")
-            workflow.add_edge("determining_tool_node", "tool_node")
+            workflow.add_conditional_edges("determining_tool_node", lambda state: END if state["next"] == END  else "tool_node")
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 

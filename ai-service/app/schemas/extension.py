@@ -21,6 +21,10 @@ class GetActionsResponse(BaseResponse):
     actions: list[str] = Field(..., title="List of actions", examples=[["action1", "action2"]])
 
 
+class GetExtensionsResponse(BaseResponse):
+    extensions: list[str] = Field(..., title="List of extensions", examples=[["extension1", "extension2"]])
+
+
 class LogoutAccountResponse(BaseResponse):
     message: str = Field(..., title="Message", examples=["Logout successful"])
 

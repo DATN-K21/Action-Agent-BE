@@ -56,7 +56,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}")
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -91,7 +91,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}")
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -147,7 +147,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}")
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -176,7 +176,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}")
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -206,6 +206,6 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=DeleteUserResponse(id=deleted_user_id))
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}")
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")

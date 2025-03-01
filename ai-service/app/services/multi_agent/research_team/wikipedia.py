@@ -57,6 +57,6 @@ async def wikipedia_node(state: AgentState, config: RunnableConfig):
         }
     except Exception as e:
         logger.error(
-            f"[wikipedia/wikipedia_node] Error in executing wikipedia node: {e}"
+            f"Error in executing wikipedia node: {e}"
         )
         raise

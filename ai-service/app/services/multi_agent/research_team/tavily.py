@@ -51,5 +51,5 @@ async def tavily_node(state: AgentState, config: RunnableConfig):
 
         return {"messages": [HumanMessage(content=messages[-1].content, name="tavily")]}
     except Exception as e:
-        logger.error(f"[tavily/tavily_node]Error in executing tavily node: {e}")
+        logger.error(f"Error in executing tavily node: {e}")
         raise

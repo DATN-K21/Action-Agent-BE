@@ -129,7 +129,7 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
     if env_settings.OPENAI_API_KEY:
         return PGVector(
-            OpenAIEmbeddings(api_key=SecretStr(env_settings.OPENAI_API_KEY)),
+            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,
             async_mode=async_mode,

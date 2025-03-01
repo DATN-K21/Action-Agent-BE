@@ -2,11 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import StateSnapshot
 from structlog.stdlib import BoundLogger
 
 from app.core import logging
+from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
+from app.utils.enums import HumanAction
+from app.utils.streaming import MessagesStream
 
 
 class BaseAgent(ABC):
@@ -24,31 +27,51 @@ class BaseAgent(ABC):
         self.config = config
 
 
-    @abstractmethod
-    def async_get_state(self, config: Dict[str, Any]):
-        """Build and return the current LangGraph state"""
-        pass
+    async def async_get_state(self, thread_id: str)->StateSnapshot:
+        state =  await self.graph.aget_state(config={"configurable": {"thread_id": thread_id}})
+        return state
 
 
     @abstractmethod
-    async def async_execute(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def async_execute(
+            self,
+            question: str,
+            thread_id: Optional[str]=None,
+            max_recursion: int = 10,
+    )->AgentExecutionResult:
         """Execute the agent's graph with given input"""
         pass
 
 
     @abstractmethod
-    async def async_handle_execution_interrupt(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the agent's graph with given input"""
+    async def async_handle_execution_interrupt(
+            self,
+            action: HumanAction,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10,
+    )->AgentInterruptHandlingResult:
+        """Handle the interrupt in the agent's graph"""
         pass
 
 
+
     @abstractmethod
-    async def async_stream(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def async_stream(
+            self,
+            question: str,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10
+    ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass
 
 
     @abstractmethod
-    async def async_handle_interrupt_stream(self, input_data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def async_handle_interrupt_stream(
+            self,
+            action: HumanAction,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10,
+    ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass

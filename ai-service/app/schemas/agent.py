@@ -21,5 +21,5 @@ class AgentResponse(BaseResponse):
     thread_id: Optional[str] = Field(None, title="Thread ID", examples=["abcdef"])
     output: Optional[str] = Field(None, title="Output", examples=["Hello!"])
 
-class GetAgentNamesResponse(BaseResponse):
+class GetAgentsResponse(BaseResponse):
     agent_names: list[str] = Field(title="Agent Names", examples=[["chat-agent", "email-agent"]])

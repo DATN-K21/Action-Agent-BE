@@ -1,4 +1,3 @@
-import traceback
 from typing import Optional, Dict, Any
 
 from langchain_core.messages import HumanMessage
@@ -25,10 +24,6 @@ class Agent(BaseAgent):
         if logger is None:
             logger = logging.get_logger(self.__class__.__name__)
         super().__init__(graph=graph, logger=logger, name=name, config=config)
-
-
-    async def async_get_state(self, config: Dict[str, Any]):
-        return await self.graph.aget_state(config)
 
 
     async def async_execute(
@@ -60,8 +55,7 @@ class Agent(BaseAgent):
                 output=response["messages"][-1].content,
             )
         except Exception as e:
-            self.logger.error(f"[async_execute] Error in executing graph: {str(e)}")
-            print(traceback.format_exc())
+            self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
 
@@ -83,7 +77,7 @@ class Agent(BaseAgent):
             )
 
         except Exception as e:
-            self.logger.error(f"[async_handle_execution_interrupt] Error in executing graph: {str(e)}")
+            self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
 
@@ -101,7 +95,7 @@ class Agent(BaseAgent):
             )
             return astream_state(app=self.graph, input_=state, config=config)
         except Exception as e:
-            self.logger.error(f"[async_stream] Error in executing graph: {str(e)}")
+            self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
 
@@ -118,5 +112,5 @@ class Agent(BaseAgent):
             )
             return astream_state(app=self.graph, input_=Command(resume=action), config=config)
         except Exception as e:
-            self.logger.error(f"[async_stream] Error in executing graph: {str(e)}")
+            self.logger.error(f"Error in executing graph: {str(e)}")
             raise

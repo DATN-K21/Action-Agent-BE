@@ -79,6 +79,6 @@ async def research_team_node(state: AgentState, config: RunnableConfig):
         }
     except Exception as e:
         logger.error(
-            f"[research_supervisor/research_team_node] Error in executing graph: {str(e)}"
+            f"Error in executing graph: {str(e)}"
         )
         raise
