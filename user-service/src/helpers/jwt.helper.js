@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { access_token_expire, refresh_token_expire, reset_password_token_expire } = require('../configs/time.config');
+const { access_token_expire, refresh_token_expire, reset_password_token_expire, activation_token_expire } = require('../configs/time.config');
 require('dotenv').config();
-
 class JWTHelper {
     static generateToken(payload, privateKey, expiresIn) {
         return jwt.sign(payload, privateKey, { expiresIn, algorithm: 'RS256' });
@@ -31,11 +30,26 @@ class JWTHelper {
         }, privateKey, reset_password_token_expire);
     }
 
+    static generateActivationToken(data, privateKey) {
+        return jwt.sign({
+            userId: data?.id?.toString() ?? data?._id?.toString(),
+            purpose: 'activation',
+        }, privateKey, { expiresIn: activation_token_expire, algorithm: 'HS256' });
+    }
+
     static verifyToken(token, publicKey) {
         return jwt.verify(token, publicKey, {
             algorithms: ['RS256']
         });
     }
+
+    static verifyActivationToken(token, publicKey) {
+        return jwt.verify(token, publicKey, {
+            algorithms: ['HS256']
+        });
+    }
+
+
 
     static checkIfTokenExpiredError(error) {
         return error instanceof jwt.TokenExpiredError;

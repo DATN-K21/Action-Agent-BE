@@ -156,6 +156,15 @@ class AccessValidator extends ValidatorConfig {
         });
     }
 
+    static validateActivateAccount(req) {
+        if (validator.isEmpty(req.query?.token || '')) {
+            return AccessValidator.returnFailedError('Activation token is required', 1010403);
+        }
+        return AccessValidator.returnPassedData({
+            activationToken: req.query?.token
+        });
+    }
+
     static validateVerifyOTP(req) {
         // User identification
         if (validator.isEmpty(req.body?.email || '')) {

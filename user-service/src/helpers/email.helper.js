@@ -65,6 +65,35 @@ class EmailHelper {
             return null;
         }
     }
+
+    static async sendActivationEmail(emailAddress, activationToken) {
+        const transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: emailConfig.user,
+                pass: emailConfig.pass,
+            },
+        });
+
+        const activationMessage = `
+            <p>Thank you for registering an account on My AI Assistant Application. Please click the link below to activate your account:</p>
+            <a href="${process.env.API_GATEWAY_URL}/api/v1/user/access/activate?token=${activationToken}">Activate Account</a><br>
+            <strong>Note: The activation link is valid for 15 minutes.</strong>
+        `;
+        const info = await transporter.sendMail({
+            to: emailAddress,
+            subject: "[My AI Assistant] Activate Account", // Subject line
+            html: activationMessage, // html body
+        });
+        if (info.accepted.length > 0) {
+            return info;
+        } else {
+            console.log("Failed to send activation email.");
+            return null;
+        }
+    }
 }
 
 module.exports = EmailHelper;

@@ -10,7 +10,7 @@ const MongooseUtil = require('../../utils/mongoose.util')
 const EmailHelper = require('../../helpers/email.helper');
 const { generateOtpCode } = require('../../utils/otpCode.util');
 const GoogleHelper = require('../../helpers/google.helper');
-
+const { jwtSecret } = require('../../configs/jwt.config');
 class AccessService {
     constructor() {
         this.userModel = UserModel;
@@ -447,6 +447,65 @@ class AccessService {
                 throw emailError;
             }
             throw new InternalServerErrorResponse('Failed to send OTP via email', 1011208);
+        }
+    }
+
+    async sendLinkToActivateAccount(userEmail) {
+        const user = await this.userModel
+            .findOne({ email: userEmail })
+            .populate('role')
+            .lean();
+        if (!user) {
+            throw new BadRequestResponse('User not found', 1011103);
+        }
+        if (user.email_verified === true) {
+            throw new BadRequestResponse('Email is already verified', 1011104);
+        }
+
+        const activationToken = JWTHelper.generateActivationToken(user, jwtSecret);
+        // Send email
+        try {
+            await EmailHelper.sendActivationEmail(user.email, activationToken);
+            //Save activation token to access model
+
+        } catch (error) {
+            throw new InternalServerErrorResponse('Failed to send activation email', 1011107);
+        }
+
+    }
+
+    async activateAccount(activationToken) {
+
+        let decodedActivationToken = null;
+
+        try {
+            decodedActivationToken = JWTHelper.verifyActivationToken(activationToken, jwtSecret);
+            if (!decodedActivationToken || !decodedActivationToken?.userId) {
+                throw new BadRequestResponse('Invalid activation token', 1011411);
+            }
+            if (decodedActivationToken && decodedActivationToken?.purpose !== 'activation') {
+                throw new BadRequestResponse('Invalid activation token', 1011412);
+            }
+            //Found user
+            const userId = MongooseUtil.convertToMongooseObjectIdType(decodedActivationToken.userId);
+            const user = await this.userModel.findById(userId).populate('role').lean();
+            if (!user) {
+                throw new BadRequestResponse('User not found', 1011413);
+            }
+            //Update user email_verified status
+            await this.userModel.updateOne({ _id: userId }, {
+                email_verified: true
+            }, { new: true });
+
+            return UserFilter.makeBasicFilter(user);
+        }
+        catch (error) {
+            if (JWTHelper.checkIfTokenExpiredError(error) === true) {
+                throw new BadRequestResponse('Activation token is expired', 1011414);
+            } else if (error instanceof BadRequestResponse || error instanceof ConflictResponse) {
+                throw error;
+            }
+            throw new InternalServerErrorResponse('Something went wrong', 1011415);
         }
     }
 
