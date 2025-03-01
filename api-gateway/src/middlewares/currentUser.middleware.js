@@ -19,8 +19,12 @@ const currentUserMiddleware = async (req, res, next) => {
 
       next();
     } catch (error) {
-      console.error('Error fetching user data:', error.message);
-      res.status(500).json({ error: 'Failed to fetch user data' });
+      console.error('Failed to get current user data: ', error.message);
+      if (error.status && error?.code && error?.message && error?.errorStack) {
+        res.status(error.status).json({ ...error, errorStack: undefined });
+      } else {
+        res.status(500).json({ error: `Failed to get current user data.` });
+      }
     }
   } else {
     next();
