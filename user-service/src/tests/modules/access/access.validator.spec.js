@@ -1,6 +1,7 @@
 const AccessValidator = require("../../../modules/access/access.validator")
 const {
 	validSignupPayload,
+	validSignupControllerResult,
 	validLoginPayload,
 	validInvokeNewTokenRequest,
 	validInvokeNewTokenResult,
