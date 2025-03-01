@@ -1,9 +1,7 @@
-from typing import Optional, Sequence, Union, Callable
+from typing import Callable, Sequence, Union
 
-from fontTools.ttLib.tables.otBase import BaseTable
 from langchain_core.tools import BaseTool
 
-from app.core.agents.agent import Agent
 from app.core.graph.base import GraphBuilder
 
 

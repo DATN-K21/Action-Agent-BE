@@ -4,12 +4,10 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core import logging
 from app.core.agents.agent import Agent
-from app.core.agents.agent_manager import AgentManager
-from app.core.agents.deps import get_agent_manager
 from app.core.graph.deps import get_extension_builder_manager
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.schemas.base import ResponseWrapper
 from app.schemas.agent import AgentResponse
+from app.schemas.base import ResponseWrapper
 from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
@@ -128,18 +126,20 @@ async def logout(
 
 @router.get("/ws-info")
 async def get_info():
-    return ResponseWrapper.wrap(status=200, data=AgentResponse(
-        output=
-"""
+    return ResponseWrapper.wrap(
+        status=200,
+        data=AgentResponse(
+            output="""
 1. Chat Endpoint:
-    URL: http://hostdomain/extension/ws/chat/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+    URL: http://hostdomain/extension/ws/chat/{user_id}/{thread_id}/{extension_name}/{max_recursion}
     Description: This WebSocket endpoint enables agent communication through message-based chatting.
 
 2. Stream Endpoint:
-   URL: http://dostdomain/extension/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}
+   URL: http://dostdomain/extension/ws/stream/{user_id}/{thread_id}/{extension_name}/{max_recursion}
    Description: This WebSocket endpoint facilitates agent communication through message streaming.
 """
-    )).to_response()
+        ),  # type: ignore
+    ).to_response()  # type: ignore
 
 
 # noinspection DuplicatedCode
@@ -159,7 +159,7 @@ async def execute(
         extension_service = extension_service_manager.get_extension_service(extension_name)
         builder_manager.update_builder_tools(
             builder_name=extension_name,
-            tools=extension_service.get_authed_tools(user_id)
+            tools=extension_service.get_authed_tools(user_id),  # type: ignore
         )
 
         builder = builder_manager.get_extension_builder(extension_name)
@@ -235,7 +235,7 @@ async def execute(
 
 
 # noinspection DuplicatedCode
-@router.websocket("/ws/stream/{user_id}/{thread_id}/{agent_name}/{max_recursion}")
+@router.websocket("/ws/stream/{user_id}/{thread_id}/{extension_name}/{max_recursion}")
 async def stream(
         websocket: WebSocket,
         user_id: str,
@@ -251,7 +251,7 @@ async def stream(
         extension_service = extension_service_manager.get_extension_service(extension_name)
         builder_manager.update_builder_tools(
             builder_name=extension_name,
-            tools=extension_service.get_authed_tools(user_id)
+            tools=extension_service.get_authed_tools(user_id),  # type: ignore
         )
 
         builder = builder_manager.get_extension_builder(extension_name)

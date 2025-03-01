@@ -7,6 +7,7 @@ from app.core.graph.base import GraphBuilder
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.memory.deps import get_checkpointer
 
+
 @lru_cache()
 def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
     manager = ExtensionBuilderManager()
@@ -17,5 +18,9 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
         name="gmail"
     )
     manager.register_extension_builder(gmail_builder)
+
+    # Register google calendar graph builder
+    google_calendar_builder = GraphBuilder(checkpointer=checkpointer, name="google-calendar")
+    manager.register_extension_builder(google_calendar_builder)
 
     return manager
