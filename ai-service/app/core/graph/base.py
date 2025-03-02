@@ -1,20 +1,24 @@
-from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
+from typing import Annotated, Any, Callable, Dict, Optional, Sequence, TypedDict
+
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.graph import StateGraph, add_messages, START, END
-from typing import Dict, Any, Annotated, Sequence, TypedDict, Union, Callable, Optional
-
+from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
-from structlog.stdlib import BoundLogger
 
-from app.prompts.prompt_templates import get_markdown_answer_generating_prompt_template, \
-    get_simple_agent_prompt_template, get_tools_determining_prompt_template
+from app.core import logging
+from app.prompts.prompt_templates import (
+    get_markdown_answer_generating_prompt_template,
+    get_simple_agent_prompt_template,
+    get_tools_determining_prompt_template,
+)
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
 from app.utils.messages import get_message_prefix, trimmer
-from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 
 class State(TypedDict):
@@ -23,32 +27,31 @@ class State(TypedDict):
     question: str
     next: str
 
+
 class GraphBuilder:
     def __init__(
-            self,
-            checkpointer: AsyncPostgresSaver,
-            logger: Optional[BoundLogger] = None,
-            tools: Optional[Sequence[Union[BaseTool, Callable]]] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None
+        self,
+        checkpointer: AsyncPostgresSaver,
+        tools: Optional[list[BaseTool | Callable]] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
-        self.checkpointer= checkpointer
-        self.logger = logging.get_logger(self.__class__.__name__) if logger is None else logger
+        self.checkpointer = checkpointer
         self.tools = tools
         self.name = name
         self.config = config
 
     async def _async_agent_node(self, state: State):
         print("---AGENT NODE---")
-        model = get_openai_model()
-        messages = trimmer.invoke(state["messages"])
-        prompt = get_simple_agent_prompt_template()
-        chain = prompt | model
 
         try:
+            model = get_openai_model()
+            messages = trimmer.invoke(state["messages"])
+            prompt = get_simple_agent_prompt_template()
+            chain = prompt | model
             response = await chain.ainvoke({"messages": messages})
         except Exception as e:
-            self.logger.error(f"[_agent_node] Error in invoking chain: {str(e)}")
+            logger.error(f"[_agent_node] Error in invoking chain: {str(e)}")
             raise
 
         return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
@@ -64,16 +67,16 @@ class GraphBuilder:
 
         model = get_openai_model()
         prompt = get_tools_determining_prompt_template()
-        model = model.bind_tools(self.tools)
+        model = model.bind_tools(self.tools)  # type: ignore
         chain = prompt | model
 
         try:
             response = await chain.ainvoke({"question": question, "context": docs})
         except Exception as e:
-            self.logger.error(f"[_determining_tool_node] Error in invoking chain: {str(e)}")
+            logger.error(f"[_determining_tool_node] Error in invoking chain: {str(e)}")
             raise
 
-        if not response.content is None and response.content != "":
+        if response.content is not None and response.content != "":
             return {
                 "messages": [AIMessage(content=response.content, name=MessageName.AI)],
                 "next": END,
@@ -94,7 +97,7 @@ class GraphBuilder:
                 }
             )
         except Exception as e:
-            self.logger.error(f"[human_review_node] Error in interrupting workflow : {str(e)}")
+            logger.error(f"[human_review_node] Error in interrupting workflow : {str(e)}")
             raise e
 
         # Approve the tool call and continue
@@ -110,7 +113,7 @@ class GraphBuilder:
         messages = []
         for tool_call in determine_tool_message.tool_calls:
             selected_tool = None
-            for tool in self.tools:
+            for tool in self.tools:  # type: ignore
                 if tool.name == tool_call["name"]:
                     selected_tool = tool
                     break
@@ -121,7 +124,7 @@ class GraphBuilder:
             try:
                 tool_msg = await selected_tool.ainvoke(tool_call, config)
             except Exception as e:
-                self.logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
+                logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
                 raise e
 
             # Check tool_msg is AIMessage
@@ -158,15 +161,12 @@ class GraphBuilder:
             }
 
         except Exception as e:
-            self.logger.error(f"[_generate_node] Error in invoking chain: {str(e)} ")
+            logger.error(f"[_generate_node] Error in invoking chain: {str(e)} ")
             raise
 
-
     def build_graph(
-            self,
-            perform_action: Optional[bool] = False,
-            has_human_acceptance_flow:Optional[bool] = False
-    )-> CompiledStateGraph:
+        self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False
+    ) -> CompiledStateGraph:
         # Define a new graph
         workflow = StateGraph(State)
 
@@ -181,7 +181,7 @@ class GraphBuilder:
             workflow.add_node("generate_node", self._async_generate_node)
 
             workflow.add_edge(START, "determining_tool_node")
-            workflow.add_conditional_edges("determining_tool_node", lambda state: END if state["next"] == END  else "tool_node")
+            workflow.add_conditional_edges("determining_tool_node", lambda state: END if state["next"] == END else "tool_node")
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 

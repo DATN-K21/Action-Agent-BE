@@ -26,9 +26,7 @@ class FileRagAgentMetadata(AgentMetadata):
 
 
 def get_rag_tool(thread_id: str):
-    retriever = vstore.as_retriever(
-        search_kwargs={"filter": {"namespace": {"$in": [thread_id]}}}
-    )
+    retriever = vstore.as_retriever(search_kwargs={"filter": {"namespace": {"$in": [thread_id]}}})
 
     rag_tool = create_retriever_tool(
         retriever,
@@ -43,9 +41,7 @@ def get_rag_tool(thread_id: str):
 async def rag_node(state: AgentState, config: RunnableConfig):
     try:
         rag_tool = get_rag_tool(config["configurable"].get("thread_id", ""))  # type: ignore
-        model_forced_to_rag = get_openai_model().bind_tools(
-            [rag_tool], tool_choice="retriever_tool"
-        )
+        model_forced_to_rag = get_openai_model().bind_tools([rag_tool], tool_choice="retriever_tool")
         result = await model_forced_to_rag.ainvoke([state["question"]])
         messages = state["messages"]
 

@@ -1,16 +1,16 @@
-from typing import Sequence, Dict, Any
+from typing import Any, Dict, Sequence
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from app.utils.enums import MessageName
 
 
-def converts_messages_to_dicts(messages: Sequence[BaseMessage]) -> Sequence[Dict[str, Any]]:
+def converts_messages_to_dicts(messages: Sequence[BaseMessage]) -> Sequence[Dict[str, Any]]:  # type: ignore
     for message in messages:
         if isinstance(message, HumanMessage):
-            yield {"human": message.content}
+            yield {"human": message.content}  # type: ignore
         if isinstance(message, AIMessage):
             if message.name == MessageName.AI:
-                yield {"ai": message.content}
+                yield {"ai": message.content}  # type: ignore
             if message.name == MessageName.TOOL:
-                yield {"tool": message.content}
+                yield {"tool": message.content}  # type: ignore

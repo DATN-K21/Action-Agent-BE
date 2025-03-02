@@ -1,10 +1,16 @@
+from functools import lru_cache
+
 from langchain import hub
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
 
+
+@lru_cache()
 def get_retriever_prompt_template():
     return hub.pull("rlm/rag-prompt")
 
+
+@lru_cache()
 def get_simple_agent_prompt_template():
     return ChatPromptTemplate.from_messages(
         [
@@ -17,6 +23,7 @@ def get_simple_agent_prompt_template():
     )
 
 
+@lru_cache()
 def get_tools_determining_prompt_template():
     return PromptTemplate(
         template="""
@@ -39,6 +46,7 @@ You are an intelligent assistant capable of determining whether a tool is needed
     )
 
 
+@lru_cache()
 def get_markdown_answer_generating_prompt_template():
     return PromptTemplate(
         template="""
@@ -92,6 +100,7 @@ By leveraging LangChain, developers can build **more accurate, context-aware AI 
     )
 
 
+@lru_cache()
 def get_grade_documents_prompt_template():
     return PromptTemplate(
         template="""
@@ -105,6 +114,7 @@ Give a binary score 'yes' or 'no' score to indicate whether the document is rele
     )
 
 
+@lru_cache()
 def get_grade_integration_agent_prompt_template():
     return PromptTemplate(
         template="""
@@ -121,6 +131,7 @@ necessary to complete the user's task.  \n
     )
 
 
+@lru_cache()
 def get_dynamic_few_shot_gmail_prompt(user_input: str):
     system_message = """
 You are a Gmail Assistant designed to assist users with their Gmail accounts 
@@ -247,9 +258,7 @@ the action you will take and then invoke the appropriate tool with correctly for
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg12345"}', tool_call_id="1"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg12345"}', tool_call_id="1"),
             AIMessage(
                 "The email to Alice with the subject 'Reminder' has been sent successfully.",
                 name="example_assistant",
@@ -276,9 +285,7 @@ the action you will take and then invoke the appropriate tool with correctly for
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg67890"}', tool_call_id="2"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg67890"}', tool_call_id="2"),
             AIMessage(
                 "The email to Bob and Charlie with the subject 'Meeting Update' has been sent successfully.",
                 name="example_assistant",
@@ -307,9 +314,7 @@ the action you will take and then invoke the appropriate tool with correctly for
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg34567"}', tool_call_id="3"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg34567"}', tool_call_id="3"),
             AIMessage(
                 "The email to Dana with CC to Erin and BCC to Frank, with the subject 'Budget Proposal,' has been sent successfully.",
                 name="example_assistant",
@@ -350,9 +355,7 @@ the action you will take and then invoke the appropriate tool with correctly for
             AIMessage(
                 "",
                 name="example_assistant",
-                tool_calls=[
-                    {"name": "GmailSearch", "args": {"query": "from:Alice"}, "id": "2"}
-                ],
+                tool_calls=[{"name": "GmailSearch", "args": {"query": "from:Alice"}, "id": "2"}],
             ),
             ToolMessage(
                 '[{"messageId": "msg67890", "snippet": "Hi, just checking in about our meeting tomorrow."}]',
@@ -365,9 +368,7 @@ the action you will take and then invoke the appropriate tool with correctly for
         ],
         # Example 3: Searching for emails within a date range
         [
-            HumanMessage(
-                "Search for emails sent in the last week.", name="example_user"
-            ),
+            HumanMessage("Search for emails sent in the last week.", name="example_user"),
             AIMessage(
                 "",
                 name="example_assistant",
@@ -539,15 +540,11 @@ the action you will take and then invoke the appropriate tool with correctly for
         ],
         # Example 2: Retrieve a thread by a specific sender
         [
-            HumanMessage(
-                "Retrieve the email thread of messages from Bob.", name="example_user"
-            ),
+            HumanMessage("Retrieve the email thread of messages from Bob.", name="example_user"),
             AIMessage(
                 "",
                 name="example_assistant",
-                tool_calls=[
-                    {"name": "GmailGetThread", "args": {"query": "from:Bob"}, "id": "2"}
-                ],
+                tool_calls=[{"name": "GmailGetThread", "args": {"query": "from:Bob"}, "id": "2"}],
             ),
             ToolMessage(
                 '[{"messageId": "msg789", "snippet": "Update on the financial report.", "body": "Hi team, Here is the updated financial report...", "subject": "Financial Report", "sender": "Bob"},'

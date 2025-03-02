@@ -1,6 +1,6 @@
 from typing import BinaryIO, cast
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Form, UploadFile
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import RunnableConfig
 
@@ -13,7 +13,10 @@ logger = logging.get_logger(__name__)
 
 router = APIRouter()
 
-@router.post("/ingest", tags=["Upload"], description="Upload files to the given thread.", response_model=ResponseWrapper[IngestResponse])
+
+@router.post(
+    "/ingest", tags=["Upload"], description="Upload files to the given thread.", response_model=ResponseWrapper[IngestResponse]
+)
 async def ingest_files(
     files: list[UploadFile],
     threadId: str = Form(...),

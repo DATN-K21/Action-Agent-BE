@@ -27,11 +27,9 @@ async def connection_success(
         return HTMLResponse("Connection failed or is still pending.", status_code=400)
 
     result = await connected_app_service.create_connected_app(
-        user_id = user_id,
-        app_name= app_name,
-        connected_account_id= connected_account_id
+        user_id=user_id, app_name=app_name, connected_account_id=connected_account_id
     )
-    
+
     if result:
         return HTMLResponse("Connection successful!")
     return HTMLResponse("Error creating connection.", status_code=500)

@@ -32,12 +32,3 @@ def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointe
     manager.register_agent(rag_agent)
 
     return manager
-
-
-
-
-
-
-
-
-

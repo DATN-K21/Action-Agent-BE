@@ -4,8 +4,8 @@ from langchain_core.runnables import RunnableConfig
 
 
 def get_invocation_config(
-        thread_id: Optional[str] = None,
-        recursion_limit: int = 10,
+    thread_id: Optional[str] = None,
+    recursion_limit: int = 10,
 ) -> RunnableConfig:
     configurable: Dict[str, Any] = {}
 

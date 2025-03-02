@@ -4,11 +4,10 @@ from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.tools import TavilySearchResults
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_core.runnables import ConfigurableField
-from langchain_core.tools import create_retriever_tool, Tool, BaseTool
+from langchain_core.tools import BaseTool, create_retriever_tool
 from pydantic import SecretStr
 
 from app.core.settings import env_settings
-from app.services.extensions.gmail_service import GmailService
 from app.utils.uploading import vstore
 
 
@@ -18,7 +17,7 @@ def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:
         max_results=max_results,
         name="tavily_search_tool",
         api_wrapper=api_wrapper,
-        description="Search and return information from Tavily"
+        description="Search and return information from Tavily",
     )
 
     wikipedia_retriever = WikipediaRetriever(wiki_client=None)
@@ -27,10 +26,7 @@ def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:
         "wikipedia_retriever_tool",
         "Search and return information from Wikipedia",
     )
-    return [
-        tavily_tool,
-        wikipedia_retriever_tool
-    ]
+    return [tavily_tool, wikipedia_retriever_tool]
 
 
 def get_rag_tools() -> Sequence[BaseTool]:
@@ -44,7 +40,7 @@ def get_rag_tools() -> Sequence[BaseTool]:
     )
 
     retrieve_tool = create_retriever_tool(
-        configurable_retriever,
+        configurable_retriever,  # type: ignore
         "retriever_tool",
         "Search and return information from the most relevant documents",
     )

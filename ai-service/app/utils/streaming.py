@@ -22,9 +22,7 @@ async def astream_state(
     root_run_id: Optional[str] = None
     messages: dict[str, BaseMessage] = {}
 
-    async for event in app.astream_events(
-        input_, config, version="v1", stream_mode="values", exclude_tags=["nostream"]
-    ):
+    async for event in app.astream_events(input_, config, version="v1", stream_mode="values", exclude_tags=["nostream"]):
         if event["event"] == "on_chain_start" and not root_run_id:
             root_run_id = event["run_id"]
             yield root_run_id

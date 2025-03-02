@@ -36,16 +36,12 @@ tavily_tool = TavilySearchResults(max_results=MAX_RESULTS, name="tavily_search_t
 
 async def tavily_node(state: AgentState, config: RunnableConfig):
     try:
-        model_forced_to_tavily = get_openai_model().bind_tools(
-            [tavily_tool], tool_choice="tavily_search_tool"
-        )
+        model_forced_to_tavily = get_openai_model().bind_tools([tavily_tool], tool_choice="tavily_search_tool")
         result = await model_forced_to_tavily.ainvoke([state["question"]])
         messages = state["messages"]
 
         for tool_call in result.tool_calls:
-            selected_tool = {"tavily_search_tool": tavily_tool}[
-                tool_call["name"].lower()
-            ]
+            selected_tool = {"tavily_search_tool": tavily_tool}[tool_call["name"].lower()]
             tool_msg = await selected_tool.ainvoke(tool_call)
             messages.append(tool_msg)
 

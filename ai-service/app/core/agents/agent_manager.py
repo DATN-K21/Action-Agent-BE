@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Optional
 
 from app.core.agents.agent import Agent
 
@@ -7,7 +7,6 @@ class AgentManager:
     def __init__(self):
         self.id_to_agent = {}
         self.name_to_id = {}
-
 
     def register_agent(self, agent: Agent):
         if agent.id is None:
@@ -26,9 +25,9 @@ class AgentManager:
         self.name_to_id[agent.name] = agent.id
 
     # noinspection DuplicatedCode
-    def remove_agent(self, name: Optional[str] = None, id_: Optional[str]= None ):
+    def remove_agent(self, name: Optional[str] = None, id_: Optional[str] = None):
         if name is None and id_ is None:
-          raise ValueError("Either name or id_ must be provided")
+            raise ValueError("Either name or id_ must be provided")
 
         if id_ is not None and id_ in self.id_to_agent:
             agent = self.id_to_agent[id_]
@@ -43,7 +42,7 @@ class AgentManager:
             return
 
     # noinspection DuplicatedCode
-    def get_agent(self, name:Optional[str]=None, id_:Optional[str]=None) -> Agent|None:
+    def get_agent(self, name: Optional[str] = None, id_: Optional[str] = None) -> Agent | None:
         if name is None and id_ is None:
             raise ValueError("Either name or id_ must be provided")
 
@@ -55,10 +54,8 @@ class AgentManager:
 
         return None
 
-
-    def get_all_agents(self) -> Sequence[Agent]:
+    def get_all_agents(self) -> list[Agent]:
         return list(self.id_to_agent.values())
 
-
-    def get_all_agent_names(self) -> Sequence[str]:
+    def get_all_agent_names(self) -> list[str]:
         return list(self.name_to_id.keys())

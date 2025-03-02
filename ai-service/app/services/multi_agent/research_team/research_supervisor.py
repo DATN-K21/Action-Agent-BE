@@ -36,9 +36,7 @@ research_builder.add_edge(TavilyAgentMetadata().name, "research_supervisor")
 research_builder.add_edge(WikipediaAgentMetadata().name, "research_supervisor")
 research_builder.add_edge(FileRagAgentMetadata().name, "research_supervisor")
 # Add the edges where routing applies
-research_builder.add_conditional_edges(
-    "research_supervisor", lambda state: state["next"]
-)
+research_builder.add_conditional_edges("research_supervisor", lambda state: state["next"])
 
 # Compile the graph
 research_graph = research_builder.compile()
@@ -70,15 +68,7 @@ class ResearchTeamMetadata(AgentMetadata):
 async def research_team_node(state: AgentState, config: RunnableConfig):
     try:
         result = await research_graph.ainvoke(state, config)
-        return {
-            "messages": [
-                HumanMessage(
-                    content=result["messages"][-1].content, name="research_team"
-                )
-            ]
-        }
+        return {"messages": [HumanMessage(content=result["messages"][-1].content, name="research_team")]}
     except Exception as e:
-        logger.error(
-            f"Error in executing graph: {str(e)}"
-        )
+        logger.error(f"Error in executing graph: {str(e)}")
         raise

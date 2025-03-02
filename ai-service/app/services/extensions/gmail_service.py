@@ -45,7 +45,6 @@ class GmailService(ExtensionService):
             supported_actions=supported_actions,
         )
 
-
     def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_toolset()
         tools = toolset.get_tools(
@@ -61,12 +60,7 @@ class GmailService(ExtensionService):
         )
         return tools
 
-
-    def get_authed_tools(
-            self,
-            user_id: str
-    )-> Sequence[Union[BaseTool, Callable]]:
-
+    def get_authed_tools(self, user_id: str) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_user_toolset(user_id=user_id)
 
         tools = toolset.get_tools(

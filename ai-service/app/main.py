@@ -9,8 +9,7 @@ from app.core.settings import env_settings
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info("Starting FastAPI server...")
-logger.info(f"DEBUG: {env_settings.DEBUG}")
+logger.info(f"Starting FastAPI server... DebugMode = {env_settings.DEBUG}")
 
 app = FastAPI(
     debug=env_settings.DEBUG,

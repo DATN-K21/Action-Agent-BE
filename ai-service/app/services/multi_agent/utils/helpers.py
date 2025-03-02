@@ -86,9 +86,7 @@ def make_supervisor_node(llm: BaseChatModel, metas: List[AgentMetadata]):
 
             return {"next": next_, "traversal": traversal}
         except Exception as e:
-            logger.error(
-                f"Error in supervisor node: {e}"
-            )
+            logger.error(f"Error in supervisor node: {e}")
             raise
 
     return supervisor_node

@@ -7,15 +7,12 @@ from app.core.graph.base import GraphBuilder
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.memory.deps import get_checkpointer
 
+
 @lru_cache()
-def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
-    manager = ExtensionBuilderManager()
-
+def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)) -> ExtensionBuilderManager:
     # Register gmail graph builder
-    gmail_builder = GraphBuilder(
-        checkpointer=checkpointer,
-        name="gmail"
-    )
-    manager.register_extension_builder(gmail_builder)
+    gmail_builder = GraphBuilder(checkpointer=checkpointer, name="gmail")
 
+    manager = ExtensionBuilderManager()
+    manager.register_extension_builder(gmail_builder)
     return manager

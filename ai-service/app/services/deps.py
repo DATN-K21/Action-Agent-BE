@@ -1,7 +1,8 @@
 from functools import lru_cache
-from fastapi import  Request
+from fastapi import Request
 
 from app.services.identity_service import IdentityService
+
 
 @lru_cache()
 # Identity Dependencies

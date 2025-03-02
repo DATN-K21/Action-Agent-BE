@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
@@ -10,27 +10,26 @@ from app.core.agents.base import BaseAgent
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
 from app.utils.enums import HumanAction
-from app.utils.streaming import astream_state, MessagesStream
+from app.utils.streaming import MessagesStream, astream_state
 
 
 class Agent(BaseAgent):
     def __init__(
-            self,
-            graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        graph: CompiledStateGraph,
+        logger: Optional[BoundLogger] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         if logger is None:
             logger = logging.get_logger(self.__class__.__name__)
         super().__init__(graph=graph, logger=logger, name=name, config=config)
 
-
     async def async_execute(
-            self,
-            question: str,
-            thread_id: Optional[str]=None,
-            max_recursion: int = 10,
+        self,
+        question: str,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
@@ -58,12 +57,11 @@ class Agent(BaseAgent):
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
-
     async def async_handle_execution_interrupt(
-            self,
-            action: HumanAction,
-            thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+        self,
+        action: HumanAction,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
     ) -> AgentInterruptHandlingResult:
         try:
             config = get_invocation_config(
@@ -80,13 +78,7 @@ class Agent(BaseAgent):
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
-
-    async def async_stream(
-            self,
-            question: str,
-            thread_id: Optional[str] =None,
-            max_recursion: int = 10
-    )-> MessagesStream:
+    async def async_stream(self, question: str, thread_id: Optional[str] = None, max_recursion: int = 10) -> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(
@@ -98,13 +90,12 @@ class Agent(BaseAgent):
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
-
     async def async_handle_interrupt_stream(
-            self,
-            action: HumanAction,
-            thread_id: Optional[str] = None,
-            max_recursion: int = 10,
-    )-> MessagesStream:
+        self,
+        action: HumanAction,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
+    ) -> MessagesStream:
         try:
             config = get_invocation_config(
                 thread_id=thread_id,

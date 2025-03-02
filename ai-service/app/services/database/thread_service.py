@@ -1,4 +1,3 @@
-import traceback
 from datetime import datetime
 
 from sqlalchemy import select, update
@@ -14,7 +13,6 @@ from app.schemas.thread import (
     GetListThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
-    UpdateThreadResponse,
 )
 from app.utils.constants import SYSTEM
 
@@ -78,9 +76,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_all_threads(
-        self, user_id: str, paging: CursorPagingRequest
-    ) -> ResponseWrapper[GetListThreadsResponse]:
+    async def get_all_threads(self, user_id: str, paging: CursorPagingRequest) -> ResponseWrapper[GetListThreadsResponse]:
         """Get all threads of a user."""
         try:
             stmt = (

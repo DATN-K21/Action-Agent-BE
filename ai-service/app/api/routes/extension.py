@@ -4,12 +4,10 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core import logging
 from app.core.agents.agent import Agent
-from app.core.agents.agent_manager import AgentManager
-from app.core.agents.deps import get_agent_manager
 from app.core.graph.deps import get_extension_builder_manager
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.schemas.base import ResponseWrapper
 from app.schemas.agent import AgentResponse
+from app.schemas.base import ResponseWrapper
 from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service

@@ -1,6 +1,4 @@
-
 import requests
-from composio.client.collections import CustomAuthParameter
 from composio.client.exceptions import NoItemsFound
 from composio_langgraph import App, ComposioToolSet
 
@@ -36,7 +34,6 @@ class ComposioService:
     @classmethod
     def get_toolset(cls):
         return ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
-
 
     @classmethod
     def get_app_enum(cls, app_type: str) -> App:

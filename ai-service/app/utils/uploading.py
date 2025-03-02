@@ -38,9 +38,7 @@ def _guess_mimetype(file_name: str, file_bytes: bytes) -> str:
     # Signature-based detection for common types
     if file_bytes.startswith(b"%PDF"):
         return "application/pdf"
-    elif file_bytes.startswith(
-        (b"\x50\x4b\x03\x04", b"\x50\x4b\x05\x06", b"\x50\x4b\x07\x08")
-    ):
+    elif file_bytes.startswith((b"\x50\x4b\x03\x04", b"\x50\x4b\x05\x06", b"\x50\x4b\x07\x08")):
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     elif file_bytes.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
         return "application/msword"
@@ -50,9 +48,7 @@ def _guess_mimetype(file_name: str, file_bytes: bytes) -> str:
     # Check for CSV-like plain text content (commas, tabs, newlines)
     try:
         decoded = file_bytes[:1024].decode("utf-8", errors="ignore")
-        if all(char in decoded for char in (",", "\n")) or all(
-            char in decoded for char in ("\t", "\n")
-        ):
+        if all(char in decoded for char in (",", "\n")) or all(char in decoded for char in ("\t", "\n")):
             return "text/csv"
         elif decoded.isprintable() or decoded == "":
             return "text/plain"
@@ -98,14 +94,10 @@ class IngestRunnable(RunnableSerializable[BinaryIO, List[str]]):
         if (self.assistant_id is None and self.thread_id is None) or (
             self.assistant_id is not None and self.thread_id is not None
         ):
-            raise ValueError(
-                "Exactly one of assistant_id or thread_id must be provided"
-            )
+            raise ValueError("Exactly one of assistant_id or thread_id must be provided")
         return self.assistant_id if self.assistant_id is not None else self.thread_id  # type: ignore
 
-    def invoke(
-        self, blob: Blob, config: Optional[RunnableConfig] = None, **kwargs
-    ) -> List[str]:
+    def invoke(self, blob: Blob, config: Optional[RunnableConfig] = None, **kwargs) -> List[str]:
         out = ingest_blob(
             blob,
             MIMETYPE_BASED_PARSER,
@@ -129,7 +121,7 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
     if env_settings.OPENAI_API_KEY:
         return PGVector(
-            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),
+            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),  # type: ignore
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,
             async_mode=async_mode,

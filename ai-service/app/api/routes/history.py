@@ -12,14 +12,15 @@ logger = logging.get_logger(__name__)
 
 router = APIRouter()
 
+
 @router.get("/state", tags=["History"], description="", response_model=ResponseWrapper[IngestResponse])
 async def get_state(
-        threadId: str,
-        agent_manager: AgentManager = Depends(get_agent_manager),
+    threadId: str,
+    agent_manager: AgentManager = Depends(get_agent_manager),
 ):
     try:
         agent = agent_manager.get_agent(name="chat-agent")
-        state = await agent.async_get_state(threadId)
+        state = await agent.async_get_state(threadId)  # type: ignore
 
         if "messages" in state.values:
             response_data = converts_messages_to_dicts(state.values["messages"])
