@@ -157,6 +157,7 @@ class AccessController {
         const { idToken } = validationResult.data;
         try {
             const result = await this.accessService.loginWithGoogle(idToken);
+
             return new OKSuccessResponse({
                 message: 'Login with google success',
                 data: result,

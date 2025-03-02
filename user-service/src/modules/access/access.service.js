@@ -11,6 +11,7 @@ const EmailHelper = require('../../helpers/email.helper');
 const { generateOtpCode } = require('../../utils/otpCode.util');
 const GoogleHelper = require('../../helpers/google.helper');
 const { jwtSecret } = require('../../configs/jwt.config');
+const { syncData } = require("../../helpers/sync.helper");
 class AccessService {
     constructor() {
         this.userModel = UserModel;
@@ -281,8 +282,24 @@ class AccessService {
                     google_id: userInfo?.googleId,
                     type_login: 'google',
                     email_verified: true,
+                    firstname: userInfo?.givenName,
+                    lastname: userInfo?.familyName,
+                    fullname: `${userInfo?.givenName} ${userInfo?.familyName}`,
                     role: foundRole?._id
                 });
+
+                //Sync data with AI-service
+                const userData = {
+                    id: newUser._id,
+                    email: newUser.email,
+                    username: newUser.username,
+                    firstName: newUser.firstname,
+                    lastName: newUser.lastname,
+                }
+                let response = await syncData('/user/create', userData);
+                if (response.error) {
+                    throw new BadRequestResponse("Something went sync data", 1010107);
+                }
 
                 const { privateKey, publicKey } = generateRSAKeysForAccess();
                 await this.accessModel.create({
