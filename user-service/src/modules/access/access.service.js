@@ -123,7 +123,7 @@ class AccessService {
             throw new BadRequestResponse('Access token is still valid', 1010308);
         } catch (error) {
             if (JWTHelper.checkIfTokenExpiredError(error) === false) {
-                throw new InternalServerErrorResponse('Something went wrong', 1010309);
+                throw new InternalServerErrorResponse('Your token has not expired yet', 1010309);
             }
 
             // Error is thrown because token is expired, continue to verify refresh token

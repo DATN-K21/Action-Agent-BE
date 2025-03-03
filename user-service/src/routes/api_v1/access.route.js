@@ -9,6 +9,7 @@ router.post("/signup", handleAsync(AccessController.handleSignup));
 router.post("/login", handleAsync(AccessController.handleLogin));
 router.post("/verify/send-otp", handleAsync(AccessController.handleVerifyEmail));
 router.post("/verify/confirm-otp", handleAsync(AccessController.handleVerifyOTP));
+router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTokens));
 
 //New activate method
 router.post("/activate/send-link", handleAsync(AccessController.handleSendLinkToActivateAccount));
@@ -30,7 +31,6 @@ router.post("/reset-password", handleAsync(AccessController.handleResetPassword)
 // Check access
 router.use(handleAsync(AccessMiddleware.checkAccess))
 
-router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTokens));
 router.post("/logout", handleAsync(AccessController.handleLogout));
 
 module.exports = router;
