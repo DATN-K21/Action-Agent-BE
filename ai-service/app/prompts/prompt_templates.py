@@ -7,6 +7,10 @@ def get_retriever_prompt_template():
     return hub.pull("rlm/rag-prompt")
 
 
+def get_openai_function_prompt_template():
+    return hub.pull("hwchase17/openai-functions-agent")
+
+
 def get_tools_determining_prompt_template():
     return PromptTemplate(
         template="""You are an assistant responsible for determining which tools to use to complete a user's task. \n

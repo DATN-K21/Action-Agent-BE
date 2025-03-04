@@ -7,7 +7,8 @@ from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.types import interrupt
 
 from app.core import logging
-from app.prompts.prompt_templates import get_retriever_prompt_template
+from app.prompts.prompt_templates import get_retriever_prompt_template, get_tools_determining_prompt_template, \
+    get_openai_function_prompt_template
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
 from app.utils.messages import get_message_prefix, trimmer
@@ -25,19 +26,15 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]], c
     async def determining_tool_node(state):
         print("---DETERMINE TOOL NODE---")
         messages = await trimmer.ainvoke(state["messages"])
-
-        docs = "#Previous Messages: "
-        docs += "\n\n".join([f"##{get_message_prefix(message)}: \n {message.content}\n\n" for message in messages])
-
         question = state["question"]
 
-        model = get_openai_model()
-        prompt = get_retriever_prompt_template()
+        model = get_openai_model(temperature=0)
+        prompt = get_openai_function_prompt_template()
         model = model.bind_tools(tools)
         chain = prompt | model
 
         try:
-            response = await chain.ainvoke({"question": question, "context": docs})
+            response = await chain.ainvoke({"input": question, "chat_history": messages, "agent_scratchpad": []})
         except Exception as e:
             logger.error(f"[multi_tools_base/determining_tool_node] Error in calling model: {str(e)}")
             raise e
@@ -109,7 +106,7 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]], c
 
             # Get the prompt
             prompt = get_retriever_prompt_template()
-            llm = get_openai_model()
+            llm = get_openai_model(temperature=0.75)
 
             # Chain
             rag_chain = prompt | llm
