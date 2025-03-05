@@ -15,4 +15,9 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     manager = ExtensionBuilderManager()
     manager.register_extension_builder(gmail_builder)
+
+    # Register google calendar graph builder
+    google_calendar_builder = GraphBuilder(checkpointer=checkpointer, name="google-calendar")
+    manager.register_extension_builder(google_calendar_builder)
+
     return manager
