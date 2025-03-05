@@ -35,6 +35,7 @@ def create_multiple_tools_workflow(tools: Sequence[Union[BaseTool, Callable]], c
 
         try:
             response = await chain.ainvoke({"input": question, "chat_history": messages, "agent_scratchpad": []})
+            print("[determining tool node]",response)
         except Exception as e:
             logger.error(f"[multi_tools_base/determining_tool_node] Error in calling model: {str(e)}")
             raise e
