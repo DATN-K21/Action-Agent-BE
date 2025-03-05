@@ -121,6 +121,7 @@ async def execute_gmail(
             await websocket.send_json(
                 {
                     "threadID": thread_id,
+                    "interrupted": False,
                     "output": result,
                 }
             )
