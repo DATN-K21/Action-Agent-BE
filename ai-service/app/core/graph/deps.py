@@ -23,4 +23,7 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
     google_calendar_builder = GraphBuilder(checkpointer=checkpointer, name="google-calendar")
     manager.register_extension_builder(google_calendar_builder)
 
+    # Register google meet graph builder
+    google_meet_builder = GraphBuilder(checkpointer=checkpointer, name="google-meet")
+    manager.register_extension_builder(google_meet_builder)
     return manager
