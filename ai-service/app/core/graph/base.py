@@ -117,18 +117,17 @@ class GraphBuilder:
 
         review_action = interrupt(
             {
-                "question": "Continue executing the tool call?",
                 # Surface tool calls for review
-                "tool_calls": state["tool_selection_message"].tool_calls,
+                "tool_calls": state["tool_selection_message"].tool_calls
             }
         )
 
         # Approve the tool call and continue
         if review_action == "continue":
-            return {"next": "tool_node"}
+            return {"next": "tool_node", "messages": [AIMessage(content=str_tool_message, name=MessageName.TOOL)]}
 
         # Reject the tool call and generate a response
-        return {"next": END}
+        return {"next": END, "messages": [AIMessage(content=str_tool_message, name=MessageName.TOOL)]}
 
     async def _async_tool_node(self, state: State, config: RunnableConfig):
         logger.info("---TOOL NODE---")
