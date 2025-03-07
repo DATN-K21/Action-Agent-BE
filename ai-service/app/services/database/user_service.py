@@ -4,6 +4,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
+from app.core.constants import SYSTEM
 from app.models import User
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
@@ -14,7 +15,6 @@ from app.schemas.user import (
     GetUserResponse,
     UpdateUserRequest,
 )
-from app.utils.constants import SYSTEM
 
 logger = logging.get_logger(__name__)
 

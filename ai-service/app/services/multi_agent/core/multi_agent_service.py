@@ -3,15 +3,15 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from app.core import logging
+from app.core.utils.messages import get_message_prefix, trimmer
+from app.core.utils.streaming import MessagesStream, astream_state
 from app.memory.checkpoint import AsyncPostgresSaver
 from app.prompts.prompt_templates import get_retriever_prompt_template
-from app.schemas.base import ResponseWrapper
 from app.schemas.agent import AgentResponse
+from app.schemas.base import ResponseWrapper
 from app.services.model_service import get_openai_model
 from app.services.multi_agent.core.teams_management import team_management_node
 from app.services.multi_agent.utils.helpers import AgentState
-from app.utils.messages import get_message_prefix, trimmer
-from app.utils.streaming import MessagesStream, astream_state
 
 logger = logging.get_logger(__name__)
 
@@ -62,7 +62,7 @@ class MultiAgentService:
 
     @logging.log_function_inputs(logger)
     async def execute_multi_agent(
-        self, thread_id: str, user_input: str, max_recursion: int = 10
+            self, thread_id: str, user_input: str, max_recursion: int = 10
     ) -> ResponseWrapper[AgentResponse]:
         try:
             config = RunnableConfig(

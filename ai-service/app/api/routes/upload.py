@@ -5,9 +5,9 @@ from langchain_core.documents.base import Blob
 from langchain_core.runnables import RunnableConfig
 
 from app.core import logging
+from app.core.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
 from app.schemas.base import ResponseWrapper
 from app.schemas.ingest import IngestResponse
-from app.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
 
 logger = logging.get_logger(__name__)
 
@@ -15,11 +15,12 @@ router = APIRouter()
 
 
 @router.post(
-    "/ingest", tags=["Upload"], description="Upload files to the given thread.", response_model=ResponseWrapper[IngestResponse]
+    "/ingest", tags=["Upload"], description="Upload files to the given thread.",
+    response_model=ResponseWrapper[IngestResponse]
 )
 async def ingest_files(
-    files: list[UploadFile],
-    threadId: str = Form(...),
+        files: list[UploadFile],
+        threadId: str = Form(...),
 ):
     try:
         file_blobs: list[Blob] = [convert_ingestion_input_to_blob(file) for file in files]

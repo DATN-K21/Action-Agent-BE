@@ -22,8 +22,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter, TextSplitte
 from pydantic import ConfigDict, SecretStr
 
 from app.core.settings import env_settings
-from app.utils.ingesting import ingest_blob
-from app.utils.parsing import MIMETYPE_BASED_PARSER
+from app.core.utils.ingesting import ingest_blob
+from app.core.utils.parsing import MIMETYPE_BASED_PARSER
 
 
 def _guess_mimetype(file_name: str, file_bytes: bytes) -> str:
@@ -92,7 +92,7 @@ class IngestRunnable(RunnableSerializable[BinaryIO, List[str]]):
     @property
     def namespace(self) -> str:
         if (self.assistant_id is None and self.thread_id is None) or (
-            self.assistant_id is not None and self.thread_id is not None
+                self.assistant_id is not None and self.thread_id is not None
         ):
             raise ValueError("Exactly one of assistant_id or thread_id must be provided")
         return self.assistant_id if self.assistant_id is not None else self.thread_id  # type: ignore
@@ -131,7 +131,6 @@ def _get_openai_embeddings(async_mode: bool) -> PGVector:
 
 
 vstore = _get_openai_embeddings(async_mode=True)
-
 
 ingest_runnable = IngestRunnable(
     text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200),

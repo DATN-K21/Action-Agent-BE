@@ -7,18 +7,18 @@ from langgraph.types import StateSnapshot
 from structlog.stdlib import BoundLogger
 
 from app.core import logging
+from app.core.enums import HumanAction
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
-from app.utils.enums import HumanAction
-from app.utils.streaming import MessagesStream
+from app.core.utils.streaming import MessagesStream
 
 
 class BaseAgent(ABC):
     def __init__(
-        self,
-        graph: CompiledStateGraph,
-        logger: Optional[BoundLogger] = None,
-        name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
+            self,
+            graph: CompiledStateGraph,
+            logger: Optional[BoundLogger] = None,
+            name: Optional[str] = None,
+            config: Optional[Dict[str, Any]] = None,
     ):
         self.id = str(uuid4())
         self.graph = graph
@@ -31,36 +31,37 @@ class BaseAgent(ABC):
         return state
 
     @abstractmethod
-    async def async_execute(
-        self,
-        question: str,
-        thread_id: Optional[str] = None,
-        max_recursion: int = 10,
+    async def async_chat(
+            self,
+            question: str,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10,
     ) -> AgentExecutionResult:
         """Execute the agent's graph with given input"""
         pass
 
     @abstractmethod
-    async def async_handle_execution_interrupt(
-        self,
-        action: HumanAction,
-        thread_id: Optional[str] = None,
-        max_recursion: int = 10,
+    async def async_handle_chat_interrupt(
+            self,
+            action: HumanAction,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10,
     ) -> AgentInterruptHandlingResult:
         """Handle the interrupt in the agent's graph"""
         pass
 
     @abstractmethod
-    async def async_stream(self, question: str, thread_id: Optional[str] = None, max_recursion: int = 10) -> MessagesStream:
+    async def async_stream(self, question: str, thread_id: Optional[str] = None,
+                           max_recursion: int = 10) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass
 
     @abstractmethod
-    async def async_handle_interrupt_stream(
-        self,
-        action: HumanAction,
-        thread_id: Optional[str] = None,
-        max_recursion: int = 10,
+    async def async_handle_stream_interrupt(
+            self,
+            action: HumanAction,
+            thread_id: Optional[str] = None,
+            max_recursion: int = 10,
     ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass

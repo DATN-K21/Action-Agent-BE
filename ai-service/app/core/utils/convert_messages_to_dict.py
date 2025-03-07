@@ -2,10 +2,10 @@ from typing import Any, Dict, Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from app.utils.enums import MessageName
+from app.core.enums import MessageName
 
 
-def converts_messages_to_dicts(messages: Sequence[BaseMessage]) -> Sequence[Dict[str, Any]]:  # type: ignore
+def convert_messages_to_dicts(messages: Sequence[BaseMessage]) -> Sequence[Dict[str, Any]]:  # type: ignore
     for message in messages:
         if isinstance(message, HumanMessage):
             yield {"human": message.content}  # type: ignore
