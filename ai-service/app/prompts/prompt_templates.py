@@ -11,6 +11,11 @@ def get_retriever_prompt_template():
 
 
 @lru_cache()
+def get_openai_function_prompt_template():
+    return hub.pull("hwchase17/openai-functions-agent")
+
+
+@lru_cache()
 def get_simple_agent_prompt_template():
     return ChatPromptTemplate.from_messages(
         [
@@ -24,7 +29,7 @@ def get_simple_agent_prompt_template():
 
 
 @lru_cache()
-def get_tools_determining_prompt_template():
+def get_tool_selection_prompt_template():
     return PromptTemplate(
         template="""
 You are an intelligent assistant capable of determining whether a tool is needed to complete a user's task or if you can answer the question directly.
@@ -97,6 +102,23 @@ LangChain provides several advantages when building Retrieval-Augmented Generati
 By leveraging LangChain, developers can build **more accurate, context-aware AI systems** for various applications.
 """,
         input_variables=["question", "context"],
+    )
+
+
+@lru_cache()
+def get_human_in_loop_evaluation_prompt_template():
+    return PromptTemplate(
+        template="""
+You are an evaluator determining whether human review is required before executing an action.\n
+Here are the details:\n
+- **Tool_calls**: {tool_calls}\n
+Decision Criteria:\n
+- If the action is a **read/retrieve operation** (e.g., searching, fetching, querying data), return 'no'.\n
+- If the action **modifies data** (e.g., updating, deleting, creating records), return 'yes'.\n
+Your response format should be:\n
+Human Review: <yes/no>
+""",
+        input_variables=["tool_calls"],
     )
 
 

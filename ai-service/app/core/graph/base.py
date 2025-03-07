@@ -1,4 +1,5 @@
-from typing import Annotated, Any, Callable, Dict, Optional, Sequence, TypedDict
+import json
+from typing import Annotated, Any, Callable, Dict, Optional, Sequence, TypedDict, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -12,7 +13,7 @@ from app.core import logging
 from app.prompts.prompt_templates import (
     get_markdown_answer_generating_prompt_template,
     get_simple_agent_prompt_template,
-    get_tools_determining_prompt_template,
+    get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
 )
 from app.services.model_service import get_openai_model
 from app.utils.enums import MessageName
@@ -23,18 +24,24 @@ logger = logging.get_logger(__name__)
 
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    determine_tool_message: AIMessage
+    tool_selection_message: AIMessage
+    tool_messages: list[ToolMessage]
     question: str
     next: str
 
 
+class BinaryScore(TypedDict):
+    score: Literal["yes", "no"]
+
+
+# noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
-        self,
-        checkpointer: AsyncPostgresSaver,
-        tools: Optional[list[BaseTool | Callable]] = None,
-        name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
+            self,
+            checkpointer: AsyncPostgresSaver,
+            tools: Optional[list[BaseTool | Callable]] = None,
+            name: Optional[str] = None,
+            config: Optional[Dict[str, Any]] = None,
     ):
         self.checkpointer = checkpointer
         self.tools = tools
@@ -42,7 +49,7 @@ class GraphBuilder:
         self.config = config
 
     async def _async_agent_node(self, state: State):
-        print("---AGENT NODE---")
+        logger.info("---AGENT NODE---")
 
         try:
             model = get_openai_model()
@@ -50,55 +57,65 @@ class GraphBuilder:
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
             response = await chain.ainvoke({"messages": messages})
+
+            return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
         except Exception as e:
             logger.error(f"[_agent_node] Error in invoking chain: {str(e)}")
             raise
 
-        return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
-
-    async def _async_determining_tool_node(self, state: State):
-        print("---DETERMINE TOOL NODE---")
-        messages = await trimmer.ainvoke(state["messages"])
-
-        docs = "#Previous Messages: "
-        docs += "\n\n".join([f"##{get_message_prefix(message)}: \n {message.content}\n\n" for message in messages])
-
-        question = state["question"]
-
-        model = get_openai_model()
-        prompt = get_tools_determining_prompt_template()
-        model = model.bind_tools(self.tools)  # type: ignore
-        chain = prompt | model
+    async def _async_select_tool_node(self, state: State):
+        logger.info("---SELECT TOOL NODE---")
 
         try:
-            response = await chain.ainvoke({"question": question, "context": docs})
+            question = state["question"]
+
+            model = get_openai_model(temperature=0)
+            prompt = get_openai_function_prompt_template()
+            model = model.bind_tools(self.tools)
+            chain = prompt | trimmer | model
+            response = await chain.ainvoke({
+                "input": question,
+                "chat_history": state["messages"],
+                "agent_scratchpad": []
+            })
+
+            if response.content is not None and response.content != "":
+                return {
+                    "messages": [AIMessage(content=response.content, name=MessageName.AI)],
+                    "next": END,
+                }
+
+            return {"tool_selection_message": response, "next": "evaluate_human_in_loop_node"}
+
         except Exception as e:
-            logger.error(f"[_determining_tool_node] Error in invoking chain: {str(e)}")
+            logger.error(f"[_async_select_tool_node] Error in invoking chain: {str(e)}")
             raise
 
-        if response.content is not None and response.content != "":
-            return {
-                "messages": [AIMessage(content=response.content, name=MessageName.AI)],
-                "next": END,
-            }
+    async def _async_evaluate_human_in_loop_node(self, state: State):
+        logger.info("---EVALUATE HUMAN IN LOOP NODE---")
+        tool_selection_message = state["tool_selection_message"]
+        str_tool_calls = json.dumps(tool_selection_message.tool_calls)
 
-        # We return a list, because this will get added to the existing list
-        return {"determine_tool_message": response, "next": "human_review_node"}
+        prompt = get_human_in_loop_evaluation_prompt_template()
+        model = get_openai_model(temperature=0)
+        chain = prompt | model.with_structured_output(BinaryScore)
+        response = await chain.ainvoke({"tool_calls": str_tool_calls})
+
+        if response["score"] == "yes":
+            return {"next": "human_review_node"}
+        else:
+            return {"next": "tool_node"}
 
     def _human_review_node(self, state: State):
-        print("---HUMAN REVIEW NODE---")
+        logger.info("---HUMAN REVIEW NODE---")
 
-        try:
-            review_action = interrupt(
-                {
-                    "question": "Continue executing the tool call?",
-                    # Surface tool calls for review
-                    "tool_calls": state["determine_tool_message"].tool_calls,
-                }
-            )
-        except Exception as e:
-            logger.error(f"[human_review_node] Error in interrupting workflow : {str(e)}")
-            raise e
+        review_action = interrupt(
+            {
+                "question": "Continue executing the tool call?",
+                # Surface tool calls for review
+                "tool_calls": state["tool_selection_message"].tool_calls,
+            }
+        )
 
         # Approve the tool call and continue
         if review_action == "continue":
@@ -108,36 +125,35 @@ class GraphBuilder:
         return {"next": END}
 
     async def _async_tool_node(self, state: State, config: RunnableConfig):
-        print("---TOOL NODE---")
-        determine_tool_message = state["determine_tool_message"]
-        messages = []
-        for tool_call in determine_tool_message.tool_calls:
-            selected_tool = None
-            for tool in self.tools:  # type: ignore
-                if tool.name == tool_call["name"]:
-                    selected_tool = tool
-                    break
+        logger.info("---TOOL NODE---")
+        try:
 
-            if selected_tool is None:
-                continue
-
-            try:
+            tool_selection_message = state["tool_selection_message"]
+            messages = []
+            for tool_call in tool_selection_message.tool_calls:
+                selected_tool = None
+                for tool in self.tools:  # type: ignore
+                    if tool.name == tool_call["name"]:
+                        selected_tool = tool
+                        break
+                if selected_tool is None:
+                    continue
                 tool_msg = await selected_tool.ainvoke(tool_call, config)
-            except Exception as e:
-                logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
-                raise e
 
-            # Check tool_msg is AIMessage
-            if isinstance(tool_msg, ToolMessage):
-                messages.append(AIMessage(content=tool_msg.content, name=MessageName.TOOL))
+                # Check tool_msg is AIMessage
+                if isinstance(tool_msg, ToolMessage):
+                    messages.append(tool_msg)
 
-        return {"messages": messages, "next": "generate_node"}
+            return {"tool_messages": messages, "next": "generate_node"}
+
+        except Exception as e:
+            logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
+            raise e
 
     async def _async_generate_node(self, state: State):
-        print("---GENERATE NODE---")
+        logger.info("---GENERATE NODE---")
         try:
-            messages = await trimmer.ainvoke(state["messages"])
-            tool_message = messages[-1] if len(messages) > 0 else None
+            tool_message = state["tool_messages"][-1] if len(state["tool_messages"]) > 0 else None
             question = state["question"]
 
             # Get the documents
@@ -165,7 +181,7 @@ class GraphBuilder:
             raise
 
     def build_graph(
-        self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False
+            self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False
     ) -> CompiledStateGraph:
         # Define a new graph
         workflow = StateGraph(State)
@@ -176,23 +192,26 @@ class GraphBuilder:
             workflow.add_edge("agent_node", END)
 
         elif not has_human_acceptance_flow:
-            workflow.add_node("determining_tool_node", self._async_determining_tool_node)  # agent
+            workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "determining_tool_node")
-            workflow.add_conditional_edges("determining_tool_node", lambda state: END if state["next"] == END else "tool_node")
+            workflow.add_edge(START, "select_tool_node")
+            workflow.add_conditional_edges("select_tool_node",
+                                           lambda state: END if state["next"] == END else "tool_node")
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 
         else:
-            workflow.add_node("determining_tool_node", self._async_determining_tool_node)  # agent
+            workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
+            workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
             workflow.add_node("human_review_node", self._human_review_node)  # human review
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "determining_tool_node")
-            workflow.add_conditional_edges("determining_tool_node", lambda state: state["next"])
+            workflow.add_edge(START, "select_tool_node")
+            workflow.add_conditional_edges("select_tool_node", lambda state: state["next"])
+            workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state["next"])
             workflow.add_conditional_edges("human_review_node", lambda state: state["next"])
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)

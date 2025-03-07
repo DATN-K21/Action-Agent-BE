@@ -10,7 +10,6 @@ from app.utils.streaming import to_sse
 
 logger = logging.get_logger(__name__)
 
-
 router = APIRouter()
 
 
@@ -33,7 +32,7 @@ async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(g
         if agent is None:
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
 
-        response = await agent.async_execute(
+        response = await agent.async_chat(
             question=request.input,
             thread_id=request.thread_id,
             max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
