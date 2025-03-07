@@ -24,7 +24,27 @@ The following code examples are written in Python and are intended to be execute
 
 ## 2. Extension APIs
 
+The Extension APIs exclusively support Socket.io for chat and streaming functionalities.
+
+1. General Information
+    - URL: http://hostdomain/
+    - Namespace: /extension
+    - Some client listeners: error, connect, disconnect
+
+2. Chat Endpoint:
+    - Event name: chat, chat_interrupt
+    - Client listens to: chat_response, handle_chat_interrupt
+    - Description: This Socket.io endpoint enables agent communication through message-based chatting.
+
+3. Stream Endpoint:
+    - Event name: stream, stream_interrupt
+    - Client listens to: stream_response, handle_stream_interrupt
+    - Description: This Socket.io endpoint facilitates agent communication through message streaming.
+
 ## 3. Agent APIs
+
+Agent functionalities are still accessible via HTTP APIs.
+You can explore these APIs using the Swagger documentation.
 
 ## 4. Multi-agent APIs
 
