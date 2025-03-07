@@ -7,6 +7,7 @@ const AccessMiddleware = require('../../../middlewares/access.middleware');
 const permissionMiddleware = require('../../../middlewares/permission.middleware');
 const {
 	validSignupPayload,
+	validSignupControllerResult,
 } = require('./access.mock');
 
 
@@ -29,7 +30,15 @@ jest.mock('passport', () => ({
 jest.mock('../../../modules/access/access.controller', () => ({
 	handleSignup: jest.fn(async (req, res) => {
 		return res.status(201).json({
-			data: { email: req.body.email, password: req.body.password },
+			data: {
+				id: '1',
+				email: req.body.email,
+				password: req.body.password,
+				username: req.body.username,
+				firstname: req.body.firstName,
+				lastname: req.body.lastName,
+				fullname: `${req.body.firstName} ${req.body.lastName}`,
+			},
 		})
 	}),
 	handleLogin: jest.fn(async (req, res) => {
@@ -126,7 +135,7 @@ describe('Access Routes', () => {
 				.send(validSignupPayload);
 
 			expect(response.statusCode).toBe(201);
-			expect(response.body.data).toEqual(validSignupPayload);
+			expect(response.body.data).toEqual(validSignupControllerResult);
 		});
 
 		it('should throw an error if another error occurred in access controller', async () => {

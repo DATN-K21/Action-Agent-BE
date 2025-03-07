@@ -51,13 +51,13 @@ class ProfileValidator extends ValidatorConfig {
         // Avatar validation
         if (dataSource?.avatar && !validator.isURL(dataSource.avatar)) {
             return ProfileValidator.returnFailedError('Avatar URL is invalid', startAPICode + 6);
-        } else if (dataSource?.avatar && !dataSource?.avatar.includes('https://') && !dataSource?.avatar.includes('http://')) {
+        } else if (dataSource?.avatar && !(dataSource?.avatar.includes('https://') || dataSource?.avatar.includes('http://'))) {
             return ProfileValidator.returnFailedError('Avatar URL must be a valid URL', startAPICode + 7);
         }
         // Cover photo validation
         if (dataSource?.cover_photo && !validator.isURL(dataSource.cover_photo)) {
             return ProfileValidator.returnFailedError('Cover photo URL is invalid', startAPICode + 8);
-        } else if (dataSource?.cover_photo && !dataSource?.cover_photo.includes('https://') && !dataSource?.cover_photo.includes('http://')) {
+        } else if (dataSource?.cover_photo && !(dataSource?.cover_photo.includes('https://') || dataSource?.cover_photo.includes('http://'))) {
             return ProfileValidator.returnFailedError('Cover photo URL must be a valid URL', startAPICode + 9);
         }
         // Email validation
@@ -69,15 +69,15 @@ class ProfileValidator extends ValidatorConfig {
             return ProfileValidator.returnFailedError('Phone is invalid', startAPICode + 11);
         }
         // Address validation
-        if (dataSource?.address && dataSource?.address?.street && validator.isLength(dataSource?.address?.street, { min: 3, max: 100 })) {
+        if (dataSource?.address && dataSource?.address?.street && !validator.isLength(dataSource?.address?.street, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of address street must between 3 and 100', startAPICode + 12);
-        } else if (dataSource?.address && dataSource?.address?.city && validator.isLength(dataSource?.address?.city, { min: 3, max: 100 })) {
+        } else if (dataSource?.address && dataSource?.address?.city && !validator.isLength(dataSource?.address?.city, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of address city must between 3 and 100', startAPICode + 13);
-        } else if (dataSource?.address && dataSource?.address?.state && validator.isLength(dataSource?.address?.state, { min: 3, max: 100 })) {
+        } else if (dataSource?.address && dataSource?.address?.state && !validator.isLength(dataSource?.address?.state, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of address state must between 3 and 100', startAPICode + 14);
-        } else if (dataSource?.address && dataSource?.address?.country && validator.isLength(dataSource?.address?.country, { min: 3, max: 100 })) {
+        } else if (dataSource?.address && dataSource?.address?.country && !validator.isLength(dataSource?.address?.country, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of address country must between 3 and 100', startAPICode + 15);
-        } else if (dataSource?.address && dataSource?.address?.postal_code && validator.isPostalCode(dataSource?.address?.postal_code, 'any')) {
+        } else if (dataSource?.address && dataSource?.address?.postal_code && !validator.isPostalCode(dataSource?.address?.postal_code, 'any')) {
             return ProfileValidator.returnFailedError('Postal code is invalid', startAPICode + 16);
         }
         // Social validation
@@ -91,11 +91,11 @@ class ProfileValidator extends ValidatorConfig {
             return ProfileValidator.returnFailedError('Social URL is invalid', startAPICode + 20);
         }
         // Workplace validation
-        if (dataSource?.workplace && validator.isLength(dataSource?.workplace, { min: 3, max: 100 })) {
+        if (dataSource?.workplace && !validator.isLength(dataSource?.workplace, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of workplace must between 3 and 100', startAPICode + 21);
         }
         // Education validation
-        if (dataSource?.education && validator.isLength(dataSource?.education, { min: 3, max: 100 })) {
+        if (dataSource?.education && !validator.isLength(dataSource?.education, { min: 3, max: 100 })) {
             return ProfileValidator.returnFailedError('The length of education must between 3 and 100', startAPICode + 22);
         }
 

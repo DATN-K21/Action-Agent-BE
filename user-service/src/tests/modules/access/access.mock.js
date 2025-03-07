@@ -8,10 +8,23 @@ const validGetAccessOwnerIdsResult = {
 const validSignupPayload = {
     email: 'jest@test.com',
     password: '123456',
+    username: 'jest tester',
+    firstName: 'Jest',
+    lastName: 'Tester',
 }
 const validSignupResult = { ...validSignupPayload, id: '1' };
 
-const validLoginPayload = { ...validSignupPayload }
+const validSignupControllerResult = {
+    id: '1',
+    email: validSignupPayload.email,
+    password: validSignupPayload.password,
+    username: validSignupPayload.username,
+    firstname: validSignupPayload.firstName,
+    lastname: validSignupPayload.lastName,
+    fullname: `${validSignupPayload.firstName} ${validSignupPayload.lastName}`
+};
+
+const validLoginPayload = { email: validSignupPayload.email, password: validSignupPayload.password };
 const validLoginResult = { user: { ...validSignupResult }, accessToken: 'jest-access-token', refreshToken: 'jest-refresh-token' };
 
 const validInvokeNewTokenRequest = {
@@ -133,6 +146,7 @@ module.exports = {
     validGetAccessOwnerIdsResult,
     validSignupPayload,
     validSignupResult,
+    validSignupControllerResult,
     validLoginPayload,
     validLoginResult,
     validVerifyEmailPayload,

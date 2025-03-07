@@ -17,6 +17,8 @@ class GoogleHelper {
                 email: payload.email,
                 name: payload.name,
                 picture: payload.picture,
+                givenName: payload.given_name,
+                familyName: payload.family_name,
             };
         }
         catch (error) {
