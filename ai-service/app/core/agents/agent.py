@@ -7,10 +7,10 @@ from structlog.stdlib import BoundLogger
 
 from app.core import logging
 from app.core.agents.base import BaseAgent
+from app.core.enums import HumanAction
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.utils.enums import HumanAction
-from app.utils.streaming import MessagesStream, astream_state
+from app.core.utils.streaming import MessagesStream, astream_state
 
 
 class Agent(BaseAgent):

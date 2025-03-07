@@ -7,9 +7,9 @@ from langgraph.types import StateSnapshot
 from structlog.stdlib import BoundLogger
 
 from app.core import logging
+from app.core.enums import HumanAction
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
-from app.utils.enums import HumanAction
-from app.utils.streaming import MessagesStream
+from app.core.utils.streaming import MessagesStream
 
 
 class BaseAgent(ABC):

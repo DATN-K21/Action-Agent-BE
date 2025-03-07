@@ -14,15 +14,16 @@ MessagesStream = AsyncIterator[Union[list[AnyMessage], str]]
 
 
 async def astream_state(
-    app: Runnable,
-    input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
-    config: RunnableConfig,
+        app: Runnable,
+        input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
+        config: RunnableConfig,
 ) -> MessagesStream:
     """Stream messages from the runnable."""
     root_run_id: Optional[str] = None
     messages: dict[str, BaseMessage] = {}
 
-    async for event in app.astream_events(input_, config, version="v1", stream_mode="values", exclude_tags=["nostream"]):
+    # async for event in app.astream_events(input_, config, version="v1", stream_mode="values", exclude_tags=["nostream"]):
+    async for event in app.astream_events(input_, config, version="v1", stream_mode="all"):
         if event["event"] == "on_chain_start" and not root_run_id:
             root_run_id = event["run_id"]
             yield root_run_id

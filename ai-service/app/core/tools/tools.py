@@ -8,7 +8,7 @@ from langchain_core.tools import BaseTool, create_retriever_tool
 from pydantic import SecretStr
 
 from app.core.settings import env_settings
-from app.utils.uploading import vstore
+from app.core.utils.uploading import vstore
 
 
 def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:

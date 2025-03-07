@@ -2,14 +2,14 @@ from socketio import AsyncNamespace
 
 from app.core import logging
 from app.core.agents.agent import Agent
+from app.core.enums import HumanAction
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.core.utils.convert_dict_message import convert_dict_message_to_binary_score, convert_dict_message_to_tool_call, \
     convert_dict_message_to_message
 from app.core.utils.socket_decorate import validate_event
+from app.core.utils.streaming import to_sse
 from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
-from app.utils.enums import HumanAction
-from app.utils.streaming import to_sse
 
 logger = logging.get_logger(__name__)
 
@@ -124,7 +124,7 @@ class ExtensionNamespace(AsyncNamespace):
             await self.emit("error", "Internal server error", to=sid)
 
     @validate_event(ExtensionCallBack)
-    async def _handle_stream_interrupt(self, sid, data: ExtensionCallBack):
+    async def on_handle_stream_interrupt(self, sid, data: ExtensionCallBack):
         if not self._check_exist_agent(sid, data.extension_name):
             logger.error(f"Agent not found")
             await self.emit("error", "Agent not found", to=sid)
@@ -141,17 +141,18 @@ class ExtensionNamespace(AsyncNamespace):
 
         async for dict_message in to_sse(result):
             message = convert_dict_message_to_message(dict_message)
-            await self.emit(
-                event="stream_response",
-                data=ExtensionResponse(
-                    user_id=data.user_id,
-                    thread_id=data.thread_id,
-                    extension_name=data.extension_name,
-                    interrupted=False,
-                    output=message
-                ).model_dump(),
-                to=sid
-            )
+            if message is not None:
+                await self.emit(
+                    event="stream_response",
+                    data=ExtensionResponse(
+                        user_id=data.user_id,
+                        thread_id=data.thread_id,
+                        extension_name=data.extension_name,
+                        interrupted=False,
+                        output=message
+                    ).model_dump(),
+                    to=sid
+                )
 
     @validate_event(ExtensionRequest)
     async def on_stream(self, sid, data):

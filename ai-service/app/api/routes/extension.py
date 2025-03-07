@@ -117,192 +117,26 @@ async def logout(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.get("/ws-info")
+@router.get("/socketio-info")
 async def get_info():
     return ResponseWrapper.wrap(
         status=200,
         data=AgentResponse(
             output="""
-1. Chat Endpoint:
-    URL: http://hostdomain/extension/ws/chat/{user_id}/{thread_id}/{extension_name}/{max_recursion}
-    Description: This WebSocket endpoint enables agent communication through message-based chatting.
+1. General Information
+    - URL: http://hostdomain/ 
+    - Namespace: /extension
+    - Some client listeners: error, connect, disconnect
+    
+2. Chat Endpoint:
+    - Event name: chat, chat_interrupt
+    - Client listens to: chat_response, handle_chat_interrupt
+    - Description: This Socket.io endpoint enables agent communication through message-based chatting.
 
-2. Stream Endpoint:
-   URL: http://dostdomain/extension/ws/stream/{user_id}/{thread_id}/{extension_name}/{max_recursion}
-   Description: This WebSocket endpoint facilitates agent communication through message streaming.
+3. Stream Endpoint:
+    - Event name: stream, stream_interrupt
+    - Client listens to: stream_response, handle_stream_interrupt
+    - Description: This Socket.io endpoint facilitates agent communication through message streaming.
 """
         ),  # type: ignore
     ).to_response()  # type: ignore
-
-# noinspection DuplicatedCode
-# @router.websocket("/ws/chat/{user_id}/{thread_id}/{extension_name}/{max_recursion}")
-# async def execute(
-#         websocket: WebSocket,
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         max_recursion: Optional[int] = 5,
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-# ):
-#     is_connected = False
-#
-#     try:
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         builder_manager.update_builder_tools(
-#             builder_name=extension_name,
-#             tools=extension_service.get_authed_tools(user_id),  # type: ignore
-#         )
-#
-#         builder = builder_manager.get_extension_builder(extension_name)
-#
-#         if builder is None:
-#             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
-#
-#         graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
-#         agent = Agent(graph)
-#
-#         await websocket.accept()
-#         logger.info("[Opened websocket connection]")
-#
-#         is_connected = True
-#
-#         user_input = await websocket.receive_text()
-#
-#         response = await agent.async_chat(
-#             question=user_input,
-#             thread_id=thread_id,
-#             max_recursion=max_recursion if max_recursion is not None else 5,
-#         )
-#
-#         # TODO: Create schema for response
-#         await websocket.send_json(
-#             {
-#                 "threadID": thread_id,
-#                 "interrupted": response.interrupted,
-#                 "output": response.output,
-#             }
-#         )
-#
-#         if response.interrupted:
-#             data = await websocket.receive_text()
-#             if data == "continue":
-#                 action = HumanAction.CONTINUE
-#                 result = await agent.async_handle_chat_interrupt(
-#                     action=action,
-#                     thread_id=thread_id,
-#                     max_recursion=max_recursion if max_recursion is not None else 5,
-#                 )
-#
-#                 # TODO: Create schema for response
-#                 await websocket.send_json(
-#                     {
-#                         "threadID": thread_id,
-#                         "output": result.output,
-#                     }
-#                 )
-#
-#             return ResponseWrapper.wrap(status=200, data=AgentResponse(
-#                 thread_id=thread_id,
-#                 output="Successfull",
-#             )).to_response()
-#
-#     except WebSocketDisconnect:
-#         logger.info("[WebSocketDisconnect] websocket disconnected")
-#         is_connected = False
-#         return ResponseWrapper.wrap(status=200, data=AgentResponse(
-#             thread_id=thread_id,
-#             output="Successfull",
-#         )
-#                                     ).to_response()
-#
-#     except Exception as e:
-#         logger.error(f"Error in executing Gmail API: {str(e)}", exc_info=True)
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#     finally:
-#         if is_connected:
-#             await websocket.close()
-#             logger.info("[Close socket manually] Closed websocket connection")
-#
-#
-# # noinspection DuplicatedCode
-# @router.websocket("/ws/stream/{user_id}/{thread_id}/{extension_name}/{max_recursion}")
-# async def stream(
-#         websocket: WebSocket,
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         max_recursion: Optional[int] = 5,
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-# ):
-#     is_connected = False
-#
-#     try:
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         builder_manager.update_builder_tools(
-#             builder_name=extension_name,
-#             tools=extension_service.get_authed_tools(user_id),  # type: ignore
-#         )
-#
-#         builder = builder_manager.get_extension_builder(extension_name)
-#
-#         if builder is None:
-#             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
-#
-#         graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
-#         agent = Agent(graph)
-#
-#         await websocket.accept()
-#         logger.info("[Opened websocket connection]")
-#
-#         is_connected = True
-#
-#         user_input = await websocket.receive_text()
-#         response = await agent.async_stream(
-#             question=user_input,
-#             thread_id=thread_id,
-#             max_recursion=max_recursion if max_recursion is not None else 5,
-#         )
-#
-#         async for dict_message in to_sse(response):
-#             await websocket.send_json(dict_message)
-#
-#         data = await websocket.receive_text()
-#         if data == "continue":
-#
-#             action = HumanAction.CONTINUE
-#
-#             result = await agent.async_handle_stream_interrupt(
-#                 action=action,
-#                 thread_id=thread_id,
-#                 max_recursion=max_recursion if max_recursion is not None else 5,
-#             )
-#
-#             async for dict_message in to_sse(result):
-#                 await websocket.send_json(dict_message)
-#
-#         return ResponseWrapper.wrap(status=200, data=AgentResponse(
-#             thread_id=thread_id,
-#             output="Successfull",
-#         )
-#                                     ).to_response()
-#
-#     except WebSocketDisconnect:
-#         logger.info("[WebSocketDisconnect] websocket disconnected")
-#         is_connected = False
-#         return ResponseWrapper.wrap(status=200, data=AgentResponse(
-#             thread_id=thread_id,
-#             output="Successfull",
-#         )
-#                                     ).to_response()
-#
-#     except Exception as e:
-#         logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#     finally:
-#         if is_connected:
-#             await websocket.close()
-#             logger.info("[Close socket manually] Closed websocket connection")

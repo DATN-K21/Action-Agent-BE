@@ -2,7 +2,7 @@ from typing import Any, Dict, Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from app.utils.enums import MessageName
+from app.core.enums import MessageName
 
 
 def convert_messages_to_dicts(messages: Sequence[BaseMessage]) -> Sequence[Dict[str, Any]]:  # type: ignore

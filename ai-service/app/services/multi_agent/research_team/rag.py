@@ -4,9 +4,9 @@ from langchain_core.runnables.config import RunnableConfig
 from langchain_core.tools import create_retriever_tool
 
 from app.core import logging
+from app.core.utils.uploading import vstore
 from app.services.model_service import get_openai_model
 from app.services.multi_agent.utils.helpers import AgentMetadata, AgentState, AvailableAgents
-from app.utils.uploading import vstore
 
 logger = logging.get_logger(__name__)
 

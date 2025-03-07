@@ -6,7 +6,7 @@ from langgraph.graph import END, MessagesState
 from pydantic import BaseModel
 
 from app.core import logging
-from app.utils.messages import trimmer
+from app.core.utils.messages import trimmer
 
 logger = logging.get_logger(__name__)
 
@@ -60,8 +60,8 @@ def make_supervisor_node(llm: BaseChatModel, metas: List[AgentMetadata]):
         """An LLM-based router."""
         try:
             messages = [
-                {"role": "system", "content": system_prompt},
-            ] + state["messages"]
+                           {"role": "system", "content": system_prompt},
+                       ] + state["messages"]
             messages = await trimmer.ainvoke(messages)
 
             response = await llm.with_structured_output(Router).ainvoke(messages)

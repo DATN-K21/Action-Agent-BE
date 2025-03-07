@@ -10,14 +10,14 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
 from app.core import logging
+from app.core.enums import MessageName
+from app.core.utils.messages import get_message_prefix, trimmer
 from app.prompts.prompt_templates import (
     get_markdown_answer_generating_prompt_template,
     get_simple_agent_prompt_template,
     get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
 )
 from app.services.model_service import get_openai_model
-from app.utils.enums import MessageName
-from app.utils.messages import get_message_prefix, trimmer
 
 logger = logging.get_logger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.get_logger(__name__)
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_selection_message: AIMessage
-    tool_messages: list[ToolMessage]
+    tool_message: ToolMessage
     question: str
     next: str
 
@@ -97,7 +97,7 @@ class GraphBuilder:
         str_tool_calls = json.dumps(tool_selection_message.tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
-        model = get_openai_model(temperature=0)
+        model = get_openai_model(model="gpt-3.5-turbo-0125", temperature=0)
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
@@ -106,8 +106,14 @@ class GraphBuilder:
         else:
             return {"next": "tool_node"}
 
-    def _human_review_node(self, state: State):
+    async def _async_human_review_node(self, state: State):
         logger.info("---HUMAN REVIEW NODE---")
+
+        # Make a stream by using LLM (for socketio stream)
+        str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
+        model = get_openai_model(temperature=0)
+        model = model.bind_tools(self.tools)
+        await model.ainvoke(input=str_tool_message)
 
         review_action = interrupt(
             {
@@ -144,7 +150,7 @@ class GraphBuilder:
                 if isinstance(tool_msg, ToolMessage):
                     messages.append(tool_msg)
 
-            return {"tool_messages": messages, "next": "generate_node"}
+            return {"tool_message": messages[-1], "next": "generate_node"}
 
         except Exception as e:
             logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
@@ -153,7 +159,7 @@ class GraphBuilder:
     async def _async_generate_node(self, state: State):
         logger.info("---GENERATE NODE---")
         try:
-            tool_message = state["tool_messages"][-1] if len(state["tool_messages"]) > 0 else None
+            tool_message = state["tool_message"]
             question = state["question"]
 
             # Get the documents
@@ -162,15 +168,12 @@ class GraphBuilder:
             else:
                 docs = f"\n\n##{get_message_prefix(tool_message)}: \n {tool_message.content}\n\n"
 
-            # Get the prompt
             prompt = get_markdown_answer_generating_prompt_template()
-            llm = get_openai_model()
-
-            # Chain
+            llm = get_openai_model(temperature=0.5)
             rag_chain = prompt | llm
 
-            # Run
             response = await rag_chain.ainvoke({"context": docs, "question": question})
+
             return {
                 "messages": [AIMessage(response.content, name=MessageName.AI)],
                 "next": END,
@@ -205,7 +208,7 @@ class GraphBuilder:
         else:
             workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
-            workflow.add_node("human_review_node", self._human_review_node)  # human review
+            workflow.add_node("human_review_node", self._async_human_review_node)  # human review
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 

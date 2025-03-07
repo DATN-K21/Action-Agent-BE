@@ -21,7 +21,7 @@ router = APIRouter(
     }
 )
 
-router.include_router(test.router, prefix="", tags=["General"])
+router.include_router(test.router, prefix="", tags=["Tests"])
 
 router.include_router(callback.router, prefix="/callback", tags=["Callback"], include_in_schema=False)
 

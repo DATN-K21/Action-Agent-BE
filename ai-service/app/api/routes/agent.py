@@ -4,9 +4,9 @@ from sse_starlette import EventSourceResponse
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
+from app.core.utils.streaming import to_sse
 from app.schemas.agent import AgentRequest, AgentResponse, GetAgentsResponse
 from app.schemas.base import ResponseWrapper
-from app.utils.streaming import to_sse
 
 logger = logging.get_logger(__name__)
 

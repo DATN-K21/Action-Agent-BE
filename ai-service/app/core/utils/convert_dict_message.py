@@ -40,6 +40,8 @@ def convert_dict_message_to_tool_call(dict_message: dict) -> dict | None:
                 if tool_call["name"] != "BinaryScore":
                     return tool_call
 
+    return None
+
 
 def convert_dict_message_to_message(dict_message: dict) -> dict | None:
     if dict_message["event"] != "data":
@@ -51,3 +53,5 @@ def convert_dict_message_to_message(dict_message: dict) -> dict | None:
         if message['type'] == 'ai':
             if 'tool_calls' in message and len(message['tool_calls']) == 0:
                 return message["content"]
+
+    return None
