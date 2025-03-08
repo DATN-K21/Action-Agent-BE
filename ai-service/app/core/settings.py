@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     COMPOSIO_REDIRECT_URL: str = "https://localhost:5001/callback/extension"
 
     # Frontend service settings
-    FRONTEND_REDIRECT_URL: str = "http://localhost:3000"
+    FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:

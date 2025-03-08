@@ -8,7 +8,8 @@ from app.core.graph.deps import get_extension_builder_manager
 from app.core.socketio import sio_asgi
 from app.memory.checkpoint import AsyncPostgresPool
 from app.memory.deps import get_checkpointer
-from app.services.extensions.deps import get_extension_service_manager, get_gmail_service, get_google_calendar_service
+from app.services.extensions.deps import get_extension_service_manager, get_gmail_service, get_google_calendar_service, \
+    get_google_meet_service
 from app.sockets.extension_socket import ExtensionNamespace
 
 
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
         extension_service_manager = get_extension_service_manager(
             gmail_service=get_gmail_service(),
             google_calendar_service=get_google_calendar_service(),
+            google_meet_service=get_google_meet_service(),
         )
         sio_asgi.register_namespace(
             ExtensionNamespace(
