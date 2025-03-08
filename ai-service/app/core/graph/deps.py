@@ -6,6 +6,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from app.core.graph.base import GraphBuilder
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.memory.deps import get_checkpointer
+from app.services.extensions.deps import get_gmail_service, get_google_calendar_service, get_google_meet_service
 
 
 @lru_cache()
@@ -15,16 +16,22 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
     # Register gmail graph builder
     gmail_builder = GraphBuilder(
         checkpointer=checkpointer,
-        name="gmail"
+        name=get_gmail_service().get_name(),
     )
     manager.register_extension_builder(gmail_builder)
 
     # Register google calendar graph builder
-    google_calendar_builder = GraphBuilder(checkpointer=checkpointer, name="google-calendar")
+    google_calendar_builder = GraphBuilder(
+        checkpointer=checkpointer,
+        name=get_google_calendar_service().get_name()
+    )
     manager.register_extension_builder(google_calendar_builder)
 
     # Register google meet graph builder
-    google_meet_builder = GraphBuilder(checkpointer=checkpointer, name="google-meet")
+    google_meet_builder = GraphBuilder(
+        checkpointer=checkpointer,
+        name=get_google_meet_service().get_name()
+    )
     manager.register_extension_builder(google_meet_builder)
 
     return manager
