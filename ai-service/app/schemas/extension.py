@@ -26,15 +26,15 @@ class GetExtensionsResponse(BaseResponse):
     extensions: list[str] = Field(..., title="List of extensions", examples=[["extension1", "extension2"]])
 
 
-class LogoutAccountResponse(BaseResponse):
-    message: str = Field(..., title="Message", examples=["Logout successful"])
-
-
 class DeleteConnectionResponse(BaseResponse):
     status: Literal["success", "failed"] = Field(..., title="Status of the delete operation", examples=["success"])
     count: Optional[int] = Field(None, title="Number of records deleted", examples=[1])
     message: Optional[str] = Field(None, title="Message", examples=["Connection deleted successfully"])
     error_code: Optional[int] = Field(None, title="Error code", examples=[400])
+
+
+class CheckConnectionResponse(BaseResponse):
+    is_connected: bool = Field(..., title="Is connected", examples=[True])
 
 
 ##################################################

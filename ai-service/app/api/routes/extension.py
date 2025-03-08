@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends
 from app.core import logging
 from app.schemas.agent import AgentResponse
 from app.schemas.base import ResponseWrapper
-from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse
+from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse, \
+    CheckConnectionResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
@@ -95,7 +96,7 @@ async def active(
     description="Disconnect the account.",
     response_model=ResponseWrapper
 )
-async def logout(
+async def disconnect(
         user_id: str,
         extension_name: str,
         connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
@@ -110,10 +111,37 @@ async def logout(
         account_id = await connected_app_service.get_account_id(user_id, "gmail")
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-        response_data = extension_service.logout(account_id)
+        response_data = extension_service.disconnect(account_id)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
         logger.error(f"[extension/logout] Error in logging out: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get(
+    path="/check-active",
+    tags=["Extension"],
+    description="Check the connection.",
+    response_model=ResponseWrapper[CheckConnectionResponse]
+)
+async def check_active(
+        user_id: str,
+        extension_name: str,
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+):
+    try:
+        extension_service = extension_service_manager.get_extension_service(extension_name)
+
+        if extension_service is None:
+            return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
+
+        result = extension_service.check_connection(str(user_id))
+
+        response_data = CheckConnectionResponse(is_connected=result)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"[extension/check_active] Error in checking connection: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 

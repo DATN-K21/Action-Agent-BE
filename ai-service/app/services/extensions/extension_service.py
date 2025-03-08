@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Sequence, Union, Callable
 from uuid import uuid4
-from composio_langgraph import Action
 
 from composio import App
+from composio_langgraph import Action
 from langchain_core.tools import BaseTool
 
 from app.core import logging
@@ -31,8 +31,11 @@ class ExtensionService(ABC):
         result = ComposioService.initialize_app_connection(user_id, self._app_enum, self._redirect_url)
         return result
 
-    def logout(self, connected_account_id: str):
+    def disconnect(self, connected_account_id: str):
         return ComposioService.delete_connection(connected_account_id)
+
+    def check_connection(self, user_id: str):
+        return ComposioService.check_app_connection(user_id, self._app_enum)
 
     def get_name(self) -> str:
         return self._name

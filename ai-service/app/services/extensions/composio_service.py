@@ -22,6 +22,16 @@ class ComposioService:
             return request
 
     @classmethod
+    def check_app_connection(cls, user_id: str, app_enum: App):
+        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY, entity_id=user_id)
+        entity = toolset.get_entity()
+        try:
+            entity.get_connection(app=app_enum)
+            return True
+        except NoItemsFound:
+            return False
+
+    @classmethod
     def get_entity(cls, user_id: str):
         toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY, entity_id=user_id)
         entity = toolset.get_entity()
