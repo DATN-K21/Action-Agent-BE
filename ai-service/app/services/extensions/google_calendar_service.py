@@ -1,5 +1,6 @@
 from typing import Callable, Sequence, Union
 
+from composio import App
 from composio_langgraph import Action
 from langchain_core.tools import BaseTool
 
@@ -10,8 +11,8 @@ from app.services.extensions.extension_service import ExtensionService
 # Docs: https://app.composio.dev/app/googlecalendar
 class GoogleCalendarService(ExtensionService):
     def __init__(self):
-        name = "google-calendar"
-        app_enum = ComposioService.get_app_enum("GOOGLECALENDAR")
+        name = str(App.GOOGLECALENDAR).lower()
+        app_enum = App.GOOGLECALENDAR
         supported_actions = [
             Action.GOOGLECALENDAR_FIND_EVENT,
             Action.GOOGLECALENDAR_CREATE_EVENT,

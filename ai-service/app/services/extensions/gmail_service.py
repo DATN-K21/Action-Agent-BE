@@ -1,5 +1,6 @@
 from typing import Callable, Sequence, Union
 
+from composio import App
 from composio_langgraph import Action
 from langchain_core.tools import BaseTool
 
@@ -28,8 +29,8 @@ def _fetch_emails_post_processor(output_data: dict) -> dict:
 
 class GmailService(ExtensionService):
     def __init__(self):
-        name = "gmail"
-        app_enum = ComposioService.get_app_enum("GMAIL")
+        name = str(App.GMAIL).lower()
+        app_enum = App.GMAIL
         supported_actions = [
             Action.GMAIL_SEND_EMAIL,
             Action.GMAIL_FETCH_EMAILS,

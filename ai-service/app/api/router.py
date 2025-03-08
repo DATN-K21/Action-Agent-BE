@@ -1,8 +1,7 @@
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.public import agent, callback, extension, history, multi_agent, test, thread, upload, user
+from app.api.public import agent, callback, connected_app, extension, history, multi_agent, test, thread, upload, user
 
 
 class ValidationErrorResponse(BaseModel):
@@ -29,5 +28,6 @@ router.include_router(user.router, prefix="/user", tags=["User"])
 router.include_router(thread.router, prefix="/thread", tags=["Thread"])
 router.include_router(history.router, prefix="/thread", tags=["History"])
 router.include_router(upload.router, prefix="/thread", tags=["Upload"])
+router.include_router(connected_app.router, prefix="/connected-app", tags=["Connected App"])
 
 # Private routes

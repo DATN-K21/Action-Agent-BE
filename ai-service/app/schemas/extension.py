@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import Field, BaseModel
 
-from app.schemas.base import BaseResponse
+from app.schemas.base import BaseResponse, BaseRequest
 
 
 ##################################################
@@ -40,7 +40,7 @@ class CheckConnectionResponse(BaseResponse):
 ##################################################
 ########### SOCKETIO REQUEST SCHEMAS #############
 ##################################################
-class ExtensionRequest(BaseModel):
+class ExtensionRequest(BaseRequest):
     user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
@@ -51,7 +51,7 @@ class ExtensionRequest(BaseModel):
 ##################################################
 ########### SOCKETIO RESPONSE SCHEMAS ############
 ##################################################
-class ExtensionResponse(BaseModel):
+class ExtensionResponse(BaseRequest):
     user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
