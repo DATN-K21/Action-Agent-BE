@@ -111,7 +111,16 @@ async def disconnect(
         account_id = await connected_app_service.get_account_id(user_id, "gmail")
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
+
+        # Disconnect the account
         response_data = extension_service.disconnect(account_id)
+
+        # Delete the account from the database
+        if response_data.status == "success":
+            result = await connected_app_service.delete_connected_app(user_id, "gmail")
+            if not result:
+                return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
         logger.error(f"[extension/logout] Error in logging out: {str(e)}", exc_info=True)
