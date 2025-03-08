@@ -3,7 +3,7 @@ from fastapi.openapi.utils import get_openapi
 
 
 def set_custom_openapi(app: FastAPI) -> FastAPI:
-    """Set custom OpenAPI schema for FastAPI app, including authorization headers."""
+    """Set custom OpenAPI schema."""
 
     def custom_openapi():
         if not app.openapi_schema:
@@ -42,6 +42,12 @@ def set_custom_openapi(app: FastAPI) -> FastAPI:
                     "name": "x-user-role",
                     "description": "User role required for authorization",
                 },
+                "EmailAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "x-user-email",
+                    "description": "User role required for authorization",
+                },
             }
 
             app.openapi_schema["components"]["securitySchemes"] = security_schemes
@@ -54,7 +60,7 @@ def set_custom_openapi(app: FastAPI) -> FastAPI:
                         del responses["422"]  # Remove default 422 response
 
                     # Apply security requirements to all endpoints
-                    details["security"] = [{"UserAuth": [], "RoleAuth": []}]
+                    details["security"] = [{"UserAuth": [], "RoleAuth": [], "EmailAuth": []}]
 
         return app.openapi_schema
 
