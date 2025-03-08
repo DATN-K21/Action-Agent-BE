@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.dependencies import get_thread_service
 from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
     CreateThreadRequest,
@@ -12,6 +11,7 @@ from app.schemas.thread import (
     UpdateThreadRequest,
     UpdateThreadResponse,
 )
+from app.services.database.deps import get_thread_service
 from app.services.database.thread_service import ThreadService
 
 logger = logging.get_logger(__name__)

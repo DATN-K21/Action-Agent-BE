@@ -1,10 +1,10 @@
-import traceback
 from datetime import datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
+from app.core.constants import SYSTEM
 from app.models.thread import Thread
 from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
@@ -14,9 +14,7 @@ from app.schemas.thread import (
     GetListThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
-    UpdateThreadResponse,
 )
-from app.utils.constants import SYSTEM
 
 logger = logging.get_logger(__name__)
 
@@ -41,7 +39,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -74,13 +72,12 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_all_threads(
-        self, user_id: str, paging: CursorPagingRequest
-    ) -> ResponseWrapper[GetListThreadsResponse]:
+    async def get_all_threads(self, user_id: str, paging: CursorPagingRequest) -> ResponseWrapper[
+        GetListThreadsResponse]:
         """Get all threads of a user."""
         try:
             stmt = (
@@ -116,13 +113,13 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.exception(f"Has error: {str(e)}", exc_info=True)
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def update_thread(
-        self, user_id: str, thread_id: str, thread: UpdateThreadRequest
-    ) -> ResponseWrapper[UpdateThreadResponse]:
+            self, user_id: str, thread_id: str, thread: UpdateThreadRequest
+    ) -> ResponseWrapper[CreateThreadResponse]:
         """Update a thread."""
         try:
             stmt = (
@@ -148,13 +145,13 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def delete_thread(
-        self, user_id: str, thread_id: str, deleted_by: str = SYSTEM
+            self, user_id: str, thread_id: str, deleted_by: str = SYSTEM
     ) -> ResponseWrapper[DeleteThreadResponse]:
         """Delete a thread."""
         try:
@@ -182,6 +179,6 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")

@@ -1,17 +1,19 @@
+import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.main import router
+from app.api.router import router
 from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
+from app.core.socketio import sio_asgi
 
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info("Starting FastAPI server...")
-logger.info(f"DEBUG: {env_settings.DEBUG}")
+logger.info(f"Starting FastAPI server... DebugMode = {env_settings.DEBUG}")
 
+# Fastapi
 app = FastAPI(
     debug=env_settings.DEBUG,
     title="Action-Executing AI Service API",
@@ -35,3 +37,6 @@ swagger.set_custom_openapi(app)
 exceptions.register_exception_handlers(app)
 
 app.include_router(router)
+
+# Socket.io
+app.mount("/socket.io", socketio.ASGIApp(sio_asgi))

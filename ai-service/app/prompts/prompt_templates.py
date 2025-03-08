@@ -1,61 +1,167 @@
+from functools import lru_cache
+
 from langchain import hub
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
 
 
+@lru_cache()
 def get_retriever_prompt_template():
     return hub.pull("rlm/rag-prompt")
 
 
+@lru_cache()
 def get_openai_function_prompt_template():
     return hub.pull("hwchase17/openai-functions-agent")
 
 
-def get_tools_determining_prompt_template():
+@lru_cache()
+def get_simple_agent_prompt_template():
+    return ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant. Answer the following question: ",
+            ),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
+
+
+@lru_cache()
+def get_tool_selection_prompt_template():
     return PromptTemplate(
-        template="""You are an assistant responsible for determining which tools to use to complete a user's task. \n
-        Here is the user's question: {question} \n
-        Based on the user's question, determine which tool(s) should be used to complete the task. \n
-        Provide the name(s) of the tool(s) that you would use to complete the task.
-        
-        Below is context that may help you generate arguments for the tool(s) you choose: \n
-        Here is the context: {context}""",
+        template="""
+You are an intelligent assistant capable of determining whether a tool is needed to complete a user's task or if you can answer the question directly.
+
+## User's Question:
+{question}
+
+## Context:
+{context}
+
+## Instructions:
+1. Analyze the question and determine if any tool(s) are required to complete the task.
+2. If tools are necessary, provide the name(s) of the appropriate tool(s) along with a reason for choosing them.
+3. If no tools are required, directly answer the user's question to the best of your ability.
+
+## Response:
+""",
         input_variables=["question", "context"],
     )
 
 
+@lru_cache()
+def get_markdown_answer_generating_prompt_template():
+    return PromptTemplate(
+        template="""
+You are an expert assistant that provides detailed answers in Markdown format.
+
+## Question:
+{question}
+
+## Context:
+{context}
+
+## Answer:
+Please generate a detailed response based on the context above. Use Markdown formatting for better readability, including:
+- Bullet points
+- Numbered lists
+- Code blocks (if applicable)
+- Headings and subheadings for structure
+- Tables (if necessary)
+
+Ensure that the response is **well-structured and informative** rather than a brief summary.
+
+---
+
+Few-show learning examples:
+
+# Benefits of Using LangChain for RAG
+
+LangChain provides several advantages when building Retrieval-Augmented Generation (RAG) systems:
+
+## 1. Modularity
+- Supports multiple retrievers (e.g., FAISS, Pinecone, Weaviate).
+- Easily integrates with different LLMs.
+
+## 2. Custom Prompting
+- Allows fine-tuning prompt templates to improve answer quality.
+- Supports structured response formatting.
+
+## 3. Memory and Context Management
+- Can track conversations across multiple queries.
+- Helps maintain relevant context for better responses.
+
+## 4. Tool Integration
+| Feature  | Description |
+|----------|------------|
+| **Agents** | Enables dynamic tool usage based on queries. |
+| **Chains** | Supports sequential processing for complex workflows. |
+
+By leveraging LangChain, developers can build **more accurate, context-aware AI systems** for various applications.
+""",
+        input_variables=["question", "context"],
+    )
+
+
+@lru_cache()
+def get_human_in_loop_evaluation_prompt_template():
+    return PromptTemplate(
+        template="""
+You are an evaluator determining whether human review is required before executing an action.\n
+Here are the details:\n
+- **Tool_calls**: {tool_calls}\n
+Decision Criteria:\n
+- If the action is a **read/retrieve operation** (e.g., searching, fetching, querying data), return 'no'.\n
+- If the action **modifies data** (e.g., updating, deleting, creating records), return 'yes'.\n
+Your response format should be:\n
+Human Review: <yes/no>
+""",
+        input_variables=["tool_calls"],
+    )
+
+
+@lru_cache()
 def get_grade_documents_prompt_template():
     return PromptTemplate(
-        template="""You are a grader assessing relevance of a retrieved document to a user question. \n 
-        Here is the retrieved document: \n\n {context} \n\n
-        Here is the user question: {question} \n
-        If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
-        Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.""",
+        template="""
+You are a grader assessing relevance of a retrieved document to a user question. \n 
+Here is the retrieved document: \n\n {context} \n\n
+Here is the user question: {question} \n
+If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
+Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.
+""",
         input_variables=["context", "question"],
     )
 
 
+@lru_cache()
 def get_grade_integration_agent_prompt_template():
     return PromptTemplate(
-        template="""You are a grader responsible for evaluating whether the system needs to integrate 
-        additional agents to complete the user's task.  
-        Here is the user's question:  \n\n {question} \n\n
-        Here are the usages of agents that could be integrated:  {usages} \n
-        If the usages of the agents contain keywords or semantic meanings related to the user's question, 
-        evaluate whether an additional agent is needed. \n
-        Give a binary score ('yes' or 'no') to indicate whether the integration of an additional agent is 
-        necessary to complete the user's task.  \n
+        template="""
+You are a grader responsible for evaluating whether the system needs to integrate 
+additional agents to complete the user's task.  
+Here is the user's question:  \n\n {question} \n\n
+Here are the usages of agents that could be integrated:  {usages} \n
+If the usages of the agents contain keywords or semantic meanings related to the user's question, 
+evaluate whether an additional agent is needed. \n
+Give a binary score ('yes' or 'no') to indicate whether the integration of an additional agent is 
+necessary to complete the user's task.  \n
     """,
         input_variables=["question", "usages"],
     )
 
 
+@lru_cache()
 def get_dynamic_few_shot_gmail_prompt(user_input: str):
-    system_message = """You are a Gmail Assistant designed to assist users with their Gmail accounts
-     by performing actions such as creating drafts, sending emails, searching for emails, 
-     and retrieving email or thread details. You utilize specific tools to interact with 
-     the Gmail API and complete tasks based on user input. Your responses must first explain 
-     the action you will take and then invoke the appropriate tool with correctly formatted input."""
+    system_message = """
+You are a Gmail Assistant designed to assist users with their Gmail accounts 
+by performing actions such as creating drafts, sending emails, searching for emails, 
+and retrieving email or thread details. You utilize specific tools to interact with 
+the Gmail API and complete tasks based on user input. Your responses must first explain  
+the action you will take and then invoke the appropriate tool with correctly formatted input.
+"""
 
     create_draft_email_examples = [
         # Example 1: Creating a draft with specific recipient, subject, and body
@@ -174,9 +280,7 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg12345"}', tool_call_id="1"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg12345"}', tool_call_id="1"),
             AIMessage(
                 "The email to Alice with the subject 'Reminder' has been sent successfully.",
                 name="example_assistant",
@@ -203,9 +307,7 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg67890"}', tool_call_id="2"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg67890"}', tool_call_id="2"),
             AIMessage(
                 "The email to Bob and Charlie with the subject 'Meeting Update' has been sent successfully.",
                 name="example_assistant",
@@ -234,9 +336,7 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
                     }
                 ],
             ),
-            ToolMessage(
-                '{"status": "Sent", "messageId": "msg34567"}', tool_call_id="3"
-            ),
+            ToolMessage('{"status": "Sent", "messageId": "msg34567"}', tool_call_id="3"),
             AIMessage(
                 "The email to Dana with CC to Erin and BCC to Frank, with the subject 'Budget Proposal,' has been sent successfully.",
                 name="example_assistant",
@@ -277,9 +377,7 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
             AIMessage(
                 "",
                 name="example_assistant",
-                tool_calls=[
-                    {"name": "GmailSearch", "args": {"query": "from:Alice"}, "id": "2"}
-                ],
+                tool_calls=[{"name": "GmailSearch", "args": {"query": "from:Alice"}, "id": "2"}],
             ),
             ToolMessage(
                 '[{"messageId": "msg67890", "snippet": "Hi, just checking in about our meeting tomorrow."}]',
@@ -292,9 +390,7 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
         ],
         # Example 3: Searching for emails within a date range
         [
-            HumanMessage(
-                "Search for emails sent in the last week.", name="example_user"
-            ),
+            HumanMessage("Search for emails sent in the last week.", name="example_user"),
             AIMessage(
                 "",
                 name="example_assistant",
@@ -466,15 +562,11 @@ def get_dynamic_few_shot_gmail_prompt(user_input: str):
         ],
         # Example 2: Retrieve a thread by a specific sender
         [
-            HumanMessage(
-                "Retrieve the email thread of messages from Bob.", name="example_user"
-            ),
+            HumanMessage("Retrieve the email thread of messages from Bob.", name="example_user"),
             AIMessage(
                 "",
                 name="example_assistant",
-                tool_calls=[
-                    {"name": "GmailGetThread", "args": {"query": "from:Bob"}, "id": "2"}
-                ],
+                tool_calls=[{"name": "GmailGetThread", "args": {"query": "from:Bob"}, "id": "2"}],
             ),
             ToolMessage(
                 '[{"messageId": "msg789", "snippet": "Update on the financial report.", "body": "Hi team, Here is the updated financial report...", "subject": "Financial Report", "sender": "Bob"},'

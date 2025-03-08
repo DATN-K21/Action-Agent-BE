@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.dependencies import get_user_service
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
     CreateUserRequest,
@@ -12,6 +11,7 @@ from app.schemas.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from app.services.database.deps import get_user_service
 from app.services.database.user_service import UserService
 
 logger = logging.get_logger(__name__)

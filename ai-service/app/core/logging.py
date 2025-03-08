@@ -5,7 +5,7 @@ from functools import wraps
 import structlog
 from structlog.stdlib import BoundLogger
 
-from app.utils.logging import is_async, is_method
+from app.core.utils.logging_helpers import is_async, is_method
 
 
 def configure_logging():

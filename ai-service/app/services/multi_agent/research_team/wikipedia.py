@@ -39,24 +39,16 @@ def get_wikipedia_retriever_tool():
 async def wikipedia_node(state: AgentState, config: RunnableConfig):
     try:
         wikipedia_tool = get_wikipedia_retriever_tool()
-        model_forced_to_wikipedia = get_openai_model().bind_tools(
-            [wikipedia_tool], tool_choice="wikipedia_retriever_tool"
-        )
+        model_forced_to_wikipedia = get_openai_model().bind_tools([wikipedia_tool], tool_choice="wikipedia_retriever_tool")
         result = await model_forced_to_wikipedia.ainvoke([state["question"]])
         messages = state["messages"]
 
         for tool_call in result.tool_calls:  # type: ignore
-            selected_tool = {"wikipedia_retriever_tool": wikipedia_tool}[
-                tool_call["name"].lower()
-            ]
+            selected_tool = {"wikipedia_retriever_tool": wikipedia_tool}[tool_call["name"].lower()]
             tool_msg = await selected_tool.ainvoke(tool_call)
             messages.append(tool_msg)
 
-        return {
-            "messages": [HumanMessage(content=messages[-1].content, name="wikipedia")]
-        }
+        return {"messages": [HumanMessage(content=messages[-1].content, name="wikipedia")]}
     except Exception as e:
-        logger.error(
-            f"[wikipedia/wikipedia_node] Error in executing wikipedia node: {e}"
-        )
+        logger.error(f"Error in executing wikipedia node: {e}")
         raise

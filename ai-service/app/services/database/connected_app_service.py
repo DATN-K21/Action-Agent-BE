@@ -1,4 +1,3 @@
-import traceback
 from typing import Optional
 
 from sqlalchemy import select
@@ -33,7 +32,7 @@ class ConnectedAppService:
             return connected_account_id
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return None
 
     @logging.log_function_inputs(logger)
@@ -54,5 +53,5 @@ class ConnectedAppService:
             return True
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exec_info=e, traceback=traceback.format_exc())
+            logger.error(f"Has error: {str(e)}", exc_info=True)
             return False
