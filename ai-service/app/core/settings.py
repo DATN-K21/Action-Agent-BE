@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings
 
 
@@ -28,6 +30,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "123456"
     POSTGRES_DB: str = "ai-database"
+    POSTGRES_USE_SSL: bool = False
 
     # SQLAlchemy settings
     SQLALCHEMY_DEBUG: bool = False
@@ -56,8 +59,13 @@ class Settings(BaseSettings):
 
     @property
     def POSTGRES_URL_PATH(self) -> str:
-        return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}?sslmode={'require' if self.POSTGRES_USE_SSL else 'disable'}"
 
 
-env_settings = Settings()
+@lru_cache()
+def get_settings():
+    return Settings()
+
+
+env_settings = get_settings()
 __all__ = ["env_settings"]

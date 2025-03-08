@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Sequence
 
 from app.services.extensions.extension_service import ExtensionService
 
@@ -28,5 +28,5 @@ class ExtensionServiceManager:
     def get_all_extension_services(self) -> Sequence[ExtensionService]:
         return list(self.extension_services.values())
 
-    def get_all_extension_service_names(self) -> Sequence[str]:
+    def get_all_extension_service_names(self) -> list[str]:
         return list(self.extension_services.keys())

@@ -42,12 +42,6 @@ def set_custom_openapi(app: FastAPI) -> FastAPI:
                     "name": "x-user-role",
                     "description": "User role required for authorization",
                 },
-                "EmailAuth": {
-                    "type": "apiKey",
-                    "in": "header",
-                    "name": "x-user-email",
-                    "description": "User role required for authorization",
-                },
             }
 
             app.openapi_schema["components"]["securitySchemes"] = security_schemes

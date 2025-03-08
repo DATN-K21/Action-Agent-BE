@@ -13,8 +13,10 @@ logger = logging.get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/all", tags=["Agent"], description="Endpoint to get all agent names.")
-async def get_agents(agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.get("/get-all", summary="Endpoint to get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
+async def get_agents(
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agents = agent_manager.get_all_agent_names()
         response_data = GetAgentsResponse(agent_names=list(agents))
@@ -24,8 +26,11 @@ async def get_agents(agent_manager: AgentManager = Depends(get_agent_manager)):
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat")
-async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.post("/chat", summary="Endpoint to chat with the agent.", response_model=ResponseWrapper[AgentResponse])
+async def execute(
+    request: AgentRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agent = agent_manager.get_agent(name=request.agent_name)
 
@@ -51,8 +56,11 @@ async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(g
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream")
-async def stream(request: AgentRequest, agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.post("/stream", summary="Endpoint to stream with the agent.", response_class=EventSourceResponse)
+async def stream(
+    request: AgentRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agent = agent_manager.get_agent(name=request.agent_name)
 

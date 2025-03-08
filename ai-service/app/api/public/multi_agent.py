@@ -13,21 +13,19 @@ logger = logging.get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/chat", description="Chat with a complex multi-agent system.",
-             response_model=ResponseWrapper[AgentResponse])
+@router.post("/chat", summary="Chat with a complex multi-agent system.", response_model=ResponseWrapper[AgentResponse])
 async def chat(
-        request: AgentRequest,
-        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
+    request: AgentRequest,
+    multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
 ):
     response = await multi_agent_service.execute_multi_agent(request.thread_id, request.input)
     return response.to_response()
 
 
-@router.post("/stream", description="Stream chat with a complex multi-agent system.",
-             response_class=EventSourceResponse)
+@router.post("/stream", summary="Stream chat with a complex multi-agent system.", response_class=EventSourceResponse)
 async def stream(
-        request: AgentRequest,
-        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
+    request: AgentRequest,
+    multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
 ):
     response = await multi_agent_service.stream_multi_agent(request.thread_id, request.input)
     return EventSourceResponse(to_sse(response))
