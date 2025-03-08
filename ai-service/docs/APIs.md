@@ -41,6 +41,44 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
     - Client listens to: stream_response, handle_stream_interrupt
     - Description: This Socket.io endpoint facilitates agent communication through message streaming.
 
+### 2.1 Schema for chat and stream events (send to server - ExtensionRequest)
+
+- **user_id:** String type - User ID (required)
+- **thread_id:** String type - Thread ID (required)
+- **extension_name:** String type - Extension name (required)
+- **input:** String type - Input message (required)
+- **max_recursion:** Specifies the recursion limit when executing the graph (optional)
+
+### 2.2 Schema for chat_response and stream_response events (send to client - ExtensionResponse)
+
+- **user_id:** String type - User ID (required)
+- **thread_id:** String type - Thread ID (required)
+- **extension_name:** String type - Extension name (required)
+- **interrupted:** Boolean type – Indicates whether human intervention is required in the process (required)
+- **output:** String type - Output message (required)
+
+**Note:** When the interrupted field is set to True, the output field contains a dictionary with "tool_calls".
+Otherwise, output is a string representing the AI's response to your question.
+
+### 2.3 Schema for handle_chat_interrupt and handle_stream_interrupt events (send to Server)
+
+- **user_id:** String type - User ID (required)
+- **thread_id:** String type - Thread ID (required)
+- **extension_name:** String type - Extension name (required)
+- **input:** String type - Input message (required)
+- **max_recursion:** Specifies the recursion limit when executing the graph (optional)
+
+### 2.4 Schema for chat_interrupt and stream_interrupt events (send to client - ExtensionResponse)
+
+- **user_id:** String type - User ID (required)
+- **thread_id:** String type - Thread ID (required)
+- **extension_name:** String type - Extension name (required)
+- **interrupted:** Boolean type – Indicates whether human intervention is required in the process (required)
+- **output:** String type - Output message (required)
+
+**Note:** The interrupted field is always set to False, and the output field contains a string summarizing the result of
+the tool call.
+
 ## 3. Agent APIs
 
 Agent functionalities are still accessible via HTTP APIs.
