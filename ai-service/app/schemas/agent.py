@@ -20,7 +20,7 @@ class AgentRequest(BaseRequest):
 ##################################################
 class AgentResponse(BaseResponse):
     thread_id: str = Field(..., title="Thread ID", examples=["abcdef"])
-    output: str = Field(None, title="Output", examples=["Hello!"])
+    output: str = Field(..., title="Output", examples=["Hello!"])
 
 
 class GetAgentsResponse(BaseResponse):

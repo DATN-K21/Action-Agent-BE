@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.schemas.agent import AgentResponse
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse, \
-    CheckConnectionResponse
+    CheckConnectionResponse, GetSocketioInfoResponse
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
@@ -158,7 +157,7 @@ async def check_active(
 async def get_info():
     return ResponseWrapper.wrap(
         status=200,
-        data=AgentResponse(
+        data=GetSocketioInfoResponse(
             output="""
 1. General Information
     - URL: http://hostdomain/ 

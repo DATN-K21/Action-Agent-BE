@@ -37,6 +37,10 @@ class CheckConnectionResponse(BaseResponse):
     is_connected: bool = Field(..., title="Is connected", examples=[True])
 
 
+class GetSocketioInfoResponse(BaseResponse):
+    output: str = Field(..., title="Output", examples=["Hello!"])
+
+
 ##################################################
 ########### SOCKETIO REQUEST SCHEMAS #############
 ##################################################
