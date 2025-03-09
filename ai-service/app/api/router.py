@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.private import user as private_user
+from app.api.internal import user as private_user
 from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, user
 
 
