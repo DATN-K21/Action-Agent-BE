@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends
 
 from app.core import logging
 from app.schemas.base import ResponseWrapper
-from app.schemas.extension import ActiveAccountResponse, GetActionsResponse, GetExtensionsResponse, \
-    CheckConnectionResponse, GetSocketioInfoResponse
+from app.schemas.extension import (
+    ActiveAccountResponse,
+    CheckConnectionResponse,
+    GetActionsResponse,
+    GetExtensionsResponse,
+    GetSocketioInfoResponse,
+)
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
@@ -11,63 +16,48 @@ from app.services.extensions.extension_service_manager import ExtensionServiceMa
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/extension", tags=["Extension"])
 
 
-@router.get(
-    path="/all",
-    tags=["Extension"],
-    description="Get the list of extensions available.",
-    response_model=ResponseWrapper[GetExtensionsResponse]
-)
-async def get_extensions(
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
-):
+@router.get(path="/get-all", summary="Get the list of extensions available.", response_model=ResponseWrapper[GetExtensionsResponse])
+async def get_extensions(extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)):
     try:
         extensions = extension_service_manager.get_all_extension_service_names()
-        response_data = GetExtensionsResponse(extensions=list(extensions))
+        response_data = GetExtensionsResponse(extensions=extensions)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
         logger.error(f"[extension/get_extensions] Error fetching extensions: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.get(
-    path="/{extension_name}/actions",
-    tags=["Extension"],
-    description="Get the list of actions available for the extension.",
-    response_model=ResponseWrapper[GetActionsResponse]
-)
+@router.get(path="/{extension_name}/get-actions", summary="Get actions available for extension.", response_model=ResponseWrapper[GetActionsResponse])
 async def get_actions(
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(get_connected_app_service),
 ):
     try:
+        # 1. Get the extension service
         extension_service = extension_service_manager.get_extension_service(extension_name)
-
         if extension_service is None:
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
+        # 2. Get the actions from the extension service
         extension_service.get_actions()
-
         actions = extension_service.get_action_names()
         response_data = GetActionsResponse(actions=list(actions))
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
     except Exception as e:
-        logger.error(f"[gmail_agent/get_actions] Error fetching actions: {str(e)}", exc_info=True)
+        logger.error(f"Error fetching actions: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post(
-    path="/active",
-    tags=["Extension"],
-    description="Initialize the connection.",
-    response_model=ResponseWrapper[ActiveAccountResponse]
-)
+@router.post(path="/active", summary="Initialize the connection.", response_model=ResponseWrapper[ActiveAccountResponse])
 async def active(
-        user_id: str,
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    user_id: str,
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
 ):
     try:
         extension_service = extension_service_manager.get_extension_service(extension_name)
@@ -89,17 +79,12 @@ async def active(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post(
-    path="/disconnect",
-    tags=["Extension"],
-    description="Disconnect the account.",
-    response_model=ResponseWrapper
-)
+@router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper)
 async def disconnect(
-        user_id: str,
-        extension_name: str,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager)
+    user_id: str,
+    extension_name: str,
+    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
 ):
     try:
         extension_service = extension_service_manager.get_extension_service(extension_name)
@@ -128,14 +113,13 @@ async def disconnect(
 
 @router.get(
     path="/check-active",
-    tags=["Extension"],
-    description="Check the connection.",
-    response_model=ResponseWrapper[CheckConnectionResponse]
+    summary="Check the connection.",
+    response_model=ResponseWrapper[CheckConnectionResponse],
 )
 async def check_active(
-        user_id: str,
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    user_id: str,
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
 ):
     try:
         extension_service = extension_service_manager.get_extension_service(extension_name)

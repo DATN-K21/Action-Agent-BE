@@ -1,31 +1,38 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sse_starlette import EventSourceResponse
 
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
 from app.core.utils.streaming import to_sse
-from app.schemas.agent import AgentRequest, AgentResponse, GetAgentsResponse
+from app.schemas.agent import AgentChatRequest, AgentChatResponse, GetAgentsResponse
 from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/agent", tags=["Agent"])
 
 
-@router.get("/all", tags=["Agent"], description="Endpoint to get all agent names.")
-async def get_agents(agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
+async def get_agents(
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agents = agent_manager.get_all_agent_names()
         response_data = GetAgentsResponse(agent_names=list(agents))
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
     except Exception as e:
         logger.error(f"Error fetching agents: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat")
-async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.post("/chat", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
+async def execute(
+    request: AgentChatRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agent = agent_manager.get_agent(name=request.agent_name)
 
@@ -40,7 +47,7 @@ async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(g
 
         return ResponseWrapper.wrap(
             status=200,
-            data=AgentResponse(
+            data=AgentChatResponse(
                 thread_id=request.thread_id,
                 output=response.output,  # type: ignore
             ),
@@ -51,8 +58,11 @@ async def execute(request: AgentRequest, agent_manager: AgentManager = Depends(g
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream")
-async def stream(request: AgentRequest, agent_manager: AgentManager = Depends(get_agent_manager)):
+@router.post("/stream", summary="Stream with the agent.", response_class=StreamingResponse)
+async def stream(
+    request: AgentChatRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
     try:
         agent = agent_manager.get_agent(name=request.agent_name)
 

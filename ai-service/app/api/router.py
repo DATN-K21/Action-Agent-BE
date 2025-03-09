@@ -1,42 +1,41 @@
-from typing import Any
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.routes import agent, callback, extension, history, multi_agent, test, thread, upload, user, connected_app
+from app.api.internal import user as internal_user
+from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, user
 
 
 class ValidationErrorResponse(BaseModel):
     status: int = 400
     message: str = "Validation Error - {field}: {message}"
-    data: Any = None
 
-
-router = APIRouter(
-    responses={
-        400: {
-            "model": ValidationErrorResponse,
-            "description": "Validation Error",
-        }
+validation_error_responses: dict = {
+    400: {
+        "model": ValidationErrorResponse,
+        "description": "Validation Error",
     }
-)
+}
 
-router.include_router(test.router, prefix="", tags=["Tests"])
 
-router.include_router(callback.router, prefix="/callback", tags=["Callback"], include_in_schema=False)
+router = APIRouter(responses=validation_error_responses)
 
-router.include_router(extension.router, prefix="/extension", tags=["Extension"])
+# Public routes
+router.include_router(test.router)
+router.include_router(callback.router)
 
-router.include_router(agent.router, prefix="/agent", tags=["Agent"])
+router.include_router(user.router)
+router.include_router(thread.router)
+router.include_router(connected_app.router)
 
-router.include_router(multi_agent.router, prefix="/multi_agent", tags=["Multi agent"])
+router.include_router(agent.router)
+router.include_router(multi_agent.router)
+router.include_router(extension.router)
 
-router.include_router(history.router, prefix="/history", tags=["History"])
 
-router.include_router(upload.router, prefix="/upload", tags=["Upload"])
+# Private routes
+private_router = APIRouter(prefix="/private", tags=["Private"])
+private_router.include_router(internal_user.router)
 
-router.include_router(user.router, prefix="/user", tags=["User"])
 
-router.include_router(thread.router, prefix="/thread", tags=["Thread"])
-
-router.include_router(connected_app.router, prefix="/connected-app", tags=["Connected App"])
+# Include all routers
+router.include_router(private_router)

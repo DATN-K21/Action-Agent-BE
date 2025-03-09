@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
+from app.api.deps import ensure_user_id
 from app.core import logging
 from app.core.settings import env_settings
 from app.services.database.connected_app_service import ConnectedAppService
@@ -8,14 +9,15 @@ from app.services.database.deps import get_connected_app_service
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/callback", tags=["Callback"], include_in_schema=False)
 
 
-@router.get("/extension/{user_id}", description="Handle connection success.")
+@router.get("/extension/{user_id}", summary="Handle connection success.")
 async def connection_success(
-        user_id: str,
-        request: Request,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    user_id: str,
+    request: Request,
+    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    _: bool = Depends(ensure_user_id),
 ):
     connection_status = request.query_params.get("status")
     connected_account_id = request.query_params.get("connectedAccountId")

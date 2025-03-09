@@ -156,7 +156,7 @@ services:
   ####################################################
 
   ai-service:
-    image: nguyendinhanhvlqt/ai-service
+    image: actionagent.azurecr.io/ai-service:latest
     container_name: ai-service
     env_file: ./ai-service/.env
     environment:

@@ -21,7 +21,7 @@ RUN uv sync --frozen --no-cache
 # Copy the application code
 COPY . .
 
-# Expose the application port
+# Expose the port
 EXPOSE 5001
 
 # Default command to run the app using `fastapi run`
