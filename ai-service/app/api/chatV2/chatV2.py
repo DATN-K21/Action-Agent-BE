@@ -13,10 +13,12 @@ from app.core.utils.streaming import to_sse
 from app.models.thread import Thread
 from app.schemas.base import ResponseWrapper
 from app.schemas.chatV2 import AgentChatV2Request
+from app.services.multi_agent.core.multi_agent_service import MultiAgentService
+from app.services.multi_agent.deps import get_multi_agent_service
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/chat", tags=["Chat"])
+router = APIRouter(prefix="/chat", tags=["Chat V2"])
 
 
 @router.post("/{user_id}/{thread_id}/chat-agent/{agent_name}", summary="Chat with the agent.", response_class=StreamingResponse)
@@ -37,12 +39,7 @@ async def chat_agent(
 
         # 2. Check the thread
         stmt = (
-            select(
-                Thread.id.label("id"),
-                Thread.user_id.label("user_id"),
-                Thread.title.label("title"),
-                Thread.created_at.label("created_at"),
-            )
+            select(Thread.id)
             .where(
                 Thread.user_id == user_id,
                 Thread.id == thread_id,
@@ -51,8 +48,7 @@ async def chat_agent(
             .limit(1)
         )
 
-        result = await db.execute(stmt)
-        db_thread = result.mappings().first()
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
@@ -68,3 +64,37 @@ async def chat_agent(
     except Exception as e:
         logger.error(f"Error executing API: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post("/{user_id}/{thread_id}/chat-multi", summary="Chat with a complex multi-agent system.", response_class=StreamingResponse)
+async def stream(
+    user_id: str,
+    thread_id: str,
+    request: AgentChatV2Request,
+    multi_agent_service: MultiAgentService = Depends(get_multi_agent_service),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
+):
+    # 1. Check the thread
+    stmt = (
+        select(Thread.id)
+        .where(
+            Thread.user_id == user_id,
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
+        .limit(1)
+    )
+
+    db_thread = (await db.execute(stmt)).scalar_one_or_none()
+    if db_thread is None:
+        return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+    # 2. Chat with the agent
+    response = await multi_agent_service.stream_multi_agent(
+        thread_id,
+        request.input,
+        request.recursion_limit if request.recursion_limit is not None else 10,
+    )
+
+    return EventSourceResponse(to_sse(response))

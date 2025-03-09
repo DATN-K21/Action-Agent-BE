@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.api.chatV2 import chatV2
 from app.api.internal import user as internal_user
 from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, user
 
@@ -35,7 +36,9 @@ router.include_router(extension.router)
 # Private routes
 private_router = APIRouter(prefix="/private", tags=["Private"])
 private_router.include_router(internal_user.router)
-
-
-# Include all routers
 router.include_router(private_router)
+
+# New routes
+router.include_router(chatV2.router)
+
+
