@@ -1,6 +1,6 @@
 from typing import BinaryIO, cast
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import RunnableConfig
 
@@ -109,7 +109,7 @@ async def get_history(
 async def upload_files(
     user_id: str,
     thread_id: str,
-    file: UploadFile = Form(...),
+    file: UploadFile = File(...),
     _: bool = Depends(ensure_user_id),
 ):
     try:
@@ -120,7 +120,10 @@ async def upload_files(
         config = RunnableConfig(configurable={"thread_id": thread_id})
         ingest_runnable.batch(cast(list[BinaryIO], [file_blob]), config)
         response_data = IngestFileResponse(
-            user_id=user_id, thread_id=thread_id, is_success=True, output="Files ingested successfully"
+            user_id=user_id,
+            thread_id=thread_id,
+            is_success=True,
+            output="Files ingested successfully",
         )
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 

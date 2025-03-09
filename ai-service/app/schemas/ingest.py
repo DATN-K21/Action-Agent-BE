@@ -11,7 +11,7 @@ from app.schemas.base import BaseResponse
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 class IngestFileResponse(BaseResponse):
-    user_id: str = Field(..., title="User ID", examples=["abcdef"])
-    thread_id: str = Field(..., title="Thread ID", examples=["abcdef"])
-    is_success: bool = Field(..., title="Is Success", examples=[True])
-    output: str = Field(..., title="Output", examples=["Ingested successfully."])
+    user_id: str = Field(..., examples=["abcdef"])
+    thread_id: str = Field(..., examples=["abcdef"])
+    is_success: bool = Field(..., examples=[True])
+    output: str = Field(..., examples=["Ingested successfully."])
