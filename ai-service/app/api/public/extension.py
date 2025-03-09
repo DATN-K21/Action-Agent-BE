@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.schemas.agent import AgentResponse
+from app.schemas.agent import AgentChatResponse
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import ActiveAccountResponse, CheckConnectionResponse, GetActionsResponse, GetExtensionsResponse
 from app.services.database.connected_app_service import ConnectedAppService
@@ -11,12 +11,11 @@ from app.services.extensions.extension_service_manager import ExtensionServiceMa
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/extension", tags=["Extension"])
 
 
 @router.get(
     path="/all",
-    tags=["Extension"],
     summary="Get the list of extensions available.",
     response_model=ResponseWrapper[GetExtensionsResponse],
 )
@@ -32,7 +31,6 @@ async def get_extensions(extension_service_manager: ExtensionServiceManager = De
 
 @router.get(
     path="/{extension_name}/actions",
-    tags=["Extension"],
     summary="Get the list of actions available for the extension.",
     response_model=ResponseWrapper[GetActionsResponse],
 )
@@ -57,7 +55,6 @@ async def get_actions(
 
 @router.post(
     path="/active",
-    tags=["Extension"],
     summary="Initialize the connection.",
     response_model=ResponseWrapper[ActiveAccountResponse],
 )
@@ -86,7 +83,7 @@ async def active(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post(path="/disconnect", tags=["Extension"], summary="Disconnect the account.", response_model=ResponseWrapper)
+@router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper)
 async def disconnect(
     user_id: str,
     extension_name: str,
@@ -120,7 +117,6 @@ async def disconnect(
 
 @router.get(
     path="/check-active",
-    tags=["Extension"],
     summary="Check the connection.",
     response_model=ResponseWrapper[CheckConnectionResponse],
 )
@@ -149,7 +145,7 @@ async def check_active(
 async def get_info():
     return ResponseWrapper.wrap(
         status=200,
-        data=AgentResponse(
+        data=AgentChatResponse(
             output="""
 1. General Information
     - URL: http://hostdomain/ 

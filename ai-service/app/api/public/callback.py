@@ -8,7 +8,7 @@ from app.services.database.deps import get_connected_app_service
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/callback", tags=["Callback"], include_in_schema=False)
 
 
 @router.get("/extension/{user_id}", summary="Handle connection success.")

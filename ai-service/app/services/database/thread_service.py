@@ -24,12 +24,12 @@ class ThreadService:
         self.db = db
 
     @logging.log_function_inputs(logger)
-    async def create_thread(self, request: CreateThreadRequest) -> ResponseWrapper[CreateThreadResponse]:
+    async def create_thread(self, user_id: str, request: CreateThreadRequest) -> ResponseWrapper[CreateThreadResponse]:
         """Create a new thread in the database."""
         try:
             db_thread = Thread(
                 **request.model_dump(),
-                created_by=request.user_id,
+                created_by=user_id,
             )
             self.db.add(db_thread)
             await self.db.commit()
