@@ -296,7 +296,7 @@ class AccessService {
                     firstName: newUser.firstname,
                     lastName: newUser.lastname,
                 }
-                let response = await syncData('/user/create', userData);
+                let response = await syncData('/private/user/create', userData);
                 if (response.error) {
                     throw new BadRequestResponse("Something went sync data", 1010107);
                 }
