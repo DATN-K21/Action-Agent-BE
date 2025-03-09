@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
+from app.api.deps import ensure_user_id
 from app.core import logging
 from app.core.settings import env_settings
 from app.services.database.connected_app_service import ConnectedAppService
@@ -16,6 +17,7 @@ async def connection_success(
     user_id: str,
     request: Request,
     connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    _: bool = Depends(ensure_user_id),
 ):
     connection_status = request.query_params.get("status")
     connected_account_id = request.query_params.get("connectedAccountId")

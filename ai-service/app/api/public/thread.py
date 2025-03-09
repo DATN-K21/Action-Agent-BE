@@ -88,12 +88,14 @@ async def delete_thread(
 
 @router.get("/{user_id}/{thread_id}/get-history", summary="Get thread chat.", response_model=ResponseWrapper[GetHistoryResponse])
 async def get_state(
-    threadId: str,
+    user_id: str,
+    thread_id: str,
     agent_manager: AgentManager = Depends(get_agent_manager),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         agent = agent_manager.get_agent(name="chat-agent")
-        state = await agent.async_get_state(threadId)  # type: ignore
+        state = await agent.async_get_state(thread_id)  # type: ignore
 
         if "messages" in state.values:
             response_data = convert_messages_to_dicts(state.values["messages"])
@@ -105,8 +107,8 @@ async def get_state(
 
 @router.post("/{user_id}/{thread_id}/upload", summary="Upload file to thread", response_model=ResponseWrapper[IngestFileResponse])
 async def upload_files(
-    thread_id: str,
     user_id: str,
+    thread_id: str,
     file: UploadFile = Form(...),
     _: bool = Depends(ensure_user_id),
 ):

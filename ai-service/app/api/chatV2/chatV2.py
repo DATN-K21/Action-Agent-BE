@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette import EventSourceResponse
 
 from app.api.deps import ensure_user_id
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
+from app.core.session import get_db_session
 from app.core.utils.streaming import to_sse
+from app.models.thread import Thread
 from app.schemas.base import ResponseWrapper
 from app.schemas.chatV2 import AgentChatV2Request
 
@@ -22,6 +26,7 @@ async def chat_agent(
     agent_name: str,
     request: AgentChatV2Request,
     agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_user_id),
 ):
     try:
@@ -31,7 +36,27 @@ async def chat_agent(
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
 
         # 2. Check the thread
+        stmt = (
+            select(
+                Thread.id.label("id"),
+                Thread.user_id.label("user_id"),
+                Thread.title.label("title"),
+                Thread.created_at.label("created_at"),
+            )
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
 
+        result = await db.execute(stmt)
+        db_thread = result.mappings().first()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        # 3. Chat with the agent
         response = await agent.async_stream(
             question=request.input,
             thread_id=thread_id,
