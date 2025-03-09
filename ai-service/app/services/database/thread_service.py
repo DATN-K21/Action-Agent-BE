@@ -29,6 +29,7 @@ class ThreadService:
         try:
             db_thread = Thread(
                 **request.model_dump(),
+                user_id=user_id,
                 created_by=user_id,
             )
             self.db.add(db_thread)

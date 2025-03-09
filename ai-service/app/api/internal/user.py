@@ -11,6 +11,7 @@ logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/user", tags=["User"])
 
+
 @router.post("/create", summary="Create a new user.", response_model=ResponseWrapper[CreateUserResponse])
 async def create_new_user(
     request: CreateUserRequest,
@@ -19,6 +20,7 @@ async def create_new_user(
 ):
     response = await user_service.create_user(request)
     return response.to_response()
+
 
 @router.patch("/{user_id}/update", summary="Update the given user.", response_model=ResponseWrapper[UpdateUserResponse])
 async def update_user(
