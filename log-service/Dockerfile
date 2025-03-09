@@ -1,27 +1,32 @@
 ARG NODE_VERSION=20.9.0
 
 #######################################
-# Build Stage
+# Builder Stage
 #######################################
 FROM node:${NODE_VERSION}-alpine AS builder
+ENV NODE_ENV=build
 
-WORKDIR /usr/src/app
+WORKDIR /home/node
 
 COPY package*.json ./
+RUN npm ci --omit=dev \
+  && npm install -g @nestjs/cli
 
-RUN npm ci --omit=dev && npm run build
+COPY . .
+RUN npm run build \
+  && npm prune --omit=dev
 
-COPY dist .
 
 #######################################
 # Runner Stage
 #######################################
-FROM node:${NODE_VERSION}-alpine AS runner
+FROM node:${NODE_VERSION}-alpine
+ENV NODE_ENV=production
 
-WORKDIR /usr/src/app
+WORKDIR /home/node
 
-COPY --from=builder /usr/src/app/dist ./
+COPY --from=builder /home/node/package*.json ./
+COPY --from=builder /home/node/node_modules/ ./node_modules/
+COPY --from=builder /home/node/dist/ ./dist/
 
-EXPOSE 8200
-
-CMD ["node", "main.js"]
+CMD ["node", "dist/server.js"]
