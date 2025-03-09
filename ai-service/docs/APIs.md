@@ -32,13 +32,13 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
     - Some client listeners: error, connect, disconnect
 
 2. Chat Endpoint:
-    - Event name: chat, chat_interrupt
-    - Client listens to: chat_response, handle_chat_interrupt
+    - Event name: chat, handle_chat_interrupt
+    - Client listens to: chat_response, chat_interrupt
     - Description: This Socket.io endpoint enables agent communication through message-based chatting.
 
 3. Stream Endpoint:
-    - Event name: stream, stream_interrupt
-    - Client listens to: stream_response, handle_stream_interrupt
+    - Event name: stream, handle_stream_interrupt
+    - Client listens to: stream_response, stream_interrupt
     - Description: This Socket.io endpoint facilitates agent communication through message streaming.
 
 ### 2.1 Schema for chat and stream events (send to server - ExtensionRequest)
@@ -60,7 +60,7 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
 **Note:** When the interrupted field is set to True, the output field contains a dictionary with "tool_calls".
 Otherwise, output is a string representing the AI's response to your question.
 
-### 2.3 Schema for handle_chat_interrupt and handle_stream_interrupt events (send to Server)
+### 2.3 Schema for handle_chat_interrupt and handle_stream_interrupt events (send to Server - ExtensionCallBack)
 
 - **user_id:** String type - User ID (required)
 - **thread_id:** String type - Thread ID (required)

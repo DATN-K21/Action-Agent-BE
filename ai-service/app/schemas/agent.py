@@ -18,6 +18,11 @@ class AgentChatRequest(BaseRequest):
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
+class AgentResponse(BaseResponse):
+    thread_id: str = Field(..., title="Thread ID", examples=["abcdef"])
+    output: str = Field(..., title="Output", examples=["Hello!"])
+
+
 class GetAgentsResponse(BaseResponse):
     agent_names: list[str] = Field(title="Agent Names", examples=[["chat-agent", "email-agent"]])
 
@@ -25,4 +30,3 @@ class GetAgentsResponse(BaseResponse):
 class AgentChatResponse(BaseResponse):
     thread_id: str = Field(..., title="Thread ID", examples=["abcdef"])
     output: Optional[str] = Field(None, title="Output", examples=["Hello!"])
-

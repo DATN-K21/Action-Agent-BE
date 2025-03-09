@@ -97,7 +97,7 @@ class GraphBuilder:
         str_tool_calls = json.dumps(tool_selection_message.tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
-        model = get_openai_model(model="gpt-3.5-turbo-0125", temperature=0)
+        model = get_openai_model(model="gpt-4o-mini", temperature=0)
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
@@ -111,7 +111,7 @@ class GraphBuilder:
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
-        model = get_openai_model(temperature=0)
+        model = get_openai_model(model="gpt-4o-mini", temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
 

@@ -1,9 +1,14 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.schemas.agent import AgentChatResponse
 from app.schemas.base import ResponseWrapper
-from app.schemas.extension import ActiveAccountResponse, CheckConnectionResponse, GetActionsResponse, GetExtensionsResponse
+from app.schemas.extension import (
+    ActiveAccountResponse,
+    CheckConnectionResponse,
+    GetActionsResponse,
+    GetExtensionsResponse,
+    GetSocketioInfoResponse,
+)
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
@@ -145,7 +150,7 @@ async def check_active(
 async def get_info():
     return ResponseWrapper.wrap(
         status=200,
-        data=AgentChatResponse(
+        data=GetSocketioInfoResponse(
             output="""
 1. General Information
     - URL: http://hostdomain/ 
