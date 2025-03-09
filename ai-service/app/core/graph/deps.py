@@ -7,7 +7,7 @@ from app.core.graph.base import GraphBuilder
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.memory.deps import get_checkpointer
 from app.services.extensions.deps import get_gmail_service, get_google_calendar_service, get_google_meet_service, \
-    get_google_maps_service, get_youtube_service
+    get_google_maps_service, get_youtube_service, get_slack_service
 
 
 @lru_cache()
@@ -48,5 +48,11 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
         name=get_youtube_service().get_name()
     )
     manager.register_extension_builder(youtube_builder)
+
+    #Register slack graph builder
+    slack_builder = GraphBuilder(
+        checkpointer=checkpointer,
+        name=get_slack_service().get_name()
+    )
 
     return manager
