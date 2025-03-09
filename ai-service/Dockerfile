@@ -21,8 +21,5 @@ RUN uv sync --frozen --no-cache
 # Copy the application code
 COPY . .
 
-# Expose the application port
-EXPOSE 5001
-
 # Default command to run the app using `fastapi run`
-CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "5001"]
+CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "80"]
