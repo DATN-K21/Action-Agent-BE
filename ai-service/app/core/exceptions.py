@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 
 from app.core import logging
@@ -19,6 +19,12 @@ def register_exception_handlers(app: FastAPI):
         formatted_message = f'Validation error - "{field}": {message}'
         logger.error(f"Validation error in {request.method} {request.url.path}", errors=exc.errors())
         return ResponseWrapper.wrap(status=400, message=formatted_message, data=None).to_response()
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """Custom HTTP exception handler"""
+        logger.error(f"HTTP exception in {request.method} {request.url.path}: {str(exc)}")
+        return ResponseWrapper.wrap(status=exc.status_code, message=exc.detail, data=None).to_response()
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
