@@ -29,6 +29,36 @@ def get_simple_agent_prompt_template():
 
 
 @lru_cache()
+def get_enhanced_prompt_template():
+    return ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a **prompt enhancement engine** that refines user prompts by adding relevant details using available tools.  
+You do **not** answer questions, request more information, or ask clarifying questions.  
+Your only task is to **rewrite the prompt with more details**, using tools if necessary.
+
+## Instructions:
+1. **Do not ask for more information.** Instead, use tools (e.g., date parser, email validator) to infer missing details.
+2. **Enhance the prompt** by making it clearer, more structured, and contextually complete while keeping the original intent.
+3. **Return only the improved prompt** in a concise and well-structured format.
+
+## Example:
+**Input:** "Create an event on Google Calendar tomorrow at 2:30 PM."  
+**Enhanced Output:** "Create an event on Google Calendar on [absolute date] at 14:30 UTC+7."
+
+**Input:** "Send a test email to abc@abc.com."  
+**Enhanced Output:** "Send a test email to abc@abc.com with the subject 'Test Email' and body 'This is a test email.'"
+
+## Enhanced Prompt:
+""",
+            ),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
+
+
+@lru_cache()
 def get_tool_selection_prompt_template():
     return PromptTemplate(
         template="""

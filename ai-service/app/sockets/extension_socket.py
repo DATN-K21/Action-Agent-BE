@@ -26,9 +26,12 @@ class ExtensionNamespace(AsyncNamespace):
         self.builder_manager = builder_manager
         self.extension_service_manager = extension_service_manager
         self.session_extension_to_agent = {}
+        self.session_to_timezone = {}
 
     async def on_connect(self, sid, environ):
-        logger.info(f"Connected: {sid}")
+        tz = environ.get("HTTP_TIMEZONE", "Asia/Ho_Chi_Minh")  # Default to Asia/Ho_Chi_Minh if missing
+        self.session_to_timezone[sid] = tz
+        logger.info(f"Connected: {sid} with timezone: {tz}")
 
     async def on_disconnect(self, sid):
         logger.info(f"Disconnected: {sid}")
@@ -36,6 +39,12 @@ class ExtensionNamespace(AsyncNamespace):
             self.session_extension_to_agent[sid] = {
                 key: value for key, value in self.session_extension_to_agent.items() if key[0] != sid
             }
+            del self.session_to_timezone[sid]
+
+    async def on_set_timezone(self, sid, timezone):
+        """Receive and store the timezone from the frontend."""
+        self.session_to_timezone[sid] = timezone
+        logger.info(f"User {sid} set timezone: {timezone}")
 
     async def on_message(self, sid, data):
         logger.info(f"Session {sid} sent a message: {data}")
@@ -76,6 +85,7 @@ class ExtensionNamespace(AsyncNamespace):
         result = await agent.async_handle_chat_interrupt(
             action=action,
             thread_id=data.thread_id,
+            timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 5,
         )
 
@@ -104,6 +114,7 @@ class ExtensionNamespace(AsyncNamespace):
             response = await agent.async_chat(
                 question=data.input,
                 thread_id=data.thread_id,
+                timezone=self.session_to_timezone[sid],
                 max_recursion=data.max_recursion if data.max_recursion is not None else 5,
             )
 
@@ -136,6 +147,7 @@ class ExtensionNamespace(AsyncNamespace):
         result = await agent.async_handle_stream_interrupt(
             action=action,
             thread_id=data.thread_id,
+            timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 5,
         )
 
@@ -166,11 +178,13 @@ class ExtensionNamespace(AsyncNamespace):
             response = await agent.async_stream(
                 question=data.input,
                 thread_id=data.thread_id,
+                timezone=self.session_to_timezone[sid],
                 max_recursion=data.max_recursion if data.max_recursion is not None else 5,
             )
 
             interrupted = False
             async for dict_message in to_sse(response):
+                print("[dict_message]", dict_message)
                 binary_score = convert_dict_message_to_binary_score(dict_message)
                 if binary_score is not None:
                     interrupted = binary_score.interrupted
