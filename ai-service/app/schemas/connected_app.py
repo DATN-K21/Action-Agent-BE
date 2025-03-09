@@ -3,13 +3,16 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.schemas.base import BaseResponse, PagingResponse
+from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
-
+class CallbackConnectionSuccessRequest(BaseRequest):
+    connection_status: str
+    connected_account_id: str
+    app_name: str
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################

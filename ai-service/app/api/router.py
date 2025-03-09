@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.api.chatV2 import chatV2
 from app.api.internal import user as internal_user
-from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, user
+from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread
 
 
 class ValidationErrorResponse(BaseModel):
@@ -24,7 +24,6 @@ router = APIRouter(responses=validation_error_responses)
 router.include_router(test.router)
 router.include_router(callback.router)
 
-router.include_router(user.router)
 router.include_router(thread.router)
 router.include_router(connected_app.router)
 
