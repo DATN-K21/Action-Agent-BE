@@ -156,14 +156,14 @@ services:
   ####################################################
 
   ai-service:
-    image: nguyendinhanhvlqt/ai-service:latest
+    image: actionagent.azurecr.io/ai-service:latest
     container_name: ai-service
     env_file: ./ai-service/.env
     environment:
       - POSTGRES_HOST=ai-database
       - POSTGRES_PORT=5432
     ports:
-      - "5001:80"
+      - "5001:5001"
     networks:
       - app-network
 
