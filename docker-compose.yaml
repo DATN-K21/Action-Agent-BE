@@ -34,11 +34,7 @@ services:
         condition: service_healthy
     volumes:
       - ./ai-service/migrations:/migrations
-    command:
-      - /bin/sh
-      - -c
-      - >
-        migrate -path /migrations  -database "$POSTGRES_URL"  up
+    command: [ "-path", "/migrations", "-database", "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable", "up" ]
 
   ####################################################
   ############### Extensions #########################

@@ -41,10 +41,9 @@ services:
 
   ai-database:
     healthcheck:
-      test: pg_isready -U $POSTGRES_USER
-      start_interval: 1s
-      start_period: 5s
-      interval: 5s
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
       retries: 5
     environment:
       - POSTGRES_DB=ai-database
@@ -61,8 +60,6 @@ services:
     depends_on:
       ai-database:
         condition: service_healthy
-    environment:
-      - POSTGRES_URL=postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable
 
   ####################################################
   ############### Extensions #########################
