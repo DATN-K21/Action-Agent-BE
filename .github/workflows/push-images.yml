@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-  workflow_dispatch:
+    workflow_dispatch:
 
 permissions:
   id-token: write
@@ -30,7 +30,7 @@ jobs:
         az acr login --name ${{ vars.ACR_NAME }}
 
     # AI Service
-    - name: AI Service: Build and Push Image
+    - name: AI Service
       working-directory: ./ai-service
       env:
         ACR_NAME: ${{ vars.ACR_NAME }}
