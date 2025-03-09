@@ -1,48 +1,27 @@
-# syntax=docker/dockerfile:1
+ARG NODE_VERSION=20.9.0
 
 #######################################
-# Stage 1: Build Stage
+# Build Stage
 #######################################
-FROM node:18-alpine AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
-# Set the working directory inside the container.
 WORKDIR /usr/src/app
 
-# Copy dependency definition files to leverage Docker cache.
-# If package.json or package-lock.json doesn't change, this layer is cached.
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies needed for building).
-RUN npm install
+RUN npm ci --omit=dev && npm run build
 
-# Copy the rest of the application source code.
-COPY . .
-
-# Build the application (this typically outputs the build artifacts into the 'dist' directory).
-RUN npm run build
+COPY dist .
 
 #######################################
-# Stage 2: Production Runner Stage
+# Runner Stage
 #######################################
-FROM node:18-alpine AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 
-# Install curl for health checks
-RUN apk add --no-cache curl
-
-# Set the working directory for the production container.
 WORKDIR /usr/src/app
 
-# Copy the built files from the builder stage.
-COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/dist ./
 
-# Copy package definition files to install production dependencies.
-COPY package*.json ./
-
-# Install only production dependencies to minimize the final image size.
-RUN npm install --only=production
-
-# Expose the port that the application listens on.
 EXPOSE 8200
 
-# Define the default command to start the application.
-CMD ["node", "dist/main.js"]
+CMD ["node", "main.js"]
