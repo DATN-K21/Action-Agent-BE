@@ -87,7 +87,7 @@ async def delete_thread(
 
 
 @router.get("/{user_id}/{thread_id}/get-history", summary="Get thread chat.", response_model=ResponseWrapper[GetHistoryResponse])
-async def get_state(
+async def get_history(
     user_id: str,
     thread_id: str,
     agent_manager: AgentManager = Depends(get_agent_manager),
