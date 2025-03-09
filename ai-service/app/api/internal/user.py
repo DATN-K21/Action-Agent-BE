@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import ensure_admin, ensure_user_id
 from app.core import logging
 from app.schemas.base import ResponseWrapper
 from app.schemas.user import CreateUserRequest, CreateUserResponse, DeleteUserResponse, UpdateUserRequest, UpdateUserResponse
@@ -16,7 +15,6 @@ router = APIRouter(prefix="/user", tags=["User"])
 async def create_new_user(
     request: CreateUserRequest,
     user_service: UserService = Depends(get_user_service),
-    _: bool = Depends(ensure_admin),
 ):
     response = await user_service.create_user(request)
     return response.to_response()
@@ -27,7 +25,6 @@ async def update_user(
     user_id: str,
     user: UpdateUserRequest,
     user_service: UserService = Depends(get_user_service),
-    _: bool = Depends(ensure_user_id),
 ):
     response = await user_service.update_user(user_id, user)
     return response.to_response()
@@ -37,7 +34,6 @@ async def update_user(
 async def delete_user(
     user_id: str,
     user_service: UserService = Depends(get_user_service),
-    _: bool = Depends(ensure_user_id),
 ):
     response = await user_service.delete_user(user_id)
     return response.to_response()
