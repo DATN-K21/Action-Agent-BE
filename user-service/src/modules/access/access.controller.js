@@ -38,7 +38,7 @@ class AccessController {
                 firstName: firstName,
                 lastName: lastName
             }
-            let response = await syncData('/user/create', userInfo);
+            let response = await syncData('/private/user/create', userInfo);
             if (response.error) {
                 throw new BadRequestResponse("Something went sync data", 1010107);
             }
