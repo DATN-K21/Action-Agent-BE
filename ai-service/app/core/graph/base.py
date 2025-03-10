@@ -8,7 +8,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
-from langgraph.types import interrupt
+from langgraph.types import interrupt, StreamWriter
+from pydantic import BaseModel
 
 from app.core import logging
 from app.core.enums import MessageName
@@ -37,6 +38,12 @@ class BinaryScore(TypedDict):
     score: Literal["yes", "no"]
 
 
+class StreamData(BaseModel):
+    node_name: str
+    name: MessageName
+    output: str
+
+
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
@@ -55,8 +62,8 @@ class GraphBuilder:
         # Add date parser tools to the enhanced question tools
         self.enhanced_question_tools.extend(get_date_parser_tools())
 
-    async def _async_enhance_question_node(self, state: State, config: RunnableConfig):
-        logger.info("---ENHANCE QUESTION NODE---")
+    async def _async_enhance_prompt_node(self, state: State, config: RunnableConfig):
+        logger.info("---ENHANCE PROMPT NODE---")
         try:
             question = state["question"]
 
@@ -78,7 +85,7 @@ class GraphBuilder:
             logger.error(f"[_enhance_question_node] Error in invoking chain: {str(e)}")
             raise
 
-    async def _async_agent_node(self, state: State):
+    async def _async_agent_node(self, state: State, writer: StreamWriter):
         logger.info("---AGENT NODE---")
 
         try:
@@ -87,6 +94,15 @@ class GraphBuilder:
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
             response = await chain.ainvoke({"messages": messages})
+
+            # Stream message
+            writer(
+                StreamData(
+                    node_name="agent_node",
+                    name=MessageName.AI,
+                    output=response.content
+                ).model_dump()
+            )
 
             return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
         except Exception as e:
@@ -136,7 +152,7 @@ class GraphBuilder:
         else:
             return {"next": "tool_node"}
 
-    async def _async_human_review_node(self, state: State):
+    async def _async_human_review_node(self, state: State, writer: StreamWriter):
         logger.info("---HUMAN REVIEW NODE---")
 
         # Make a stream by using LLM (for socketio stream)
@@ -144,6 +160,15 @@ class GraphBuilder:
         model = get_openai_model(model="gpt-4o-mini", temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
+
+        # Stream message
+        writer(
+            StreamData(
+                node_name="human_review_node",
+                name=MessageName.TOOL,
+                output=str_tool_message
+            ).model_dump()
+        )
 
         review_action = interrupt(
             {
@@ -185,7 +210,7 @@ class GraphBuilder:
             logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
             raise e
 
-    async def _async_generate_node(self, state: State):
+    async def _async_generate_node(self, state: State, writer: StreamWriter):
         logger.info("---GENERATE NODE---")
         try:
             tool_messages = state["tool_messages"]
@@ -204,6 +229,15 @@ class GraphBuilder:
             rag_chain = prompt | llm
 
             response = await rag_chain.ainvoke({"context": docs, "question": question})
+
+            # Stream message
+            writer(
+                StreamData(
+                    node_name="generate_node",
+                    name=MessageName.AI,
+                    output=response.content
+                ).model_dump()
+            )
 
             return {
                 "messages": [AIMessage(response.content, name=MessageName.AI)],
@@ -237,15 +271,15 @@ class GraphBuilder:
             workflow.add_edge("generate_node", END)
 
         else:
-            workflow.add_node("enhance_question_node", self._async_enhance_question_node)
+            workflow.add_node("enhance_prompt_node", self._async_enhance_prompt_node)
             workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
             workflow.add_node("human_review_node", self._async_human_review_node)  # human review
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "enhance_question_node")
-            workflow.add_edge("enhance_question_node", "select_tool_node")
+            workflow.add_edge(START, "enhance_prompt_node")
+            workflow.add_edge("enhance_prompt_node", "select_tool_node")
             workflow.add_conditional_edges("select_tool_node", lambda state: state["next"])
             workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state["next"])
             workflow.add_conditional_edges("human_review_node", lambda state: state["next"])
