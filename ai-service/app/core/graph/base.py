@@ -8,7 +8,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
-from langgraph.types import interrupt, StreamWriter
+from langgraph.types import interrupt
 from pydantic import BaseModel
 
 from app.core import logging
@@ -85,7 +85,7 @@ class GraphBuilder:
             logger.error(f"[_enhance_question_node] Error in invoking chain: {str(e)}")
             raise
 
-    async def _async_agent_node(self, state: State, writer: StreamWriter):
+    async def _async_agent_node(self, state: State):
         logger.info("---AGENT NODE---")
 
         try:
@@ -94,15 +94,6 @@ class GraphBuilder:
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
             response = await chain.ainvoke({"messages": messages})
-
-            # Stream message
-            writer(
-                StreamData(
-                    node_name="agent_node",
-                    name=MessageName.AI,
-                    output=response.content
-                ).model_dump()
-            )
 
             return {"messages": [AIMessage(content=response.content, name=MessageName.AI)], "next": END}
         except Exception as e:
@@ -152,23 +143,14 @@ class GraphBuilder:
         else:
             return {"next": "tool_node"}
 
-    async def _async_human_review_node(self, state: State, writer: StreamWriter):
+    async def _async_human_review_node(self, state: State):
         logger.info("---HUMAN REVIEW NODE---")
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
-        model = get_openai_model(model="gpt-4o-mini", temperature=0)
+        model = get_openai_model(temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
-
-        # Stream message
-        writer(
-            StreamData(
-                node_name="human_review_node",
-                name=MessageName.TOOL,
-                output=str_tool_message
-            ).model_dump()
-        )
 
         review_action = interrupt(
             {
@@ -210,7 +192,7 @@ class GraphBuilder:
             logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
             raise e
 
-    async def _async_generate_node(self, state: State, writer: StreamWriter):
+    async def _async_generate_node(self, state: State):
         logger.info("---GENERATE NODE---")
         try:
             tool_messages = state["tool_messages"]
@@ -229,15 +211,6 @@ class GraphBuilder:
             rag_chain = prompt | llm
 
             response = await rag_chain.ainvoke({"context": docs, "question": question})
-
-            # Stream message
-            writer(
-                StreamData(
-                    node_name="generate_node",
-                    name=MessageName.AI,
-                    output=response.content
-                ).model_dump()
-            )
 
             return {
                 "messages": [AIMessage(response.content, name=MessageName.AI)],

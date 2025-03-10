@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 from pydantic import Field, BaseModel
 
@@ -60,7 +60,7 @@ class ExtensionResponse(BaseRequest):
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     interrupted: bool = Field(..., title="Interrupted", examples=[False])
-    output: str | dict = Field(..., title="Output", examples=["Hello"])
+    output: str | dict | list[Any] = Field(..., title="Output", examples=["Hello"])
 
 
 ##################################################

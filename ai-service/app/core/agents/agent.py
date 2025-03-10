@@ -10,7 +10,7 @@ from app.core.agents.base import BaseAgent
 from app.core.enums import HumanAction
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import MessagesStream, astream_state
+from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNodeEnum
 
 
 class Agent(BaseAgent):
@@ -113,7 +113,12 @@ class Agent(BaseAgent):
                 timezone=timezone,
                 recursion_limit=max_recursion,
             )
-            return astream_state(app=self.graph, input_=Command(resume=action), config=config)
+            return astream_state(
+                app=self.graph,
+                input_=Command(resume=action),
+                config=config,
+                allow_stream_nodes=[LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.GENERATE_NODE],
+            )
         except Exception as e:
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise

@@ -31,7 +31,8 @@ class Metadata(BaseModel):
     langgraph_node: str
 
 
-list_stream_nodes = [LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.HUMAN_REVIEW_NODE, LanggraphNodeEnum.GENERATE_NODE]
+list_stream_nodes = [LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.SELECT_TOOL_NODE,
+                     LanggraphNodeEnum.HUMAN_REVIEW_NODE, LanggraphNodeEnum.GENERATE_NODE]
 
 
 async def astream_state(
