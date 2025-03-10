@@ -1,13 +1,15 @@
+import json
+
 from socketio import AsyncNamespace
 
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.enums import HumanAction
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_binary_score, convert_dict_message_to_tool_call, \
+from app.core.utils.convert_dict_message import convert_dict_message_to_output, convert_dict_message_to_tool_calls, \
     convert_dict_message_to_message
 from app.core.utils.socket_decorate import validate_event
-from app.core.utils.streaming import to_sse
+from app.core.utils.streaming import to_sse, LanggraphNodeEnum
 from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
@@ -26,9 +28,12 @@ class ExtensionNamespace(AsyncNamespace):
         self.builder_manager = builder_manager
         self.extension_service_manager = extension_service_manager
         self.session_extension_to_agent = {}
+        self.session_to_timezone = {}
 
     async def on_connect(self, sid, environ):
-        logger.info(f"Connected: {sid}")
+        tz = environ.get("HTTP_TIMEZONE", "Asia/Ho_Chi_Minh")  # Default to Asia/Ho_Chi_Minh if missing
+        self.session_to_timezone[sid] = tz
+        logger.info(f"Connected: {sid} with timezone: {tz}")
 
     async def on_disconnect(self, sid):
         logger.info(f"Disconnected: {sid}")
@@ -36,6 +41,12 @@ class ExtensionNamespace(AsyncNamespace):
             self.session_extension_to_agent[sid] = {
                 key: value for key, value in self.session_extension_to_agent.items() if key[0] != sid
             }
+            del self.session_to_timezone[sid]
+
+    async def on_set_timezone(self, sid, timezone):
+        """Receive and store the timezone from the frontend."""
+        self.session_to_timezone[sid] = timezone
+        logger.info(f"User {sid} set timezone: {timezone}")
 
     async def on_message(self, sid, data):
         logger.info(f"Session {sid} sent a message: {data}")
@@ -76,6 +87,7 @@ class ExtensionNamespace(AsyncNamespace):
         result = await agent.async_handle_chat_interrupt(
             action=action,
             thread_id=data.thread_id,
+            timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 5,
         )
 
@@ -104,6 +116,7 @@ class ExtensionNamespace(AsyncNamespace):
             response = await agent.async_chat(
                 question=data.input,
                 thread_id=data.thread_id,
+                timezone=self.session_to_timezone[sid],
                 max_recursion=data.max_recursion if data.max_recursion is not None else 5,
             )
 
@@ -136,12 +149,13 @@ class ExtensionNamespace(AsyncNamespace):
         result = await agent.async_handle_stream_interrupt(
             action=action,
             thread_id=data.thread_id,
+            timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 5,
         )
 
         async for dict_message in to_sse(result):
-            message = convert_dict_message_to_message(dict_message)
-            if message is not None:
+            output = convert_dict_message_to_output(dict_message)
+            if output is not None:
                 await self.emit(
                     event="stream_response",
                     data=ExtensionResponse(
@@ -149,7 +163,7 @@ class ExtensionNamespace(AsyncNamespace):
                         thread_id=data.thread_id,
                         extension_name=data.extension_name,
                         interrupted=False,
-                        output=message
+                        output=output
                     ).model_dump(),
                     to=sid
                 )
@@ -166,43 +180,45 @@ class ExtensionNamespace(AsyncNamespace):
             response = await agent.async_stream(
                 question=data.input,
                 thread_id=data.thread_id,
+                timezone=self.session_to_timezone[sid],
                 max_recursion=data.max_recursion if data.max_recursion is not None else 5,
             )
 
             interrupted = False
             async for dict_message in to_sse(response):
-                binary_score = convert_dict_message_to_binary_score(dict_message)
-                if binary_score is not None:
-                    interrupted = binary_score.interrupted
+                if dict_message["event"] == "metadata":
+                    dict_message_data = json.loads(dict_message["data"])
+                    if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_REVIEW_NODE:
+                        interrupted = True
+                elif interrupted:
+                    tool_calls = convert_dict_message_to_tool_calls(dict_message)
+                    if tool_calls is not None:
+                        await self.emit(
+                            event="stream_response",
+                            data=ExtensionResponse(
+                                user_id=data.user_id,
+                                thread_id=data.thread_id,
+                                extension_name=data.extension_name,
+                                interrupted=True,
+                                output=tool_calls
+                            ).model_dump(),
+                            to=sid
+                        )
                 else:
-                    if interrupted:
-                        tool_call = convert_dict_message_to_tool_call(dict_message)
-                        if tool_call is not None:
-                            await self.emit(
-                                event="stream_response",
-                                data=ExtensionResponse(
-                                    user_id=data.user_id,
-                                    thread_id=data.thread_id,
-                                    extension_name=data.extension_name,
-                                    interrupted=interrupted,
-                                    output=tool_call
-                                ).model_dump(),
-                                to=sid
-                            )
-                    else:
-                        message = convert_dict_message_to_message(dict_message)
-                        if message is not None:
-                            await self.emit(
-                                event="stream_response",
-                                data=ExtensionResponse(
-                                    user_id=data.user_id,
-                                    thread_id=data.thread_id,
-                                    extension_name=data.extension_name,
-                                    interrupted=interrupted,
-                                    output=message
-                                ).model_dump(),
-                                to=sid
-                            )
+                    message = convert_dict_message_to_message(dict_message)
+                    if message is not None:
+                        await self.emit(
+                            event="stream_response",
+                            data=ExtensionResponse(
+                                user_id=data.user_id,
+                                thread_id=data.thread_id,
+                                extension_name=data.extension_name,
+                                interrupted=False,
+                                output=message
+                            ).model_dump(),
+                            to=sid
+                        )
+                        
         except Exception as e:
             logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
             await self.emit("error", "Internal server error", to=sid)

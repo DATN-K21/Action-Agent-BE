@@ -1,17 +1,20 @@
+from functools import lru_cache
 from typing import Sequence
 
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.tools import TavilySearchResults
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
-from langchain_core.runnables import ConfigurableField
+from langchain_core.runnables import ConfigurableField, Runnable
 from langchain_core.tools import BaseTool, create_retriever_tool
 from pydantic import SecretStr
 
 from app.core.settings import env_settings
+from app.core.tools.built_in_tools.date_parser_tool import parser_date
 from app.core.utils.uploading import vstore
 
 
-def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:
+@lru_cache
+def get_search_tools(max_results: int = 5) -> Sequence[BaseTool | Runnable]:
     api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TAVILY_API_KEY))
     tavily_tool = TavilySearchResults(
         max_results=max_results,
@@ -29,7 +32,7 @@ def get_search_tools(max_results: int = 5) -> Sequence[BaseTool]:
     return [tavily_tool, wikipedia_retriever_tool]
 
 
-def get_rag_tools() -> Sequence[BaseTool]:
+def get_rag_tools() -> Sequence[BaseTool | Runnable]:
     retriever = vstore.as_retriever()
     configurable_retriever = retriever.configurable_fields(
         search_kwargs=ConfigurableField(
@@ -46,3 +49,8 @@ def get_rag_tools() -> Sequence[BaseTool]:
     )
 
     return [retrieve_tool]
+
+
+@lru_cache()
+def get_date_parser_tools() -> Sequence[BaseTool | Runnable]:
+    return [parser_date]

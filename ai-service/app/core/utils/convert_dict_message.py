@@ -1,13 +1,8 @@
 import json
-
-from pydantic import BaseModel
-
-
-class BinaryScore(BaseModel):
-    interrupted: bool
+from typing import Any
 
 
-def convert_dict_message_to_binary_score(dict_message: dict) -> BinaryScore | None:
+def convert_dict_message_to_output(dict_message: dict) -> Any | None:
     if dict_message["event"] != "data":
         return None
 
@@ -16,18 +11,15 @@ def convert_dict_message_to_binary_score(dict_message: dict) -> BinaryScore | No
         message = data[-1]
         if message['type'] == 'ai':
             if 'tool_calls' in message and len(message['tool_calls']) > 0:
-                tool_call = message['tool_calls'][-1]
-                if tool_call["name"] == "BinaryScore":
-                    args = tool_call["args"]
-                    if "score" in args and args["score"] == "yes":
-                        return BinaryScore(interrupted=True)
+                tool_calls = message['tool_calls']
+                return tool_calls
 
-                    if "score" in args and args["score"] == "no":
-                        return BinaryScore(interrupted=False)
+            if 'tool_calls' in message and len(message['tool_calls']) == 0:
+                return message["content"]
     return None
 
 
-def convert_dict_message_to_tool_call(dict_message: dict) -> dict | None:
+def convert_dict_message_to_tool_calls(dict_message: dict) -> Any | None:
     if dict_message["event"] != "data":
         return None
 
@@ -36,14 +28,12 @@ def convert_dict_message_to_tool_call(dict_message: dict) -> dict | None:
         message = data[-1]
         if message['type'] == 'ai':
             if 'tool_calls' in message and len(message['tool_calls']) > 0:
-                tool_call = message['tool_calls'][-1]
-                if tool_call["name"] != "BinaryScore":
-                    return tool_call
-
+                tool_calls = message['tool_calls']
+                return tool_calls
     return None
 
 
-def convert_dict_message_to_message(dict_message: dict) -> dict | None:
+def convert_dict_message_to_message(dict_message: dict) -> Any | None:
     if dict_message["event"] != "data":
         return None
 
@@ -53,5 +43,4 @@ def convert_dict_message_to_message(dict_message: dict) -> dict | None:
         if message['type'] == 'ai':
             if 'tool_calls' in message and len(message['tool_calls']) == 0:
                 return message["content"]
-
     return None
