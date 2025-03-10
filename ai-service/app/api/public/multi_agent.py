@@ -18,7 +18,7 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/multi-agent", tags=["Multi agent"])
 
 
-@router.post("/chat//{user_id}/{thread_id}", summary="Chat with a complex multi-agent system.", response_model=ResponseWrapper[AgentChatResponse])
+@router.post("/chat/{user_id}/{thread_id}", summary="Chat with a complex multi-agent system.", response_model=ResponseWrapper[AgentChatResponse])
 async def chat(
     user_id: str,
     thread_id: str,
