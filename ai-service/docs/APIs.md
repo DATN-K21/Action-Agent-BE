@@ -119,8 +119,9 @@ the tool call.
 
 ## 3. Agent APIs
 
-Agent functionalities are still accessible via HTTP APIs.
-You can explore these APIs using the Swagger documentation.
+- Agent functionalities are still accessible via HTTP APIs.
+  You can explore these APIs using the Swagger documentation.
+- Stream APIs utilize Server-Sent Events (SSE)
 
 ## 4. Multi-agent APIs
 
