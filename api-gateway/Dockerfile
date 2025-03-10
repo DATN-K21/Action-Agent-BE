@@ -1,44 +1,27 @@
-# syntax=docker/dockerfile:1
+ARG NODE_VERSION=20.9.0
 
 #######################################
-# Stage 1: Build Stage
+# Build Stage
 #######################################
-FROM node:18-alpine AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
-# Set the working directory inside the container.
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json to leverage Docker caching.
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies for potential build steps).
-RUN npm install
+RUN npm ci --omit=dev
 
-# Copy the rest of the application source code.
 COPY . .
 
-# If a build step is required (e.g., transpiling TypeScript), uncomment the following line:
-# RUN npm run build
-
 #######################################
-# Stage 2: Production Stage
+# Production Stage
 #######################################
-FROM node:18-alpine AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 
-# Install curl for health checks
-RUN apk add --no-cache curl
-
-# Set the working directory in the final image.
 WORKDIR /usr/src/app
 
-# Copy the built (or original) application files from the builder stage.
 COPY --from=builder /usr/src/app .
 
-# Install only production dependencies to minimize the final image size.
-RUN npm install --only=production
-
-# Expose the application port.
 EXPOSE 8300
 
-# Define the command to run the application.
 CMD ["npm", "start"]

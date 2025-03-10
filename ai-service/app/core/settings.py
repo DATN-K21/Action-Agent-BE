@@ -1,11 +1,14 @@
-from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    class Config:
-        case_sensitive = False
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_file_encoding="utf-8",
+    )
 
     # FastAPI settings
     PORT: int = 5001
@@ -59,5 +62,10 @@ class Settings(BaseSettings):
         return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 
-env_settings = Settings()
+@lru_cache()
+def get_settings():
+    return Settings()
+
+
+env_settings = get_settings()
 __all__ = ["env_settings"]

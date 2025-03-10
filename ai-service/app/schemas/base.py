@@ -33,7 +33,11 @@ class CursorPagingRequest(BaseRequest):
 ##################################################
 class BaseResponse(BaseModel):
     model_config = ConfigDict(
-        from_attributes=True, alias_generator=to_camel, populate_by_name=True, validate_assignment=True, cache_strings="all"
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+        validate_assignment=True,
+        cache_strings="all",
     )
 
 
@@ -51,7 +55,7 @@ class ResponseWrapper(BaseModel, Generic[T]):
     def to_response(self) -> ORJSONResponse:
         return ORJSONResponse(
             status_code=self.status,
-            content=self.model_dump(),
+            content=self.model_dump(by_alias=True),
         )
 
     @classmethod

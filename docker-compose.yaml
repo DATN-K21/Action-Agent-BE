@@ -1,0 +1,62 @@
+services:
+
+  ####################################################
+  ############### Services ###########################
+  ####################################################
+  user-service:
+    image: actionagent.azurecr.io/user-service:latest
+    container_name: user-service
+
+  log-service:
+    image: actionagent.azurecr.io/log-service:latest
+    container_name: log-service
+
+  api-gateway:
+    image: actionagent.azurecr.io/api-gateway:latest
+    container_name: api-gateway
+
+  ai-service:
+    image: actionagent.azurecr.io/ai-service:latest
+    container_name: ai-service
+
+  ####################################################
+  ################ Databases #########################
+  ####################################################
+
+  ai-database:
+    image: pgvector/pgvector:pg16
+    container_name: ai-database
+
+  migration:
+    image: migrate/migrate
+    depends_on:
+      ai-database:
+        condition: service_healthy
+    volumes:
+      - ./ai-service/migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable", "up" ]
+
+  ####################################################
+  ############### Extensions #########################
+  ####################################################
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    container_name: elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.16.1
+    container_name: logstash
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.16.1
+    container_name: kibana
+
+volumes:
+  es_data:
+  logstash_data:
+  ai-database:

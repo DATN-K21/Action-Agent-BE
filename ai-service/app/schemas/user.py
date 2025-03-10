@@ -22,10 +22,10 @@ class CreateUserRequest(BaseRequest):
 
 
 class UpdateUserRequest(BaseModel):
-    userName: Optional[str] = Field(None, min_length=3, max_length=50)
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = Field(None, max_length=50)
-    firstName: Optional[str] = Field(None, min_length=1, max_length=50)
-    lastName: Optional[str] = Field(None, min_length=1, max_length=50)
+    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
 
 
 ##################################################
