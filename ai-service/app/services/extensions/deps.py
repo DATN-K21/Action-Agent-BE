@@ -34,6 +34,7 @@ def get_youtube_service() -> YoutubeService:
 @lru_cache()
 def get_slack_service() -> SlackService:
     return SlackService()
+
 @lru_cache()
 def get_extension_service_manager(
         gmail_service:GmailService = Depends(get_gmail_service),
