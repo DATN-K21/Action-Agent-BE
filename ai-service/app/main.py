@@ -11,13 +11,12 @@ from app.core.socketio import sio_asgi
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info(f"Starting FastAPI server... DebugMode = {env_settings.DEBUG}")
+logger.info(f"Starting server... DebugMode = {env_settings.DEBUG}")
 
-# Fastapi
 app = FastAPI(
     debug=env_settings.DEBUG,
     title="Action-Executing AI Service API",
-    description="This is a AI Service API using FastAPI.",
+    description="This is an AI Service API using FastAPI.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -38,5 +37,4 @@ exceptions.register_exception_handlers(app)
 
 app.include_router(router)
 
-# Socket.io
 app.mount("/socket.io", socketio.ASGIApp(sio_asgi))

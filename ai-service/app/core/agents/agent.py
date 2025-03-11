@@ -10,7 +10,7 @@ from app.core.agents.base import BaseAgent
 from app.core.enums import HumanAction
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import MessagesStream, astream_state
+from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNodeEnum
 
 
 class Agent(BaseAgent):
@@ -29,12 +29,14 @@ class Agent(BaseAgent):
             self,
             question: str,
             thread_id: Optional[str] = None,
+            timezone: Optional[str] = None,
             max_recursion: int = 10,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(
                 thread_id=thread_id,
+                timezone=timezone,
                 recursion_limit=max_recursion,
             )
             response = await self.graph.ainvoke(input=state, config=config)
@@ -61,11 +63,13 @@ class Agent(BaseAgent):
             self,
             action: HumanAction,
             thread_id: Optional[str] = None,
+            timezone: Optional[str] = None,
             max_recursion: int = 10,
     ) -> AgentInterruptHandlingResult:
         try:
             config = get_invocation_config(
                 thread_id=thread_id,
+                timezone=timezone,
                 recursion_limit=max_recursion,
             )
             response = await self.graph.ainvoke(Command(resume=action), config=config)
@@ -78,12 +82,17 @@ class Agent(BaseAgent):
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise
 
-    async def async_stream(self, question: str, thread_id: Optional[str] = None,
-                           max_recursion: int = 10) -> MessagesStream:
+    async def async_stream(
+            self, question: str,
+            thread_id: Optional[str] = None,
+            timezone: Optional[str] = None,
+            max_recursion: int = 10
+    ) -> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(
                 thread_id=thread_id,
+                timezone=timezone,
                 recursion_limit=max_recursion,
             )
             return astream_state(app=self.graph, input_=state, config=config)
@@ -95,14 +104,21 @@ class Agent(BaseAgent):
             self,
             action: HumanAction,
             thread_id: Optional[str] = None,
+            timezone: Optional[str] = None,
             max_recursion: int = 10,
     ) -> MessagesStream:
         try:
             config = get_invocation_config(
                 thread_id=thread_id,
+                timezone=timezone,
                 recursion_limit=max_recursion,
             )
-            return astream_state(app=self.graph, input_=Command(resume=action), config=config)
+            return astream_state(
+                app=self.graph,
+                input_=Command(resume=action),
+                config=config,
+                allow_stream_nodes=[LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.GENERATE_NODE],
+            )
         except Exception as e:
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise

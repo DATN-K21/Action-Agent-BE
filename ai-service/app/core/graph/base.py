@@ -1,21 +1,25 @@
 import json
-from typing import Annotated, Any, Callable, Dict, Optional, Sequence, TypedDict, Literal
+from typing import Annotated, Any, Dict, Optional, Sequence, TypedDict, Literal
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig, Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import create_react_agent
 from langgraph.types import interrupt
+from pydantic import BaseModel
 
 from app.core import logging
 from app.core.enums import MessageName
+from app.core.tools.tools import get_date_parser_tools
 from app.core.utils.messages import get_message_prefix, trimmer
 from app.prompts.prompt_templates import (
     get_markdown_answer_generating_prompt_template,
     get_simple_agent_prompt_template,
     get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
+    get_enhanced_prompt_template,
 )
 from app.services.model_service import get_openai_model
 
@@ -25,7 +29,7 @@ logger = logging.get_logger(__name__)
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_selection_message: AIMessage
-    tool_message: ToolMessage
+    tool_messages: list[ToolMessage]
     question: str
     next: str
 
@@ -34,12 +38,18 @@ class BinaryScore(TypedDict):
     score: Literal["yes", "no"]
 
 
+class StreamData(BaseModel):
+    node_name: str
+    name: MessageName
+    output: str
+
+
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
             self,
             checkpointer: AsyncPostgresSaver,
-            tools: Optional[list[BaseTool | Callable]] = None,
+            tools: Optional[list[BaseTool | Runnable]] = None,
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
     ):
@@ -47,6 +57,33 @@ class GraphBuilder:
         self.tools = tools
         self.name = name
         self.config = config
+        self.enhanced_question_tools = []
+
+        # Add date parser tools to the enhanced question tools
+        self.enhanced_question_tools.extend(get_date_parser_tools())
+
+    async def _async_enhance_prompt_node(self, state: State, config: RunnableConfig):
+        logger.info("---ENHANCE PROMPT NODE---")
+        try:
+            question = state["question"]
+
+            model = get_openai_model(temperature=0, streaming=False)
+            prompt = get_enhanced_prompt_template()
+            agent = create_react_agent(
+                model=model,
+                tools=self.enhanced_question_tools,
+                prompt=prompt
+            )
+
+            response = await agent.ainvoke(input={"messages": HumanMessage(question)}, config=config)
+
+            print("[updated question]", response["messages"][-1].content)
+
+            return {"question": response["messages"][-1].content}
+
+        except Exception as e:
+            logger.error(f"[_enhance_question_node] Error in invoking chain: {str(e)}")
+            raise
 
     async def _async_agent_node(self, state: State):
         logger.info("---AGENT NODE---")
@@ -111,7 +148,7 @@ class GraphBuilder:
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
-        model = get_openai_model(model="gpt-4o-mini", temperature=0)
+        model = get_openai_model(temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
 
@@ -149,7 +186,7 @@ class GraphBuilder:
                 if isinstance(tool_msg, ToolMessage):
                     messages.append(tool_msg)
 
-            return {"tool_message": messages[-1], "next": "generate_node"}
+            return {"tool_messages": messages, "next": "generate_node"}
 
         except Exception as e:
             logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
@@ -158,14 +195,16 @@ class GraphBuilder:
     async def _async_generate_node(self, state: State):
         logger.info("---GENERATE NODE---")
         try:
-            tool_message = state["tool_message"]
+            tool_messages = state["tool_messages"]
             question = state["question"]
 
             # Get the documents
-            if tool_message is None:
+            docs = ""
+            if tool_messages is None or len(tool_messages) == 0:
                 docs = "#No tool messages"
             else:
-                docs = f"\n\n##{get_message_prefix(tool_message)}: \n {tool_message.content}\n\n"
+                for tool_message in tool_messages:
+                    docs = f"\n\n##{get_message_prefix(tool_message)}: \n {tool_message.content}\n\n"
 
             prompt = get_markdown_answer_generating_prompt_template()
             llm = get_openai_model(temperature=0.5)
@@ -205,13 +244,15 @@ class GraphBuilder:
             workflow.add_edge("generate_node", END)
 
         else:
+            workflow.add_node("enhance_prompt_node", self._async_enhance_prompt_node)
             workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
             workflow.add_node("human_review_node", self._async_human_review_node)  # human review
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "select_tool_node")
+            workflow.add_edge(START, "enhance_prompt_node")
+            workflow.add_edge("enhance_prompt_node", "select_tool_node")
             workflow.add_conditional_edges("select_tool_node", lambda state: state["next"])
             workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state["next"])
             workflow.add_conditional_edges("human_review_node", lambda state: state["next"])
