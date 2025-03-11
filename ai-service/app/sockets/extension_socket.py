@@ -218,7 +218,7 @@ class ExtensionNamespace(AsyncNamespace):
                             ).model_dump(),
                             to=sid
                         )
-                        
+
         except Exception as e:
-            logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
+            logger.error(f"Error executing Extension API: {str(e)}", exc_info=True)
             await self.emit("error", "Internal server error", to=sid)

@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any, Dict, Optional, Sequence, TypedDict, Literal
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig, Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.core import logging
 from app.core.enums import MessageName
 from app.core.tools.tools import get_date_parser_tools
-from app.core.utils.messages import get_message_prefix, trimmer
+from app.core.utils.messages import trimmer
 from app.prompts.prompt_templates import (
     get_markdown_answer_generating_prompt_template,
     get_simple_agent_prompt_template,
@@ -29,7 +29,7 @@ logger = logging.get_logger(__name__)
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_selection_message: AIMessage
-    tool_messages: list[ToolMessage]
+    tool_messages: list[AIMessage]
     question: str
     next: str
 
@@ -180,11 +180,11 @@ class GraphBuilder:
                         break
                 if selected_tool is None:
                     continue
-                tool_msg = await selected_tool.ainvoke(tool_call, config)
+                data = await selected_tool.ainvoke(tool_call["args"], config)
 
                 # Check tool_msg is AIMessage
-                if isinstance(tool_msg, ToolMessage):
-                    messages.append(tool_msg)
+                if data is not None:
+                    messages.append(AIMessage(content=str(data), name=MessageName.TOOL))
 
             return {"tool_messages": messages, "next": "generate_node"}
 
@@ -204,7 +204,7 @@ class GraphBuilder:
                 docs = "#No tool messages"
             else:
                 for tool_message in tool_messages:
-                    docs = f"\n\n##{get_message_prefix(tool_message)}: \n {tool_message.content}\n\n"
+                    docs = f"\n\n## ToolMessage: \n {tool_message.content}\n\n"
 
             prompt = get_markdown_answer_generating_prompt_template()
             llm = get_openai_model(temperature=0.5)

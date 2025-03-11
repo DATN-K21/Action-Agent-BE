@@ -34,7 +34,7 @@ class YoutubeService(ExtensionService):
 
     def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_toolset()
-        tools = toolset.get_tools(actions=self._supported_actions)
+        tools = toolset.get_tools(apps=[self._app_enum], actions=self._supported_actions)
         return tools
 
     def get_authed_tools(self, user_id) -> Sequence[Union[BaseTool, Callable]]:
