@@ -169,7 +169,6 @@ class GraphBuilder:
     async def _async_tool_node(self, state: State, config: RunnableConfig):
         logger.info("---TOOL NODE---")
         try:
-
             tool_selection_message = state["tool_selection_message"]
             messages = []
             for tool_call in tool_selection_message.tool_calls:

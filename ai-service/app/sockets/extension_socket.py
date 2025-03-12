@@ -88,7 +88,7 @@ class ExtensionNamespace(AsyncNamespace):
             action=action,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
-            max_recursion=data.max_recursion if data.max_recursion is not None else 5,
+            max_recursion=data.max_recursion if data.max_recursion is not None else 10,
         )
 
         if action == HumanAction.CONTINUE:
@@ -117,7 +117,7 @@ class ExtensionNamespace(AsyncNamespace):
                 question=data.input,
                 thread_id=data.thread_id,
                 timezone=self.session_to_timezone[sid],
-                max_recursion=data.max_recursion if data.max_recursion is not None else 5,
+                max_recursion=data.max_recursion if data.max_recursion is not None else 10,
             )
 
             # emit response to the client
@@ -150,7 +150,7 @@ class ExtensionNamespace(AsyncNamespace):
             action=action,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
-            max_recursion=data.max_recursion if data.max_recursion is not None else 5,
+            max_recursion=data.max_recursion if data.max_recursion is not None else 10,
         )
 
         async for dict_message in to_sse(result):
@@ -181,7 +181,7 @@ class ExtensionNamespace(AsyncNamespace):
                 question=data.input,
                 thread_id=data.thread_id,
                 timezone=self.session_to_timezone[sid],
-                max_recursion=data.max_recursion if data.max_recursion is not None else 5,
+                max_recursion=data.max_recursion if data.max_recursion is not None else 10,
             )
 
             interrupted = False
