@@ -1,0 +1,7 @@
+import composio
+
+from app.core.monkey_patches.composio_schema_helper import composio_schemas_helper_substitute_file_downloads_recursively
+
+
+def patch_lib():
+    composio.tools.toolset.SchemaHelper._substitute_file_downloads_recursively = composio_schemas_helper_substitute_file_downloads_recursively

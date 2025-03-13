@@ -15,8 +15,9 @@ async def check():
 async def error():
     raise Exception("Test exception")
 
+
 @router.get("/auth", summary="Endpoint to check auth.", response_model=ResponseWrapper)
 async def auth(
-    _: bool = Depends(ensure_authenticated),
+        _: bool = Depends(ensure_authenticated),
 ):
     return ResponseWrapper.wrap(status=200, message="Authenticated").to_response()

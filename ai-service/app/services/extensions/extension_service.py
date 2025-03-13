@@ -47,9 +47,7 @@ class ExtensionService(ABC):
         return self._supported_actions
 
     def get_action_names(self) -> Sequence[str]:
-        toolset = ComposioService.get_toolset()
-        tools = toolset.get_tools(actions=self._supported_actions)
-        tool_names = [tool.name for tool in tools]
+        tool_names = [str(action) for action in self._supported_actions]
         return tool_names
 
     @abstractmethod
