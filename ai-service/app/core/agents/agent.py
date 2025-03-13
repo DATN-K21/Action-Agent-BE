@@ -7,7 +7,7 @@ from structlog.stdlib import BoundLogger
 
 from app.core import logging
 from app.core.agents.base import BaseAgent
-from app.core.enums import HumanAction
+from app.core.graph.base import HumanEditingData, ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
 from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNodeEnum
@@ -61,7 +61,8 @@ class Agent(BaseAgent):
 
     async def async_handle_chat_interrupt(
             self,
-            action: HumanAction,
+            execute: bool,
+            tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
             max_recursion: int = 10,
@@ -72,7 +73,15 @@ class Agent(BaseAgent):
                 timezone=timezone,
                 recursion_limit=max_recursion,
             )
-            response = await self.graph.ainvoke(Command(resume=action), config=config)
+            response = await self.graph.ainvoke(
+                Command(
+                    resume=HumanEditingData(
+                        execute=execute,
+                        tool_calls=tool_calls
+                    ).model_dump()
+                ),
+                config=config
+            )
 
             return AgentInterruptHandlingResult(
                 output=response["messages"][-1].content,
@@ -102,7 +111,8 @@ class Agent(BaseAgent):
 
     async def async_handle_stream_interrupt(
             self,
-            action: HumanAction,
+            execute: bool,
+            tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
             max_recursion: int = 10,
@@ -115,7 +125,12 @@ class Agent(BaseAgent):
             )
             return astream_state(
                 app=self.graph,
-                input_=Command(resume=action),
+                input_=Command(
+                    resume=HumanEditingData(
+                        execute=execute,
+                        tool_calls=tool_calls
+                    ).model_dump()
+                ),
                 config=config,
                 allow_stream_nodes=[LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.GENERATE_NODE],
             )

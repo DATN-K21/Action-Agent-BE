@@ -83,9 +83,11 @@ class ExtensionNamespace(AsyncNamespace):
 
         agent = self.session_extension_to_agent[(sid, data.extension_name)]
 
-        action = HumanAction.CONTINUE if data.input.strip().lower() == "continue" else HumanAction.REFUSE
+        execute = data.execute
+        tool_calls = data.tool_calls
         result = await agent.async_handle_chat_interrupt(
-            action=action,
+            execute=execute,
+            tool_calls=tool_calls,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 10,
@@ -145,9 +147,11 @@ class ExtensionNamespace(AsyncNamespace):
 
         agent = self.session_extension_to_agent[(sid, data.extension_name)]
 
-        action = HumanAction.CONTINUE if data.input.strip().lower() == "continue" else HumanAction.REFUSE
+        execute = data.execute
+        tool_calls = data.tool_calls
         result = await agent.async_handle_stream_interrupt(
-            action=action,
+            execute=execute,
+            tool_calls=tool_calls,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
             max_recursion=data.max_recursion if data.max_recursion is not None else 10,

@@ -45,6 +45,18 @@ class StreamData(BaseModel):
     output: str
 
 
+class ToolCall(BaseModel):
+    name: str
+    args: dict
+    id: Optional[str] = None
+    type: Optional[str] = None
+
+
+class HumanEditingData(BaseModel):
+    execute: bool
+    tool_calls: Optional[list[ToolCall]] = None
+
+
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
@@ -140,12 +152,12 @@ class GraphBuilder:
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
         if response["score"] == "yes":
-            return {"next": "human_review_node"}
+            return {"next": "human_editing_node"}
         else:
             return {"next": "tool_node"}
 
-    async def _async_human_review_node(self, state: State):
-        logger.info("---HUMAN REVIEW NODE---")
+    async def _async_human_editing_node(self, state: State):
+        logger.info("---HUMAN EDITING NODE---")
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
@@ -153,19 +165,30 @@ class GraphBuilder:
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
 
-        review_action = interrupt(
+        data = interrupt(
             {
-                # Surface tool calls for review
                 "tool_calls": state["tool_selection_message"].tool_calls
             }
         )
 
         # Approve the tool call and continue
-        if review_action == "continue":
+        if data.get("execute"):
+            tool_calls = data.get("tool_calls")
+            if tool_calls is not None:
+                tool_selection_message = state["tool_selection_message"]
+                for tool_call in tool_calls:
+                    index = next((i for i, item in enumerate(tool_selection_message.get("tool_calls"))
+                                  if item.get("name") == tool_call.get("name")
+                                  ), -1)
+                    tool_selection_message["tool_calls"][index]["args"] = tool_call.get("args")
+
+                state["tool_selection_message"] = tool_selection_message
+                str_tool_message = str(tool_selection_message)
+
             return {"next": "tool_node", "messages": [AIMessage(content=str_tool_message, name=MessageName.TOOL)]}
 
         # Reject the tool call and generate a response
-        return {"next": END, "messages": [AIMessage(content=str_tool_message, name=MessageName.TOOL)]}
+        return {"next": END}
 
     async def _async_tool_node(self, state: State, config: RunnableConfig):
         logger.info("---TOOL NODE---")
@@ -173,7 +196,7 @@ class GraphBuilder:
         try:
             # Fix composio library
             patch_lib()
-            
+
             tool_selection_message = state["tool_selection_message"]
             messages = []
             for tool_call in tool_selection_message.tool_calls:
@@ -251,7 +274,7 @@ class GraphBuilder:
             workflow.add_node("enhance_prompt_node", self._async_enhance_prompt_node)
             workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
-            workflow.add_node("human_review_node", self._async_human_review_node)  # human review
+            workflow.add_node("human_editing_node", self._async_human_editing_node)  # human edit
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
@@ -259,7 +282,7 @@ class GraphBuilder:
             workflow.add_edge("enhance_prompt_node", "select_tool_node")
             workflow.add_conditional_edges("select_tool_node", lambda state: state["next"])
             workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state["next"])
-            workflow.add_conditional_edges("human_review_node", lambda state: state["next"])
+            workflow.add_conditional_edges("human_editing_node", lambda state: state["next"])
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 
