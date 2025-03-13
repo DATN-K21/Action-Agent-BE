@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.core import logging
 from app.core.enums import MessageName
+from app.core.monkey_patches.deps import patch_lib
 from app.core.tools.tools import get_date_parser_tools
 from app.core.utils.messages import trimmer
 from app.prompts.prompt_templates import (
@@ -168,7 +169,11 @@ class GraphBuilder:
 
     async def _async_tool_node(self, state: State, config: RunnableConfig):
         logger.info("---TOOL NODE---")
+
         try:
+            # Fix composio library
+            patch_lib()
+            
             tool_selection_message = state["tool_selection_message"]
             messages = []
             for tool_call in tool_selection_message.tool_calls:
