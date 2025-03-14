@@ -1,4 +1,3 @@
-import json
 from typing import Annotated, Any, Dict, Optional, Sequence, TypedDict, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -9,7 +8,7 @@ from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import interrupt
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from app.core import logging
 from app.core.enums import MessageName
@@ -27,12 +26,20 @@ from app.services.model_service import get_openai_model
 logger = logging.get_logger(__name__)
 
 
+class ToolCall(BaseModel):
+    name: str
+    args: dict
+    id: Optional[str] = None
+    type: Optional[str] = None
+
+
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    tool_selection_message: AIMessage
+    tool_calls: list[ToolCall]
     tool_messages: list[AIMessage]
     question: str
     next: str
+    interrupted: bool
 
 
 class BinaryScore(TypedDict):
@@ -43,13 +50,6 @@ class StreamData(BaseModel):
     node_name: str
     name: MessageName
     output: str
-
-
-class ToolCall(BaseModel):
-    name: str
-    args: dict
-    id: Optional[str] = None
-    type: Optional[str] = None
 
 
 class HumanEditingData(BaseModel):
@@ -135,7 +135,10 @@ class GraphBuilder:
                     "next": END,
                 }
 
-            return {"tool_selection_message": response, "next": "evaluate_human_in_loop_node"}
+            adapter = TypeAdapter(list[ToolCall])
+
+            return {"tool_calls": adapter.validate_python(response.tool_calls),
+                    "next": "evaluate_human_in_loop_node"}
 
         except Exception as e:
             logger.error(f"[_async_select_tool_node] Error in invoking chain: {str(e)}")
@@ -143,8 +146,8 @@ class GraphBuilder:
 
     async def _async_evaluate_human_in_loop_node(self, state: State):
         logger.info("---EVALUATE HUMAN IN LOOP NODE---")
-        tool_selection_message = state["tool_selection_message"]
-        str_tool_calls = json.dumps(tool_selection_message.tool_calls)
+        tool_calls = state["tool_calls"]
+        str_tool_calls = str(tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
         model = get_openai_model(model="gpt-4o-mini", temperature=0)
@@ -152,38 +155,41 @@ class GraphBuilder:
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
         if response["score"] == "yes":
-            return {"next": "human_editing_node"}
+            return {"next": "human_editing_node", "interrupted": True}
         else:
-            return {"next": "tool_node"}
+            return {"next": "tool_node", "interrupted": False}
 
     async def _async_human_editing_node(self, state: State):
         logger.info("---HUMAN EDITING NODE---")
 
         # Make a stream by using LLM (for socketio stream)
-        str_tool_message = json.dumps(state["tool_selection_message"].tool_calls)
+        str_tool_message = str(state["tool_calls"])
         model = get_openai_model(temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
 
         data = interrupt(
             {
-                "tool_calls": state["tool_selection_message"].tool_calls
+                "tool_calls": state["tool_calls"]
             }
         )
 
-        # Approve the tool call and continue
-        if data.get("execute"):
-            tool_calls = data.get("tool_calls")
-            if tool_calls is not None:
-                tool_selection_message = state["tool_selection_message"]
-                for tool_call in tool_calls:
-                    index = next((i for i, item in enumerate(tool_selection_message.get("tool_calls"))
-                                  if item.get("name") == tool_call.get("name")
-                                  ), -1)
-                    tool_selection_message["tool_calls"][index]["args"] = tool_call.get("args")
+        adapter = TypeAdapter(HumanEditingData)
+        data = adapter.validate_python(data)
 
-                state["tool_selection_message"] = tool_selection_message
-                str_tool_message = str(tool_selection_message)
+        # Approve the tool call and continue
+        if data.execute:
+            human_tool_calls = data.tool_calls
+            if human_tool_calls is not None:
+                tool_calls = state["tool_calls"]
+                for human_tool_call in human_tool_calls:
+                    index = next((i for i, item in enumerate(tool_calls)
+                                  if item.name == human_tool_call.name
+                                  ), -1)
+                    tool_calls[index].args = human_tool_call.args
+
+                state["tool_calls"] = tool_calls
+                str_tool_message = str(tool_calls)
 
             return {"next": "tool_node", "messages": [AIMessage(content=str_tool_message, name=MessageName.TOOL)]}
 
@@ -197,17 +203,17 @@ class GraphBuilder:
             # Fix composio library
             patch_lib()
 
-            tool_selection_message = state["tool_selection_message"]
+            tool_calls = state["tool_calls"]
             messages = []
-            for tool_call in tool_selection_message.tool_calls:
+            for tool_call in tool_calls:
                 selected_tool = None
                 for tool in self.tools:  # type: ignore
-                    if tool.name == tool_call["name"]:
+                    if tool.name == tool_call.name:
                         selected_tool = tool
                         break
                 if selected_tool is None:
                     continue
-                data = await selected_tool.ainvoke(tool_call["args"], config)
+                data = await selected_tool.ainvoke(tool_call.args, config)
 
                 # Check tool_msg is AIMessage
                 if data is not None:
@@ -222,16 +228,25 @@ class GraphBuilder:
     async def _async_generate_node(self, state: State):
         logger.info("---GENERATE NODE---")
         try:
+            tool_calls = state["tool_calls"]
             tool_messages = state["tool_messages"]
             question = state["question"]
 
             # Get the documents
             docs = ""
+
+            if state["interrupted"]:
+                if tool_calls is None or len(tool_calls) == 0:
+                    docs += "\n#No tool calls\n"
+                else:
+                    for tool_call in tool_calls:
+                        docs += f"\n## ToolCall: \n {str(tool_call)}\n"
+
             if tool_messages is None or len(tool_messages) == 0:
-                docs = "#No tool messages"
+                docs += "\n#No tool messages\n"
             else:
                 for tool_message in tool_messages:
-                    docs = f"\n\n## ToolMessage: \n {tool_message.content}\n\n"
+                    docs += f"\n## ToolMessage: \n {tool_message.content}\n"
 
             prompt = get_markdown_answer_generating_prompt_template()
             llm = get_openai_model(temperature=0.5)

@@ -72,6 +72,6 @@ class ExtensionCallBack(BaseModel):
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     execute: bool = Field(..., title="Continue executing the action", examples=[True])
-    tool_calls: Optional[ToolCall] = Field(None, title="Update args of executing the action",
-                                           examples=[{'args': {'a': 1, 'b': 2}, 'name': 'tool'}])
+    tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
+                                                 examples=[{'args': {'a': 1, 'b': 2}, 'name': 'tool'}])
     max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])

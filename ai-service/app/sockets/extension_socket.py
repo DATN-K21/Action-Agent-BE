@@ -4,7 +4,6 @@ from socketio import AsyncNamespace
 
 from app.core import logging
 from app.core.agents.agent import Agent
-from app.core.enums import HumanAction
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.core.utils.convert_dict_message import convert_dict_message_to_output, convert_dict_message_to_tool_calls, \
     convert_dict_message_to_message
@@ -93,7 +92,7 @@ class ExtensionNamespace(AsyncNamespace):
             max_recursion=data.max_recursion if data.max_recursion is not None else 10,
         )
 
-        if action == HumanAction.CONTINUE:
+        if execute:
             await self.emit(
                 event="chat_interrupt",
                 data=ExtensionResponse(
@@ -157,20 +156,21 @@ class ExtensionNamespace(AsyncNamespace):
             max_recursion=data.max_recursion if data.max_recursion is not None else 10,
         )
 
-        async for dict_message in to_sse(result):
-            output = convert_dict_message_to_output(dict_message)
-            if output is not None:
-                await self.emit(
-                    event="stream_response",
-                    data=ExtensionResponse(
-                        user_id=data.user_id,
-                        thread_id=data.thread_id,
-                        extension_name=data.extension_name,
-                        interrupted=False,
-                        output=output
-                    ).model_dump(),
-                    to=sid
-                )
+        if execute:
+            async for dict_message in to_sse(result):
+                output = convert_dict_message_to_output(dict_message)
+                if output is not None:
+                    await self.emit(
+                        event="stream_response",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=False,
+                            output=output
+                        ).model_dump(),
+                        to=sid
+                    )
 
     @validate_event(ExtensionRequest)
     async def on_stream(self, sid, data):
