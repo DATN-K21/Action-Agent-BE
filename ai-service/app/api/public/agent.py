@@ -21,8 +21,8 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 @router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
 async def get_agents(
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    _: bool = Depends(ensure_authenticated),
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        _: bool = Depends(ensure_authenticated),
 ):
     try:
         agents = agent_manager.get_all_agent_names()
@@ -34,15 +34,16 @@ async def get_agents(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
+@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.",
+             response_model=ResponseWrapper[AgentChatResponse])
 async def execute(
-    user_id: str,
-    thread_id: str,
-    agent_name: str,
-    request: AgentChatRequest,
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_user_id),
+        user_id: str,
+        thread_id: str,
+        agent_name: str,
+        request: AgentChatRequest,
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the agent
@@ -84,15 +85,16 @@ async def execute(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.", response_class=StreamingResponse)
+@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.",
+             response_class=StreamingResponse)
 async def stream(
-    user_id: str,
-    thread_id: str,
-    agent_name: str,
-    request: AgentChatRequest,
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_user_id),
+        user_id: str,
+        thread_id: str,
+        agent_name: str,
+        request: AgentChatRequest,
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the agent
@@ -124,5 +126,5 @@ async def stream(
         return EventSourceResponse(to_sse(response))
 
     except Exception as e:
-        logger.error(f"Error executing Gmail API: {str(e)}", exc_info=True)
+        logger.error(f"Has error: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
