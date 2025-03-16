@@ -7,6 +7,7 @@ from app.services.extensions.gmail_service import GmailService
 from app.services.extensions.google_calendar_service import GoogleCalendarService
 from app.services.extensions.google_maps_service import GoogleMapsService
 from app.services.extensions.google_meet_service import GoogleMeetService
+from app.services.extensions.googledrive_service import GoogleDriveService
 from app.services.extensions.outlook_service import OutlookService
 from app.services.extensions.slack_service import SlackService
 from app.services.extensions.youtube_service import YoutubeService
@@ -41,6 +42,10 @@ def get_outlook_service() -> OutlookService:
     return OutlookService()
 
 @lru_cache()
+def get_google_drive_service() -> GoogleDriveService:
+    return GoogleDriveService()
+
+@lru_cache()
 def get_extension_service_manager(
         gmail_service:GmailService = Depends(get_gmail_service),
         google_calendar_service:GoogleCalendarService = Depends(get_google_calendar_service),
@@ -49,6 +54,7 @@ def get_extension_service_manager(
         youtube_service:YoutubeService = Depends(get_youtube_service),
         slack_service:SlackService = Depends(get_slack_service),
         outlook_service:OutlookService = Depends(get_outlook_service),
+        google_drive_service:GoogleDriveService = Depends(get_google_drive_service)
 ) -> ExtensionServiceManager:
     manager = ExtensionServiceManager()
 
@@ -60,6 +66,7 @@ def get_extension_service_manager(
     manager.register_extension_service(youtube_service)
     manager.register_extension_service(slack_service)
     manager.register_extension_service(outlook_service)
+    manager.register_extension_service(google_drive_service)
 
 
     return manager
