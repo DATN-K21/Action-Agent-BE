@@ -161,7 +161,7 @@ class ExtensionNamespace(AsyncNamespace):
                 output = convert_dict_message_to_output(dict_message)
                 if output is not None:
                     await self.emit(
-                        event="stream_response",
+                        event="stream_interrupt",
                         data=ExtensionResponse(
                             user_id=data.user_id,
                             thread_id=data.thread_id,
