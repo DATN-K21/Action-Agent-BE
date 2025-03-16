@@ -11,7 +11,7 @@ from app.memory.checkpoint import AsyncPostgresPool
 from app.memory.deps import get_checkpointer
 from app.services.extensions.deps import get_extension_service_manager, get_gmail_service, get_google_calendar_service, \
     get_google_meet_service, get_google_maps_service, get_youtube_service, get_slack_service, get_outlook_service, \
-    get_google_drive_service
+    get_google_drive_service, get_notion_service
 from app.sockets.extension_socket import ExtensionNamespace
 
 
@@ -35,7 +35,8 @@ async def lifespan(app: FastAPI):
             youtube_service=get_youtube_service(),
             slack_service=get_slack_service(),
             outlook_service=get_outlook_service(),
-            google_drive_service=get_google_drive_service()
+            google_drive_service=get_google_drive_service(),
+            notion_service=get_notion_service()
         )
         sio_asgi.register_namespace(
             ExtensionNamespace(
