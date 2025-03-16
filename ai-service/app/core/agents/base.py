@@ -7,7 +7,7 @@ from langgraph.types import StateSnapshot
 from structlog.stdlib import BoundLogger
 
 from app.core import logging
-from app.core.enums import HumanAction
+from app.core.graph.base import ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.streaming import MessagesStream
 
@@ -43,7 +43,8 @@ class BaseAgent(ABC):
     @abstractmethod
     async def async_handle_chat_interrupt(
             self,
-            action: HumanAction,
+            execute: bool,
+            tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             max_recursion: int = 10,
     ) -> AgentInterruptHandlingResult:
@@ -59,7 +60,8 @@ class BaseAgent(ABC):
     @abstractmethod
     async def async_handle_stream_interrupt(
             self,
-            action: HumanAction,
+            execute: bool,
+            tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             max_recursion: int = 10,
     ) -> MessagesStream:

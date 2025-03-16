@@ -30,6 +30,7 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
     - URL: http://hostdomain/
     - Namespace: /extension
     - Some client listeners: error, connect, disconnect
+    - Some server listeners: connect, disconnect, message, set_timezone
 
 2. Chat Endpoint:
     - Event name: chat, handle_chat_interrupt
@@ -40,6 +41,43 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
     - Event name: stream, handle_stream_interrupt
     - Client listens to: stream_response, stream_interrupt
     - Description: This Socket.io endpoint facilitates agent communication through message streaming.
+
+**Note:** There are two ways to set timezone:
+
+- Set timezone using extraHeaders in the connection options (with JavaScript).
+
+```javascript
+const socket = io('http://localhost:5001/extension', {
+    extraHeaders: {
+        timezone: 'Asia/Kolkata'
+    }
+});
+```
+
+- Set timezone using the set_timezone event (for both Python and JavaScript).
+  Using set_timezone event, you can set the timezone when you connect to server
+
+```python
+import socketio
+import pytz
+
+sio = socketio.Client()
+namespace = "/extension"
+
+
+# Event handler for connection
+@sio.on("connect", namespace=namespace)
+def connect():
+    print("Connected to server")
+    timezone_str = pytz.timezone("Asia/Ho_Chi_Minh").zone  # Example: "Asia/Ho_Chi_Minh"
+    sio.emit("set_timezone", timezone_str, namespace=namespace)
+```
+
+**How to get timezone:**
+
+```javascript
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+```
 
 ### 2.1 Schema for chat and stream events (send to server - ExtensionRequest)
 
@@ -65,7 +103,8 @@ Otherwise, output is a string representing the AI's response to your question.
 - **user_id:** String type - User ID (required)
 - **thread_id:** String type - Thread ID (required)
 - **extension_name:** String type - Extension name (required)
-- **input:** String type - Input message (required)
+- **execute:** Boolean type - Indicates whether to continue executing the action (required)
+- **tool_calls:** List type - List of the updated tool calls (Optional)
 - **max_recursion:** Specifies the recursion limit when executing the graph (optional)
 
 ### 2.4 Schema for chat_interrupt and stream_interrupt events (send to client - ExtensionResponse)
@@ -81,8 +120,9 @@ the tool call.
 
 ## 3. Agent APIs
 
-Agent functionalities are still accessible via HTTP APIs.
-You can explore these APIs using the Swagger documentation.
+- Agent functionalities are still accessible via HTTP APIs.
+  You can explore these APIs using the Swagger documentation.
+- Stream APIs utilize Server-Sent Events (SSE)
 
 ## 4. Multi-agent APIs
 

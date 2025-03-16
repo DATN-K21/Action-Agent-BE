@@ -1,48 +1,32 @@
-# syntax=docker/dockerfile:1
+ARG NODE_VERSION=20.9.0
 
 #######################################
-# Stage 1: Build Stage
+# Builder Stage
 #######################################
-FROM node:18-alpine AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
+ENV NODE_ENV=build
 
-# Set the working directory inside the container.
-WORKDIR /usr/src/app
+WORKDIR /home/node
 
-# Copy dependency definition files to leverage Docker cache.
-# If package.json or package-lock.json doesn't change, this layer is cached.
 COPY package*.json ./
+RUN npm ci --omit=dev \
+  && npm install -g @nestjs/cli
 
-# Install all dependencies (including dev dependencies needed for building).
-RUN npm install
-
-# Copy the rest of the application source code.
 COPY . .
+RUN npm run build \
+  && npm prune --omit=dev
 
-# Build the application (this typically outputs the build artifacts into the 'dist' directory).
-RUN npm run build
 
 #######################################
-# Stage 2: Production Runner Stage
+# Runner Stage
 #######################################
-FROM node:18-alpine AS runner
+FROM node:${NODE_VERSION}-alpine
+ENV NODE_ENV=production
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+WORKDIR /home/node
 
-# Set the working directory for the production container.
-WORKDIR /usr/src/app
+COPY --from=builder /home/node/package*.json ./
+COPY --from=builder /home/node/node_modules/ ./node_modules/
+COPY --from=builder /home/node/dist/ ./dist/
 
-# Copy the built files from the builder stage.
-COPY --from=builder /usr/src/app/dist ./dist
-
-# Copy package definition files to install production dependencies.
-COPY package*.json ./
-
-# Install only production dependencies to minimize the final image size.
-RUN npm install --only=production
-
-# Expose the port that the application listens on.
-EXPOSE 8200
-
-# Define the default command to start the application.
 CMD ["node", "dist/main.js"]

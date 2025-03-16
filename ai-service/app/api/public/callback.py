@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from app.api.deps import ensure_user_id
 from app.core import logging
 from app.core.settings import env_settings
 from app.services.database.connected_app_service import ConnectedAppService
@@ -14,15 +13,15 @@ router = APIRouter(prefix="/callback", tags=["Callback"], include_in_schema=Fals
 
 @router.get("/extension/{user_id}", summary="Handle connection success.")
 async def connection_success(
-    user_id: str,
-    request: Request,
-    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-    _: bool = Depends(ensure_user_id),
+        user_id: str,
+        request: Request,
+        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
 ):
+    url = env_settings.FRONTEND_REDIRECT_URL
+
     connection_status = request.query_params.get("status")
     connected_account_id = request.query_params.get("connectedAccountId")
     app_name = request.query_params.get("appName")
-    url = env_settings.FRONTEND_REDIRECT_URL
 
     if connection_status is None or connected_account_id is None or app_name is None:
         full_url = f"{url}?success=false&message=missing%20parameters"

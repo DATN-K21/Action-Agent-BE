@@ -1,7 +1,8 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 from pydantic import Field, BaseModel
 
+from app.core.graph.base import ToolCall
 from app.schemas.base import BaseResponse, BaseRequest
 
 
@@ -49,7 +50,7 @@ class ExtensionRequest(BaseRequest):
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(5, ge=1, le=20, title="Max Recursion", examples=[5])
+    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[5])
 
 
 ##################################################
@@ -60,7 +61,7 @@ class ExtensionResponse(BaseRequest):
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     interrupted: bool = Field(..., title="Interrupted", examples=[False])
-    output: str | dict = Field(..., title="Output", examples=["Hello"])
+    output: str | dict | list[Any] = Field(..., title="Output", examples=["Hello"])
 
 
 ##################################################
@@ -70,5 +71,7 @@ class ExtensionCallBack(BaseModel):
     user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
-    input: str = Field(min_length=1, max_length=100, title="Output", examples=["Hello"])
-    max_recursion: Optional[int] = Field(5, ge=1, le=20, title="Max Recursion", examples=[5])
+    execute: bool = Field(..., title="Continue executing the action", examples=[True])
+    tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
+                                                 examples=[{'args': {'a': 1, 'b': 2}, 'name': 'tool'}])
+    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])

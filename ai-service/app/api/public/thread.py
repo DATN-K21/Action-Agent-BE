@@ -1,15 +1,19 @@
 from typing import BinaryIO, cast
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import RunnableConfig
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import ensure_user_id
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
+from app.core.session import get_db_session
 from app.core.utils.convert_messages_to_dict import convert_messages_to_dicts
 from app.core.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
+from app.models.thread import Thread
 from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.history import GetHistoryResponse
 from app.schemas.ingest import IngestFileResponse
@@ -63,7 +67,7 @@ async def get_thread_by_id(
     return response.to_response()
 
 
-@router.patch("/{user_id}/{thread_id}/update", summary="Update thread inf.", response_model=ResponseWrapper[UpdateThreadResponse])
+@router.patch("/{user_id}/{thread_id}/update", summary="Update thread information.", response_model=ResponseWrapper[UpdateThreadResponse])
 async def update_thread(
     user_id: str,
     thread_id: str,
@@ -91,15 +95,34 @@ async def get_history(
     user_id: str,
     thread_id: str,
     agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        agent = agent_manager.get_agent(name="chat-agent")
-        state = await agent.async_get_state(thread_id)  # type: ignore
+        # 1. Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
 
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        # 2. Get the agent
+        agent = agent_manager.get_agent(name="chat-agent")
+
+        # 3. Get the history
+        state = await agent.async_get_state(thread_id)  # type: ignore
         if "messages" in state.values:
             response_data = convert_messages_to_dicts(state.values["messages"])
             return ResponseWrapper.wrap(status=200, data=GetHistoryResponse(messages=list(response_data))).to_response()
+
     except Exception as e:
         logger.error(f"Error ingesting files: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
@@ -109,18 +132,35 @@ async def get_history(
 async def upload_files(
     user_id: str,
     thread_id: str,
-    file: UploadFile = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # TODO: check if userid-threadid exists
-        # Call db to find (userId, threadId)
+        # 1. Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
 
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        # 2. Ingest the file
         file_blob: Blob = convert_ingestion_input_to_blob(file)
         config = RunnableConfig(configurable={"thread_id": thread_id})
         ingest_runnable.batch(cast(list[BinaryIO], [file_blob]), config)
         response_data = IngestFileResponse(
-            user_id=user_id, thread_id=thread_id, is_success=True, output="Files ingested successfully"
+            user_id=user_id,
+            thread_id=thread_id,
+            is_success=True,
+            output="Files ingested successfully",
         )
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
