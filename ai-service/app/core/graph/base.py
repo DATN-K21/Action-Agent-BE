@@ -21,7 +21,7 @@ from app.prompts.prompt_templates import (
     get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
     get_enhanced_prompt_template,
 )
-from app.services.model_service import get_openai_model
+from app.services.model_service import AIModelService, AIModelProviderEnum
 
 logger = logging.get_logger(__name__)
 
@@ -80,7 +80,7 @@ class GraphBuilder:
         try:
             question = state["question"]
 
-            model = get_openai_model(temperature=0, streaming=False)
+            model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free, temperature=0, streaming=False)
             prompt = get_enhanced_prompt_template()
             agent = create_react_agent(
                 model=model,
@@ -102,7 +102,7 @@ class GraphBuilder:
         logger.info("---AGENT NODE---")
 
         try:
-            model = get_openai_model()
+            model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free)
             messages = trimmer.invoke(state["messages"])
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
@@ -119,7 +119,7 @@ class GraphBuilder:
         try:
             question = state["question"]
 
-            model = get_openai_model(temperature=0)
+            model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free, temperature=0)
             prompt = get_openai_function_prompt_template()
             model = model.bind_tools(self.tools)
             chain = prompt | trimmer | model
@@ -150,7 +150,7 @@ class GraphBuilder:
         str_tool_calls = str(tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
-        model = get_openai_model(model="gpt-4o-mini", temperature=0)
+        model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free, model="gpt-4o-mini", temperature=0)
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
@@ -164,7 +164,7 @@ class GraphBuilder:
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = str(state["tool_calls"])
-        model = get_openai_model(temperature=0)
+        model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free, temperature=0)
         model = model.bind_tools(self.tools)
         await model.ainvoke(input=str_tool_message)
 
@@ -249,7 +249,7 @@ class GraphBuilder:
                     docs += f"\n## ToolMessage: \n {tool_message.content}\n"
 
             prompt = get_markdown_answer_generating_prompt_template()
-            llm = get_openai_model(temperature=0.5)
+            llm = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free, temperature=0.5)
             rag_chain = prompt | llm
 
             response = await rag_chain.ainvoke({"context": docs, "question": question})

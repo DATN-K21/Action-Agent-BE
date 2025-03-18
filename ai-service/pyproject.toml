@@ -12,6 +12,7 @@ dependencies = [
     "composio-langgraph>=0.7.4",
     "dateparser>=1.2.1",
     "fastapi[standard]>=0.115.8",
+    "g4f[all]>=0.4.8.6",
     "google-auth-oauthlib>=1.2.1",
     "langchain>=0.3.19",
     "langchain-google-community>=2.0.4",
