@@ -192,7 +192,7 @@ class ExtensionNamespace(AsyncNamespace):
             async for dict_message in to_sse(response):
                 if dict_message["event"] == "metadata":
                     dict_message_data = json.loads(dict_message["data"])
-                    if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_REVIEW_NODE:
+                    if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_EDITING_NODE:
                         interrupted = True
                 elif interrupted:
                     tool_calls = convert_dict_message_to_tool_calls(dict_message)
