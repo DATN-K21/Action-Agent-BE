@@ -175,6 +175,7 @@ class ExtensionNamespace(AsyncNamespace):
     @validate_event(ExtensionRequest)
     async def on_stream(self, sid, data):
         try:
+
             if not self._check_exist_agent(sid, data.extension_name):
                 agent = self._create_agent(data.extension_name, data.user_id)
                 self.session_extension_to_agent[(sid, data.extension_name)] = agent

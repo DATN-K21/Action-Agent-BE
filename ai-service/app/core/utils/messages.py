@@ -5,7 +5,7 @@ from app.services.model_service import MAX_TOKENS, AIModelService, AIModelProvid
 trimmer = trim_messages(
     max_tokens=MAX_TOKENS,
     strategy="last",
-    token_counter=AIModelService.get_ai_model(provider=AIModelProviderEnum.langchain_openai),
+    token_counter=AIModelService.get_ai_model(provider=AIModelProviderEnum.LANGCHAIN_OPENAI),
     include_system=True,
     allow_partial=True,
 )

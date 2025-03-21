@@ -625,44 +625,37 @@ class BaseChatG4F(BaseChatModel):
             **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
         kwargs["stream"] = True
+        payload = self._get_request_payload(messages, stop=stop, **kwargs)
         default_chunk_class: Type[BaseMessageChunk] = AIMessageChunk
         base_generation_info = {}
 
-        response_stream = self.root_client.chat.completions.create(
-            model=self.model_name,
-            messages=_convert_messages_to_dicts(messages),
-            stream=True,
-            web_search=False
-        )
-        context_manager = response_stream
+        response = self.client.create(**payload)
 
         try:
-            with context_manager as response:
-                is_first_chunk = True
-                for chunk in response:
-                    if not isinstance(chunk, dict):
-                        chunk = chunk.model_dump()
-                    generation_chunk = self._convert_chunk_to_generation_chunk(
-                        chunk,
-                        default_chunk_class,
-                        base_generation_info if is_first_chunk else {},
+            is_first_chunk = True
+            for chunk in response:
+                if not isinstance(chunk, dict):
+                    chunk = chunk.model_dump()
+                generation_chunk = self._convert_chunk_to_generation_chunk(
+                    chunk,
+                    default_chunk_class,
+                    base_generation_info if is_first_chunk else {},
+                )
+                if generation_chunk is None:
+                    continue
+                default_chunk_class = generation_chunk.message.__class__
+                logprobs = (generation_chunk.generation_info or {}).get("logprobs")
+                if run_manager:
+                    run_manager.on_llm_new_token(
+                        generation_chunk.text,
+                        chunk=generation_chunk,
+                        logprobs=logprobs,
                     )
-                    if generation_chunk is None:
-                        continue
-                    default_chunk_class = generation_chunk.message.__class__
-                    logprobs = (generation_chunk.generation_info or {}).get("logprobs")
-                    if run_manager:
-                        run_manager.on_llm_new_token(
-                            generation_chunk.text,
-                            chunk=generation_chunk,
-                            logprobs=logprobs,
-                        )
-                    is_first_chunk = False
-                    yield generation_chunk
+                is_first_chunk = False
+                yield generation_chunk
         except openai.BadRequestError as e:
             _handle_openai_bad_request(e)
-
-        if hasattr(response, "get_final_completion"):
+        if hasattr(response, "get_final_completion") and "response_format" in payload:
             final_completion = response.get_final_completion()
             generation_chunk = self._get_generation_chunk_from_completion(
                 final_completion
@@ -685,18 +678,27 @@ class BaseChatG4F(BaseChatModel):
                 messages, stop=stop, run_manager=run_manager, **kwargs
             )
             return generate_from_stream(stream_iter)
+        payload = self._get_request_payload(messages, stop=stop, **kwargs)
+        generation_info = None
+        response = self.client.create(**payload)
+        return self._create_chat_result(response, generation_info)
 
-        try:
-            response = self.root_client.chat.completions.create(
-                model=self.model_name,
-                messages=_convert_messages_to_dicts(messages),
-                stream=False,
-                web_search=False
-            )
+    def _get_request_payload(
+            self,
+            input_: LanguageModelInput,
+            *,
+            stop: Optional[List[str]] = None,
+            **kwargs: Any,
+    ) -> dict:
+        messages = self._convert_input(input_).to_messages()
+        if stop is not None:
+            kwargs["stop"] = stop
 
-            return self._create_chat_result(response)
-        except openai.BadRequestError as e:
-            _handle_openai_bad_request(e)
+        return {
+            "messages": [_convert_message_to_dict(m) for m in messages],
+            **self._default_params,
+            **kwargs,
+        }
 
     def _create_chat_result(
             self,
@@ -754,15 +756,11 @@ class BaseChatG4F(BaseChatModel):
             run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
             **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
+        kwargs["stream"] = True
+        payload = self._get_request_payload(messages, stop=stop, **kwargs)
         default_chunk_class: Type[BaseMessageChunk] = AIMessageChunk
         base_generation_info = {}
-
-        response = self.root_async_client.chat.completions.stream(
-            model=self.model_name,
-            messages=_convert_messages_to_dicts(messages),
-            web_search=False
-        )
-
+        response = await self.async_client.create(**payload)
         try:
             is_first_chunk = True
             async for chunk in response:
@@ -787,7 +785,7 @@ class BaseChatG4F(BaseChatModel):
                 yield generation_chunk
         except openai.BadRequestError as e:
             _handle_openai_bad_request(e)
-        if hasattr(response, "get_final_completion"):
+        if hasattr(response, "get_final_completion") and "response_format" in payload:
             final_completion = await response.get_final_completion()
             generation_chunk = self._get_generation_chunk_from_completion(
                 final_completion
@@ -810,18 +808,12 @@ class BaseChatG4F(BaseChatModel):
                 messages, stop=stop, run_manager=run_manager, **kwargs
             )
             return await agenerate_from_stream(stream_iter)
-
-        try:
-            response = await self.root_async_client.chat.completions.create(
-                model=self.model_name,
-                messages=_convert_messages_to_dicts(messages),
-                web_search=False
-            )
-
-            return await run_in_executor(
-                None, self._create_chat_result, response)
-        except openai.BadRequestError as e:
-            _handle_openai_bad_request(e)
+        payload = self._get_request_payload(messages, stop=stop, **kwargs)
+        generation_info = None
+        response = await self.async_client.create(**payload)
+        return await run_in_executor(
+            None, self._create_chat_result, response, generation_info
+        )
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:

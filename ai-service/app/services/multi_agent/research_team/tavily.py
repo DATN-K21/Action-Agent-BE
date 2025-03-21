@@ -37,7 +37,7 @@ tavily_tool = TavilySearchResults(max_results=MAX_RESULTS, name="tavily_search_t
 async def tavily_node(state: AgentState, config: RunnableConfig):
     try:
         model_forced_to_tavily = (AIModelService.
-                                  get_ai_model(provider=AIModelProviderEnum.gpt4free).
+                                  get_ai_model(provider=AIModelProviderEnum.GPT4FREE).
                                   bind_tools([tavily_tool], tool_choice="tavily_search_tool"))
         result = await model_forced_to_tavily.ainvoke([state["question"]])
         messages = state["messages"]

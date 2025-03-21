@@ -14,7 +14,7 @@ logger = logging.get_logger(__name__)
 METAS: List[Any] = [ResearchTeamMetadata()]
 
 main_supervisor_node = make_supervisor_node(AIModelService.
-                                            get_ai_model(provider=AIModelProviderEnum.gpt4free), METAS)
+                                            get_ai_model(provider=AIModelProviderEnum.GPT4FREE), METAS)
 
 teams_builder = StateGraph(state_schema=AgentState)
 teams_builder.add_node("main_supervisor", main_supervisor_node)

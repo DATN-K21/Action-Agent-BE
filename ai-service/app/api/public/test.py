@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
+from langchain_core.tools import tool
 
 from app.api.deps import ensure_authenticated
-from app.core.g4f_chat_model import ChatG4F
 from app.schemas.base import ResponseWrapper
+from app.services.model_service import AIModelService, AIModelProviderEnum
 
 router = APIRouter(prefix="", tags=["Tests"], responses={})
 
@@ -24,12 +25,22 @@ async def auth(
     return ResponseWrapper.wrap(status=200, message="Authenticated").to_response()
 
 
+@tool
+def add(a: int, b: int) -> int:
+    """Adds a and b."""
+    return a + b
+
+
+@tool
+def multiply(a: int, b: int) -> int:
+    """Multiplies a and b."""
+    return a * b
+
+
 @router.get("/test-gpt4free", summary="Endpoint to check GPT4FREE.", response_model=ResponseWrapper)
 async def test_gpt4free():
-    # model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free)
-    # res = await model.ainvoke("Hello")
-    # print(res)
-
-    model = ChatG4F()
-    res = await model.ainvoke("Hello")
+    tools = [add, multiply]
+    model = AIModelService.get_ai_model(provider=AIModelProviderEnum.GPT4FREE)
+    model = model.bind_tools(tools, tool_choice="multiply")
+    res = model.invoke("what is 2 + 4")
     return ResponseWrapper.wrap(status=200, message=f"{res}").to_response()

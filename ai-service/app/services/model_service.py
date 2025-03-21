@@ -10,8 +10,8 @@ MAX_TOKENS = 10000
 
 
 class AIModelProviderEnum(StrEnum):
-    langchain_openai = "langchain_openai"
-    gpt4free = "gpt4free"
+    LANGCHAIN_OPENAI = "langchain_openai"
+    GPT4FREE = "gpt4free"
 
 
 class AIModelService:
@@ -36,15 +36,15 @@ class AIModelService:
     @classmethod
     def get_ai_model(
             cls,
-            provider: AIModelProviderEnum = AIModelProviderEnum.langchain_openai,
+            provider: AIModelProviderEnum = AIModelProviderEnum.LANGCHAIN_OPENAI,
             model: str = "gpt-3.5-turbo",
             temperature: float = 0,
             streaming: bool = True,
     ):
         """Get an AI model from the specified provider."""
-        if provider == AIModelProviderEnum.langchain_openai:
+        if provider == AIModelProviderEnum.LANGCHAIN_OPENAI:
             return cls._get_langchain_openai_model(model=model, temperature=temperature, streaming=streaming)
-        elif provider == AIModelProviderEnum.gpt4free:
+        elif provider == AIModelProviderEnum.GPT4FREE:
             return cls._get_gpt4free_llm()
         else:
             raise ValueError(f"Invalid provider: {provider}")

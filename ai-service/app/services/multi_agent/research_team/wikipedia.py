@@ -40,7 +40,7 @@ async def wikipedia_node(state: AgentState, config: RunnableConfig):
     try:
         wikipedia_tool = get_wikipedia_retriever_tool()
         model_forced_to_wikipedia = (AIModelService.
-                                     get_ai_model(provider=AIModelProviderEnum.gpt4free).
+                                     get_ai_model(provider=AIModelProviderEnum.GPT4FREE).
                                      bind_tools([wikipedia_tool], tool_choice="wikipedia_retriever_tool"))
         result = await model_forced_to_wikipedia.ainvoke([state["question"]])
         messages = state["messages"]

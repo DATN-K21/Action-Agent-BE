@@ -20,7 +20,7 @@ METAS: List[Any] = [
     FileRagAgentMetadata(),
 ]
 
-research_supervisor = make_supervisor_node(AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free), METAS)
+research_supervisor = make_supervisor_node(AIModelService.get_ai_model(provider=AIModelProviderEnum.GPT4FREE), METAS)
 
 # Define graph builder
 research_builder = StateGraph(state_schema=AgentState)

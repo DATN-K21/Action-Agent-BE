@@ -35,7 +35,7 @@ class MultiAgentService:
             prompt = get_retriever_prompt_template()
 
             # Model
-            model = AIModelService.get_ai_model(provider=AIModelProviderEnum.gpt4free)
+            model = AIModelService.get_ai_model(provider=AIModelProviderEnum.GPT4FREE)
 
             # Chain
             rag_chain = prompt | trimmer | model
