@@ -29,6 +29,19 @@ def get_simple_agent_prompt_template():
 
 
 @lru_cache()
+def get_regenerate_tool_calls_prompt_template():
+    return PromptTemplate(
+        template="""
+You are an intelligent assistant responsible for selecting the appropriate tools based on the provided tool_calls message.
+
+## Tool Calls Message:
+{tool_calls}
+""",
+        input_variables=["tool_calls"],
+    )
+
+
+@lru_cache()
 def get_enhanced_prompt_template():
     return ChatPromptTemplate.from_messages(
         [

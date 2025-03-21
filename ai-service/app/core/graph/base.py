@@ -19,7 +19,7 @@ from app.prompts.prompt_templates import (
     get_markdown_answer_generating_prompt_template,
     get_simple_agent_prompt_template,
     get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
-    get_enhanced_prompt_template,
+    get_enhanced_prompt_template, get_regenerate_tool_calls_prompt_template,
 )
 from app.services.model_service import get_openai_model
 
@@ -166,7 +166,10 @@ class GraphBuilder:
         str_tool_message = str(state["tool_calls"])
         model = get_openai_model(temperature=0)
         model = model.bind_tools(self.tools)
-        await model.ainvoke(input=str_tool_message)
+        prompt = get_regenerate_tool_calls_prompt_template()
+        chain = prompt | model
+
+        await chain.ainvoke(input={"tool_calls": str_tool_message})
 
         data = interrupt(
             {

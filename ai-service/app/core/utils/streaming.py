@@ -21,7 +21,7 @@ class LanggraphNodeEnum(StrEnum):
     ENHANCE_PROMPT_NODE = "enhance_prompt_node"
     SELECT_TOOL_NODE = "select_tool_node"
     EVALUATE_HUMAN_IN_LOOP_NODE = "evaluate_human_in_loop_node"
-    HUMAN_REVIEW_NODE = "human_review_node"
+    HUMAN_EDITING_NODE = "human_editing_node"
     TOOL_NODE = "tool_node"
     GENERATE_NODE = "generate_node"
 
@@ -32,7 +32,7 @@ class Metadata(BaseModel):
 
 
 list_stream_nodes = [LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.SELECT_TOOL_NODE,
-                     LanggraphNodeEnum.HUMAN_REVIEW_NODE, LanggraphNodeEnum.GENERATE_NODE]
+                     LanggraphNodeEnum.HUMAN_EDITING_NODE, LanggraphNodeEnum.GENERATE_NODE]
 
 
 async def astream_state(
