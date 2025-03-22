@@ -78,7 +78,7 @@ class GraphBuilder:
     async def _async_enhance_prompt_node(self, state: State, config: RunnableConfig):
         logger.info("---ENHANCE PROMPT NODE---")
         try:
-            question = state["question"]
+            question = state.get("question")
 
             model = get_openai_model(temperature=0, streaming=False)
             prompt = get_enhanced_prompt_template()
@@ -103,7 +103,7 @@ class GraphBuilder:
 
         try:
             model = get_openai_model()
-            messages = trimmer.invoke(state["messages"])
+            messages = trimmer.invoke(state.get("messages"))
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
             response = await chain.ainvoke({"messages": messages})
@@ -117,7 +117,7 @@ class GraphBuilder:
         logger.info("---SELECT TOOL NODE---")
 
         try:
-            question = state["question"]
+            question = state.get("question")
 
             model = get_openai_model(temperature=0)
             prompt = get_openai_function_prompt_template()
@@ -125,7 +125,7 @@ class GraphBuilder:
             chain = prompt | trimmer | model
             response = await chain.ainvoke({
                 "input": question,
-                "chat_history": state["messages"],
+                "chat_history": state.get("messages"),
                 "agent_scratchpad": []
             })
 
@@ -146,7 +146,7 @@ class GraphBuilder:
 
     async def _async_evaluate_human_in_loop_node(self, state: State):
         logger.info("---EVALUATE HUMAN IN LOOP NODE---")
-        tool_calls = state["tool_calls"]
+        tool_calls = state.get("tool_calls")
         str_tool_calls = str(tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
@@ -163,7 +163,7 @@ class GraphBuilder:
         logger.info("---HUMAN EDITING NODE---")
 
         # Make a stream by using LLM (for socketio stream)
-        str_tool_message = str(state["tool_calls"])
+        str_tool_message = str(state.get("tool_calls"))
         model = get_openai_model(temperature=0)
         model = model.bind_tools(self.tools)
         prompt = get_regenerate_tool_calls_prompt_template()
@@ -173,7 +173,7 @@ class GraphBuilder:
 
         data = interrupt(
             {
-                "tool_calls": state["tool_calls"]
+                "tool_calls": state.get("tool_calls")
             }
         )
 
@@ -184,7 +184,7 @@ class GraphBuilder:
         if data.execute:
             human_tool_calls = data.tool_calls
             if human_tool_calls is not None:
-                tool_calls = state["tool_calls"]
+                tool_calls = state.get("tool_calls")
                 for human_tool_call in human_tool_calls:
                     index = next((i for i, item in enumerate(tool_calls)
                                   if item.name == human_tool_call.name
@@ -206,7 +206,7 @@ class GraphBuilder:
             # Fix composio library
             patch_lib()
 
-            tool_calls = state["tool_calls"]
+            tool_calls = state.get("tool_calls")
             messages = []
             for tool_call in tool_calls:
                 selected_tool = None
@@ -231,14 +231,14 @@ class GraphBuilder:
     async def _async_generate_node(self, state: State):
         logger.info("---GENERATE NODE---")
         try:
-            tool_calls = state["tool_calls"]
-            tool_messages = state["tool_messages"]
-            question = state["question"]
+            tool_calls = state.get("tool_calls")
+            tool_messages = state.get("tool_messages")
+            question = state.get("question")
 
             # Get the documents
             docs = ""
 
-            if state["interrupted"]:
+            if state.get("interrupted"):
                 if tool_calls is None or len(tool_calls) == 0:
                     docs += "\n#No tool calls\n"
                 else:
@@ -284,7 +284,7 @@ class GraphBuilder:
 
             workflow.add_edge(START, "select_tool_node")
             workflow.add_conditional_edges("select_tool_node",
-                                           lambda state: END if state["next"] == END else "tool_node")
+                                           lambda state: END if state.get("next") == END else "tool_node")
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 
@@ -298,9 +298,9 @@ class GraphBuilder:
 
             workflow.add_edge(START, "enhance_prompt_node")
             workflow.add_edge("enhance_prompt_node", "select_tool_node")
-            workflow.add_conditional_edges("select_tool_node", lambda state: state["next"])
-            workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state["next"])
-            workflow.add_conditional_edges("human_editing_node", lambda state: state["next"])
+            workflow.add_conditional_edges("select_tool_node", lambda state: state.get("next"))
+            workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state.get("next"))
+            workflow.add_conditional_edges("human_editing_node", lambda state: state.get("next"))
             workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 
