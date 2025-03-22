@@ -1,6 +1,6 @@
 const express = require('express');
 // const { initRabbitMQ } = require('./services/rabbitmq.service');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const morgan = require('morgan');
 
@@ -10,20 +10,20 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Rate limiter middleware
-const limiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 50, // 50 requests per minute
-    keyGenerator: (req) => req.ip, // Use req.ip instead of X-Forwarded-For
-    handler: (req, res) => {
-        res.status(429).json({ error: "Too many requests. Please try again later." });
-    }
-});
+// const limiter = rateLimit({
+//     windowMs: 60 * 1000, // 1 minute
+//     max: 50, // 50 requests per minute
+//     keyGenerator: (req) => req.ip, // Use req.ip instead of X-Forwarded-For
+//     handler: (req, res) => {
+//         res.status(429).json({ error: "Too many requests. Please try again later." });
+//     }
+// });
 
 // Middleware
 app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
-app.use(limiter); // Apply rate limiter
+// app.use(limiter); // Apply rate limiter
 
 // Routes
 app.get('/', (req, res) => {
