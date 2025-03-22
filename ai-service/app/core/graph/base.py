@@ -63,11 +63,13 @@ class GraphBuilder:
             self,
             checkpointer: AsyncPostgresSaver,
             tools: Optional[list[BaseTool | Runnable]] = None,
+            tool_choice: Optional[str] = None,
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
     ):
         self.checkpointer = checkpointer
         self.tools = tools
+        self.tool_choice = tool_choice
         self.name = name
         self.config = config
         self.enhanced_question_tools = []
@@ -121,7 +123,10 @@ class GraphBuilder:
 
             model = get_openai_model(temperature=0)
             prompt = get_openai_function_prompt_template()
-            model = model.bind_tools(self.tools)
+            if self.tool_choice is not None:
+                model = model.bind_tools(tools=self.tools, tool_choice=self.tool_choice)
+            else:
+                model = model.bind_tools(self.tools)
             chain = prompt | trimmer | model
             response = await chain.ainvoke({
                 "input": question,
