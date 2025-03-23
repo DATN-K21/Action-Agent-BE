@@ -34,6 +34,10 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     needs: detect-changes
+    if: needs.detect-changes.outputs.ai == 'true' || 
+        needs.detect-changes.outputs.gw == 'true' || 
+        needs.detect-changes.outputs.user == 'true' || 
+        needs.detect-changes.outputs.log == 'true'
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -115,7 +119,8 @@ jobs:
 
       - name: Setup WireGuard VPN
         run: |
-          sudo echo "$WIREGUARD_CLIENT_CONF" > /etc/wireguard/wg-client.conf
+          sudo mkdir -p /etc/wireguard
+          echo "$WIREGUARD_CLIENT_CONF" | sudo tee /etc/wireguard/wg-client.conf > /dev/null
           sudo apt update && sudo apt install -y wireguard
           sudo wg-quick up wg-client
         env:
