@@ -15,6 +15,10 @@ class CreateThreadRequest(BaseRequest):
     thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
 
 
+class FilterThreadRequest(BaseRequest):
+    thread_type: Optional[str] = Field(None, description="Filter by thread type")
+
+
 class UpdateThreadRequest(BaseRequest):
     title: Optional[str] = Field(None, min_length=3, max_length=50)
     thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
