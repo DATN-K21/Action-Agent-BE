@@ -116,7 +116,7 @@ jobs:
       - name: SSH into VM and Deploy
         if: env.SERVICES_TO_UPDATE != ''
         run: |
-          ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
+          ssh -o StrictHostKeyChecking=no -t -t -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
             cd ~/Action-Agent-BE
             docker compose pull $SERVICES_TO_UPDATE
             docker compose up -d --build $SERVICES_TO_UPDATE
