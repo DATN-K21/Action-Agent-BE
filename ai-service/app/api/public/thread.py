@@ -124,9 +124,12 @@ async def get_history(
 
         # 3. Get the history
         state = await agent.async_get_state(thread_id)  # type: ignore
-        if "messages" in state.values:
+
+        if state is not None and "messages" in state.values:
             response_data = convert_messages_to_dicts(state.values["messages"])
             return ResponseWrapper.wrap(status=200, data=GetHistoryResponse(messages=list(response_data))).to_response()
+        else:
+            return ResponseWrapper.wrap(status=200, data=GetHistoryResponse(messages=[])).to_response()
 
     except Exception as e:
         logger.error(f"Error ingesting files: {str(e)}", exc_info=True)
