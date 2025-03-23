@@ -103,18 +103,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Determine Services to Update
+        run: |
+          SERVICES_TO_UPDATE="ai-service api-gateway user-service log-service"
+          if [[ -z "$SERVICES_TO_UPDATE" ]]; then
+            echo "No services changed, skipping deployment."
+            exit 0
+          fi
+          
+          echo "SERVICES_TO_UPDATE=$SERVICES_TO_UPDATE" >> $GITHUB_ENV
+
+      - name: Setup WireGuard VPN
+        run: |
+          echo "$WIREGUARD_CLIENT_CONF" > wg-client.conf
+          sudo apt update && sudo apt install -y wireguard
+          sudo wg-quick up wg-client.conf
+
       - name: Setup SSH Key
         run: |
           echo "$SSH_PRIVATE_KEY" | base64 -d > private_key.pem
           chmod 600 private_key.pem
 
-      - name: Determine Services to Update
-        run: |
-          SERVICES_TO_UPDATE="ai-service api-gateway user-service log-service"
-          echo "SERVICES_TO_UPDATE=$SERVICES_TO_UPDATE" >> $GITHUB_ENV
-
       - name: SSH into VM and Deploy
-        if: env.SERVICES_TO_UPDATE != ''
         run: |
           ssh -o StrictHostKeyChecking=no -t -t -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
             cd ~/Action-Agent-BE
@@ -124,3 +134,7 @@ jobs:
           EOF
         env:
           VM_PRIVATE_IP: ${{ secrets.VM_PRIVATE_IP }}
+
+      - name: Teardown WireGuard VPN
+        if: always()
+        run: sudo wg-quick down wg-client.conf
