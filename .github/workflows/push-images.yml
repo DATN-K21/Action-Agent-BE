@@ -34,6 +34,10 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     needs: detect-changes
+    if: needs.detect-changes.outputs.ai == 'true' || 
+        needs.detect-changes.outputs.gw == 'true' || 
+        needs.detect-changes.outputs.user == 'true' || 
+        needs.detect-changes.outputs.log == 'true'
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -94,3 +98,68 @@ jobs:
 
     - name: Logout from Azure
       run: az logout
+
+  # Deploy updated services via SSH
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.ai == 'true' || 
+        needs.detect-changes.outputs.gw == 'true' || 
+        needs.detect-changes.outputs.user == 'true' || 
+        needs.detect-changes.outputs.log == 'true'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Services to Update
+        run: |
+          SERVICES_TO_UPDATE=""
+          if [[ "${{ needs.detect-changes.outputs.ai }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" ai-service"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.gw }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" api-gateway"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.user }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" user-service"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.log }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" log-service"
+          fi
+          if [[ -z "$SERVICES_TO_UPDATE" ]]; then
+            echo "No services changed, skipping deployment."
+            exit 0
+          fi
+          
+          echo "SERVICES_TO_UPDATE=$SERVICES_TO_UPDATE" >> $GITHUB_ENV
+
+      - name: Setup WireGuard VPN
+        run: |
+          sudo mkdir -p /etc/wireguard
+          echo "$WIREGUARD_CLIENT_CONF" | sudo tee /etc/wireguard/wg-client.conf > /dev/null
+          sudo apt update && sudo apt install -y wireguard
+          sudo wg-quick up wg-client
+        env:
+          WIREGUARD_CLIENT_CONF: ${{ secrets.WIREGUARD_CLIENT_CONF }}
+
+      - name: Setup SSH Key
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: SSH into VM and Deploy
+        run: |
+          ssh -o StrictHostKeyChecking=no -t -t -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
+            cd ~/Action-Agent-BE
+            docker compose pull $SERVICES_TO_UPDATE
+            docker compose up -d --build $SERVICES_TO_UPDATE
+            exit
+          EOF
+        env:
+          VM_PRIVATE_IP: ${{ secrets.VM_PRIVATE_IP }}
+
+      - name: Teardown WireGuard VPN
+        if: always()
+        run: sudo wg-quick down wg-client
