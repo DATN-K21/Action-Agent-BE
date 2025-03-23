@@ -110,19 +110,14 @@ jobs:
 
       - name: Determine Services to Update
         run: |
-          SERVICES_TO_UPDATE=""
-          if [[ "${{ needs.detect-changes.outputs.ai }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE ai-service"; fi
-          if [[ "${{ needs.detect-changes.outputs.gw }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE api-gateway"; fi
-          if [[ "${{ needs.detect-changes.outputs.user }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE user-service"; fi
-          if [[ "${{ needs.detect-changes.outputs.log }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE log-service"; fi
-          
+          SERVICES_TO_UPDATE="ai-service api-gateway user-service log-service"
           echo "SERVICES_TO_UPDATE=$SERVICES_TO_UPDATE" >> $GITHUB_ENV
 
       - name: SSH into VM and Deploy
         if: env.SERVICES_TO_UPDATE != ''
         run: |
           ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
-            cd /path/to/docker-compose/
+            cd ~/Action-Agent-BE
             docker compose pull $SERVICES_TO_UPDATE
             docker compose up -d --build $SERVICES_TO_UPDATE
             exit
