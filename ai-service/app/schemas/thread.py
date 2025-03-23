@@ -12,10 +12,12 @@ from app.schemas.base import BaseRequest, BaseResponse, CursorPagingResponse
 class CreateThreadRequest(BaseRequest):
     id: Optional[str] = None
     title: str = Field(..., min_length=3, max_length=50)
+    thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
 
 
 class UpdateThreadRequest(BaseRequest):
     title: Optional[str] = Field(None, min_length=3, max_length=50)
+    thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
 
 
 ##################################################
@@ -25,6 +27,7 @@ class CreateThreadResponse(BaseResponse):
     id: str
     user_id: str
     title: str
+    thread_type: Optional[str]
     created_at: datetime
 
 
@@ -32,6 +35,7 @@ class GetThreadResponse(BaseResponse):
     id: str
     user_id: str
     title: str
+    thread_type: Optional[str]
     created_at: datetime
 
 
@@ -49,4 +53,3 @@ class UpdateThreadResponse(CreateThreadResponse):
 class DeleteThreadResponse(BaseResponse):
     id: str
     user_id: str
-
