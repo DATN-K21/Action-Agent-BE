@@ -118,6 +118,8 @@ jobs:
           echo "$WIREGUARD_CLIENT_CONF" > wg-client.conf
           sudo apt update && sudo apt install -y wireguard
           sudo wg-quick up wg-client.conf
+        env:
+          WIREGUARD_CLIENT_CONF: ${{ secrets.WIREGUARD_CLIENT_CONF }}
 
       - name: Setup SSH Key
         run: |
