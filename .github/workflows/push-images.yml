@@ -103,36 +103,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install WireGuard
-        run: sudo apt-get update && sudo apt-get install -y wireguard
-
-      - name: Setup WireGuard VPN
-        run: |
-          echo "${{ secrets.WIREGUARD_CLIENT_CONF }}" > client.conf
-          sudo wg-quick up ./client.conf
-
-      - name: Deploy Updated Services via SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          VM_PRIVATE_IP: ${{ secrets.VM_PRIVATE_IP }}
+      - name: Setup SSH Key
         run: |
           echo "$SSH_PRIVATE_KEY" | base64 -d > private_key.pem
           chmod 600 private_key.pem
 
+      - name: Determine Services to Update
+        run: |
           SERVICES_TO_UPDATE=""
           if [[ "${{ needs.detect-changes.outputs.ai }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE ai-service"; fi
           if [[ "${{ needs.detect-changes.outputs.gw }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE api-gateway"; fi
           if [[ "${{ needs.detect-changes.outputs.user }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE user-service"; fi
           if [[ "${{ needs.detect-changes.outputs.log }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE log-service"; fi
+          
+          echo "SERVICES_TO_UPDATE=$SERVICES_TO_UPDATE" >> $GITHUB_ENV
 
-          if [[ -n "$SERVICES_TO_UPDATE" ]]; then
-            ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
+      - name: SSH into VM and Deploy
+        if: env.SERVICES_TO_UPDATE != ''
+        run: |
+          ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP <<EOF
             cd /path/to/docker-compose/
             docker compose pull $SERVICES_TO_UPDATE
             docker compose up -d --build $SERVICES_TO_UPDATE
             exit
-EOF
-          fi
-
-      - name: Cleanup WireGuard
-        run: sudo wg-quick down ./client.conf
+          EOF
+        env:
+          VM_PRIVATE_IP: ${{ secrets.VM_PRIVATE_IP }}
