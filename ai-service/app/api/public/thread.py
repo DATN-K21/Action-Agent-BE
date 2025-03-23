@@ -24,7 +24,7 @@ from app.schemas.thread import (
     GetListThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
-    UpdateThreadResponse,
+    UpdateThreadResponse, FilterThreadRequest,
 )
 from app.services.database.deps import get_thread_service
 from app.services.database.thread_service import ThreadService
@@ -38,11 +38,12 @@ router = APIRouter(prefix="/thread", tags=["Thread"])
             response_model=ResponseWrapper[GetListThreadsResponse])
 async def get_all_threads(
         user_id: str,
+        _filter: FilterThreadRequest = Depends(),
         paging: CursorPagingRequest = Depends(),
         thread_service: ThreadService = Depends(get_thread_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response = await thread_service.get_all_threads(user_id, paging)
+    response = await thread_service.get_all_threads(user_id, paging, _filter.thread_type)
     return response.to_response()
 
 
@@ -53,6 +54,8 @@ async def create_new_thread(
         thread_service: ThreadService = Depends(get_thread_service),
         _: bool = Depends(ensure_user_id),
 ):
+    if request.thread_type is None:
+        request.thread_type = "default"
     response = await thread_service.create_thread(user_id, request)
     return response.to_response()
 
