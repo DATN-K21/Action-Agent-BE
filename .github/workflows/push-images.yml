@@ -130,6 +130,7 @@ jobs:
               cd /path/to/docker-compose/
               docker compose pull $SERVICES_TO_UPDATE
               docker compose up $SERVICES_TO_UPDATE -d --build
+              exit
             EOF
           fi
 
