@@ -116,7 +116,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           VM_PRIVATE_IP: ${{ secrets.VM_PRIVATE_IP }}
         run: |
-          printf "%s\n" "$SSH_PRIVATE_KEY" > private_key.pem
+          echo "$SSH_PRIVATE_KEY" | base64 -d > private_key.pem
           chmod 600 private_key.pem
 
           SERVICES_TO_UPDATE=""
