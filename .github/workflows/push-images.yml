@@ -102,14 +102,30 @@ jobs:
   # Deploy updated services via SSH
   deploy:
     runs-on: ubuntu-latest
-    needs: [detect-changes]
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.ai == 'true' || 
+        needs.detect-changes.outputs.gw == 'true' || 
+        needs.detect-changes.outputs.user == 'true' || 
+        needs.detect-changes.outputs.log == 'true'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Determine Services to Update
         run: |
-          SERVICES_TO_UPDATE="ai-service"
+          SERVICES_TO_UPDATE=""
+          if [[ "${{ needs.detect-changes.outputs.ai }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" ai-service"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.gw }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" api-gateway"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.user }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" user-service"
+          fi
+          if [[ "${{ needs.detect-changes.outputs.log }}" == "true" ]]; then
+            SERVICES_TO_UPDATE+=" log-service"
+          fi
           if [[ -z "$SERVICES_TO_UPDATE" ]]; then
             echo "No services changed, skipping deployment."
             exit 0
