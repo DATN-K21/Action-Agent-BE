@@ -23,7 +23,7 @@ app.set('trust proxy', 1);
 app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
-app.use(limiter); // Apply rate limiter
+// app.use(limiter); // Apply rate limiter
 
 // Routes
 app.get('/', (req, res) => {

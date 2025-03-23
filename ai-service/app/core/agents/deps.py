@@ -1,6 +1,7 @@
+from functools import lru_cache
+
 from fastapi import Depends
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from functools import lru_cache
 
 from app.core.agents.agent import Agent
 from app.core.agents.agent_manager import AgentManager
@@ -20,13 +21,13 @@ def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointe
     manager.register_agent(chat_agent)
 
     # Register search agent
-    search_builder = GraphBuilder(checkpointer=checkpointer, tools=get_search_tools())
+    search_builder = GraphBuilder(checkpointer=checkpointer, tools=list(get_search_tools()))
     search_graph = search_builder.build_graph(perform_action=True, has_human_acceptance_flow=False)
     search_agent = Agent(search_graph, name="search-agent")
     manager.register_agent(search_agent)
 
     # Register rag agent
-    rag_builder = GraphBuilder(checkpointer=checkpointer, tools=get_rag_tools())
+    rag_builder = GraphBuilder(checkpointer=checkpointer, tools=list(get_rag_tools()))
     rag_graph = rag_builder.build_graph(perform_action=True, has_human_acceptance_flow=False)
     rag_agent = Agent(rag_graph, name="rag-agent")
     manager.register_agent(rag_agent)

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS threads (
     deleted_at TIMESTAMP,
     user_id VARCHAR NOT NULL,
     title VARCHAR,
+    thread_type in VARCHAR DEFAULT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users (id)
 );

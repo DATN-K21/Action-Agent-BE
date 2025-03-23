@@ -53,6 +53,7 @@ class ThreadService:
                     Thread.id.label("id"),
                     Thread.user_id.label("user_id"),
                     Thread.title.label("title"),
+                    Thread.thread_type.label("thread_type"),
                     Thread.created_at.label("created_at"),
                 )
                 .where(
@@ -86,6 +87,7 @@ class ThreadService:
                     Thread.id.label("id"),
                     Thread.user_id.label("user_id"),
                     Thread.title.label("title"),
+                    Thread.thread_type.label("thread_type"),
                     Thread.created_at.label("created_at"),
                 )
                 .where(
