@@ -126,12 +126,12 @@ jobs:
           if [[ "${{ needs.detect-changes.outputs.log }}" == "true" ]]; then SERVICES_TO_UPDATE="$SERVICES_TO_UPDATE log-service"; fi
 
           if [[ -n "$SERVICES_TO_UPDATE" ]]; then
-            ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP << EOF
+            ssh -o StrictHostKeyChecking=no -i private_key.pem dev@$VM_PRIVATE_IP << 'EOT'
               cd /path/to/docker-compose/
               docker compose pull $SERVICES_TO_UPDATE
-              docker compose up $SERVICES_TO_UPDATE -d --build
+              docker compose up -d --build $SERVICES_TO_UPDATE
               exit
-            EOF
+            EOT
           fi
 
       - name: Cleanup WireGuard
