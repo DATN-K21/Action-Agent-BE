@@ -115,9 +115,9 @@ jobs:
 
       - name: Setup WireGuard VPN
         run: |
-          echo "$WIREGUARD_CLIENT_CONF" > wg-client.conf
+          sudo echo "$WIREGUARD_CLIENT_CONF" > /etc/wireguard/wg-client.conf
           sudo apt update && sudo apt install -y wireguard
-          sudo wg-quick up wg-client.conf
+          sudo wg-quick up wg-client
         env:
           WIREGUARD_CLIENT_CONF: ${{ secrets.WIREGUARD_CLIENT_CONF }}
 
@@ -139,4 +139,4 @@ jobs:
 
       - name: Teardown WireGuard VPN
         if: always()
-        run: sudo wg-quick down wg-client.conf
+        run: sudo wg-quick down wg-client
