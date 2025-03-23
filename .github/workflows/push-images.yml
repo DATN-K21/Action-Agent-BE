@@ -109,7 +109,7 @@ jobs:
 
       - name: Determine Services to Update
         run: |
-          SERVICES_TO_UPDATE="ai-service api-gateway user-service log-service"
+          SERVICES_TO_UPDATE="ai-service"
           if [[ -z "$SERVICES_TO_UPDATE" ]]; then
             echo "No services changed, skipping deployment."
             exit 0
@@ -128,8 +128,10 @@ jobs:
 
       - name: Setup SSH Key
         run: |
-          echo "$SSH_PRIVATE_KEY" | base64 -d > private_key.pem
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: SSH into VM and Deploy
         run: |
