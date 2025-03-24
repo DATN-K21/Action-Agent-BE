@@ -278,10 +278,12 @@ class AccessController {
         const { activationToken } = validationResult?.data;
 
         try {
-            await this.accessService.activateAccount(activationToken);
-            const redirectUrl = process.env.CLIENT_URL + '/login';
-
-            res.render('activate-account', { redirectUrl });
+            const result = await this.accessService.activateAccount(activationToken);
+            return new OKSuccessResponse({
+                message: 'Activate account success',
+                data: result,
+                code: 1011300
+            }).send(res);
 
         } catch (error) {
             if (MongooseUtil.isMongooseError(error)) {

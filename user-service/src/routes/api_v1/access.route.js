@@ -13,7 +13,7 @@ router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTo
 
 //New activate method
 router.post("/activate/send-link", handleAsync(AccessController.handleSendLinkToActivateAccount));
-router.get("/activate", handleAsync(AccessController.handleActivateAccount));
+router.post("/activate/confirm", handleAsync(AccessController.handleActivateAccount));
 
 router.post('/google/auth', handleAsync(AccessController.handleLoginWithGoogle));
 
