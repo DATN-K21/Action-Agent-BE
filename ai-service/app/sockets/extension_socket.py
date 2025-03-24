@@ -5,10 +5,9 @@ from socketio import AsyncNamespace
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_output, convert_dict_message_to_tool_calls, \
-    convert_dict_message_to_message
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
-from app.core.utils.streaming import to_sse, LanggraphNodeEnum
+from app.core.utils.streaming import LanggraphNodeEnum, to_sse
 from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
@@ -76,7 +75,7 @@ class ExtensionNamespace(AsyncNamespace):
     @validate_event(ExtensionCallBack)
     async def on_handle_chat_interrupt(self, sid, data: ExtensionCallBack):
         if not self._check_exist_agent(sid, data.extension_name):
-            logger.error(f"Agent not found")
+            logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
             return
 
@@ -140,7 +139,7 @@ class ExtensionNamespace(AsyncNamespace):
     @validate_event(ExtensionCallBack)
     async def on_handle_stream_interrupt(self, sid, data: ExtensionCallBack):
         if not self._check_exist_agent(sid, data.extension_name):
-            logger.error(f"Agent not found")
+            logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
             return
 
