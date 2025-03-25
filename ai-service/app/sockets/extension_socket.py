@@ -158,6 +158,21 @@ class ExtensionNamespace(AsyncNamespace):
 
         if execute:
             async for dict_message in to_sse(result):
+                if dict_message.get("event") == "end":
+                    await self.emit(
+                        event="stream_interrupt",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=False,
+                            streaming=False,
+                            output="",
+                        ).model_dump(),
+                        to=sid
+                    )
+                    return
+
                 output = convert_dict_message_to_output(dict_message)
                 if output is not None:
                     await self.emit(
@@ -167,6 +182,7 @@ class ExtensionNamespace(AsyncNamespace):
                             thread_id=data.thread_id,
                             extension_name=data.extension_name,
                             interrupted=False,
+                            streaming=True,
                             output=output
                         ).model_dump(),
                         to=sid
@@ -190,20 +206,36 @@ class ExtensionNamespace(AsyncNamespace):
 
             interrupted = False
             async for dict_message in to_sse(response):
-                if dict_message["event"] == "metadata":
-                    dict_message_data = json.loads(dict_message["data"])
+                if dict_message.get("event") == "end":
+                    await self.emit(
+                        event="stream_interrupt",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=False,
+                            streaming=False,
+                            output="",
+                        ).model_dump(),
+                        to=sid
+                    )
+                    return
+
+                if dict_message.get("event") == "metadata":
+                    dict_message_data = json.loads(dict_message.get("data"))
                     if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_EDITING_NODE:
                         interrupted = True
                 elif interrupted:
                     tool_calls = convert_dict_message_to_tool_calls(dict_message)
                     if tool_calls is not None:
                         await self.emit(
-                            event="stream_tool_calls",
+                            event="stream_response",
                             data=ExtensionResponse(
                                 user_id=data.user_id,
                                 thread_id=data.thread_id,
                                 extension_name=data.extension_name,
                                 interrupted=True,
+                                streaming=True,
                                 output=tool_calls
                             ).model_dump(),
                             to=sid
@@ -218,6 +250,7 @@ class ExtensionNamespace(AsyncNamespace):
                                 thread_id=data.thread_id,
                                 extension_name=data.extension_name,
                                 interrupted=False,
+                                streaming=True,
                                 output=message
                             ).model_dump(),
                             to=sid
