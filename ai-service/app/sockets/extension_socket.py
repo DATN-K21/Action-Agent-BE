@@ -206,21 +206,6 @@ class ExtensionNamespace(AsyncNamespace):
 
             interrupted = False
             async for dict_message in to_sse(response):
-                if dict_message.get("event") == "end":
-                    await self.emit(
-                        event="stream_interrupt",
-                        data=ExtensionResponse(
-                            user_id=data.user_id,
-                            thread_id=data.thread_id,
-                            extension_name=data.extension_name,
-                            interrupted=False,
-                            streaming=False,
-                            output="",
-                        ).model_dump(),
-                        to=sid
-                    )
-                    return
-
                 if dict_message.get("event") == "metadata":
                     dict_message_data = json.loads(dict_message.get("data"))
                     if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_EDITING_NODE:
@@ -255,6 +240,21 @@ class ExtensionNamespace(AsyncNamespace):
                             ).model_dump(),
                             to=sid
                         )
+
+                if dict_message.get("event") == "end":
+                    await self.emit(
+                        event="stream_response",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=interrupted,
+                            streaming=False,
+                            output="",
+                        ).model_dump(),
+                        to=sid
+                    )
+                    return
 
         except Exception as e:
             logger.error(f"Error executing Extension API: {str(e)}", exc_info=True)
