@@ -5,7 +5,8 @@ from socketio import AsyncNamespace
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, \
+    convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
 from app.core.utils.streaming import LanggraphNodeEnum, to_sse
 from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
@@ -197,7 +198,7 @@ class ExtensionNamespace(AsyncNamespace):
                     tool_calls = convert_dict_message_to_tool_calls(dict_message)
                     if tool_calls is not None:
                         await self.emit(
-                            event="stream_response",
+                            event="stream_tool_calls",
                             data=ExtensionResponse(
                                 user_id=data.user_id,
                                 thread_id=data.thread_id,

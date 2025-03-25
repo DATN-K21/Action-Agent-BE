@@ -8,7 +8,7 @@ from app.schemas.extension import (
     CheckConnectionResponse,
     GetActionsResponse,
     GetExtensionsResponse,
-    GetSocketioInfoResponse,
+    GetSocketioInfoResponse, ExtensionRequest,
 )
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
@@ -168,3 +168,10 @@ async def get_info():
 """
     )
     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+
+@router.post("/stream")
+async def stream(
+        request: ExtensionRequest = Depends(),
+):
+    return ResponseWrapper.wrap(status=200).to_response()

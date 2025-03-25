@@ -39,7 +39,7 @@ The Extension APIs exclusively support Socket.io for chat and streaming function
 
 3. Stream Endpoint:
     - Event name: stream, handle_stream_interrupt
-    - Client listens to: stream_response, stream_interrupt
+    - Client listens to: stream_response, stream_tool_calls, stream_interrupt
     - Description: This Socket.io endpoint facilitates agent communication through message streaming.
 
 **Note:** There are two ways to set timezone:
