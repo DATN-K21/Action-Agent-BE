@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sse_starlette import EventSourceResponse
 
 from app.api.deps import ensure_authenticated, ensure_user_id
 from app.core import logging
@@ -6,6 +7,7 @@ from app.core.cache.cached_agents import AgentCache
 from app.core.cache.deps import get_agent_cache
 from app.core.graph.deps import get_extension_builder_manager, get_extension
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
+from app.core.utils.streaming import format_extension_stream_sse, format_extension_interrupt_sse
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import (
     ActiveAccountResponse,
@@ -269,12 +271,59 @@ async def chat_interrupt(
 @router.post("/stream")
 async def stream(
         request: ExtensionRequest = Depends(),
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
 ):
-    return ResponseWrapper.wrap(status=200).to_response()
+    try:
+        agent = get_extension(
+            extension_name=request.extension_name,
+            user_id=request.user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        response = await agent.async_stream(
+            question=request.input,
+            thread_id=request.thread_id,
+            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+        )
+
+        return EventSourceResponse(format_extension_stream_sse(response))
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
 @router.post("/stream-interrupt")
 async def stream_interrupt(
-        request: ExtensionRequest = Depends(),
+        request: ExtensionCallBack = Depends(),
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager)
 ):
-    return ResponseWrapper.wrap(status=200).to_response()
+    try:
+        agent = get_extension(
+            extension_name=request.extension_name,
+            user_id=request.user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        execute = request.execute
+        tool_calls = request.tool_calls
+        result = await agent.async_handle_stream_interrupt(
+            execute=execute,
+            tool_calls=tool_calls,
+            thread_id=request.thread_id,
+            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+        )
+
+        return EventSourceResponse(format_extension_interrupt_sse(result))
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

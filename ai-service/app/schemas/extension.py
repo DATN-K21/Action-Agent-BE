@@ -57,12 +57,13 @@ class ExtensionRequest(BaseRequest):
 ########### SOCKETIO RESPONSE SCHEMAS ############
 ##################################################
 class ExtensionResponse(BaseResponse):
-    user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
-    thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
-    extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
-    interrupted: bool = Field(..., title="Interrupted", examples=[False])
+    user_id: Optional[str] = Field(None, min_length=1, max_length=100, title="User ID", examples=["userid"])
+    thread_id: Optional[str] = Field(None, min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
+    extension_name: Optional[str] = Field(None, min_length=1, max_length=100, title="Extension Name",
+                                          examples=["extension1"])
+    interrupted: Optional[bool] = Field(None, title="Interrupted", examples=[False])
     streaming: Optional[bool] = Field(None, title="Streaming", examples=[False])
-    output: str | dict | list[Any] = Field(..., title="Output", examples=["Hello"])
+    output: Optional[str | dict | list[Any]] = Field(None, title="Output", examples=["Hello"])
 
 
 ##################################################
