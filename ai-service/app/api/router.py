@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread
+from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, llm
 
 
 class ValidationErrorResponse(BaseModel):
@@ -17,7 +17,6 @@ validation_error_responses: dict = {
     }
 }
 
-
 router = APIRouter(responses=validation_error_responses)
 
 # Public routes
@@ -30,7 +29,7 @@ router.include_router(connected_app.router)
 router.include_router(agent.router)
 router.include_router(multi_agent.router)
 router.include_router(extension.router)
-
+router.include_router(llm.router)
 
 # Private routes
 private_router = APIRouter(prefix="/private", tags=["Private"])

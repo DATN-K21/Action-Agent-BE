@@ -56,7 +56,7 @@ class ExtensionRequest(BaseRequest):
 ##################################################
 ########### SOCKETIO RESPONSE SCHEMAS ############
 ##################################################
-class ExtensionResponse(BaseRequest):
+class ExtensionResponse(BaseResponse):
     user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])

@@ -2,13 +2,17 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import ensure_authenticated, ensure_user_id
 from app.core import logging
+from app.core.cache.cached_agents import AgentCache
+from app.core.cache.deps import get_agent_cache
+from app.core.graph.deps import get_extension_builder_manager, get_extension
+from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import (
     ActiveAccountResponse,
     CheckConnectionResponse,
     GetActionsResponse,
     GetExtensionsResponse,
-    GetSocketioInfoResponse, ExtensionRequest,
+    GetSocketioInfoResponse, ExtensionRequest, ExtensionResponse, ExtensionCallBack,
 )
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
@@ -170,8 +174,107 @@ async def get_info():
     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
+@router.post("/chat")
+async def chat(
+        request: ExtensionRequest = Depends(),
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+):
+    try:
+        agent = get_extension(
+            extension_name=request.extension_name,
+            user_id=request.user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        response = await agent.async_chat(
+            question=request.input,
+            thread_id=request.thread_id,
+            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+        )
+
+        return ResponseWrapper.wrap(
+            status=200,
+            data=ExtensionResponse(
+                user_id=request.user_id,
+                thread_id=request.thread_id,
+                extension_name=request.extension_name,
+                interrupted=response.interrupted,
+                output=response.output
+            )
+        ).to_response()
+
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post("/chat-interrupt")
+async def chat_interrupt(
+        request: ExtensionCallBack = Depends(),
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+):
+    try:
+        agent = get_extension(
+            extension_name=request.extension_name,
+            user_id=request.user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        execute = request.execute
+        tool_calls = request.tool_calls
+        result = await agent.async_handle_chat_interrupt(
+            execute=execute,
+            tool_calls=tool_calls,
+            thread_id=request.thread_id,
+            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+        )
+
+        if execute:
+            return ResponseWrapper.wrap(
+                status=200,
+                data=ExtensionResponse(
+                    user_id=request.user_id,
+                    thread_id=request.thread_id,
+                    extension_name=request.extension_name,
+                    interrupted=False,
+                    output=result.output
+                )
+            ).to_response()
+        else:
+            return ResponseWrapper.wrap(
+                status=200,
+                data=ExtensionResponse(
+                    user_id=request.user_id,
+                    thread_id=request.thread_id,
+                    extension_name=request.extension_name,
+                    interrupted=False,
+                    output=""
+                )
+            ).to_response()
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
 @router.post("/stream")
 async def stream(
+        request: ExtensionRequest = Depends(),
+):
+    return ResponseWrapper.wrap(status=200).to_response()
+
+
+@router.post("/stream-interrupt")
+async def stream_interrupt(
         request: ExtensionRequest = Depends(),
 ):
     return ResponseWrapper.wrap(status=200).to_response()
