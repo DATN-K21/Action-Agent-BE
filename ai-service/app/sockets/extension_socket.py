@@ -9,7 +9,7 @@ from app.core.utils.convert_dict_message import convert_dict_message_to_message,
     convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
 from app.core.utils.streaming import LanggraphNodeEnum, to_sse
-from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
+from app.schemas.extension import SocketioExtensionCallback, SocketioExtensionRequest, ExtensionResponse
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
 logger = logging.get_logger(__name__)
@@ -73,8 +73,8 @@ class ExtensionNamespace(AsyncNamespace):
         graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
         return Agent(graph)
 
-    @validate_event(ExtensionCallBack)
-    async def on_handle_chat_interrupt(self, sid, data: ExtensionCallBack):
+    @validate_event(SocketioExtensionCallback)
+    async def on_handle_chat_interrupt(self, sid, data: SocketioExtensionCallback):
         if not self._check_exist_agent(sid, data.extension_name):
             logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
@@ -105,8 +105,8 @@ class ExtensionNamespace(AsyncNamespace):
                 to=sid
             )
 
-    @validate_event(ExtensionRequest)
-    async def on_chat(self, sid, data: ExtensionRequest):
+    @validate_event(SocketioExtensionRequest)
+    async def on_chat(self, sid, data: SocketioExtensionRequest):
         try:
             if not self._check_exist_agent(sid, data.extension_name):
                 agent = self._create_agent(data.extension_name, data.user_id)
@@ -137,8 +137,8 @@ class ExtensionNamespace(AsyncNamespace):
             logger.error(f"Error in chat event of extension namespace: {str(e)}", exc_info=True)
             await self.emit("error", "Internal server error", to=sid)
 
-    @validate_event(ExtensionCallBack)
-    async def on_handle_stream_interrupt(self, sid, data: ExtensionCallBack):
+    @validate_event(SocketioExtensionCallback)
+    async def on_handle_stream_interrupt(self, sid, data: SocketioExtensionCallback):
         if not self._check_exist_agent(sid, data.extension_name):
             logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
@@ -188,7 +188,7 @@ class ExtensionNamespace(AsyncNamespace):
                         to=sid
                     )
 
-    @validate_event(ExtensionRequest)
+    @validate_event(SocketioExtensionRequest)
     async def on_stream(self, sid, data):
         try:
             if not self._check_exist_agent(sid, data.extension_name):

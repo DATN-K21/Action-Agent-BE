@@ -9,6 +9,16 @@ from app.schemas.base import BaseResponse, BaseRequest
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
+class HTTPExtensionRequest(BaseRequest):
+    input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
+    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[5])
+
+
+class HTTPExtensionCallbackRequest(BaseRequest):
+    execute: bool = Field(..., title="Continue executing the action", examples=[True])
+    tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
+                                                 examples=["..."])
+    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])
 
 
 ##################################################
@@ -42,20 +52,6 @@ class GetSocketioInfoResponse(BaseResponse):
     output: str = Field(..., title="Output", examples=["Hello!"])
 
 
-##################################################
-########### SOCKETIO REQUEST SCHEMAS #############
-##################################################
-class ExtensionRequest(BaseRequest):
-    user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
-    thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
-    extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
-    input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[5])
-
-
-##################################################
-########### SOCKETIO RESPONSE SCHEMAS ############
-##################################################
 class ExtensionResponse(BaseResponse):
     user_id: Optional[str] = Field(None, min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: Optional[str] = Field(None, min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
@@ -67,13 +63,24 @@ class ExtensionResponse(BaseResponse):
 
 
 ##################################################
+########### SOCKETIO REQUEST SCHEMAS #############
+##################################################
+class SocketioExtensionRequest(BaseRequest):
+    user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
+    thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
+    extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
+    input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
+    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[5])
+
+
+##################################################
 ########### SOCKETIO CALLBACK SCHEMAS ############
 ##################################################
-class ExtensionCallBack(BaseModel):
+class SocketioExtensionCallback(BaseModel):
     user_id: str = Field(min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     execute: bool = Field(..., title="Continue executing the action", examples=[True])
     tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
-                                                 examples=[{'args': {'a': 1, 'b': 2}, 'name': 'tool'}])
+                                                 examples=["..."])
     max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])
