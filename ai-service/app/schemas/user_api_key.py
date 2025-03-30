@@ -1,53 +1,52 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import Field, field_validator
 
-from app.core.enums.llm_provider import LLM_Provider
+from app.core.enums import LlmProvider
 from app.schemas.base import BaseRequest, BaseResponse
 
 
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
-class GetApiKeyRequest(BaseRequest):
+class SetDefaultApiKeyRequest(BaseRequest):
     user_id: str = Field(..., min_length=1, max_length=100)
-
-
-class SetDefaultProviderRequest(BaseRequest):
-    user_id: str = Field(..., min_length=1, max_length=100)
-    provider: LLM_Provider = Field(..., min_length=1, max_length=50)
+    provider: Optional[LlmProvider] = Field(...)
 
     @field_validator("provider")
-    def validate_provider(cls, provider: LLM_Provider) -> LLM_Provider:
-        if provider not in LLM_Provider:
-            raise ValueError(f"Invalid provider: {provider}. Must be one of {list(LLM_Provider)}.")
+    def validate_provider(cls, provider: Optional[LlmProvider]) -> Optional[LlmProvider]:
+        if provider and provider not in LlmProvider:
+            raise ValueError(f"Invalid provider: {provider}. Must be null or one of {list(LlmProvider)}.")
         return provider
 
 
 class UpsertApiKeyRequest(BaseRequest):
     user_id: str = Field(..., min_length=1, max_length=100)
-    value: str = Field(..., min_length=1, max_length=1000)
-    provider: LLM_Provider = Field(..., min_length=1, max_length=50)
+    encrypted_value: str = Field(..., min_length=1, max_length=1000)
+    provider: LlmProvider = Field(...)
 
-    @field_validator("value")
+    @field_validator("encrypted_value")
     def validate_value(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Value cannot be empty or whitespace.")
         return value.strip()
 
     @field_validator("provider")
-    def validate_provider(cls, provider: LLM_Provider) -> LLM_Provider:
-        if provider not in LLM_Provider:
-            raise ValueError(f"Invalid provider: {provider}. Must be one of {list(LLM_Provider)}.")
+    def validate_provider(cls, provider: LlmProvider) -> LlmProvider:
+        if provider not in LlmProvider:
+            raise ValueError(f"Invalid provider: {provider}. Must be one of {list(LlmProvider)}.")
         return provider
 
 
 class DeleteApiKeyRequest(BaseRequest):
     user_id: str = Field(..., min_length=1, max_length=100)
-    provider: LLM_Provider = Field(..., min_length=1, max_length=50)
+    provider: LlmProvider = Field(...)
 
     @field_validator("provider")
-    def validate_provider(cls, provider: LLM_Provider) -> LLM_Provider:
-        if provider not in LLM_Provider:
-            raise ValueError(f"Invalid provider: {provider}. Must be one of {list(LLM_Provider)}.")
+    def validate_provider(cls, provider: LlmProvider) -> LlmProvider:
+        if provider not in LlmProvider:
+            raise ValueError(f"Invalid provider: {provider}. Must be one of {list(LlmProvider)}.")
         return provider
 
 
@@ -55,22 +54,27 @@ class DeleteApiKeyRequest(BaseRequest):
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 class GetApiKeyResponse(BaseResponse):
-    value: str = Field(..., min_length=1, max_length=1000)
-    provider: LLM_Provider = Field(..., min_length=1, max_length=50)
+    id: str
+    provider: LlmProvider
+    created_at: datetime
 
 
 class GetApiKeysResponse(BaseResponse):
-    user_id: str = Field(..., min_length=1, max_length=100)
+    user_id: str
+    default_api_key_id: Optional[str]
+    remain_trial_tokens: int
     api_keys: list[GetApiKeyResponse]
 
 
-class SetDefaultProviderResponse(BaseResponse):
+class SetDefaultApiKeyResponse(BaseResponse):
     pass
 
 
 class UpsertApiKeyResponse(BaseResponse):
-    pass
-
+    id: str
+    user_id: str
+    provider: LlmProvider
+    is_default: bool
 
 class DeleteApiKeyResponse(BaseResponse):
     pass

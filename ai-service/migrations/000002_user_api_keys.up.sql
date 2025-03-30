@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS user_api_keys (
     provider INTEGER NOT NULL,
     encrypted_value VARCHAR NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- Create unique index on `user_id` and `provider_id`
@@ -29,7 +29,8 @@ BEGIN
     ) THEN
         ALTER TABLE users 
         ADD CONSTRAINT fk_users_default_api_key_id 
-        FOREIGN KEY (default_api_key_id) REFERENCES user_api_keys(id);
+        FOREIGN KEY (default_api_key_id) REFERENCES user_api_keys(id)
+        ON DELETE SET NULL;
     END IF;
 END $$;
 

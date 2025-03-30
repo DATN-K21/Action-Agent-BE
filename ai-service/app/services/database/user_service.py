@@ -1,11 +1,14 @@
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.constants import SYSTEM
+from app.core.constants import SYSTEM, TRIAL_TOKENS
+from app.core.enums import LlmProvider
 from app.models import User
+from app.models.user_api_key import UserApiKey
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
     CreateUserRequest,
@@ -15,6 +18,7 @@ from app.schemas.user import (
     GetUserResponse,
     UpdateUserRequest,
 )
+from app.schemas.user_api_key import DeleteApiKeyResponse, GetApiKeysResponse, SetDefaultApiKeyResponse, UpsertApiKeyResponse
 
 logger = logging.get_logger(__name__)
 
@@ -45,6 +49,8 @@ class UserService:
             # 2. Create new user
             db_user = User(
                 **user.model_dump(),
+                default_api_key_id=None,
+                remain_trial_tokens=TRIAL_TOKENS,
                 created_by=SYSTEM,
             )
 
@@ -207,5 +213,210 @@ class UserService:
 
         except Exception as e:
             logger.exception(f"Has error: {str(e)}", exc_info=True)
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def get_user_with_api_keys(self, user_id: str) -> ResponseWrapper[GetApiKeysResponse]:
+        """Get user with API keys."""
+        try:
+            # Fetch user data with API keys
+            stmt = (
+                select(
+                    User.id.label("user_id"),
+                    User.default_api_key_id.label("default_api_key_id"),
+                    User.remain_trial_tokens.label("remain_trial_tokens"),
+                    UserApiKey.id.label("api_key_id"),
+                    UserApiKey.provider.label("provider"),
+                    UserApiKey.created_at.label("created_at"),
+                )
+                .join(UserApiKey, (User.id == UserApiKey.user_id) and (UserApiKey.is_deleted.is_(False)), isouter=True)
+                .where(
+                    User.id == user_id,
+                    User.is_deleted.is_(False),
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            db_records = result.mappings().all()
+            logger.info(f"db_records: {db_records}")
+
+            if not db_records:
+                return ResponseWrapper.wrap(status=404, message="User not found")
+
+            # Convert query result into structured object
+            user_with_keys = None
+            api_keys = []
+
+            for record in db_records:
+                if not user_with_keys:
+                    user_with_keys = {
+                        "user_id": record["user_id"],
+                        "default_api_key_id": record["default_api_key_id"],
+                        "remain_trial_tokens": record["remain_trial_tokens"],
+                        "api_keys": [],
+                    }
+
+                if record["api_key_id"]:
+                    api_keys.append(
+                        {
+                            "id": record["api_key_id"],
+                            "provider": record["provider"],
+                            "created_at": record["created_at"],
+                        }
+                    )
+
+            if user_with_keys:
+                user_with_keys["api_keys"] = api_keys
+
+            response_data = GetApiKeysResponse.model_validate(user_with_keys)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Error fetching user with API keys: {e}")
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def set_default_api_key(self, user_id: str, provider: Optional[LlmProvider]) -> ResponseWrapper[SetDefaultApiKeyResponse]:
+        """Set default API key for a user."""
+        try:
+            if not provider:
+                api_key_id = None
+            else:
+                # Fetch the API key for the given provider
+                stmt = (
+                    select(UserApiKey.id)
+                    .where(
+                        UserApiKey.user_id == user_id,
+                        UserApiKey.provider == provider,
+                        UserApiKey.is_deleted.is_(False),
+                    )
+                    .limit(1)
+                )
+
+                result = await self.db.execute(stmt)
+                api_key_id = result.scalar_one_or_none()
+
+                if not api_key_id:
+                    return ResponseWrapper.wrap(status=404, message="API key not found")
+
+            # Update the user's default API key
+            update_stmt = (
+                update(User)
+                .where(
+                    User.id == user_id,
+                    User.is_deleted.is_(False),
+                )
+                .values(default_api_key_id=api_key_id)
+                .returning(User.default_api_key_id)
+            )
+
+            result = await self.db.execute(update_stmt)
+            updated_default_api_key_id = result.scalar_one_or_none()
+
+            if api_key_id and not updated_default_api_key_id:
+                return ResponseWrapper.wrap(status=404, message="User not found")
+
+            await self.db.commit()
+
+            response_data = SetDefaultApiKeyResponse()
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Error setting default API key: {e}")
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def upsert_api_key(self, user_id: str, provider: LlmProvider, encrypted_value: str) -> ResponseWrapper[UpsertApiKeyResponse]:
+        """Upsert API key for a user."""
+        try:
+            # Check if the API key already exists
+            stmt = (
+                select(UserApiKey.id)
+                .where(
+                    UserApiKey.user_id == user_id,
+                    UserApiKey.provider == provider,
+                    UserApiKey.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+
+            result = await self.db.execute(stmt)
+            existing_api_key_id = result.scalar_one_or_none()
+
+            if existing_api_key_id:
+                # Update the existing API key
+                update_stmt = (
+                    update(UserApiKey)
+                    .where(
+                        UserApiKey.id == existing_api_key_id,
+                        UserApiKey.is_deleted.is_(False),
+                    )
+                    .values(
+                        encrypted_value=encrypted_value,
+                        created_at=datetime.utcnow(),
+                        created_by=user_id,
+                    )
+                    .returning(UserApiKey.id, UserApiKey.provider, UserApiKey.created_at)
+                )
+
+                result = await self.db.execute(update_stmt)
+                updated_api_key = result.mappings().one_or_none()
+
+                if not updated_api_key:
+                    return ResponseWrapper.wrap(status=404, message="API key not found")
+
+                await self.db.commit()
+                response_data = SetDefaultApiKeyResponse.model_validate(updated_api_key)
+
+            else:
+                # Create a new API key
+                new_api_key = UserApiKey(
+                    user_id=user_id,
+                    provider=provider,
+                    encrypted_value=encrypted_value,
+                    created_by=user_id,
+                )
+
+                self.db.add(new_api_key)
+                await self.db.commit()
+                await self.db.refresh(new_api_key)
+
+                response_data = SetDefaultApiKeyResponse.model_validate(new_api_key)
+
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Error upserting API key: {e}")
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def delete_api_key(self, user_id: str, provider: LlmProvider) -> ResponseWrapper[DeleteApiKeyResponse]:
+        """Delete an API key."""
+        try:
+            stmt = (
+                delete(UserApiKey)
+                .where(
+                    UserApiKey.user_id == user_id,
+                    UserApiKey.provider == provider,
+                    UserApiKey.is_deleted.is_(False),
+                )
+                .returning(UserApiKey.id)
+            )
+
+            result = await self.db.execute(stmt)
+            deleted_api_key_id = result.scalar_one_or_none()
+
+            if not deleted_api_key_id:
+                return ResponseWrapper.wrap(status=404, message="API key not found")
+
+            await self.db.commit()
+            response_data = DeleteApiKeyResponse()
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.error(f"Error deleting API key: {e}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
