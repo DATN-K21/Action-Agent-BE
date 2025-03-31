@@ -221,7 +221,8 @@ async def chat(
         response = await agent.async_chat(
             question=request.input,
             thread_id=thread_id,
-            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
         )
 
         return ResponseWrapper.wrap(
@@ -283,7 +284,8 @@ async def chat_interrupt(
             execute=execute,
             tool_calls=tool_calls,
             thread_id=thread_id,
-            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
         )
 
         if execute:
@@ -353,7 +355,8 @@ async def stream(
         response = await agent.async_stream(
             question=request.input,
             thread_id=thread_id,
-            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
         )
 
         return EventSourceResponse(format_extension_stream_sse(response))
@@ -405,7 +408,8 @@ async def stream_interrupt(
             execute=execute,
             tool_calls=tool_calls,
             thread_id=thread_id,
-            max_recursion=request.max_recursion if request.max_recursion is not None else 10,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
         )
 
         return EventSourceResponse(format_extension_interrupt_sse(result))

@@ -154,7 +154,7 @@ async def format_extension_interrupt_sse(messages_stream: MessagesStream) -> Asy
                 interrupted=False,
                 streaming=True,
                 output=output
-            ).model_dump()
+            ).model_dump_json()
             yield {
                 "event": "data",
                 "data": data,

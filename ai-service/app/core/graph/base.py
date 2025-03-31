@@ -142,6 +142,7 @@ class GraphBuilder:
                 }
 
             adapter = TypeAdapter(list[ToolCall])
+            print("[tool_calls]", response.tool_calls)
 
             return {"tool_calls": adapter.validate_python(response.tool_calls),
                     "next": "evaluate_human_in_loop_node"}
