@@ -41,7 +41,14 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = "<your-api-key>"
 
     # LLM service settings
+    DEFAULT_PROVIDER: str = "<default-provider>"
+    DEFAULT_MODEL: str = "<default-model>"
     OPENAI_API_KEY: str = "<your-api-key>"
+    AZURE_OPENAI_DEPLOYMENT_NAME: str = "<your-deployment-name>"
+    AZURE_OPENAI_API_KEY: str = "<your-api-key>"
+    AZURE_OPENAI_API_BASE: str = "<your-url-base>"
+    AZURE_OPENAI_API_VERSION: str = "<your-api-version>"
+    AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME: str = "<your-embeddings-deployment-name>"
 
     # Langchain service settings
     LANGCHAIN_TRACING_V2: bool = False

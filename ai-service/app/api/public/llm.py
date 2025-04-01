@@ -6,7 +6,7 @@ from app.prompts.prompt_templates import get_title_generation_prompt_template
 from app.schemas.agent import AgentChatResponse
 from app.schemas.base import ResponseWrapper
 from app.schemas.llm import GenerateTitleRequest, GenerateTitleResponse
-from app.services.model_service import get_openai_model
+from app.services.model_service import AIModelService
 
 logger = logging.get_logger(__name__)
 
@@ -20,7 +20,7 @@ async def generate_title(
         _: bool = Depends(ensure_authenticated),
 ):
     try:
-        model = get_openai_model()
+        model = AIModelService.get_ai_model()
         prompt = get_title_generation_prompt_template()
         chain = prompt | model
         title = await chain.ainvoke({"content": request.content})

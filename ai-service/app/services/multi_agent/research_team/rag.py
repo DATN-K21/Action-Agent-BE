@@ -5,7 +5,7 @@ from langchain_core.tools import create_retriever_tool
 
 from app.core import logging
 from app.core.utils.uploading import vstore
-from app.services.model_service import get_openai_model
+from app.services.model_service import AIModelService
 from app.services.multi_agent.utils.helpers import AgentMetadata, AgentState, AvailableAgents
 
 logger = logging.get_logger(__name__)
@@ -41,7 +41,7 @@ def get_rag_tool(thread_id: str):
 async def rag_node(state: AgentState, config: RunnableConfig):
     try:
         rag_tool = get_rag_tool(config["configurable"].get("thread_id", ""))  # type: ignore
-        model_forced_to_rag = get_openai_model().bind_tools([rag_tool], tool_choice="retriever_tool")
+        model_forced_to_rag = AIModelService.get_ai_model().bind_tools([rag_tool], tool_choice="retriever_tool")
         result = await model_forced_to_rag.ainvoke([state["question"]])
         messages = state["messages"]
 
