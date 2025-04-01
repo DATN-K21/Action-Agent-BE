@@ -31,6 +31,7 @@ dependencies = [
     { name = "google-auth-oauthlib" },
     { name = "langchain" },
     { name = "langchain-google-community" },
+    { name = "langchain-mcp-adapters" },
     { name = "langchain-openai" },
     { name = "langchain-postgres" },
     { name = "langchain-unstructured" },
@@ -67,6 +68,7 @@ requires-dist = [
     { name = "google-auth-oauthlib", specifier = ">=1.2.1" },
     { name = "langchain", specifier = ">=0.3.19" },
     { name = "langchain-google-community", specifier = ">=2.0.4" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.0.6" },
     { name = "langchain-openai", specifier = ">=0.3.6" },
     { name = "langchain-postgres", specifier = ">=0.0.13" },
     { name = "langchain-unstructured", specifier = ">=0.1.6" },
@@ -1279,6 +1281,19 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-mcp-adapters"
+version = "0.0.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "mcp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/71/f2/86aa09eb115e0fd2bfcfd466e9a26605242bd17b7970115b601d5097065d/langchain_mcp_adapters-0.0.6.tar.gz", hash = "sha256:87cc456cbbe565717512f27f6ad0d2415c3c72f0728f042c181e41f8b739360e", size = 8671 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/18/58c06d21beb973ab007e2ce1c729b7c96f26c2563f75f44a596101d59c55/langchain_mcp_adapters-0.0.6-py3-none-any.whl", hash = "sha256:260fca11facd6f51a9ec0593e6b159709b893714f7e5b0b6059e79bca8c652a0", size = 8553 },
+]
+
+[[package]]
 name = "langchain-openai"
 version = "0.3.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1559,6 +1574,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ab/5e/5e53d26b42ab75491cda89b871dab9e97c840bf12c63ec58a1919710cd06/marshmallow-3.26.1.tar.gz", hash = "sha256:e6d8affb6cb61d39d26402096dc0aee12d5a26d490a121f118d2e81dc0719dc6", size = 221825 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/34/75/51952c7b2d3873b44a0028b1bd26a25078c18f92f256608e8d1dc61b39fd/marshmallow-3.26.1-py3-none-any.whl", hash = "sha256:3350409f20a70a7e4e11a27661187b77cdcaeb20abca41c1454fe33636bea09c", size = 50878 },
+]
+
+[[package]]
+name = "mcp"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "httpx" },
+    { name = "httpx-sse" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "sse-starlette" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/50/cc/5c5bb19f1a0f8f89a95e25cb608b0b07009e81fd4b031e519335404e1422/mcp-1.4.1.tar.gz", hash = "sha256:b9655d2de6313f9d55a7d1df62b3c3fe27a530100cc85bf23729145b0dba4c7a", size = 154942 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/0e/885f156ade60108e67bf044fada5269da68e29d758a10b0c513f4d85dd76/mcp-1.4.1-py3-none-any.whl", hash = "sha256:a7716b1ec1c054e76f49806f7d96113b99fc1166fc9244c2c6f19867cb75b593", size = 72448 },
 ]
 
 [[package]]
@@ -2230,6 +2264,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/06/47/b61c1c44b87cbdaee
 wheels = [
     { url = "https://files.pythonhosted.org/packages/61/9b/98ef4b98309e9db3baa9fe572f0e61b6130bb9852d13189970f35b703499/pymupdf-1.25.3-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:96878e1b748f9c2011aecb2028c5f96b5a347a9a91169130ad0133053d97915e", size = 19343576 },
     { url = "https://files.pythonhosted.org/packages/14/62/4e12126db174c8cfbf692281cda971cc4046c5f5226032c2cfaa6f83e08d/pymupdf-1.25.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:6ef753005b72ebfd23470f72f7e30f61e21b0b5e748045ec5b8f89e6e3068d62", size = 18580114 },
+    { url = "https://files.pythonhosted.org/packages/ec/c5/cf7ecf005e4f8ba3664d6aaa0613adeba4c2ab524832c452c69857e7184f/pymupdf-1.25.3-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cbff443d899f37b17f1e67563cc03673d50b4bf33ccc237e73d34f18f3a07ccf", size = 19442580 },
     { url = "https://files.pythonhosted.org/packages/52/de/bd1418e31f73d37b8381cd5deacfd681e6be702b8890e123e83724569ee1/pymupdf-1.25.3-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:46d90c4f9e62d1856e8db4b9f04a202ff4a7f086a816af73abdc86adb7f5e25a", size = 19999825 },
     { url = "https://files.pythonhosted.org/packages/42/ee/3c449b0de061440ba1ac984aa845315e9e2dca0ff2003c5adfc6febff203/pymupdf-1.25.3-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a5de51efdbe4d486b6c1111c84e8a231cbfb426f3d6ff31ab530ad70e6f39756", size = 21123157 },
     { url = "https://files.pythonhosted.org/packages/83/53/71faaaf91c56f2883b13f3dd849bf2697f012eb35eb7b952d62734cff41f/pymupdf-1.25.3-cp39-abi3-win32.whl", hash = "sha256:bca72e6089f985d800596e22973f79cc08af6cbff1d93e5bda9248326a03857c", size = 15094211 },
