@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument } from 'mongoose';
 
-export type GenreDocument = HydratedDocument<Provider>;
+export type ProviderDocument = HydratedDocument<Provider>;
 
 @Schema({ timestamps: true, collection: 'Providers' })
 export class Provider extends Document {
@@ -20,6 +20,9 @@ export class Provider extends Document {
   
   @Prop({ default: '' })
   image_url: string;
+
+  @Prop({ default: 0 })
+  total_extensions: number;
 }
 
 export const ProviderSchema = SchemaFactory.createForClass(Provider);
@@ -28,5 +31,5 @@ export const ProviderSchema = SchemaFactory.createForClass(Provider);
 ProviderSchema.virtual('extensions', {
   ref: 'Extension',
   localField: '_id',
-  foreignField: 'providerId',
+  foreignField: 'provider_id',
 });

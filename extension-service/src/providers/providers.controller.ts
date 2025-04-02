@@ -19,19 +19,25 @@ export class ProvidersController {
     }
   }
 
-  @Get(':id')
-  async getProviderById(@Param('id') id: string): Promise<Provider> {
-    return this.providerService.getDetailById(id);
-  }
-
   @Get('slug/:slug')
-  async getProviderBySlug(@Param('slug') slug: string): Promise<Provider> {
-    return this.providerService.getDetailBySlug(slug);
+  async getProviderBySlug(@Param('slug') slug: string): Promise<IResponse<Provider>> {
+    const foundProvider = await this.providerService.getDetailBySlug(slug);
+    return {
+      error_code: 0,
+      message: 'Success',
+      data: foundProvider,
+      meta: {},
+    };
   }
 
   @Get('name/:name')
   async getProviderByName(@Param('name') name: string): Promise<Provider> {
     return this.providerService.getDetailByName(name);
+  }
+
+  @Get(':id')
+  async getProviderById(@Param('id') id: string): Promise<Provider> {
+    return this.providerService.getDetailById(id);
   }
 
   @Post()

@@ -50,7 +50,7 @@ export class ProvidersService {
   }
 
   async getDetailById(id: string): Promise<Provider> {  
-    const foundProvider = await this.providerModel.findById(MongooseHelper.convertToObjectId(id));
+    const foundProvider = await this.providerModel.findById(MongooseHelper.convertToObjectId(id)).populate('extensions');
     if (!foundProvider) {
       throw new NotFoundException(`Provider with id ${id} not found`);
     }
@@ -58,7 +58,7 @@ export class ProvidersService {
   }
 
   async getDetailBySlug(slug: string): Promise<Provider> {
-    const foundProvider = await this.providerModel.findOne({ slug });
+    const foundProvider = await this.providerModel.findOne({ slug }).populate('extensions');
     if (!foundProvider) {
       throw new NotFoundException(`Provider with slug ${slug} not found`);
     }
@@ -66,7 +66,7 @@ export class ProvidersService {
   }
 
   async getDetailByName(name: string): Promise<Provider> {
-    const foundProvider = await this.providerModel.findOne({ name });
+    const foundProvider = await this.providerModel.findOne({ name }).populate('extensions');
     if (!foundProvider) {
       throw new NotFoundException(`Provider with name ${name} not found`);
     }
