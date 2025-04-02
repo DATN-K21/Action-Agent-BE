@@ -16,7 +16,7 @@ from fastapi import UploadFile
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import ConfigurableField, RunnableConfig, RunnableSerializable
 from langchain_core.vectorstores import VectorStore
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter, TextSplitter
 from pydantic import ConfigDict, SecretStr
@@ -119,7 +119,7 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 
 
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
-    if env_settings.OPENAI_API_KEY:
+    if env_settings.DEFAULT_PROVIDER == "openai" and env_settings.OPENAI_API_KEY:
         return PGVector(
             OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),  # type: ignore
             connection=PG_CONNECTION_STRING,
@@ -127,6 +127,24 @@ def _get_openai_embeddings(async_mode: bool) -> PGVector:
             async_mode=async_mode,
         )
 
+    if (env_settings.DEFAULT_PROVIDER == "azure-openai"
+            and env_settings.OPENAI_API_KEY
+            and env_settings.AZURE_OPENAI_DEPLOYMENT_NAME
+            and env_settings.AZURE_OPENAI_ENDPOINT
+            and env_settings.AZURE_OPENAI_API_VERSION
+
+    ):
+        return PGVector(
+            AzureOpenAIEmbeddings(
+                openai_api_key=SecretStr(env_settings.AZURE_OPENAI_API_KEY),
+                deployment=env_settings.AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAMEDEPLOYMENT_NAME,
+                azure_endpoint=env_settings.AZURE_OPENAI_ENDPOINT,
+                openai_api_version=env_settings.AZURE_OPENAI_API_VERSION,
+            ),  # type: ignore
+            connection=PG_CONNECTION_STRING,
+            use_jsonb=True,
+            async_mode=async_mode,
+        )
     raise ValueError("OPENAI_API_KEY needs to be set for embeddings to work.")
 
 
