@@ -3,7 +3,7 @@ from enum import StrEnum
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
-from app.core.g4f_chat_model import ChatG4F
+from app.core.g4f_chat_model import ChatAI
 from app.core.settings import env_settings
 
 MAX_TOKENS = 10000
@@ -31,7 +31,7 @@ class AIModelService:
     @classmethod
     def _get_gpt4free_llm(cls):
         """Get a GPT-4-free language model."""
-        return ChatG4F(temperature=0, streaming=True, model_name="gpt-4")
+        return ChatAI(temperature=0, streaming=True, model_name="gpt-4")
 
     @classmethod
     def get_ai_model(

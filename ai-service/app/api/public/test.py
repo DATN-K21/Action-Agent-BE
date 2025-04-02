@@ -41,6 +41,6 @@ def multiply(a: int, b: int) -> int:
 async def test_gpt4free():
     tools = [add, multiply]
     model = AIModelService.get_ai_model(provider=AIModelProviderEnum.GPT4FREE)
-    model = model.bind_tools(tools, tool_choice="multiply")
-    res = model.invoke("what is 2 + 4")
+    model.bind_functions(tools)
+    res = await model.ainvoke("what is 2 + 4 using add tool")
     return ResponseWrapper.wrap(status=200, message=f"{res}").to_response()
