@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 
-from app.services.model_service import get_openai_model
+from app.services.model_service import AIModelService
 
 
 @asynccontextmanager
@@ -26,5 +26,5 @@ async def make_graph():
             }
     ) as client:
         tools = client.get_tools()
-        agent = create_react_agent(get_openai_model(), tools)
+        agent = create_react_agent(AIModelService.get_ai_model(), tools)
         yield agent

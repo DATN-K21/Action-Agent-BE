@@ -46,12 +46,10 @@ class AIModelService:
     ):
         """Get an Azure OpenAI language model."""
         api_key = SecretStr(env_settings.AZURE_OPENAI_API_KEY)
-        deployment_name = env_settings.AZURE_OPENAI_DEPLOYMENT_NAME
         api_base = env_settings.AZURE_OPENAI_API_BASE
         api_version = env_settings.AZURE_OPENAI_API_VERSION
         return AzureChatOpenAI(
             openai_api_key=api_key,
-            deployment_name=deployment_name,
             azure_endpoint=api_base,
             openai_api_version=api_version,
             temperature=temperature,
