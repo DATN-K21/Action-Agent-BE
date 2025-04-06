@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
@@ -230,7 +230,7 @@ class UserService:
                     UserApiKey.provider.label("provider"),
                     UserApiKey.created_at.label("created_at"),
                 )
-                .join(UserApiKey, (User.id == UserApiKey.user_id) and (UserApiKey.is_deleted.is_(False)), isouter=True)
+                .join(UserApiKey, and_((User.id == UserApiKey.user_id), (UserApiKey.is_deleted.is_(False))), isouter=True)
                 .where(
                     User.id == user_id,
                     User.is_deleted.is_(False),
@@ -368,7 +368,7 @@ class UserService:
                     return ResponseWrapper.wrap(status=404, message="API key not found")
 
                 await self.db.commit()
-                response_data = SetDefaultApiKeyResponse.model_validate(updated_api_key)
+                response_data = UpsertApiKeyResponse.model_validate(updated_api_key)
 
             else:
                 # Create a new API key
