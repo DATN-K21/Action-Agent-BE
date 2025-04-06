@@ -1,14 +1,25 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette import EventSourceResponse
+from starlette.responses import StreamingResponse
 
 from app.api.deps import ensure_authenticated, ensure_user_id
 from app.core import logging
+from app.core.cache.cached_agents import AgentCache
+from app.core.cache.deps import get_agent_cache
+from app.core.graph.deps import get_extension_builder_manager, get_extension
+from app.core.graph.extension_builder_manager import ExtensionBuilderManager
+from app.core.session import get_db_session
+from app.core.utils.streaming import format_extension_stream_sse, format_extension_interrupt_sse
+from app.models import Thread
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import (
     ActiveAccountResponse,
     CheckConnectionResponse,
     GetActionsResponse,
     GetExtensionsResponse,
-    GetSocketioInfoResponse, ExtensionRequest,
+    GetSocketioInfoResponse, ExtensionResponse, HTTPExtensionRequest, HTTPExtensionCallbackRequest,
 )
 from app.services.database.connected_app_service import ConnectedAppService
 from app.services.database.deps import get_connected_app_service
@@ -170,8 +181,238 @@ async def get_info():
     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
-@router.post("/stream")
-async def stream(
-        request: ExtensionRequest = Depends(),
+@router.post("/chat/{user_id}/{thread_id}/{extension_name}", summary="Chat with the extension.",
+             response_model=ResponseWrapper[ExtensionResponse])
+async def chat(
+        user_id: str,
+        thread_id: str,
+        extension_name: str,
+        request: HTTPExtensionRequest,
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
-    return ResponseWrapper.wrap(status=200).to_response()
+    try:
+        # Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        agent = get_extension(
+            extension_name=extension_name,
+            user_id=user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        response = await agent.async_chat(
+            question=request.input,
+            thread_id=thread_id,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
+        )
+
+        return ResponseWrapper.wrap(
+            status=200,
+            data=ExtensionResponse(
+                user_id=user_id,
+                thread_id=thread_id,
+                extension_name=extension_name,
+                interrupted=response.interrupted,
+                output=response.output
+            )
+        ).to_response()
+
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post("/chat-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the chat.",
+             response_model=ResponseWrapper[ExtensionResponse])
+async def chat_interrupt(
+        user_id: str,
+        thread_id: str,
+        extension_name: str,
+        request: HTTPExtensionCallbackRequest,
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
+):
+    try:
+        # Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        agent = get_extension(
+            extension_name=extension_name,
+            user_id=user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        execute = request.execute
+        tool_calls = request.tool_calls
+        result = await agent.async_handle_chat_interrupt(
+            execute=execute,
+            tool_calls=tool_calls,
+            thread_id=thread_id,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
+        )
+
+        if execute:
+            return ResponseWrapper.wrap(
+                status=200,
+                data=ExtensionResponse(
+                    user_id=user_id,
+                    thread_id=thread_id,
+                    extension_name=extension_name,
+                    interrupted=False,
+                    output=result.output
+                )
+            ).to_response()
+        else:
+            return ResponseWrapper.wrap(
+                status=200,
+                data=ExtensionResponse(
+                    user_id=user_id,
+                    thread_id=thread_id,
+                    extension_name=extension_name,
+                    interrupted=False,
+                    output=""
+                )
+            ).to_response()
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post("/stream/{user_id}/{thread_id}/{extension_name}", summary="Stream with the extension.",
+             response_class=StreamingResponse)
+async def stream(
+        user_id: str,
+        thread_id: str,
+        extension_name: str,
+        request: HTTPExtensionRequest,
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
+):
+    try:
+        # Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        agent = get_extension(
+            extension_name=extension_name,
+            user_id=user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        response = await agent.async_stream(
+            question=request.input,
+            thread_id=thread_id,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
+        )
+
+        return EventSourceResponse(format_extension_stream_sse(response))
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post("/stream-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the stream.",
+             response_class=StreamingResponse)
+async def stream_interrupt(
+        user_id: str,
+        thread_id: str,
+        extension_name: str,
+        request: HTTPExtensionCallbackRequest,
+        agent_cache: AgentCache = Depends(get_agent_cache),
+        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
+):
+    try:
+        # Check the thread
+        stmt = (
+            select(Thread.id)
+            .where(
+                Thread.user_id == user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+        db_thread = (await db.execute(stmt)).scalar_one_or_none()
+        if db_thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        agent = get_extension(
+            extension_name=extension_name,
+            user_id=user_id,
+            agent_cache=agent_cache,
+            extension_service_manager=extension_service_manager,
+            builder_manager=builder_manager,
+            logger=logger,
+        )
+
+        execute = request.execute
+        tool_calls = request.tool_calls
+        result = await agent.async_handle_stream_interrupt(
+            execute=execute,
+            tool_calls=tool_calls,
+            thread_id=thread_id,
+            timezone='Asia/Ho_Chi_Minh',
+            max_recursion=request.max_recursion,
+        )
+
+        return EventSourceResponse(format_extension_interrupt_sse(result))
+    except Exception as e:
+        logger.error(f"Has error: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

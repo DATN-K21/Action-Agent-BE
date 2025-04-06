@@ -14,7 +14,7 @@ from app.core import logging
 from app.core.enums import MessageName
 from app.core.monkey_patches.deps import patch_lib
 from app.core.tools.tools import get_date_parser_tools
-from app.core.utils.messages import trimmer
+from app.core.utils.messages import trimmer, truncate_text
 from app.prompts.prompt_templates import (
     get_enhanced_prompt_template,
     get_human_in_loop_evaluation_prompt_template,
@@ -122,6 +122,7 @@ class GraphBuilder:
 
         try:
             question = state.get("question")
+            messages = trimmer.invoke(state.get("messages"))
 
             model = get_openai_model(temperature=0)
             prompt = get_openai_function_prompt_template()
@@ -132,7 +133,7 @@ class GraphBuilder:
             chain = prompt | trimmer | model
             response = await chain.ainvoke({
                 "input": question,
-                "chat_history": state.get("messages"),
+                "chat_history": messages,
                 "agent_scratchpad": []
             })
 
@@ -143,6 +144,7 @@ class GraphBuilder:
                 }
 
             adapter = TypeAdapter(list[ToolCall])
+            print("[tool_calls]", response.tool_calls)
 
             return {"tool_calls": adapter.validate_python(response.tool_calls),
                     "next": "evaluate_human_in_loop_node"}
@@ -257,6 +259,8 @@ class GraphBuilder:
             else:
                 for tool_message in tool_messages:
                     docs += f"\n## ToolMessage: \n {tool_message.content}\n"
+
+            docs = truncate_text(docs)
 
             prompt = get_markdown_answer_generating_prompt_template()
             llm = get_openai_model(temperature=0.5)

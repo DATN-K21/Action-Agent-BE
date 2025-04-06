@@ -6,7 +6,7 @@ from langchain_core.runnables import RunnableConfig
 def get_invocation_config(
         thread_id: Optional[str] = None,
         timezone: Optional[str] = None,
-        recursion_limit: int = 10,
+        recursion_limit: Optional[int] = None,
 ) -> RunnableConfig:
     configurable: Dict[str, Any] = {}
 
@@ -17,7 +17,10 @@ def get_invocation_config(
     if timezone is not None:
         configurable["timezone"] = timezone
 
-    return RunnableConfig(
-        recursion_limit=recursion_limit,
-        configurable=configurable,
-    )
+    if recursion_limit is not None:
+        return RunnableConfig(
+            recursion_limit=recursion_limit,
+            configurable=configurable,
+        )
+    
+    return RunnableConfig(configurable=configurable)
