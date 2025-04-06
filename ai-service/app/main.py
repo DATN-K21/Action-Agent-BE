@@ -1,4 +1,3 @@
-import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,7 +5,7 @@ from app.api.router import router
 from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
-from app.core.socketio import sio_asgi
+from app.core.socketio import get_socketio_asgi
 
 logging.configure_logging()
 
@@ -37,4 +36,5 @@ exceptions.register_exception_handlers(app)
 
 app.include_router(router)
 
-app.mount("/socket.io", socketio.ASGIApp(sio_asgi))
+
+app.mount("/", get_socketio_asgi())

@@ -5,11 +5,11 @@ from socketio import AsyncNamespace
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_output, convert_dict_message_to_tool_calls, \
-    convert_dict_message_to_message
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, \
+    convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
-from app.core.utils.streaming import to_sse, LanggraphNodeEnum
-from app.schemas.extension import ExtensionCallBack, ExtensionRequest, ExtensionResponse
+from app.core.utils.streaming import LanggraphNodeEnum, to_sse
+from app.schemas.extension import SocketioExtensionCallback, SocketioExtensionRequest, ExtensionResponse
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
 logger = logging.get_logger(__name__)
@@ -73,10 +73,10 @@ class ExtensionNamespace(AsyncNamespace):
         graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
         return Agent(graph)
 
-    @validate_event(ExtensionCallBack)
-    async def on_handle_chat_interrupt(self, sid, data: ExtensionCallBack):
+    @validate_event(SocketioExtensionCallback)
+    async def on_handle_chat_interrupt(self, sid, data: SocketioExtensionCallback):
         if not self._check_exist_agent(sid, data.extension_name):
-            logger.error(f"Agent not found")
+            logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
             return
 
@@ -105,8 +105,8 @@ class ExtensionNamespace(AsyncNamespace):
                 to=sid
             )
 
-    @validate_event(ExtensionRequest)
-    async def on_chat(self, sid, data: ExtensionRequest):
+    @validate_event(SocketioExtensionRequest)
+    async def on_chat(self, sid, data: SocketioExtensionRequest):
         try:
             if not self._check_exist_agent(sid, data.extension_name):
                 agent = self._create_agent(data.extension_name, data.user_id)
@@ -137,10 +137,10 @@ class ExtensionNamespace(AsyncNamespace):
             logger.error(f"Error in chat event of extension namespace: {str(e)}", exc_info=True)
             await self.emit("error", "Internal server error", to=sid)
 
-    @validate_event(ExtensionCallBack)
-    async def on_handle_stream_interrupt(self, sid, data: ExtensionCallBack):
+    @validate_event(SocketioExtensionCallback)
+    async def on_handle_stream_interrupt(self, sid, data: SocketioExtensionCallback):
         if not self._check_exist_agent(sid, data.extension_name):
-            logger.error(f"Agent not found")
+            logger.error("Agent not found")
             await self.emit("error", "Agent not found", to=sid)
             return
 
@@ -158,6 +158,21 @@ class ExtensionNamespace(AsyncNamespace):
 
         if execute:
             async for dict_message in to_sse(result):
+                if dict_message.get("event") == "end":
+                    await self.emit(
+                        event="stream_interrupt",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=False,
+                            streaming=False,
+                            output="",
+                        ).model_dump(),
+                        to=sid
+                    )
+                    return
+
                 output = convert_dict_message_to_output(dict_message)
                 if output is not None:
                     await self.emit(
@@ -167,12 +182,13 @@ class ExtensionNamespace(AsyncNamespace):
                             thread_id=data.thread_id,
                             extension_name=data.extension_name,
                             interrupted=False,
+                            streaming=True,
                             output=output
                         ).model_dump(),
                         to=sid
                     )
 
-    @validate_event(ExtensionRequest)
+    @validate_event(SocketioExtensionRequest)
     async def on_stream(self, sid, data):
         try:
             if not self._check_exist_agent(sid, data.extension_name):
@@ -190,8 +206,8 @@ class ExtensionNamespace(AsyncNamespace):
 
             interrupted = False
             async for dict_message in to_sse(response):
-                if dict_message["event"] == "metadata":
-                    dict_message_data = json.loads(dict_message["data"])
+                if dict_message.get("event") == "metadata":
+                    dict_message_data = json.loads(dict_message.get("data"))
                     if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_EDITING_NODE:
                         interrupted = True
                 elif interrupted:
@@ -204,6 +220,7 @@ class ExtensionNamespace(AsyncNamespace):
                                 thread_id=data.thread_id,
                                 extension_name=data.extension_name,
                                 interrupted=True,
+                                streaming=True,
                                 output=tool_calls
                             ).model_dump(),
                             to=sid
@@ -218,10 +235,26 @@ class ExtensionNamespace(AsyncNamespace):
                                 thread_id=data.thread_id,
                                 extension_name=data.extension_name,
                                 interrupted=False,
+                                streaming=True,
                                 output=message
                             ).model_dump(),
                             to=sid
                         )
+
+                if dict_message.get("event") == "end":
+                    await self.emit(
+                        event="stream_response",
+                        data=ExtensionResponse(
+                            user_id=data.user_id,
+                            thread_id=data.thread_id,
+                            extension_name=data.extension_name,
+                            interrupted=interrupted,
+                            streaming=False,
+                            output="",
+                        ).model_dump(),
+                        to=sid
+                    )
+                    return
 
         except Exception as e:
             logger.error(f"Error executing Extension API: {str(e)}", exc_info=True)

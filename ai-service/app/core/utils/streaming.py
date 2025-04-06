@@ -10,6 +10,9 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.core import logging
+from app.core.utils.convert_dict_message import convert_dict_message_to_tool_calls, convert_dict_message_to_message, \
+    convert_dict_message_to_output
+from app.schemas.extension import ExtensionResponse
 
 logger = logging.get_logger(__name__)
 
@@ -103,3 +106,59 @@ async def to_sse(messages_stream: MessagesStream) -> AsyncIterator[dict]:
 
     # Send an end event to signal the end of the stream
     yield {"event": "end"}
+
+
+async def format_extension_stream_sse(messages_stream: MessagesStream) -> AsyncIterator[str]:
+    interrupted = False
+    async for dict_message in to_sse(messages_stream):
+        if dict_message.get("event") == "metadata":
+            dict_message_data = json.loads(dict_message.get("data"))
+            if dict_message_data["langgraph_node"] == LanggraphNodeEnum.HUMAN_EDITING_NODE:
+                interrupted = True
+        elif interrupted:
+            tool_calls = convert_dict_message_to_tool_calls(dict_message)
+            if tool_calls is not None:
+                data = ExtensionResponse(
+                    interrupted=True,
+                    streaming=True,
+                    output=tool_calls
+                ).model_dump_json()
+
+                yield {
+                    "event": "data",
+                    "data": data,
+                }
+
+        else:
+            message = convert_dict_message_to_message(dict_message)
+            if message is not None:
+                data = ExtensionResponse(
+                    interrupted=False,
+                    streaming=True,
+                    output=message
+                ).model_dump_json()
+                yield {
+                    "event": "data",
+                    "data": data,
+                }
+
+        if dict_message.get("event") == "end":
+            yield {"event": "end"}
+
+
+async def format_extension_interrupt_sse(messages_stream: MessagesStream) -> AsyncIterator[str]:
+    async for dict_message in to_sse(messages_stream):
+        output = convert_dict_message_to_output(dict_message)
+        if output is not None:
+            data = ExtensionResponse(
+                interrupted=False,
+                streaming=True,
+                output=output
+            ).model_dump_json()
+            yield {
+                "event": "data",
+                "data": data,
+            }
+
+        if dict_message.get("event") == "end":
+            yield {"event": "end"}

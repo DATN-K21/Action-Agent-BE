@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Index, String
+from sqlalchemy import Column, ForeignKey, Index, Integer, String
 
 from app.models.base_entity import BaseEntity
 
@@ -11,6 +11,14 @@ class User(BaseEntity):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
 
+    default_api_key_id = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
+    remain_trial_tokens = Column(Integer, nullable=False, default=0)
+
     __table_args__ = (
-        Index("idx_users_username_email", "username", "email"),  # Ensure it's a tuple
+        Index(
+            "idx_users_username_email",
+            "username",
+            "email",
+            unique=True,
+        ),
     )

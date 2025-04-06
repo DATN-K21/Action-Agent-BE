@@ -21,10 +21,11 @@ from app.schemas.thread import (
     CreateThreadRequest,
     CreateThreadResponse,
     DeleteThreadResponse,
+    FilterThreadRequest,
     GetListThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
-    UpdateThreadResponse, FilterThreadRequest,
+    UpdateThreadResponse,
 )
 from app.services.database.deps import get_thread_service
 from app.services.database.thread_service import ThreadService
