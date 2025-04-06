@@ -79,7 +79,7 @@ class EmailHelper {
 
         const activationMessage = `
             <p>Thank you for registering an account on My AI Assistant Application. Please click the link below to activate your account:</p>
-            <a href="${process.env.CLIENT_URL}/api/account/activate?token=${activationToken}">Activate Account</a><br>
+            <a href="${process.env.CLIENT_URL}/account-activation?token=${activationToken}">Activate Account</a><br>
             <strong>Note: The activation link is valid for 15 minutes.</strong>
         `;
         const info = await transporter.sendMail({
