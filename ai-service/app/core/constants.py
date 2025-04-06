@@ -1,2 +1,4 @@
 # constant
 SYSTEM = "SYSTEM"
+
+TRIAL_TOKENS = 3000
