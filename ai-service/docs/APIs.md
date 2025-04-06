@@ -93,6 +93,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 - **thread_id:** String type - Thread ID (required)
 - **extension_name:** String type - Extension name (required)
 - **interrupted:** Boolean type – Indicates whether human intervention is required in the process (required)
+- **streaming:** Boolean type – Indicates whether the response is streaming (Optional)
 - **output:** String type - Output message (required)
 
 **Note:** When the interrupted field is set to True, the output field contains a dictionary with "tool_calls".

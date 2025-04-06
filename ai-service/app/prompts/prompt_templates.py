@@ -16,6 +16,26 @@ def get_openai_function_prompt_template():
 
 
 @lru_cache()
+def get_title_generation_prompt_template():
+    return PromptTemplate(
+        template="""
+    You are an intelligent assistant responsible for generating a concise and relevant title based on the given content.
+
+    ## Content:
+    {content}
+
+    ## Task:
+    - Generate a short, clear, and descriptive title.
+    - Ensure the title accurately represents the essence of the content.
+    - Keep it within 6 words.
+
+    ## Title:
+    """,
+        input_variables=["content"],
+    )
+
+
+@lru_cache()
 def get_simple_agent_prompt_template():
     return ChatPromptTemplate.from_messages(
         [

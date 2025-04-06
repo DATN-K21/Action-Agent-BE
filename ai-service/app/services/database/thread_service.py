@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, update, or_
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
@@ -79,9 +79,9 @@ class ThreadService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_all_threads(self, user_id: str, paging: CursorPagingRequest, thread_type: Optional[str] = None) -> \
-            ResponseWrapper[
-                GetListThreadsResponse]:
+    async def get_all_threads(
+        self, user_id: str, paging: CursorPagingRequest, thread_type: Optional[str] = None
+    ) -> ResponseWrapper[GetListThreadsResponse]:
         """Get all threads of a user."""
         try:
             stmt = (

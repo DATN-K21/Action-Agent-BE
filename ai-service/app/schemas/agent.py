@@ -10,7 +10,7 @@ from app.schemas.base import BaseRequest, BaseResponse
 ##################################################
 class AgentChatRequest(BaseRequest):
     input: str = Field(min_length=1, max_length=8000, title="Input", examples=["Hello!"])
-    recursion_limit: Optional[int] = Field(10, ge=1, le=100, title="Recursion Limit", examples=[5])
+    recursion_limit: Optional[int] = Field(None, ge=1, le=100, title="Recursion Limit", examples=[10])
 
 
 ##################################################

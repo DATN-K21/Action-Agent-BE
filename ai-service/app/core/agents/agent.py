@@ -30,7 +30,7 @@ class Agent(BaseAgent):
             question: str,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: int = 10,
+            max_recursion: Optional[int] = None,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
@@ -65,7 +65,7 @@ class Agent(BaseAgent):
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: int = 10,
+            max_recursion: Optional[int] = None,
     ) -> AgentInterruptHandlingResult:
         try:
             config = get_invocation_config(
@@ -95,7 +95,7 @@ class Agent(BaseAgent):
             self, question: str,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: int = 10
+            max_recursion: Optional[int] = None,
     ) -> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
@@ -115,7 +115,7 @@ class Agent(BaseAgent):
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: int = 10,
+            max_recursion: Optional[int] = None,
     ) -> MessagesStream:
         try:
             config = get_invocation_config(
