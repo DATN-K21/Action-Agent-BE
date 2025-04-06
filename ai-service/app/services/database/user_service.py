@@ -383,7 +383,7 @@ class UserService:
                 await self.db.commit()
                 await self.db.refresh(new_api_key)
 
-                response_data = SetDefaultApiKeyResponse.model_validate(new_api_key)
+                response_data = UpsertApiKeyResponse.model_validate(new_api_key)
 
             return ResponseWrapper.wrap(status=200, data=response_data)
 
