@@ -2,7 +2,7 @@ from typing import Callable, Sequence, Union
 
 from langchain_core.tools import BaseTool
 
-from app.core.graph.base import GraphBuilder
+from app.core.graph.builder import GraphBuilder
 
 
 class ExtensionBuilderManager:

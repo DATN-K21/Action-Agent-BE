@@ -4,7 +4,9 @@ from langchain_core.runnables import RunnableConfig
 
 
 def get_runnable_config(
-    thread_id: Optional[str],
+    thread_id: str,
+    user_id: Optional[str],
+    agent_id: Optional[str],
     timezone: Optional[str],
     recursion_limit: Optional[int],
 ) -> RunnableConfig:

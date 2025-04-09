@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import ensure_user_id
 from app.core import logging
-from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
+from app.core.agents.manager import AgentManager
 from app.core.session import get_db_session
 from app.core.utils.convert_messages_to_dict import convert_messages_to_dicts
 from app.models.thread import Thread
