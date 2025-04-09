@@ -4,7 +4,13 @@ from pydantic import SecretStr
 from app.core.settings import env_settings
 
 
-def get_openai_model(model: str = "gpt-3.5-turbo", temperature=0, streaming=True):
-    """Get an OpenAI language model."""
-    api_key = SecretStr(env_settings.OPENAI_API_KEY)
-    return ChatOpenAI(temperature=temperature, streaming=streaming, model=model, api_key=api_key)
+def get_openai_model(
+    model: str = env_settings.DEFAULT_MODEL,
+    temperature: float = 0,
+    streaming: bool = False,
+    api_key: str = env_settings.OPENAI_API_KEY,
+):
+    """
+    Get an OpenAI language model.
+    """
+    return ChatOpenAI(temperature=temperature, streaming=streaming, model=model, api_key=SecretStr(api_key))

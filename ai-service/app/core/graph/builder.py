@@ -12,7 +12,8 @@ from pydantic import BaseModel, TypeAdapter
 
 from app.core import logging
 from app.core.enums import MessageName
-from app.core.monkey_patches.deps import patch_lib
+from app.core.monkey_patches.composio_schema_patches import patch_composio_library
+from app.core.settings import env_settings
 from app.core.tools.tools import get_date_parser_tools
 from app.core.utils.messages import trimmer, truncate_text
 from app.prompts.prompt_templates import (
@@ -159,7 +160,7 @@ class GraphBuilder:
         str_tool_calls = str(tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
-        model = get_openai_model(model="gpt-4o-mini", temperature=0)
+        model = get_openai_model(model=env_settings.DEFAULT_MODEL, temperature=0)
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
@@ -209,20 +210,28 @@ class GraphBuilder:
         return {"next": END}
 
     async def _async_tool_node(self, state: State, config: RunnableConfig):
-        logger.info("---TOOL NODE---")
+        """
+        Tool node to invoke the selected tools and get the results.
+        """
+        # Logging
+        function_name = "_async_tool_node"
+        logger.info(f"{function_name} config: {config} =>")
 
         try:
-            # Fix composio library
-            patch_lib()
+            # Monkey-patch composio library
+            patch_composio_library()
 
+            # Check if tools are available
+            if self.tools is None or len(self.tools) == 0:
+                raise ValueError("No tools available for invocation")
+
+            # Get the tool calls from the state
             tool_calls = state.get("tool_calls")
             messages = []
+
+            # Invoke tools sequentially
             for tool_call in tool_calls:
-                selected_tool = None
-                for tool in self.tools:  # type: ignore
-                    if tool.name == tool_call.name:
-                        selected_tool = tool
-                        break
+                selected_tool = next((tool for tool in self.tools if tool.name == tool_call.name), None)
                 if selected_tool is None:
                     continue
                 data = await selected_tool.ainvoke(tool_call.args, config)
@@ -234,11 +243,18 @@ class GraphBuilder:
             return {"tool_messages": messages, "next": "generate_node"}
 
         except Exception as e:
-            logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
+            logger.error(f"{function_name} Has error: {str(e)}", exc_info=True)
             raise e
 
     async def _async_generate_node(self, state: State):
-        logger.info("---GENERATE NODE---")
+        """
+        Generate the final response based on the tool messages and question.
+        """
+
+        # Logging
+        function_name = "_async_generate_node"
+        logger.info(f"{function_name} =>")
+
         try:
             tool_calls = state.get("tool_calls")
             tool_messages = state.get("tool_messages")
@@ -247,6 +263,7 @@ class GraphBuilder:
             # Get the documents
             docs = ""
 
+            # Handle interrupted state
             if state.get("interrupted"):
                 if tool_calls is None or len(tool_calls) == 0:
                     docs += "\n#No tool calls\n"
@@ -254,6 +271,7 @@ class GraphBuilder:
                     for tool_call in tool_calls:
                         docs += f"\n## ToolCall: \n {str(tool_call)}\n"
 
+            # Handle tool messages
             if tool_messages is None or len(tool_messages) == 0:
                 docs += "\n#No tool messages\n"
             else:
