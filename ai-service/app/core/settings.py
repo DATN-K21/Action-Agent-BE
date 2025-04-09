@@ -13,17 +13,12 @@ class Settings(BaseSettings):
     # FastAPI settings
     PORT: int = 5001
     HOST: str = "0.0.0.0"
-    DEBUG: bool = False
+    DBG: bool = False
     HTTPS: bool = False
 
     # Logging settings
     LOG_LEVEL: str = "INFO"
     LOG_TO_CONSOLE: bool = True
-    LOG_TO_ELASTICSEARCH: bool = False
-    ELASTICSEARCH_URL: str = "http://localhost:9200"
-    ELASTICSEARCH_USER: str = "elastic"
-    ELASTICSEARCH_PASSWORD: str = "123456"
-    ELASTICSEARCH_INDEX: str = "logs"
 
     # Database settings
     POSTGRES_HOST: str = "localhost"

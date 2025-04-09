@@ -5,57 +5,42 @@ from app.core.agents.agent import Agent
 
 class AgentManager:
     def __init__(self):
-        self.id_to_agent = {}
-        self.name_to_id = {}
+        self.agent_list: dict[str, Agent] = {}
 
     def register_agent(self, agent: Agent):
-        if agent.id is None:
-            raise ValueError("Agent id is not set")
-
-        if agent.name is None:
+        """
+        Register an agent in the manager.
+        """
+        if agent.name is None or agent.name == "":
             raise ValueError("Agent name is not set")
+        if agent.name in self.agent_list:
+            raise ValueError(f"Agent '{agent.name} already exists")
+        self.agent_list[agent.name] = agent
+        self.agent_list = dict(sorted(self.agent_list.items()))
 
-        if agent.id in self.id_to_agent:
-            raise ValueError(f"Agent '{agent.id} already exists")
+    def remove_agent(self, name: str):
+        """
+        Remove an agent from the manager by its name.
+        """
+        if name is not None and name in self.agent_list:
+            del self.agent_list[name]
 
-        if agent.name in self.name_to_id:
-            raise ValueError(f"Agent '{agent.name}' already exists")
-
-        self.id_to_agent[agent.id] = agent
-        self.name_to_id[agent.name] = agent.id
-
-    # noinspection DuplicatedCode
-    def remove_agent(self, name: Optional[str] = None, id_: Optional[str] = None):
-        if name is None and id_ is None:
-            raise ValueError("Either name or id_ must be provided")
-
-        if id_ is not None and id_ in self.id_to_agent:
-            agent = self.id_to_agent[id_]
-            del self.name_to_id[agent.name]
-            del self.id_to_agent[id_]
-            return
-
-        if name is not None and name in self.name_to_id:
-            id_ = self.name_to_id[name]
-            del self.name_to_id[name]
-            del self.id_to_agent[id_]
-            return
-
-    # noinspection DuplicatedCode
-    def get_agent(self, name: Optional[str] = None, id_: Optional[str] = None) -> Agent | None:
-        if name is None and id_ is None:
-            raise ValueError("Either name or id_ must be provided")
-
-        if id_ is not None and id_ in self.id_to_agent:
-            return self.id_to_agent[id_]
-
-        if name is not None and name in self.name_to_id:
-            return self.id_to_agent[self.name_to_id[name]]
-
+    def get_agent(self, name: str) -> Optional[Agent]:
+        """
+        Get an agent by its name.
+        """
+        if name in self.agent_list:
+            return self.agent_list[name]
         return None
 
     def get_all_agents(self) -> list[Agent]:
-        return list(self.id_to_agent.values())
+        """
+        Get all agents in the manager.
+        """
+        return list(self.agent_list.values())
 
     def get_all_agent_names(self) -> list[str]:
-        return list(self.name_to_id.keys())
+        """
+        Get all agent names in the manager.
+        """
+        return list(self.agent_list.keys())

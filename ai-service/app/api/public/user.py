@@ -37,7 +37,7 @@ async def set_default_api_key(
     user_service: UserService = Depends(get_user_service),
     _: bool = Depends(ensure_user_id),
 ):
-    response = await user_service.set_default_api_key(request.user_id, request.provider)
+    response = await user_service.set_default_api_key(user_id, request.provider)
     return response.to_response()
 
 
@@ -48,7 +48,7 @@ async def upsert_api_key(
     user_service: UserService = Depends(get_user_service),
     _: bool = Depends(ensure_user_id),
 ):
-    response = await user_service.upsert_api_key(request.user_id, request.provider, request.encrypted_value)
+    response = await user_service.upsert_api_key(user_id, request.provider, request.encrypted_value)
     return response.to_response()
 
 @router.delete("/{user_id}/key/delete", summary="Delete API Key.", response_model=ResponseWrapper[DeleteApiKeyResponse])
@@ -58,5 +58,5 @@ async def delete_api_key(
     user_service: UserService = Depends(get_user_service),
     _: bool = Depends(ensure_user_id),
 ):
-    response = await user_service.delete_api_key(request.user_id, request.provider)
+    response = await user_service.delete_api_key(user_id, request.provider)
     return response.to_response()

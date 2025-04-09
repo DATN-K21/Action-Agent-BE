@@ -21,8 +21,8 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 @router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
 async def get_agents(
-        agent_manager: AgentManager = Depends(get_agent_manager),
-        _: bool = Depends(ensure_authenticated),
+    agent_manager: AgentManager = Depends(get_agent_manager),
+    _: bool = Depends(ensure_authenticated),
 ):
     try:
         agents = agent_manager.get_all_agent_names()
@@ -34,21 +34,21 @@ async def get_agents(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.",
-             response_model=ResponseWrapper[AgentChatResponse])
+@router.post("/{user_id}/{thread_id}/{agent_name}/chat", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
 async def execute(
-        user_id: str,
-        thread_id: str,
-        agent_name: str,
-        request: AgentChatRequest,
-        agent_manager: AgentManager = Depends(get_agent_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    agent_name: str,
+    request: AgentChatRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the agent
         agent = agent_manager.get_agent(agent_name)
         if agent is None:
+            logger.warning(f"Agent {agent_name} not found.")
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
 
         # 2. Check the thread
@@ -63,14 +63,17 @@ async def execute(
         )
         db_thread = (await db.execute(stmt)).scalar_one_or_none()
         if db_thread is None:
+            logger.warning(f"Thread {thread_id} not found for user {user_id}.")
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
         # 3. Chat with the agent
         response = await agent.async_chat(
             question=request.input,
             thread_id=thread_id,
-            max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
+            max_recursion=request.recursion_limit if request.recursion_limit else 5,
         )
+
+        logger.info(f"Agent {agent_name} response: {response.output}")
 
         return ResponseWrapper.wrap(
             status=200,
@@ -85,21 +88,21 @@ async def execute(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.",
-             response_class=StreamingResponse)
+@router.post("/{user_id}/{thread_id}/{agent_name}/stream", summary="Stream with the agent.", response_class=StreamingResponse)
 async def stream(
-        user_id: str,
-        thread_id: str,
-        agent_name: str,
-        request: AgentChatRequest,
-        agent_manager: AgentManager = Depends(get_agent_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    agent_name: str,
+    request: AgentChatRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the agent
         agent = agent_manager.get_agent(agent_name)
         if agent is None:
+            logger.warning(f"Agent {agent_name} not found.")
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
 
         # 2. Check the thread
@@ -114,6 +117,7 @@ async def stream(
         )
         db_thread = (await db.execute(stmt)).scalar_one_or_none()
         if db_thread is None:
+            logger.warning(f"Thread {thread_id} not found for user {user_id}.")
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
         # 3. Chat with the agent

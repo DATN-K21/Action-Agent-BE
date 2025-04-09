@@ -13,11 +13,11 @@ async def check():
 
 @router.get("/error", summary="Endpoint to check error handlers.", response_model=ResponseWrapper)
 async def error():
-    raise Exception("Test exception")
+    raise Exception(500, "Test exception")
 
 
 @router.get("/auth", summary="Endpoint to check auth.", response_model=ResponseWrapper)
 async def auth(
-        _: bool = Depends(ensure_authenticated),
+    _: bool = Depends(ensure_authenticated),
 ):
     return ResponseWrapper.wrap(status=200, message="Authenticated").to_response()

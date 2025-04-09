@@ -10,20 +10,20 @@ from app.core.agents.base import BaseAgent
 from app.core.graph.base import HumanEditingData, ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNodeEnum
+from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_state
 
 
 class Agent(BaseAgent):
     def __init__(
-            self,
-            graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        name: str,
+        graph: CompiledStateGraph,
+        logger: Optional[BoundLogger] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
-        if logger is None:
+        if not logger:
             logger = logging.get_logger(self.__class__.__name__)
-        super().__init__(graph=graph, logger=logger, name=name, config=config)
+        super().__init__(name, graph, logger, config)
 
     async def async_chat(
             self,
@@ -32,6 +32,9 @@ class Agent(BaseAgent):
             timezone: Optional[str] = None,
             max_recursion: Optional[int] = None,
     ) -> AgentExecutionResult:
+        """
+        Execute the agent's graph with given input
+        """
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(

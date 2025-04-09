@@ -1,7 +1,10 @@
 import tiktoken
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage, trim_messages
 
-from app.services.model_service import MAX_TOKENS, get_openai_model
+from app.services.model_service import get_openai_model
+
+MAX_TOKENS = 10000
+
 
 trimmer = trim_messages(
     max_tokens=MAX_TOKENS,

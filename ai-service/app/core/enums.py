@@ -12,6 +12,7 @@ class MessageName(StrEnum):
     TOOL = "TOOL"
     ASSISTANT = "ASSISTANT"
 
+
 class LlmProvider(IntEnum):
     OPENAI = 1
     ANTHROPIC = 2
@@ -19,3 +20,22 @@ class LlmProvider(IntEnum):
     MISTRAL = 4
     COHERE = 5
     LOCAL = 6
+
+
+class MessageFormat(IntEnum):
+    MARKDOWN = 1
+    FILE = 2
+
+
+class MessageRole(IntEnum):
+    SYSTEM = 0
+    HUMAN = 1
+    AI = 2
+    TOOL = 3
+
+
+class ThreadFileStatus(IntEnum):
+    FAILED = 0
+    UPLOADED = 1
+    VECTORIZING = 2
+    VECTORIZED = 3

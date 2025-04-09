@@ -10,10 +10,10 @@ from app.core.socketio import get_socketio_asgi
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info(f"Starting server... DebugMode = {env_settings.DEBUG}")
+logger.info(f"Starting server... DebugMode = {env_settings.DBG}")
 
 app = FastAPI(
-    debug=env_settings.DEBUG,
+    debug=env_settings.DBG,
     title="Action-Executing AI Service API",
     description="This is an AI Service API using FastAPI.",
     version="1.0.0",
@@ -31,10 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+exceptions.setup_exception_handlers(app)
+
 swagger.set_custom_openapi(app)
-exceptions.register_exception_handlers(app)
-
 app.include_router(router)
-
 
 app.mount("/", get_socketio_asgi())

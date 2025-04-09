@@ -62,12 +62,12 @@ class HumanEditingData(BaseModel):
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
-            self,
-            checkpointer: AsyncPostgresSaver,
-            tools: Optional[list[BaseTool | Runnable]] = None,
-            tool_choice: Optional[str] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        checkpointer: AsyncPostgresSaver,
+        tools: Optional[list[BaseTool | Runnable]] = None,
+        tool_choice: Optional[str] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.checkpointer = checkpointer
         self.tools = tools
@@ -94,7 +94,7 @@ class GraphBuilder:
 
             response = await agent.ainvoke(input={"messages": HumanMessage(question)}, config=config)
 
-            print("[updated question]", response["messages"][-1].content)
+            logger.info(f"[updated question]: {response['messages'][-1].content}")
 
             return {"question": response["messages"][-1].content}
 
@@ -278,7 +278,9 @@ class GraphBuilder:
             raise
 
     def build_graph(
-            self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False
+        self,
+        perform_action: Optional[bool] = False,
+        has_human_acceptance_flow: Optional[bool] = False,
     ) -> CompiledStateGraph:
         # Define a new graph
         workflow = StateGraph(State)
