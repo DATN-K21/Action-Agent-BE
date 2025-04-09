@@ -46,7 +46,7 @@ class AIModelService:
     ):
         """Get an Azure OpenAI language model."""
         api_key = SecretStr(env_settings.AZURE_OPENAI_API_KEY)
-        endpoint = env_settings.AZURE_OPENAI_API_BASE
+        endpoint = env_settings.AZURE_OPENAI_ENDPOINT
         api_version = env_settings.AZURE_OPENAI_API_VERSION
         deployment_name = env_settings.AZURE_OPENAI_DEPLOYMENT_NAME
 

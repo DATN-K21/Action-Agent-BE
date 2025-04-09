@@ -137,9 +137,9 @@ def _get_openai_embeddings(async_mode: bool) -> PGVector:
         return PGVector(
             AzureOpenAIEmbeddings(
                 openai_api_key=SecretStr(env_settings.AZURE_OPENAI_API_KEY),
-                deployment=env_settings.AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAMEDEPLOYMENT_NAME,
+                deployment=env_settings.AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME,
                 azure_endpoint=env_settings.AZURE_OPENAI_ENDPOINT,
-                openai_api_version=env_settings.AZURE_OPENAI_API_VERSION,
+                openai_api_version=env_settings.AZURE_OPENAI_EMBEDDINGS_API_VERSION,
             ),  # type: ignore
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,

@@ -13,21 +13,29 @@ from app.services.extensions.deps import get_gmail_service, get_google_calendar_
     get_google_maps_service, get_youtube_service, get_slack_service, get_outlook_service, get_google_drive_service, \
     get_notion_service
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
+from app.services.model_service import AIModelService
 
 
 @lru_cache()
 def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
     manager = ExtensionBuilderManager()
 
+    model = AIModelService.get_ai_model()
+
     # Register gmail graph builder
     gmail_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_gmail_service().get_name(),
     )
+
     manager.register_extension_builder(gmail_builder)
 
     # Register google calendar graph builder
     google_calendar_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_google_calendar_service().get_name()
     )
@@ -35,6 +43,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register google meet graph builder
     google_meet_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_google_meet_service().get_name()
     )
@@ -42,6 +52,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register google map graph builder
     google_map_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_google_maps_service().get_name()
     )
@@ -49,6 +61,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register youtube graph builder
     youtube_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_youtube_service().get_name()
     )
@@ -56,6 +70,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register slack graph builder
     slack_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_slack_service().get_name()
     )
@@ -63,6 +79,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register outlook graph builder
     outlook_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_outlook_service().get_name()
     )
@@ -70,6 +88,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register google drive graph builder
     google_drive_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_google_drive_service().get_name()
     )
@@ -77,6 +97,8 @@ def get_extension_builder_manager(checkpointer: AsyncPostgresSaver = Depends(get
 
     # Register notion graph builder
     notion_builder = GraphBuilder(
+        model=model,
+        tools=[],
         checkpointer=checkpointer,
         name=get_notion_service().get_name()
     )
@@ -104,7 +126,7 @@ def create_extension(
         logger.error("Builder not found")
         return None
 
-    graph = builder.build_graph(perform_action=True, has_human_acceptance_flow=True)
+    graph = builder.build_graph()
     return Agent(graph)
 
 

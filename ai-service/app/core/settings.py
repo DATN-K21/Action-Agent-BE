@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = "<your-endpoint>"
     AZURE_OPENAI_API_VERSION: str = "<your-api-version>"
     AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME: str = "<your-deployment-name>"
+    AZURE_OPENAI_EMBEDDINGS_API_VERSION: str = "<your-version>"
 
     # Langchain service settings
     LANGCHAIN_TRACING_V2: bool = False

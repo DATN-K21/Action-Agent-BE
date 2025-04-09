@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from langchain_core.messages import HumanMessage
-from langgraph.graph.state import CompiledStateGraph
+from langgraph.graph.graph import CompiledGraph
 from langgraph.types import Command
 from structlog.stdlib import BoundLogger
 
@@ -16,7 +16,7 @@ from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNod
 class Agent(BaseAgent):
     def __init__(
             self,
-            graph: CompiledStateGraph,
+            graph: CompiledGraph,
             logger: Optional[BoundLogger] = None,
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,

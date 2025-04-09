@@ -34,8 +34,7 @@ class Metadata(BaseModel):
     langgraph_node: str
 
 
-list_stream_nodes = [LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.SELECT_TOOL_NODE,
-                     LanggraphNodeEnum.HUMAN_EDITING_NODE, LanggraphNodeEnum.GENERATE_NODE]
+list_stream_nodes = None
 
 
 async def astream_state(
@@ -48,7 +47,7 @@ async def astream_state(
     messages: dict[str, BaseMessage] = {}
     run_id: Optional[str] = None
 
-    if allow_stream_nodes is None:
+    if allow_stream_nodes is None and list_stream_nodes is not None:
         allow_stream_nodes = list_stream_nodes
 
     async for event in app.astream_events(input_, config, version="v1", stream_mode="all"):
@@ -56,9 +55,11 @@ async def astream_state(
         langgraph_node = metadata.get("langgraph_node")
 
         if event["event"] == "on_chat_model_stream":
+            print("[event]", event)
             if (langgraph_node in LanggraphNodeEnum.__members__.values()
-                    and LanggraphNodeEnum(langgraph_node) in allow_stream_nodes
+                    and (allow_stream_nodes is None or LanggraphNodeEnum(langgraph_node) in allow_stream_nodes)
             ):
+                print("filtered event", event)
                 if run_id != event["run_id"]:
                     run_id = event["run_id"]
                     yield Metadata(run_id=run_id, langgraph_node=langgraph_node).model_dump_json()
