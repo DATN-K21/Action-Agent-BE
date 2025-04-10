@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from enum import StrEnum
 from typing import Optional
 
 from langchain_core.messages import HumanMessage
@@ -15,47 +14,45 @@ from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_
 logger = logging.get_logger(__name__)
 
 
-class AgentType(StrEnum):
-    """
-    Enum for agent types.
-    """
-
-    MULTI = "multi"
-    BUILTIN = "builtin"
-    COMPOSIO = "composio"
-    MCP = "mcp"
-
-
 ###################################################################################
 ##################### BaseAgent Class #############################################
 ###################################################################################
-class BaseCompiledAgent(ABC):
+class BaseAgent(ABC):
     """
     Base class for all types of agents.
-    This class defines the common interface for all agents.
+    This class defines the common interface for all type of agents.
     """
+
     def __init__(
         self,
+        *,
         id: str,
         type: AgentType,
         graph: CompiledStateGraph,
-        config: RunnableConfig,
     ):
         self.id = id
         self.type = type
         self.graph = graph
-        self.config = config
 
-    async def get_state_snapshot(self) -> StateSnapshot:
+    async def get_graph_state(
+        self,
+        config: RunnableConfig,
+        subgraphs: bool = False,
+    ) -> StateSnapshot:
         """
-        Get the state of an agent/thread.
+        Get the state of the agent's graph for the given config.
         """
-        return await self.graph.aget_state(self.config)
+        return await self.graph.aget_state(
+            config=config,
+            subgraphs=subgraphs,
+        )
 
     @abstractmethod
     async def ainvoke(
         self,
         question: str,
+        config: RunnableConfig,
+        **kwargs,
     ) -> AgentExecutionResult:
         """Execute the agent's graph with given input"""
         pass
@@ -64,6 +61,8 @@ class BaseCompiledAgent(ABC):
     async def astream(
         self,
         question: str,
+        config: RunnableConfig,
+        **kwargs,
     ) -> MessagesStream:
         """
         Stream the agent's graph with given input
@@ -103,29 +102,35 @@ class BaseCompiledAgent(ABC):
 ########################################################################################
 ######################## BuiltinAgent Class ############################################
 ########################################################################################
-class BuiltinAgent(BaseCompiledAgent):
+class BuiltinAgent(BaseAgent):
     def __init__(
         self,
+        *,
         id: str,
         graph: CompiledStateGraph,
-        config: RunnableConfig,
     ):
-        super().__init__(id=id, type=AgentType.BUILTIN, graph=graph, config=config)
+        super().__init__(id=id, type=AgentType.BUILTIN, graph=graph)
 
     async def ainvoke(
         self,
         question: str,
+        config: RunnableConfig,
+        **kwargs,
     ) -> AgentExecutionResult:
         """
         Execute the agent's graph with given input
         """
         try:
-            state = {"messages": [HumanMessage(question)]}
-            response = await self.graph.ainvoke(input=state, config=self.config)
+            # Logging
+            function_name = "BuiltinAgent.ainvoke =>"
+            logger.debug(f"{function_name} Question: {question}")
 
-            state = await self.graph.aget_state(self.config)
+            # Invoke the graph
+            state = {"messages": [HumanMessage(question)]}
+            response = await self.graph.ainvoke(input=state, config=config, **kwargs)
 
             # TODO: handle later
+            # state = await self.graph.aget_state(config=config, subgraphs=False)
             # if len(state.tasks) > 0:
             #     task = state.tasks[-1]
             #     if len(task.interrupts) > 0:
@@ -140,19 +145,23 @@ class BuiltinAgent(BaseCompiledAgent):
                 output=response["messages"][-1].content,
             )
         except Exception as e:
-            function_name = "BuiltinAgent.ainvoke"
             logger.error(f"{function_name} Has error: {str(e)}")
             raise
 
-    async def async_stream(
+    async def astream(
         self,
         question: str,
+        config: RunnableConfig,
+        **kwargs,
     ) -> MessagesStream:
         try:
+            # Logging
+            function_name = "BuiltinAgent.async_stream =>"
+            logger.debug(f"{function_name} Question: {question}")
+
             state = {"messages": [HumanMessage(question)]}
-            return astream_state(app=self.graph, input_=state, config=self.config)
+            return astream_state(app=self.graph, input_=state, config=config, **kwargs)
         except Exception as e:
-            function_name = "BuiltinAgent.async_stream"
             logger.error(f"{function_name} Has error: {str(e)}")
             raise
 
@@ -190,12 +199,9 @@ class BuiltinAgent(BaseCompiledAgent):
             return astream_state(
                 app=self.graph,
                 input_=Command(resume=HumanEditingData(execute=execute, tool_calls=tool_calls).model_dump()),
-                config=self.config,
+                config=RunnableConfig(),
                 allow_stream_nodes=[LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.GENERATE_NODE],
             )
         except Exception as e:
             logger.error(f"Error in executing graph: {str(e)}")
             raise
-
-
-#########################################################################################

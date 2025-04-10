@@ -12,9 +12,15 @@ from app.memory.deps import get_checkpointer
 
 @lru_cache()
 def get_agent_manager(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
+    """
+    Get the agent manager singleton instance.
+    This function is decorated with lru_cache to ensure that the same instance is returned
+    across multiple calls.
+    """
+
     manager = AgentManager()
 
-    # Register chat agent
+    # 1. Register chat agent
     chat_builder = GraphBuilder(checkpointer=checkpointer)
     chat_graph = chat_builder.build_graph(perform_action=False, has_human_acceptance_flow=False)
     config = chat_builder.get_config()
