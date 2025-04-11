@@ -53,7 +53,6 @@ class Settings(BaseSettings):
 
     # Frontend service settings
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:

@@ -6,8 +6,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from app.core.agents.agent import Agent
 from app.core.agents.agent_manager import AgentManager
 from app.core.graph.base import GraphBuilder
-from app.core.tools.tools import get_search_tools, get_rag_tools
-from app.memory.deps import get_checkpointer
+from app.core.tools.tools import get_rag_tools, get_search_tools
+from app.memory.checkpoint import get_checkpointer
 
 
 @lru_cache()

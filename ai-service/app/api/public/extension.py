@@ -4,25 +4,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette import EventSourceResponse
 from starlette.responses import StreamingResponse
 
-from app.api.deps import ensure_authenticated, ensure_user_id
+from app.api.auth import ensure_authenticated, ensure_user_id
 from app.core import logging
 from app.core.cache.cached_agents import AgentCache
 from app.core.cache.deps import get_agent_cache
-from app.core.graph.deps import get_extension_builder_manager, get_extension
+from app.core.graph.deps import get_extension, get_extension_builder_manager
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.core.session import get_db_session
-from app.core.utils.streaming import format_extension_stream_sse, format_extension_interrupt_sse
+from app.core.utils.streaming import format_extension_interrupt_sse, format_extension_stream_sse
 from app.models import Thread
 from app.schemas.base import ResponseWrapper
 from app.schemas.extension import (
     ActiveAccountResponse,
     CheckConnectionResponse,
+    ExtensionResponse,
     GetActionsResponse,
     GetExtensionsResponse,
-    GetSocketioInfoResponse, ExtensionResponse, HTTPExtensionRequest, HTTPExtensionCallbackRequest,
+    GetSocketioInfoResponse,
+    HTTPExtensionCallbackRequest,
+    HTTPExtensionRequest,
 )
-from app.services.database.connected_app_service import ConnectedAppService
-from app.services.database.deps import get_connected_app_service
+from app.services.database.connected_app_service import ConnectedAppService, get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 

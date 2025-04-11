@@ -11,8 +11,7 @@ from app.schemas.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
-from app.services.database.deps import get_user_service
-from app.services.database.user_service import UserService
+from app.services.database.user_service import UserService, get_user_service
 
 logger = logging.get_logger(__name__)
 

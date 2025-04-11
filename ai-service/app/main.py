@@ -10,7 +10,7 @@ logger = logging.get_logger(__name__)
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from app.api.router import router  # noqa: E402
+from app.api.base import router  # noqa: E402
 from app.core import exceptions, swagger  # noqa: E402
 from app.core.lifespan import lifespan  # noqa: E402
 from app.core.socketio import get_socketio_asgi  # noqa: E402
@@ -33,7 +33,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[env_settings.ALLOWED_ORIGINS],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

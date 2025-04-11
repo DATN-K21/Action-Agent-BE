@@ -4,7 +4,7 @@ from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph import START, StateGraph
 
 from app.core import logging
-from app.services.model_service import get_openai_model
+from app.services.model_service import get_chat_model
 from app.services.multi_agent.research_team.research_supervisor import ResearchTeamMetadata, research_team_node
 from app.services.multi_agent.utils.helpers import AgentMetadata, AgentState, AvailableAgents, make_supervisor_node
 
@@ -13,7 +13,7 @@ logger = logging.get_logger(__name__)
 # ************ Build teams management graph  ************
 METAS: List[Any] = [ResearchTeamMetadata()]
 
-main_supervisor_node = make_supervisor_node(get_openai_model(), METAS)
+main_supervisor_node = make_supervisor_node(get_chat_model(), METAS)
 
 teams_builder = StateGraph(state_schema=AgentState)
 teams_builder.add_node("main_supervisor", main_supervisor_node)

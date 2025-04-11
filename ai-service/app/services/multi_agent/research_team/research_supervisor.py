@@ -5,7 +5,7 @@ from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph import START, StateGraph
 
 from app.core import logging
-from app.services.model_service import get_openai_model
+from app.services.model_service import get_chat_model
 from app.services.multi_agent.research_team.rag import FileRagAgentMetadata, rag_node
 from app.services.multi_agent.research_team.tavily import TavilyAgentMetadata, tavily_node
 from app.services.multi_agent.research_team.wikipedia import WikipediaAgentMetadata, wikipedia_node
@@ -20,7 +20,7 @@ METAS: List[Any] = [
     FileRagAgentMetadata(),
 ]
 
-research_supervisor = make_supervisor_node(get_openai_model(), METAS)
+research_supervisor = make_supervisor_node(get_chat_model(), METAS)
 
 # Define graph builder
 research_builder = StateGraph(state_schema=AgentState)

@@ -1,11 +1,13 @@
 from datetime import datetime
 from typing import Optional
 
+from fastapi import Depends
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.constants import SYSTEM
+from app.core.session import get_db_session
 from app.models.thread import Thread
 from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
@@ -188,3 +190,7 @@ class ThreadService:
             logger.error(f"Has error: {str(e)}", exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+def get_thread_service(db: AsyncSession = Depends(get_db_session)):
+    return ThreadService(db)

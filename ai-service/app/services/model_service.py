@@ -5,6 +5,7 @@ from pydantic import SecretStr
 from app.core.enums import LlmProvider
 from app.core.settings import env_settings
 
+MAX_TOKENS = 10000
 
 def get_chat_model(
     *,
@@ -19,7 +20,13 @@ def get_chat_model(
     """
     match provider:
         case LlmProvider.OPENAI:
-            return _get_openai_model(model=model, temperature=temperature, api_key=SecretStr(api_key), **kwargs)
+            return _get_openai_model(
+                model=model,
+                temperature=temperature,
+                api_key=SecretStr(api_key),
+                streaming=True,
+                **kwargs,
+            )
         case _:
             raise ValueError(f"Unsupported provider: {provider}. Supported are: {LlmProvider.supported_values()}")
 

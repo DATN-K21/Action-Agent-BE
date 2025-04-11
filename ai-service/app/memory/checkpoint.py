@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import HTTPException
+from langgraph.checkpoint.postgres._ainternal import Conn
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
@@ -12,7 +13,7 @@ logger = logging.get_logger(__name__)
 
 
 class AsyncPostgresPool:
-    _async_pool: Optional[AsyncConnectionPool] = None
+    _async_pool: Optional[Conn] = None
     _is_initialized: bool = False
 
     @classmethod
@@ -26,30 +27,44 @@ class AsyncPostgresPool:
                     open=False,
                     timeout=5,
                 )
+                logger.info("Setting up connection pool")
                 await cls._async_pool.open()
-                logger.info(f"Async Postgres connection pool created at {env_settings.POSTGRES_URL_PATH}")
+                logger.info("Connection pool set up successfully")
             except Exception as e:
-                logger.exception("Error setting up the Postgres Saver")
-                raise HTTPException(status_code=500, detail="Error setting up the Postgres Saver") from e
+                logger.exception("Error setting up connection pool: %s", e)
+                raise HTTPException(status_code=500, detail="Error setting up connection pool") from e
 
     @classmethod
     async def atear_down(cls) -> None:
-        """Clean up resources when shutting down."""
+        """
+        Clean up resources when shutting down.
+        """
         if cls._async_pool is not None:
             try:
-                logger.info("Closing connection pool...")
+                logger.info("Tearing down connection pool")
                 await cls._async_pool.close()
                 cls._async_pool = None
-                logger.info("Connection pool closed.")
+                logger.info("Connection pool torn down successfully")
             except Exception as e:
-                logger.exception("Error during async checkpoint teardown")
-                raise HTTPException(status_code=500, detail="Error during async checkpoint teardown") from e
+                logger.exception("Error tearing down connection pool: %s", e)
+                raise HTTPException(status_code=500, detail="Error tearing down connection pool") from e
 
     @classmethod
     async def get_checkpointer(cls) -> AsyncPostgresSaver:
-        """Returns the singleton instance of the checkpoint."""
-        checkpoint = AsyncPostgresSaver(cls._async_pool)  # type: ignore
+        """
+        Returns the singleton instance of the checkpoint.
+        """
+        if cls._async_pool is None:
+            raise HTTPException(status_code=500, detail="Connection pool not set up. Please call asetup() first.")
+        checkpoint = AsyncPostgresSaver(cls._async_pool)
         if not cls._is_initialized:
             await checkpoint.setup()
             cls._is_initialized = True
         return checkpoint
+
+
+async def get_checkpointer() -> AsyncPostgresSaver:
+    """
+    Get the checkpointer singleton.
+    """
+    return await AsyncPostgresPool.get_checkpointer()

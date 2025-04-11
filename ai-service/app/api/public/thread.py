@@ -6,7 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import ensure_user_id
+from app.api.auth import ensure_user_id
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
@@ -27,8 +27,7 @@ from app.schemas.thread import (
     UpdateThreadRequest,
     UpdateThreadResponse,
 )
-from app.services.database.deps import get_thread_service
-from app.services.database.thread_service import ThreadService
+from app.services.database.thread_service import ThreadService, get_thread_service
 
 logger = logging.get_logger(__name__)
 

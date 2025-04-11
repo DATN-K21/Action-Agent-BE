@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import ensure_user_id
+from app.api.auth import ensure_user_id
 from app.core import logging
 from app.schemas.base import ResponseWrapper
 from app.schemas.user_api_key import (
@@ -12,8 +12,7 @@ from app.schemas.user_api_key import (
     UpsertApiKeyRequest,
     UpsertApiKeyResponse,
 )
-from app.services.database.deps import get_user_service
-from app.services.database.user_service import UserService
+from app.services.database.user_service import UserService, get_user_service
 
 logger = logging.get_logger(__name__)
 

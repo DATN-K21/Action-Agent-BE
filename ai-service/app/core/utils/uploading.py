@@ -119,15 +119,15 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 
 
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
-    if env_settings.OPENAI_API_KEY:
+    if env_settings.DEFAULT_API_KEY:
         return PGVector(
-            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),  # type: ignore
+            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.DEFAULT_API_KEY)),  # type: ignore
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,
             async_mode=async_mode,
         )
 
-    raise ValueError("OPENAI_API_KEY needs to be set for embeddings to work.")
+    raise ValueError("DEFAULT_API_KEY needs to be set for embeddings to work.")
 
 
 vstore = _get_openai_embeddings(async_mode=True)

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, llm, user
+from app.api.public import agent, callback, connected_app, extension, llm, multi_agent, test, thread, user
 
 
 class ValidationErrorResponse(BaseModel):

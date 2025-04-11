@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Optional
 
+from fastapi import Depends
 from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.constants import SYSTEM, TRIAL_TOKENS
 from app.core.enums import LlmProvider
+from app.core.session import get_db_session
 from app.models import User
 from app.models.user_api_key import UserApiKey
 from app.schemas.base import PagingRequest, ResponseWrapper
@@ -420,3 +422,7 @@ class UserService:
             logger.error(f"Error deleting API key: {e}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+def get_user_service(db: AsyncSession = Depends(get_db_session)):
+    return UserService(db)
