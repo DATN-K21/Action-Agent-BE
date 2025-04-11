@@ -2,6 +2,8 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.enums import LlmProvider
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -13,17 +15,12 @@ class Settings(BaseSettings):
     # FastAPI settings
     PORT: int = 5001
     HOST: str = "0.0.0.0"
-    DEBUG: bool = False
+    DBG: bool = False
     HTTPS: bool = False
 
     # Logging settings
     LOG_LEVEL: str = "INFO"
     LOG_TO_CONSOLE: bool = True
-    LOG_TO_ELASTICSEARCH: bool = False
-    ELASTICSEARCH_URL: str = "http://localhost:9200"
-    ELASTICSEARCH_USER: str = "elastic"
-    ELASTICSEARCH_PASSWORD: str = "123456"
-    ELASTICSEARCH_INDEX: str = "logs"
 
     # Database settings
     POSTGRES_HOST: str = "localhost"
@@ -39,15 +36,9 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = "<your-api-key>"
 
     # LLM service settings
-    DEFAULT_PROVIDER: str = "openai"
-    DEFAULT_MODEL: str = "gpt-3.5-turbo"
-
-    OPENAI_API_KEY: str = "<your-api-key>"
-
-    AZURE_OPENAI_ENDPOINT: str = "<your-endpoint>"
-    AZURE_OPENAI_API_VERSION: str = "<your-api-version>"
-    AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME: str = "<your-embeddings-deployment-name>"
-    AZURE_OPENAI_EMBEDDINGS_API_VERSION: str = "<your-embeddings-api-version>"
+    DEFAULT_PROVIDER: str = LlmProvider.OPENAI
+    DEFAULT_MODEL: str = "gpt-4o-mini"
+    DEFAULT_API_KEY: str = "<your-api-key>"
 
     # Langchain service settings
     LANGCHAIN_TRACING_V2: bool = False
