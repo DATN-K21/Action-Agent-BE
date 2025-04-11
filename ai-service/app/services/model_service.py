@@ -1,12 +1,48 @@
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
+from app.core.enums import LlmProvider
 from app.core.settings import env_settings
 
-MAX_TOKENS = 10000
+
+def get_chat_model(
+    *,
+    provider: LlmProvider = env_settings.DEFAULT_PROVIDER,
+    model: str = env_settings.DEFAULT_MODEL,
+    api_key: str = env_settings.DEFAULT_API_KEY,
+    temperature: float = 0,
+    **kwargs,
+) -> BaseChatModel:
+    """
+    Get a chat model based on the provider.
+    """
+    match provider:
+        case LlmProvider.OPENAI:
+            return _get_openai_model(model=model, temperature=temperature, api_key=SecretStr(api_key), **kwargs)
+        case _:
+            raise ValueError(f"Unsupported provider: {provider}. Supported are: {LlmProvider.supported_values()}")
 
 
-def get_openai_model(model: str = "gpt-3.5-turbo", temperature=0, streaming=True):
-    """Get an OpenAI language model."""
-    api_key = SecretStr(env_settings.OPENAI_API_KEY)
-    return ChatOpenAI(temperature=temperature, streaming=streaming, model_name=model, openai_api_key=api_key)
+def _get_openai_model(
+    model: str,
+    temperature: float,
+    api_key: SecretStr,
+    streaming: bool,
+    timeout: int = 60,
+    max_retries: int = 3,
+    **kwargs,
+) -> ChatOpenAI:
+    """
+    Get an OpenAI language model.
+    """
+    return ChatOpenAI(
+        temperature=temperature,
+        streaming=streaming,
+        stream_usage=streaming,
+        model=model,
+        api_key=api_key,
+        timeout=timeout,
+        max_retries=max_retries,
+        **kwargs,
+    )

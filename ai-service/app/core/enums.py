@@ -1,4 +1,4 @@
-from enum import IntEnum, StrEnum
+from enum import StrEnum
 
 
 class HumanAction(StrEnum):
@@ -19,3 +19,7 @@ class LlmProvider(StrEnum):
     MISTRAL = "mistral"
     COHERE = "cohere"
     LOCAL = "local"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member.value for member in cls]

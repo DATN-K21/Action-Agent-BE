@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = "<your-api-key>"
 
     # LLM service settings
-    DEFAULT_PROVIDER: str = LlmProvider.OPENAI
+    DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     DEFAULT_MODEL: str = "gpt-4o-mini"
     DEFAULT_API_KEY: str = "<your-api-key>"
 
@@ -53,6 +53,7 @@ class Settings(BaseSettings):
 
     # Frontend service settings
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
+    ALLOWED_ORIGINS: str = "http://localhost:3000"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:
