@@ -2,6 +2,8 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.enums import LlmProvider
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -34,10 +36,9 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = "<your-api-key>"
 
     # LLM service settings
-    DEFAULT_PROVIDER: str = "openai"
-    DEFAULT_MODEL: str = "gpt-3.5-turbo"
-
-    OPENAI_API_KEY: str = "<your-api-key>"
+    DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
+    DEFAULT_MODEL: str = "gpt-4o-mini"
+    DEFAULT_API_KEY: str = "<your-api-key>"
 
     AZURE_OPENAI_ENDPOINT: str = "<your-endpoint>"
     AZURE_OPENAI_API_VERSION: str = "<your-api-version>"

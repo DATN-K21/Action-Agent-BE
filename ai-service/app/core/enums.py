@@ -13,13 +13,20 @@ class MessageName(StrEnum):
     ASSISTANT = "ASSISTANT"
 
 
-class LlmProvider(IntEnum):
-    OPENAI = 1
-    ANTHROPIC = 2
-    GOOGLE = 3
-    MISTRAL = 4
-    COHERE = 5
-    LOCAL = 6
+class LlmProvider(StrEnum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+    MISTRAL = "mistral"
+    COHERE = "cohere"
+    LOCAL = "local"
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def supported_values(cls):
+        return [provider.value for provider in cls]
 
 
 class MessageFormat(IntEnum):

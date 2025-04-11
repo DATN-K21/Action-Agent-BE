@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS user_api_keys (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at TIMESTAMP,
     user_id VARCHAR NOT NULL,
-    provider INTEGER NOT NULL,
+    provider VARCHAR NOT NULL,
     encrypted_value VARCHAR NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
