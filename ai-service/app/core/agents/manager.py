@@ -56,3 +56,10 @@ class AgentManager:
         Get an agent by id.
         """
         return self._agents.get(agent_id, None)
+
+
+def get_agent_manager() -> AgentManager:
+    """
+    Get the singleton instance of the agent manager.
+    """
+    return AgentManager()
