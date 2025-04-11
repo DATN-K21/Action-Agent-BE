@@ -27,15 +27,6 @@ services:
     image: pgvector/pgvector:pg16
     container_name: ai-database
 
-  migration:
-    image: migrate/migrate
-    depends_on:
-      ai-database:
-        condition: service_healthy
-    volumes:
-      - ./ai-service/migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable", "up" ]
-
   ####################################################
   ############### Extensions #########################
   ####################################################

@@ -56,11 +56,6 @@ services:
     volumes:
       - ai-database:/var/lib/postgresql/data
 
-  migration:
-    depends_on:
-      ai-database:
-        condition: service_healthy
-
   ####################################################
   ############### Extensions #########################
   ####################################################
