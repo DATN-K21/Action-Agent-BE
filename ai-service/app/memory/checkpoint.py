@@ -27,7 +27,6 @@ class AsyncPostgresPool:
                     open=False,
                     timeout=5,
                 )
-                logger.info("Setting up connection pool")
                 await cls._async_pool.open()
                 logger.info("Connection pool set up successfully")
             except Exception as e:
@@ -41,7 +40,6 @@ class AsyncPostgresPool:
         """
         if cls._async_pool is not None:
             try:
-                logger.info("Tearing down connection pool")
                 await cls._async_pool.close()
                 cls._async_pool = None
                 logger.info("Connection pool torn down successfully")

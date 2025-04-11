@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 
+from app.core import logging
 from app.core.graph.deps import get_extension_builder_manager
 from app.core.session import engine
 from app.core.socketio import get_socketio_server
@@ -23,6 +24,8 @@ from app.services.extensions.deps import (
 )
 from app.sockets.extension_socket import ExtensionNamespace
 
+logger = logging.get_logger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +39,7 @@ async def lifespan(app: FastAPI):
         # Setup PostgreSQL migrations
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            logger.info("SQLAlchemy tables created")
 
         # Manually resolve dependencies at startup
         checkpointer = await get_checkpointer()
