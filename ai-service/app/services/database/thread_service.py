@@ -6,9 +6,12 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
+from app.core.agents.agent_manager import AgentManager
+from app.core.agents.deps import get_agent_manager
 from app.core.constants import SYSTEM
 from app.core.session import get_db_session
 from app.models.thread import Thread
+from app.prompts.prompt_templates import get_title_generation_prompt_template
 from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
     CreateThreadRequest,
@@ -17,14 +20,17 @@ from app.schemas.thread import (
     GetListThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
+    UpdateThreadResponse,
 )
+from app.services.model_service import get_chat_model
 
 logger = logging.get_logger(__name__)
 
 
 class ThreadService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, agent_manager: AgentManager):
         self.db = db
+        self.agent_manager = agent_manager
 
     @logging.log_function_inputs(logger)
     async def create_thread(self, user_id: str, request: CreateThreadRequest) -> ResponseWrapper[CreateThreadResponse]:
@@ -191,6 +197,86 @@ class ThreadService:
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
+    @logging.log_function_inputs(logger)
+    async def generate_thread_title(
+        self,
+        user_id: str,
+        thread_id: str,
+    ) -> ResponseWrapper[UpdateThreadResponse]:
+        """
+        Generate a thread title based on the thread's messages.
+        """
+        try:
+            # Check the thread
+            stmt = (
+                select(Thread.id)
+                .where(
+                    Thread.user_id == user_id,
+                    Thread.id == thread_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+            db_thread = (await self.db.execute(stmt)).scalar_one_or_none()
+            if db_thread is None:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
 
-def get_thread_service(db: AsyncSession = Depends(get_db_session)):
-    return ThreadService(db)
+            # Get the thread messages
+            agent = self.agent_manager.get_agent(name="chat-agent")
+            if agent is None:
+                return ResponseWrapper.wrap(status=404, message="Agent not found")
+            state = await agent.async_get_state(thread_id)  # type: ignore
+            if state is None or "messages" not in state.values:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+            messages = state.values["messages"]
+            if not messages:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+            thread_messages_str = "".join([f"{message.type}: {message.content}\n" for message in messages])
+
+            # Invoke the model to generate a title
+            model = get_chat_model()
+            prompt = get_title_generation_prompt_template()
+            chain = prompt | model
+            gen_title = await chain.ainvoke({"content": thread_messages_str})
+            logger.info(f"Generated title: |{gen_title.content}|")
+
+            # Update the thread title in the database
+            stmt = (
+                update(Thread)
+                .where(
+                    Thread.user_id == user_id,
+                    Thread.id == thread_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .values(title=gen_title.content.replace('"', ""))
+                .returning(
+                    Thread.id.label("id"),
+                    Thread.user_id.label("user_id"),
+                    Thread.title.label("title"),
+                    Thread.thread_type.label("thread_type"),
+                    Thread.created_at.label("created_at"),
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            db_thread = result.mappings().first()
+            if not db_thread:
+                return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+            await self.db.commit()
+            response_data = CreateThreadResponse.model_validate(db_thread)
+            return ResponseWrapper.wrap(status=200, data=response_data)
+
+        except Exception as e:
+            logger.exception("Has error: %s", str(e))
+            await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+def get_thread_service(
+    db: AsyncSession = Depends(get_db_session),
+    agent_manager: AgentManager = Depends(get_agent_manager),
+):
+    return ThreadService(db=db, agent_manager=agent_manager)

@@ -33,11 +33,10 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/extension", tags=["Extension"])
 
 
-@router.get(path="/get-all", summary="Get the list of extensions available.",
-            response_model=ResponseWrapper[GetExtensionsResponse])
+@router.get(path="/get-all", summary="Get the list of extensions available.", response_model=ResponseWrapper[GetExtensionsResponse])
 async def get_extensions(
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        _: bool = Depends(ensure_authenticated),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(ensure_authenticated),
 ):
     try:
         extensions = extension_service_manager.get_all_extension_service_names()
@@ -48,12 +47,11 @@ async def get_extensions(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.get(path="/{extension_name}/get-actions", summary="Get actions available for extension.",
-            response_model=ResponseWrapper[GetActionsResponse])
+@router.get(path="/{extension_name}/get-actions", summary="Get actions available for extension.", response_model=ResponseWrapper[GetActionsResponse])
 async def get_actions(
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        _: bool = Depends(ensure_authenticated),
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(ensure_authenticated),
 ):
     try:
         # 1. Get the extension service
@@ -72,13 +70,12 @@ async def get_actions(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post(path="/active", summary="Initialize the connection.",
-             response_model=ResponseWrapper[ActiveAccountResponse])
+@router.post(path="/active", summary="Initialize the connection.", response_model=ResponseWrapper[ActiveAccountResponse])
 async def active(
-        user_id: str,
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the extension service
@@ -102,11 +99,11 @@ async def active(
 
 @router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper)
 async def disconnect(
-        user_id: str,
-        extension_name: str,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    extension_name: str,
+    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the extension service
@@ -137,10 +134,10 @@ async def disconnect(
 @router.get(path="/check-active", summary="Check the connection.",
             response_model=ResponseWrapper[CheckConnectionResponse])
 async def check_active(
-        user_id: str,
-        extension_name: str,
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    extension_name: str,
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the extension service
@@ -183,18 +180,17 @@ async def get_info():
     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
-@router.post("/chat/{user_id}/{thread_id}/{extension_name}", summary="Chat with the extension.",
-             response_model=ResponseWrapper[ExtensionResponse])
+@router.post("/chat/{user_id}/{thread_id}/{extension_name}", summary="Chat with the extension.", response_model=ResponseWrapper[ExtensionResponse])
 async def chat(
-        user_id: str,
-        thread_id: str,
-        extension_name: str,
-        request: HTTPExtensionRequest,
-        agent_cache: AgentCache = Depends(get_agent_cache),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    extension_name: str,
+    request: HTTPExtensionRequest,
+    agent_cache: AgentCache = Depends(get_agent_cache),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # Check the thread
@@ -243,18 +239,19 @@ async def chat(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the chat.",
-             response_model=ResponseWrapper[ExtensionResponse])
+@router.post(
+    "/chat-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the chat.", response_model=ResponseWrapper[ExtensionResponse]
+)
 async def chat_interrupt(
-        user_id: str,
-        thread_id: str,
-        extension_name: str,
-        request: HTTPExtensionCallbackRequest,
-        agent_cache: AgentCache = Depends(get_agent_cache),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    extension_name: str,
+    request: HTTPExtensionCallbackRequest,
+    agent_cache: AgentCache = Depends(get_agent_cache),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # Check the thread
@@ -317,18 +314,17 @@ async def chat_interrupt(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream/{user_id}/{thread_id}/{extension_name}", summary="Stream with the extension.",
-             response_class=StreamingResponse)
+@router.post("/stream/{user_id}/{thread_id}/{extension_name}", summary="Stream with the extension.", response_class=StreamingResponse)
 async def stream(
-        user_id: str,
-        thread_id: str,
-        extension_name: str,
-        request: HTTPExtensionRequest,
-        agent_cache: AgentCache = Depends(get_agent_cache),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    extension_name: str,
+    request: HTTPExtensionRequest,
+    agent_cache: AgentCache = Depends(get_agent_cache),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # Check the thread
@@ -367,18 +363,17 @@ async def stream(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the stream.",
-             response_class=StreamingResponse)
+@router.post("/stream-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the stream.", response_class=StreamingResponse)
 async def stream_interrupt(
-        user_id: str,
-        thread_id: str,
-        extension_name: str,
-        request: HTTPExtensionCallbackRequest,
-        agent_cache: AgentCache = Depends(get_agent_cache),
-        extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-        builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    extension_name: str,
+    request: HTTPExtensionCallbackRequest,
+    agent_cache: AgentCache = Depends(get_agent_cache),
+    extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
+    builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # Check the thread

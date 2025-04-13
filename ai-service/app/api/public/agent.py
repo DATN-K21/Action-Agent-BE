@@ -21,29 +21,31 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 @router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
 async def get_agents(
-        agent_manager: AgentManager = Depends(get_agent_manager),
-        _: bool = Depends(ensure_authenticated),
+    agent_manager: AgentManager = Depends(get_agent_manager),
+    _: bool = Depends(ensure_authenticated),
 ):
+    """
+    Get all agent names.
+    """
     try:
         agents = agent_manager.get_all_agent_names()
         response_data = GetAgentsResponse(agent_names=list(agents))
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"Error fetching agents: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.",
-             response_model=ResponseWrapper[AgentChatResponse])
-async def execute(
-        user_id: str,
-        thread_id: str,
-        agent_name: str,
-        request: AgentChatRequest,
-        agent_manager: AgentManager = Depends(get_agent_manager),
-        db: AsyncSession = Depends(get_db_session),
-        _: bool = Depends(ensure_user_id),
+@router.post("/{agent_name}/chat/{user_id}/{thread_id}", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
+async def chat(
+    user_id: str,
+    thread_id: str,
+    agent_name: str,
+    request: AgentChatRequest,
+    agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
+    _: bool = Depends(ensure_user_id),
 ):
     try:
         # 1. Get the agent
@@ -85,8 +87,7 @@ async def execute(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.",
-             response_class=StreamingResponse)
+@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.", response_class=StreamingResponse)
 async def stream(
         user_id: str,
         thread_id: str,

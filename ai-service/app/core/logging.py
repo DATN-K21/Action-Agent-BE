@@ -10,16 +10,26 @@ from app.core.settings import env_settings
 
 
 @lru_cache(maxsize=None)  # Infinite caching for coroutine checks
-def is_async(func):
+def _is_async(func):
     """Check if a function is asynchronous."""
     return iscoroutinefunction(func)
 
 
 @lru_cache(maxsize=None)  # Infinite caching for method checks
-def is_method(func):
+def _is_method(func):
     """Check if a function is a method (instance or class method)."""
     sig = signature(func)
     return "self" in sig.parameters or "cls" in sig.parameters
+
+
+def _sanitize_args(args, kwargs, skip_first_arg=False):
+    """Sanitize args and kwargs for logging."""
+    if skip_first_arg:
+        args = args[1:]  # Skip 'self' or 'cls'
+    return {
+        "args": [str(arg) for arg in args],
+        "kwargs": {k: str(v) for k, v in kwargs.items()},
+    }
 
 
 def configure_logging():
@@ -59,16 +69,6 @@ def configure_logging():
     logging.getLogger().handlers = [handler]
 
 
-# Sanitize args and kwargs for logging
-def sanitize_args(args, kwargs, skip_first_arg=False):
-    """Sanitize args and kwargs for logging."""
-    if skip_first_arg:
-        args = args[1:]  # Skip 'self' or 'cls'
-    return {
-        "args": [str(arg) for arg in args],
-        "kwargs": {k: str(v) for k, v in kwargs.items()},
-    }
-
 
 def get_logger(name: str) -> BoundLogger:
     """Get a logger instance."""
@@ -82,17 +82,17 @@ def log_function_inputs(logger):
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             """Wrapper for synchronous functions."""
-            bound_logger = logger.bind(**sanitize_args(args, kwargs, is_method(func)))
+            bound_logger = logger.bind(**_sanitize_args(args, kwargs, _is_method(func)))
             bound_logger.info(f"{func.__name__} =>")
             return func(*args, **kwargs)
 
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             """Wrapper for asynchronous functions."""
-            bound_logger = logger.bind(**sanitize_args(args, kwargs, is_method(func)))
+            bound_logger = logger.bind(**_sanitize_args(args, kwargs, _is_method(func)))
             bound_logger.info(f"{func.__name__} =>")
             return await func(*args, **kwargs)
 
-        return async_wrapper if is_async(func) else sync_wrapper
+        return async_wrapper if _is_async(func) else sync_wrapper
 
     return decorator
