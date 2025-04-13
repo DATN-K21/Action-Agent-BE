@@ -11,30 +11,42 @@ logger = logging.get_logger(__name__)
 
 class ComposioService:
     @classmethod
-    def initialize_app_connection(cls, user_id: str, app_enum: App, redirect_url: str):
-        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY, entity_id=user_id)
-        entity = toolset.get_entity()
+    def initiate_integration(cls, app_enum: App):
+        logger.info(f"Creating integration for {app_enum}")
+        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
         try:
-            entity.get_connection(app=app_enum)
+            result = toolset.client.integrations.get(app_name=app_enum)
+            if len(result) == 0:
+                integration = toolset.create_integration(app=app_enum)
+                integration_id = integration.id
+                return integration_id
+            return None
+        except Exception as e:
+            logger.error(f"Error creating {app_enum} integration: {e}")
+
+    @classmethod
+    def initiate_app_connection(cls, user_id: str, app_enum: App, redirect_url: str):
+        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
+        try:
+            toolset.client.get_entity(id=user_id).get_connection(app=app_enum)
             return None
         except NoItemsFound:
-            request = entity.initiate_connection(app_name=app_enum, redirect_url=f"{redirect_url}/{user_id}")
+            request = toolset.initiate_connection(app=app_enum, redirect_url=f"{redirect_url}/{user_id}")
             return request
 
     @classmethod
     def check_app_connection(cls, user_id: str, app_enum: App):
-        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY, entity_id=user_id)
-        entity = toolset.get_entity()
+        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
         try:
-            entity.get_connection(app=app_enum)
+            toolset.client.get_entity(id=user_id).get_connection(app=app_enum)
             return True
         except NoItemsFound:
             return False
 
     @classmethod
     def get_entity(cls, user_id: str):
-        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY, entity_id=user_id)
-        entity = toolset.get_entity()
+        toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
+        entity = toolset.client.get_entity(id=user_id)
         return entity
 
     @classmethod

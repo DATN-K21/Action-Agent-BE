@@ -8,6 +8,7 @@ class Settings(BaseSettings):
         env_file=".env",
         case_sensitive=False,
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
     )
 
     # FastAPI settings
@@ -39,16 +40,7 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = "<your-api-key>"
 
     # LLM service settings
-    DEFAULT_PROVIDER: str = "openai"
-    DEFAULT_MODEL: str = "gpt-3.5-turbo"
-
     OPENAI_API_KEY: str = "<your-api-key>"
-
-    AZURE_OPENAI_API_KEY: str = "<your-api-key>"
-    AZURE_OPENAI_ENDPOINT: str = "<your-endpoint>"
-    AZURE_OPENAI_API_VERSION: str = "<your-api-version>"
-    AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME: str = "<your-embeddings-deployment-name>"
-    AZURE_OPENAI_EMBEDDINGS_API_VERSION: str = "<your-embeddings-api-version>"
 
     # Langchain service settings
     LANGCHAIN_TRACING_V2: bool = False

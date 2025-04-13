@@ -21,6 +21,7 @@ class ExtensionService(ABC):
         self._supported_actions = supported_actions
         self._id = str(uuid4)
         self._redirect_url = env_settings.COMPOSIO_REDIRECT_URL
+        self._integration_id = ComposioService.initiate_integration(self._app_enum)
 
     def initialize_connection(self, user_id: str):
         if self._app_enum is None:
@@ -28,7 +29,7 @@ class ExtensionService(ABC):
         if self._redirect_url is None:
             raise ValueError("Redirect URL is not set")
 
-        result = ComposioService.initialize_app_connection(user_id, self._app_enum, self._redirect_url)
+        result = ComposioService.initiate_app_connection(user_id, self._app_enum, self._redirect_url)
         return result
 
     def disconnect(self, connected_account_id: str):
