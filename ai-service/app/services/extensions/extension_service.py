@@ -21,6 +21,7 @@ class ExtensionService(ABC):
         self._supported_actions = supported_actions
         self._id = str(uuid4)
         self._redirect_url = env_settings.COMPOSIO_REDIRECT_URL
+        self._integration_id = ComposioService.initiate_integration(app_enum=self._app_enum)
 
     def initialize_connection(self, user_id: str):
         if self._app_enum is None:

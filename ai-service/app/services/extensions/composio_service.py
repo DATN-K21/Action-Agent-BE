@@ -17,7 +17,7 @@ class ComposioService:
         try:
             result = toolset.client.integrations.get(app_name=app_enum)
             if len(result) == 0:
-                integration = toolset.create_integration(app=app_enum)
+                integration = toolset.create_integration(app=app_enum, force_new_integration=True)
                 integration_id = integration.id
                 return integration_id
             return None
