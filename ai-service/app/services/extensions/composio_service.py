@@ -31,7 +31,11 @@ class ComposioService:
             toolset.client.get_entity(id=user_id).get_connection(app=app_enum)
             return None
         except NoItemsFound:
-            request = toolset.initiate_connection(app=app_enum, redirect_url=f"{redirect_url}/{user_id}")
+            request = toolset.initiate_connection(
+                app=app_enum,
+                entity_id=user_id,
+                redirect_url=f"{redirect_url}/{user_id}"
+            )
             return request
 
     @classmethod
