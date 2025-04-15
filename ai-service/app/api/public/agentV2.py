@@ -10,26 +10,42 @@ from app.core.agents.agent_manager import AgentManager
 from app.core.agents.deps import get_agent_manager
 from app.core.session import get_db_session
 from app.core.utils.streaming import to_sse
-from app.models.thread import Thread
-from app.schemas.agent import AgentChatRequest, AgentChatResponse, GetAgentsResponse
+from app.models.agent import BuiltinAgent, CustomAgent
+from app.schemas.agent import AgentChatRequest, AgentChatResponse, GetAgentV2ListResponse
 from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/agent", tags=["Agent"])
+router = APIRouter(prefix="/agent-v2", tags=["Agent-V2"])
 
 
-@router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
+@router.get("/get-all", summary="Get all agents.", response_model=ResponseWrapper[GetAgentV2ListResponse])
 async def get_agents(
-    agent_manager: AgentManager = Depends(get_agent_manager),
+    db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_authenticated),
 ):
     """
-    Get all agent names.
+    Get all agents.
     """
     try:
-        agents = agent_manager.get_all_agent_names()
-        response_data = GetAgentsResponse(agent_names=list(agents))
+        # Get all agents
+        stmt = select(
+            BuiltinAgent.name,
+            BuiltinAgent.description,
+            BuiltinAgent.image_url,
+            BuiltinAgent.tools,
+            BuiltinAgent.is_public,
+            CustomAgent.child_agents,
+        ).where(            BuiltinAgent.is_deleted.is_(False),
+                BuiltinAgent.is_public.is_(True))
+        builtin_agents = (await db.execute(stmt)).all()
+        stmt = select(
+            CustomAgent.name,
+            CustomAgent.description,
+            CustomAgent.image_url,
+            CustomAgent.tools,
+        ).where(CustomAgent.is_deleted.is_(False))
+        custom_agents = (await db.execute(stmt)).all()
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
