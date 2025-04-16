@@ -5,5 +5,5 @@ from app.services.model_service import get_openai_model
 
 
 def make_graph(tools: list[Tool]):
-    agent = create_react_agent(get_openai_model(), tools)
+    agent = create_react_agent(model=get_openai_model(), tools=tools, debug=True)
     return agent

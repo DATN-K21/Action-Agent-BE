@@ -24,7 +24,7 @@ async def create_mcp_agent(
         connection_type=result.data.connection_type,
     )
 
-    tools = mcp_service.get_tools(mcp_infos=[info])
+    tools = await mcp_service.get_tools(mcp_infos=[info])
 
     agent = make_graph(tools)
 

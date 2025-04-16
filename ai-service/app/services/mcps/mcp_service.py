@@ -13,7 +13,7 @@ class McpInfo(BaseModel):
 
 class McpService:
     @classmethod
-    def get_tools(cls, mcp_infos: list[McpInfo]):
+    async def get_tools(cls, mcp_infos: list[McpInfo]):
         """
         Get the tools for each connected MCP.
         :param mcp_infos: list of connected MCPs
@@ -28,6 +28,7 @@ class McpService:
                     "transport": info.connection_type,
                 }
 
-        client = MultiServerMCPClient(config)
-        tools = client.get_tools()
-        return tools
+        async with MultiServerMCPClient(config) as client:
+            # Get the tools for each connected MCP
+            tools = client.get_tools()
+            return tools
