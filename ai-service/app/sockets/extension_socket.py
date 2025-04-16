@@ -5,8 +5,7 @@ from socketio import AsyncNamespace
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, \
-    convert_dict_message_to_tool_calls
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
 from app.core.utils.streaming import LanggraphNodeEnum, to_sse
 from app.schemas.extension import SocketioExtensionCallback, SocketioExtensionRequest, ExtensionResponse
