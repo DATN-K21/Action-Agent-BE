@@ -11,3 +11,13 @@ def get_agent_cache():
     """
 
     return AgentCache()
+
+
+@lru_cache()
+def get_mcp_agent_cache():
+    """
+    Get the MCP agent cache instance.
+    :return: The MCP agent cache instance.
+    """
+
+    return AgentCache()
