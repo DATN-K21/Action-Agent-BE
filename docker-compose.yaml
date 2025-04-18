@@ -4,7 +4,7 @@ services:
   ############### Services ###########################
   ####################################################
   api-gateway:
-    image: actionagent.azurecr.io/api-gateway:latest
+    image: actionagent.azurecr.io/api-gateway:dev
     container_name: api-gateway
     environment:
       HTTPS_PORT: 15000
@@ -23,7 +23,7 @@ services:
       - ./api-gateway/certs:/usr/src/app/certs:ro   
   
   user-service:
-    image: actionagent.azurecr.io/user-service:latest
+    image: actionagent.azurecr.io/user-service:dev
     container_name: user-service
     environment:
       NODE_ENV: dev
@@ -46,7 +46,7 @@ services:
     restart: always
 
   ai-service:
-    image: actionagent.azurecr.io/ai-service:latest
+    image: actionagent.azurecr.io/ai-service:dev
     container_name: ai-service
     environment:
       DEBUG_SERVER: False
