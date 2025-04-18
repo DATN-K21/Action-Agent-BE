@@ -1,9 +1,8 @@
 const router = require('express').Router();
 
 
-
-router.get("/health", (req, res) => {
-  res.status(200).json({ status: "UP" });
+router.get("/ping", (req, res) => {
+  res.status(200).json({ message: "pong" });
 });
 
 router.use('/log', require('./log.route'));

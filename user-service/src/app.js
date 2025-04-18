@@ -5,9 +5,6 @@ const cors = require('cors');
 
 const app = express();
 
-app.set('view engine', 'ejs');
-app.set('views', __dirname + '/modules/access/views');
-
 app.use(cors());
 // Initialize Passport
 app.use(passport.initialize());

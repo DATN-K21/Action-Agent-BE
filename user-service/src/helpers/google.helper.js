@@ -1,14 +1,14 @@
 require('dotenv').config();
 
 const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.AUTH_GOOGLE_CLIENT_ID, process.env.AUTH_GOOGLE_SECRET);
+const client = new OAuth2Client(process.env.GOOGLE_APP_CLIENT_ID, process.env.GOOGLE_APP_CLIENT_SECRET);
 
 class GoogleHelper {
     static async verifyIdToken(idToken) {
         try {
             const ticket = await client.verifyIdToken({
                 idToken,
-                audience: process.env.AUTH_GOOGLE_CLIENT_ID,
+                audience: process.env.GOOGLE_APP_CLIENT_ID,
             });
 
             const payload = ticket.getPayload();

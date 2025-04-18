@@ -3,14 +3,15 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
 const currentUserMiddleware = require('../middlewares/currentUser.middleware');
 const TIME_CONFIGS = require('../configs/time.config');
+const privateEndpointMiddleware = require('../middlewares/privateEndpoint.middleware');
 
 const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
-    'log': ENDPOINT_CONFIGS.LOG_SERVICE_URL,
     'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
 };
 
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
+    router.use(privateEndpointMiddleware);
     router.use(currentUserMiddleware);
 
     router.use(`/${serviceName}/*`,
@@ -21,9 +22,7 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
             pathRewrite: (path, req) => {
                 const isWs = req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket';
                 let originalPath = isWs ? (req.url || path) : (req.originalUrl || path);
-                const rewrittenPath = serviceName == "ai"
-                    ? originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '')
-                    : originalPath.replace(new RegExp(`^/api/v1/${serviceName}`), '/api/v1');
+                const rewrittenPath = originalPath.replace(new RegExp(`/${serviceName}`), '');
                 console.log("[HTTP] Rewritten path:", rewrittenPath);
                 return rewrittenPath;
             },
