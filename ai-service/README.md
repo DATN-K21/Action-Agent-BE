@@ -4,8 +4,7 @@ This project is a web application that provides a service to send emails using t
 The application is built using the Fastapi, Langchain (Using Langgraph) and Composio Frameworks.
 
 This service is designed to provide APIs for asking and answering AI. 
-It supports multiple purposes such as chatting with LLM, retrieving information 
-from given knowledge or searching on Wikipedia.
+It supports multiple purposes such as chatting with LLM, retrieving information from given knowledge or searching on Wikipedia.
 
 ## 2. Setup environment
 You should copy .env.example and rename it to .env. 
