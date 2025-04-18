@@ -16,9 +16,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Login to ACR
-        run: echo "${{ secrets.DEV_ACR_PASSWORD }}" | docker login actionagent.azurecr.io -u ${{ secrets.DEV_ACR_USERNAME }} --password-stdin
-
       - name: Check if ${{ matrix.service }} changed
         id: check_changes
         run: |
@@ -29,6 +26,10 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Login to ACR
+        if: steps.check_changes.outputs.changed == 'true'
+        run: echo "${{ secrets.DEV_ACR_PASSWORD }}" | docker login actionagent.azurecr.io -u ${{ secrets.DEV_ACR_USERNAME }} --password-stdin
+
       - name: Build & Push image
         if: steps.check_changes.outputs.changed == 'true'
         run: |
@@ -37,7 +38,8 @@ jobs:
           docker push actionagent.azurecr.io/${{ matrix.service }}:dev
 
       - name: Send Discord Notification
+        if: steps.check_changes.outputs.changed == 'true'
         run: |
           curl -X POST -H "Content-Type: application/json" \
-            -d '{"content": "[DEV] Service '${{ matrix.service }}' built and pushed successfully to actionagent.azurecr.io!"}' \
+            -d '{"content": "[DEV] Service '${{ matrix.service }}' built and pushed successfully to actionagent.azurecr.io! \nBranch: '${{ github.ref }}'\nCommit: '${{ github.sha }}'\nCommit Message: '${{ github.event.head_commit.message }}'\nBuild Status: Success\nTriggered By: '${{ github.actor }}'\nTime: $(date)"}' \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
