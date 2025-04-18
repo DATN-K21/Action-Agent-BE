@@ -28,6 +28,8 @@ services:
     ports:
       - "15100:15100"
     restart: always
+    depends_on:
+      - user-database
 
   ai-service:
     environment:
@@ -50,6 +52,8 @@ services:
     ports:
       - "15200:15200"
     restart: always
+    depends_on:
+      - ai-database
     
 
   ####################################################
