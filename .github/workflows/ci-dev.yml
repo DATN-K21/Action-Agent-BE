@@ -61,6 +61,4 @@ jobs:
       - name: Send Discord Notification
         if: steps.check.outputs.changed == 'true'
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-            -d "{\"content\": \"[DEV]\nService '${{ matrix.service }}' built and pushed successfully to actionagent.azurecr.io!\nBranch: '${{ github.ref }}'\nCommit: '${{ github.sha }}'\nCommit Message: '${{ github.event.head_commit.message }}'\nBuild Status: Success\nTriggered By: '${{ github.actor }}'\nTime: $(date)\"}" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [DEV BUILD SUCCESS]**\\n- **Service:** \`${{ matrix.service }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ matrix.service }}:dev\`\\n- **Commit:** \`${{ github.sha }}\` — _${{ github.event.head_commit.message }}_\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
