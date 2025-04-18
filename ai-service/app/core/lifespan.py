@@ -5,9 +5,11 @@ import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 
 from app.core.graph.deps import get_extension_builder_manager
+from app.core.session import engine
 from app.core.socketio import get_socketio_server
 from app.memory.checkpoint import AsyncPostgresPool
 from app.memory.deps import get_checkpointer
+from app.models.base_entity import Base
 from app.services.extensions.deps import (
     get_extension_service_manager,
     get_gmail_service,
@@ -31,6 +33,10 @@ async def lifespan(app: FastAPI):
 
         # Manually set up and tear down the connection
         await AsyncPostgresPool.asetup()
+
+        # Create tables if they don't exist
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         # Manually resolve dependencies at startup
         checkpointer = await get_checkpointer()

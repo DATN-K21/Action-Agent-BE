@@ -4,7 +4,7 @@ require("dotenv").config();
 const { mongoDB: mongoConfig } = require("../configs/db.config");
 
 const { maxPoolSize: MAX_POOL_SIZE } = mongoConfig;
-const connectString = process.env.ONLINE_MONGODB_CONNECTION_STRING;
+const connectString = process.env.MONGODB_CONNECTION_STRING;
 
 const setupMongoDB = async () => {
     mongoose.connect(connectString, { maxPoolSize: MAX_POOL_SIZE })

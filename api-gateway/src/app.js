@@ -25,12 +25,9 @@ app.use(cors());
 app.use(express.json());
 // app.use(limiter); // Apply rate limiter
 
-// Routes
-app.get('/', (req, res) => {
-    res.send('My AI Assistant API Gateway is listening!');
-});
-app.get('/health', (req, res) => {
-    res.json({ status: 'UP!' });
+
+app.get('/ping', (req, res) => {
+    res.status(200).json({ message: "pong" });
 });
 
 // Main API routes

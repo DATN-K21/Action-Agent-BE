@@ -19,13 +19,6 @@ def configure_logging():
             structlog.processors.TimeStamper(fmt="iso"),  # Adds timestamp
             structlog.stdlib.add_log_level,  # Adds log level (INFO, ERROR)
             structlog.stdlib.add_logger_name,  # Adds logger name
-            structlog.processors.CallsiteParameterAdder(
-                parameters=[
-                    structlog.processors.CallsiteParameter.FILENAME,
-                    structlog.processors.CallsiteParameter.FUNC_NAME,
-                    structlog.processors.CallsiteParameter.LINENO,
-                ]
-            ),  # Optional: Keeps minimal file info without rich traceback
             structlog.processors.ExceptionPrettyPrinter(),
             structlog.dev.ConsoleRenderer(colors=True),
         ],

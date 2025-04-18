@@ -13,5 +13,5 @@ RUN uv sync --frozen --no-cache
 
 COPY . .
 
-EXPOSE 5001
-CMD ["/app/.venv/bin/fastapi", "run", "app/main.py", "--port", "5001"]
+EXPOSE 15200
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "15200"]

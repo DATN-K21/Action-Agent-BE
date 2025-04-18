@@ -10,10 +10,10 @@ from app.core.socketio import get_socketio_asgi
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info(f"Starting server... DebugMode = {env_settings.DEBUG}")
+logger.info(f"Starting server... DebugMode = {env_settings.DEBUG_SERVER}")
 
 app = FastAPI(
-    debug=env_settings.DEBUG,
+    debug=env_settings.DEBUG_SERVER,
     title="Action-Executing AI Service API",
     description="This is an AI Service API using FastAPI.",
     version="1.0.0",

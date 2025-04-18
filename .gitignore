@@ -1,4 +1,7 @@
 .env
+.env.local
+.env.production
+
 /coverage
 node_modules
 postman
@@ -6,3 +9,8 @@ mock
 
 /uploads
 /keys
+/.vscode
+/.idea
+/.DS_Store
+
+docker-compose.override.yaml

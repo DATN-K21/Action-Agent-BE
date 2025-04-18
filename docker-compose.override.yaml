@@ -3,63 +3,80 @@ services:
   ####################################################
   ############### Services ###########################
   ####################################################
-  user-service:
-    env_file: ./user-service/.env
-    ports:
-      - "8100:8100"
-
-  log-service:
-    env_file: ./log-service/.env
-    environment:
-      NODE_ENV: production
-      LOG_LEVEL: info
-    ports:
-      - "8200:8200"
-
   api-gateway:
-    env_file: ./api-gateway/.env
     environment:
-      NODE_ENV: production
-      USER_SERVICE_URL: http://user-service:8100
-      LOG_SERVICE_URL: http://log-service:8200
-      RABBITMQ_URL: amqp://myuser:mypassword@rabbitmq:5672
-      ELASTICSEARCH_URL: http://elasticsearch:9200
+      SSL_KEY_PATH: "certs/key.pem"
+      SSL_CERT_PATH: "certs/cert.pem"
     ports:
-      - "8300:8300"
+      - "15000:15000"
+    restart: always
+    volumes:
+      - ./api-gateway/certs:/usr/src/app/certs:ro
+
+  user-service:
+    environment:
+      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017"
+      EMAIL_USERNAME: myaiassistant24@gmail.com
+      EMAIL_PASSWORD: "jjjq stko kaqd laii"
+      GOOGLE_APP_CLIENT_ID: 1000000000000-abc123def456.apps.googleusercontent.com
+      GOOGLE_APP_CLIENT_SECRET: "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"
+      GOOGLE_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+      FACEBOOK_APP_CLIENT_ID: 3105674576249720
+      FACEBOOK_APP_CLIENT_SECRET: 7d6bbf8068bd5e3dd6c99c203cae4851
+      FACEBOOK_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/facebook/verify
+      CLIENT_URL: http://localhost:3000
+    ports:
+      - "15100:15100"
+    restart: always
 
   ai-service:
-    env_file: ./ai-service/.env
     environment:
-      - POSTGRES_HOST=ai-database
-      - POSTGRES_PORT=5432
+      DEBUG_SERVER: False
+      DEBUG_SQLALCHEMY: False
+      LOGGING_LOG_LEVEL: INFO
+      POSTGRES_HOST: ai-database
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: ai-database
+      LLM_DEFAULT_PROVIDER: openai
+      LLM_DEFAULT_MODEL: gpt-4o-nano
+      LLM_DEFAULT_API_KEY: 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
+      TOOL_TAVILY_API_KEY: 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
+      COMPOSIO_LOGGING_LEVEL: debug
+      COMPOSIO_API_KEY: vi61grgt6wfshjir6i8l3b
+      COMPOSIO_REDIRECT_URL: https://localhost:15000/ai/api/v1/callback/extension
+      FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
     ports:
-      - "5001:5001"
+      - "15200:15200"
+    restart: always
+    
 
   ####################################################
   ################ Databases #########################
   ####################################################
+  user-database:
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - "27017:27017"
+    volumes:
+      - user-database:/data/db
+    restart: always
 
   ai-database:
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     environment:
-      - POSTGRES_DB=ai-database
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=123456
-      - POSTGRES_HOST=ai-database
-      - POSTGRES_PORT=5432
+      POSTGRES_DB: ai-database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_HOST: ai-database
+      POSTGRES_PORT: 5432
     ports:
       - "5433:5432"
     volumes:
       - ai-database:/var/lib/postgresql/data
-
-  migration:
-    depends_on:
-      ai-database:
-        condition: service_healthy
+    restart: always
 
   ####################################################
   ############### Extensions #########################
@@ -67,23 +84,17 @@ services:
 
   elasticsearch:
     environment:
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
-      - xpack.security.enabled=false
-      - http.host=0.0.0.0
-      - transport.host=127.0.0.1
-      - xpack.security.http.ssl.enabled=false
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+      xpack.security.enabled: false
+      http.host: 0.0.0.0
+      transport.host: 127.0.0.1
+      xpack.security.http.ssl.enabled: false
     ports:
       - "9200:9200"
     volumes:
-      - es_data:/usr/share/elasticsearch/data
-
-  logstash:
-    ports:
-      - "5044:5044"
-    volumes:
-      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-      - logstash_data:/usr/share/logstash/data
+      - es-data:/usr/share/elasticsearch/data
+    restart: always
 
   kibana:
     environment:
@@ -92,13 +103,30 @@ services:
       XPACK_SECURITY_ENABLED: "false"
     ports:
       - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: always
 
   rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: root
+      RABBITMQ_DEFAULT_PASS: root
     ports:
       - "5672:5672"
       - "15672:15672"
       - "15692:15692"
+    restart: always
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+
+  redis:
     environment:
-      RABBITMQ_DEFAULT_USER: myuser
-      RABBITMQ_DEFAULT_PASS: mypassword
-      RABBITMQ_PLUGINS: rabbitmq_prometheus
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USER: root
+      REDIS_PASSWORD: root
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    restart: always

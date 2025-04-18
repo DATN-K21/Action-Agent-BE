@@ -6,7 +6,6 @@ const TIME_CONFIGS = require('../configs/time.config');
 
 const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
-    'log': ENDPOINT_CONFIGS.LOG_SERVICE_URL,
     'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
 };
 
