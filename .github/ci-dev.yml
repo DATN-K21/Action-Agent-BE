@@ -1,0 +1,43 @@
+name: Dev CI/CD
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ai-service, api-gateway, user-service]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to ACR
+        run: echo "${{ secrets.DEV_ACR_PASSWORD }}" | docker login actionagent.azurecr.io -u ${{ secrets.DEV_ACR_USERNAME }} --password-stdin
+
+      - name: Check if ${{ matrix.service }} changed
+        id: check_changes
+        run: |
+          echo "Checking changes in ${{ matrix.service }}"
+          if git diff --name-only origin/dev...HEAD | grep "^${{ matrix.service }}/" > /dev/null; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build & Push image
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          echo "Building and pushing ${{ matrix.service }}"
+          docker build -t actionagent.azurecr.io/${{ matrix.service }}:dev ./${{ matrix.service }}
+          docker push actionagent.azurecr.io/${{ matrix.service }}:dev
+
+      - name: Send Discord Notification
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{"content": "[DEV] Service '${{ matrix.service }}' built and pushed successfully to actionagent.azurecr.io!"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
