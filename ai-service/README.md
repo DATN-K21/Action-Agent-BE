@@ -5,7 +5,7 @@ The application is built using the Fastapi, Langchain (Using Langgraph) and Comp
 
 This service is designed to provide APIs for asking and answering AI. 
 It supports multiple purposes such as chatting with LLM, retrieving information 
-from given knowledge or searching on wikipedia.
+from given knowledge or searching on Wikipedia.
 
 ## 2. Setup environment
 You should copy .env.example and rename it to .env. 
