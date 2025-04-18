@@ -1,0 +1,97 @@
+name: Prod CI/CD
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ai-service: ${{ steps.filter.outputs.ai-service }}
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      user-service: ${{ steps.filter.outputs.user-service }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            ai-service: 'ai-service/**'
+            api-gateway: 'api-gateway/**'
+            user-service: 'user-service/**'
+
+# Approval jobs per service
+  approve-ai-service:
+    if: needs.detect-changes.outputs.ai-service == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-ai-service
+      url: https://ai.action-agent.software
+    steps:
+      - name: Manual approval for AI Service
+        run: echo "✅ Approved ai-service deployment"
+
+  approve-api-gateway:
+    if: needs.detect-changes.outputs.api-gateway == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-api-gateway
+      url: https://apigw.action-agent.software
+    steps:
+      - name: Manual approval for API Gateway
+        run: echo "✅ Approved api-gateway deployment"
+
+  approve-user-service:
+    if: needs.detect-changes.outputs.user-service == 'true'
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-user-service
+      url: https://user.action-agent.software
+    steps:
+      - name: Manual approval for User Service
+        run: echo "✅ Approved user-service deployment"
+
+# Build and Push with manual approval gating
+  build-and-push:
+    needs: [detect-changes, approve-ai-service, approve-api-gateway, approve-user-service]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ai-service, api-gateway, user-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Check for changes and skip if none
+        id: check
+        run: |
+          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+          if [ "$changed" != "true" ]; then
+            echo "No changes in ${{ matrix.service }}, skipping."
+            exit 0
+          fi
+
+      - name: Login to ACR
+        if: steps.check.outputs.changed == 'true'
+        run: echo "${{ secrets.PROD_ACR_PASSWORD }}" | docker login actionagent.azurecr.io -u ${{ secrets.PROD_ACR_USERNAME }} --password-stdin
+
+      - name: Build & Push Image for ${{ matrix.service }}
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "Building and pushing ${{ matrix.service }} to actionagent.azurecr.io/${{ matrix.service }}:prod"
+          docker build -t actionagent.azurecr.io/${{ matrix.service }}:prod ./${{ matrix.service }}
+          docker push actionagent.azurecr.io/${{ matrix.service }}:prod
+
+      - name: Send Discord Notification
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ 🚀 [PROD DEPLOYED]**\\n- **Service:** \`${{ matrix.service }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ matrix.service }}:prod\`\\n- **Commit:** \`${{ github.sha }}\` — _${{ github.event.head_commit.message }}_\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
