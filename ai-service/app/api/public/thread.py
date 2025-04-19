@@ -59,13 +59,12 @@ async def create_new_thread(
     return response.to_response()
 
 
-@router.get("/{user_id}/{thread_id}/get-detail", summary="Get thread details.",
-            response_model=ResponseWrapper[GetThreadResponse])
+@router.get("/{user_id}/{thread_id}/get-detail", summary="Get thread details.", response_model=ResponseWrapper[GetThreadResponse])
 async def get_thread_by_id(
-        user_id: str,
-        thread_id: str,
-        thread_service: ThreadService = Depends(get_thread_service),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    thread_service: ThreadService = Depends(get_thread_service),
+    _: bool = Depends(ensure_user_id),
 ):
     response = await thread_service.get_thread_by_id(user_id, thread_id)
     return response.to_response()
@@ -83,13 +82,12 @@ async def update_thread(
     return response.to_response()
 
 
-@router.delete("/{user_id}/{thread_id}/delete", summary="Delete a thread.",
-               response_model=ResponseWrapper[DeleteThreadResponse])
+@router.delete("/{user_id}/{thread_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[DeleteThreadResponse])
 async def delete_thread(
-        user_id: str,
-        thread_id: str,
-        thread_service: ThreadService = Depends(get_thread_service),
-        _: bool = Depends(ensure_user_id),
+    user_id: str,
+    thread_id: str,
+    thread_service: ThreadService = Depends(get_thread_service),
+    _: bool = Depends(ensure_user_id),
 ):
     response = await thread_service.delete_thread(user_id, thread_id, user_id)
     return response.to_response()
@@ -104,7 +102,7 @@ async def get_history(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Check the thread
+        # Check the thread
         stmt = (
             select(Thread.id)
             .where(
@@ -119,10 +117,10 @@ async def get_history(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        # 2. Get the agent
+        # Get the agent
         agent = agent_manager.get_agent(name="chat-agent")
 
-        # 3. Get the history
+        # Get the history
         state = await agent.async_get_state(thread_id)  # type: ignore
 
         if state is not None and "messages" in state.values:
@@ -132,7 +130,7 @@ async def get_history(
             return ResponseWrapper.wrap(status=200, data=GetHistoryResponse(messages=[])).to_response()
 
     except Exception as e:
-        logger.error(f"Error ingesting files: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -145,7 +143,7 @@ async def upload_files(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Check the thread
+        # Check the thread
         stmt = (
             select(Thread.id)
             .where(
@@ -160,7 +158,7 @@ async def upload_files(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        # 2. Ingest the file
+        # Ingest the file
         file_blob: Blob = convert_ingestion_input_to_blob(file)
         config = RunnableConfig(configurable={"thread_id": thread_id})
         ingest_runnable.batch(cast(list[BinaryIO], [file_blob]), config)
@@ -173,7 +171,7 @@ async def upload_files(
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"Error ingesting files: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 

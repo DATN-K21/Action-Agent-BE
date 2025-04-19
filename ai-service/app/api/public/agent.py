@@ -37,8 +37,8 @@ async def get_agents(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/{agent_name}/chat/{user_id}/{thread_id}", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
-async def chat(
+@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
+async def execute(
     user_id: str,
     thread_id: str,
     agent_name: str,
@@ -83,7 +83,7 @@ async def chat(
         ).to_response()
 
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -98,12 +98,12 @@ async def stream(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Get the agent
+        # Get the agent
         agent = agent_manager.get_agent(agent_name)
         if agent is None:
             return ResponseWrapper.wrap(status=404, message="Agent not found").to_response()
 
-        # 2. Check the thread
+        # Check the thread
         stmt = (
             select(Thread.id)
             .where(
@@ -117,7 +117,7 @@ async def stream(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        # 3. Chat with the agent
+        # Chat with the agent
         response = await agent.async_stream(
             question=request.input,
             thread_id=thread_id,
@@ -127,5 +127,5 @@ async def stream(
         return EventSourceResponse(to_sse(response))
 
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

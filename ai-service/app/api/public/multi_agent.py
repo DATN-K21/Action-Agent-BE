@@ -27,7 +27,7 @@ async def chat(
     db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_user_id),
 ):
-    # 1. Check the thread
+    # Check the thread
     stmt = (
         select(Thread.id)
         .where(
@@ -54,7 +54,7 @@ async def stream(
     db: AsyncSession = Depends(get_db_session),
     _: bool = Depends(ensure_user_id),
 ):
-    # 1. Check the thread
+    # Check the thread
     stmt = (
         select(Thread.id)
         .where(
@@ -68,6 +68,6 @@ async def stream(
     if db_thread is None:
         return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-    # 2. Stream chat with the multi-agent system
+    # Stream chat with the multi-agent system
     response = await multi_agent_service.stream_multi_agent(thread_id, request.input)
     return EventSourceResponse(to_sse(response))

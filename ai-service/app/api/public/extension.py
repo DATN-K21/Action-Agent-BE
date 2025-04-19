@@ -43,7 +43,7 @@ async def get_extensions(
         response_data = GetExtensionsResponse(extensions=extensions)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -54,19 +54,19 @@ async def get_actions(
     _: bool = Depends(ensure_authenticated),
 ):
     try:
-        # 1. Get the extension service
+        # Get the extension service
         extension_service = extension_service_manager.get_extension_service(extension_name)
         if extension_service is None:
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
-        # 2. Get the actions from the extension service
+        # Get the actions from the extension service
         extension_service.get_actions()
         actions = extension_service.get_action_names()
         response_data = GetActionsResponse(actions=list(actions))
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"Error fetching actions: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -78,12 +78,12 @@ async def active(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Get the extension service
+        # Get the extension service
         extension_service = extension_service_manager.get_extension_service(extension_name)
         if extension_service is None:
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
-        # 2. Initialize the connection
+        # Initialize the connection
         connection_request = extension_service.initialize_connection(str(user_id))
         if connection_request is None:
             response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
@@ -93,7 +93,7 @@ async def active(
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"[extension/active] Error in activating account: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -106,20 +106,20 @@ async def disconnect(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Get the extension service
+        # Get the extension service
         extension_service = extension_service_manager.get_extension_service(extension_name)
         if extension_service is None:
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
-        # 2. Get the account id
+        # Get the account id
         account_id = await connected_app_service.get_account_id(user_id, extension_name)
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
 
-        # 3. Disconnect the account
+        # Disconnect the account
         response_data = extension_service.disconnect(account_id)
 
-        # 4. Delete the account from the database
+        # Delete the account from the database
         if response_data.status == "success":
             result = await connected_app_service.delete_connected_app(user_id, extension_name)
             if not result:
@@ -127,12 +127,11 @@ async def disconnect(
 
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.get(path="/check-active", summary="Check the connection.",
-            response_model=ResponseWrapper[CheckConnectionResponse])
+@router.get(path="/check-active", summary="Check the connection.", response_model=ResponseWrapper[CheckConnectionResponse])
 async def check_active(
     user_id: str,
     extension_name: str,
@@ -140,19 +139,19 @@ async def check_active(
     _: bool = Depends(ensure_user_id),
 ):
     try:
-        # 1. Get the extension service
+        # Get the extension service
         extension_service = extension_service_manager.get_extension_service(extension_name)
         if extension_service is None:
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
-        # 2. Check the connection
+        # Check the connection
         result = extension_service.check_connection(str(user_id))
 
         response_data = CheckConnectionResponse(is_connected=result)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
-        logger.error(f"[extension/check_active] Error in checking connection: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -230,12 +229,13 @@ async def chat(
                 thread_id=thread_id,
                 extension_name=extension_name,
                 interrupted=response.interrupted,
-                output=response.output
-            )
+                output=response.output,
+                streaming=None,
+            ),
         ).to_response()
 
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -295,8 +295,9 @@ async def chat_interrupt(
                     thread_id=thread_id,
                     extension_name=extension_name,
                     interrupted=False,
-                    output=result.output
-                )
+                    output=result.output,
+                    streaming=None,
+                ),
             ).to_response()
         else:
             return ResponseWrapper.wrap(
@@ -306,11 +307,12 @@ async def chat_interrupt(
                     thread_id=thread_id,
                     extension_name=extension_name,
                     interrupted=False,
-                    output=""
-                )
+                    output="",
+                    streaming=None,
+                ),
             ).to_response()
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -359,7 +361,7 @@ async def stream(
 
         return EventSourceResponse(format_extension_stream_sse(response))
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
@@ -410,6 +412,7 @@ async def stream_interrupt(
         )
 
         return EventSourceResponse(format_extension_interrupt_sse(result))
+
     except Exception as e:
-        logger.error(f"Has error: {str(e)}", exc_info=True)
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
