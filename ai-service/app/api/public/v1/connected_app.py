@@ -4,8 +4,7 @@ from app.api.auth import ensure_user_id
 from app.core import logging
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse
-from app.services.database.connected_app_service import ConnectedAppService
-from app.services.database.deps import get_connected_app_service
+from app.services.database.connected_app_service import ConnectedAppService, get_connected_app_service
 
 logger = logging.get_logger(__name__)
 

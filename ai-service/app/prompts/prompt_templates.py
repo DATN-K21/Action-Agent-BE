@@ -28,6 +28,8 @@ def get_title_generation_prompt_template():
     - Generate a short, clear, and descriptive title.
     - Ensure the title accurately represents the essence of the content.
     - Keep it within 6 words.
+    - Avoid using special characters or unnecessary words.
+    - Just the title, no additional double quotes.
 
     ## Title:
     """,

@@ -24,6 +24,9 @@ async def get_agents(
     agent_manager: AgentManager = Depends(get_agent_manager),
     _: bool = Depends(ensure_authenticated),
 ):
+    """
+    Get all agent names.
+    """
     try:
         agents = agent_manager.get_all_agent_names()
         response_data = GetAgentsResponse(agent_names=list(agents))

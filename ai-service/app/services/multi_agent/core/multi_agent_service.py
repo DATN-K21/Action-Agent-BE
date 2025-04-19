@@ -9,7 +9,7 @@ from app.memory.checkpoint import AsyncPostgresSaver
 from app.prompts.prompt_templates import get_retriever_prompt_template
 from app.schemas.agent import AgentChatResponse
 from app.schemas.base import ResponseWrapper
-from app.services.model_service import get_openai_model
+from app.services.model_service import get_chat_model
 from app.services.multi_agent.core.teams_management import team_management_node
 from app.services.multi_agent.utils.helpers import AgentState
 
@@ -35,7 +35,7 @@ class MultiAgentService:
             prompt = get_retriever_prompt_template()
 
             # Model
-            model = get_openai_model()
+            model = get_chat_model()
 
             # Chain
             rag_chain = prompt | trimmer | model

@@ -91,9 +91,7 @@ class IngestRunnable(RunnableSerializable[BinaryIO, List[str]]):
 
     @property
     def namespace(self) -> str:
-        if (self.assistant_id is None and self.thread_id is None) or (
-                self.assistant_id is not None and self.thread_id is not None
-        ):
+        if (self.assistant_id is None and self.thread_id is None) or (self.assistant_id is not None and self.thread_id is not None):
             raise ValueError("Exactly one of assistant_id or thread_id must be provided")
         return self.assistant_id if self.assistant_id is not None else self.thread_id  # type: ignore
 

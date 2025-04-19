@@ -27,8 +27,7 @@ from app.schemas.thread import (
     UpdateThreadRequest,
     UpdateThreadResponse,
 )
-from app.services.database.deps import get_thread_service
-from app.services.database.thread_service import ThreadService
+from app.services.database.thread_service import ThreadService, get_thread_service
 
 logger = logging.get_logger(__name__)
 
@@ -174,3 +173,16 @@ async def upload_files(
     except Exception as e:
         logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post(
+    "/{user_id}/{thread_id}/generate-title", summary="Generate title from the content.", response_model=ResponseWrapper[UpdateThreadResponse]
+)
+async def generate_title(
+    user_id: str,
+    thread_id: str,
+    thread_service: ThreadService = Depends(get_thread_service),
+    _: bool = Depends(ensure_user_id),
+):
+    response = await thread_service.generate_thread_title(user_id, thread_id)
+    return response.to_response()

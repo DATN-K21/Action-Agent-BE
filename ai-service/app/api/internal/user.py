@@ -11,8 +11,7 @@ from app.schemas.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
-from app.services.database.deps import get_user_service
-from app.services.database.user_service import UserService
+from app.services.database.user_service import UserService, get_user_service
 
 logger = logging.get_logger(__name__)
 
@@ -24,6 +23,9 @@ async def create_new_user(
     request: CreateUserRequest,
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Create a new user.
+    """
     response = await user_service.create_user(request)
     return response.to_response()
 
@@ -34,6 +36,9 @@ async def update_user(
     user: UpdateUserRequest,
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Update the given user.
+    """
     response = await user_service.update_user(user_id, user)
     return response.to_response()
 
@@ -43,6 +48,9 @@ async def delete_user(
     user_id: str,
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Delete the given user.
+    """
     response = await user_service.delete_user(user_id)
     return response.to_response()
 
@@ -52,6 +60,9 @@ async def get_all_users(
     paging: PagingRequest = Depends(),
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Get all users.
+    """
     response = await user_service.get_all_users(paging)
     return response.to_response()
 
@@ -61,5 +72,8 @@ async def get_user_by_user_id(
     user_id: str,
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Get details of the given user.
+    """
     response = await user_service.get_user_by_id(user_id)
     return response.to_response()

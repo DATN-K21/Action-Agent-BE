@@ -4,6 +4,11 @@ from app.models.base_entity import BaseEntity
 
 
 class User(BaseEntity):
+    """
+    Represents a user in the application. This model stores information about the user's username,
+    email, first name, last name, and other related attributes. It is used to manage user accounts
+    and their associated data within the application.
+    """
     __tablename__ = "users"
 
     username = Column(String, unique=True, nullable=False, index=True)

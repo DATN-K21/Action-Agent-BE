@@ -24,8 +24,7 @@ from app.schemas.extension import (
     HTTPExtensionCallbackRequest,
     HTTPExtensionRequest,
 )
-from app.services.database.connected_app_service import ConnectedAppService
-from app.services.database.deps import get_connected_app_service
+from app.services.database.connected_app_service import ConnectedAppService, get_connected_app_service
 from app.services.extensions.deps import get_extension_service_manager
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 

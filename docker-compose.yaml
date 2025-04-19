@@ -20,8 +20,8 @@ services:
       - "15000:15000"
     restart: always
     volumes:
-      - ./api-gateway/certs:/usr/src/app/certs:ro   
-  
+      - ./api-gateway/certs:/usr/src/app/certs:ro
+
   user-service:
     image: actionagent.azurecr.io/user-service:dev
     container_name: user-service
@@ -98,7 +98,7 @@ services:
     volumes:
       - user-database:/data/db
     restart: always
-    
+
   ####################################################
   ############### Extensions #########################
   ####################################################

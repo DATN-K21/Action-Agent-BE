@@ -1,9 +1,11 @@
 from typing import Optional
 
-from sqlalchemy import select, func
+from fastapi import Depends
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
+from app.core.session import get_db_session
 from app.models.connected_app import ConnectedApp
 from app.schemas.base import PagingRequest
 from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse
@@ -162,3 +164,7 @@ class ConnectedAppService:
                 max_per_page=paging.max_per_page,
                 total_page=0
             )
+
+
+def get_connected_app_service(db: AsyncSession = Depends(get_db_session)):
+    return ConnectedAppService(db)

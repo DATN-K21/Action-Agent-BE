@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.router import router
+from app.api.base import router
 from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings

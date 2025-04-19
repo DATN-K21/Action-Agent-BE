@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Optional
 
+from fastapi import Depends
 from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.constants import SYSTEM, TRIAL_TOKENS
 from app.core.enums import LlmProvider
+from app.core.session import get_db_session
 from app.models import User
 from app.models.user_api_key import UserApiKey
 from app.schemas.base import PagingRequest, ResponseWrapper
@@ -29,9 +31,11 @@ class UserService:
 
     @logging.log_function_inputs(logger)
     async def create_user(self, user: CreateUserRequest) -> ResponseWrapper[CreateUserResponse]:
-        """Create a new user in the database."""
+        """
+        Create a new user in the database.
+        """
         try:
-            # 1. Check if user already exists
+            # Check if user already exists
             stmt = (
                 select(User.id)
                 .where(
@@ -46,7 +50,7 @@ class UserService:
             if existing_user:
                 return ResponseWrapper.wrap(status=400, message="User already exists")
 
-            # 2. Create new user
+            # Create new user
             db_user = User(
                 **user.model_dump(),
                 default_api_key_id=None,
@@ -62,7 +66,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e), exc_info=True)
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -420,3 +424,7 @@ class UserService:
             logger.error(f"Error deleting API key: {e}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+def get_user_service(db: AsyncSession = Depends(get_db_session)):
+    return UserService(db)

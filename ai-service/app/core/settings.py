@@ -2,6 +2,8 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.enums import LlmProvider
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -20,7 +22,7 @@ class Settings(BaseSettings):
 
     # LLM
     LLM_DEFAULT_API_KEY: str = "<your-api-key>"
-    LLM_DEFAULT_PROVIDER: str = "openai"
+    LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
 
     # Database
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
     # Tool
     TOOL_TAVILY_API_KEY: str = "<your-api-key>"
 
-    # Composio service
+    # Composio
     COMPOSIO_LOGGING_LEVEL: str = "debug"
     COMPOSIO_API_KEY: str = "<your-api-key>"
     COMPOSIO_REDIRECT_URL: str = "http://localhost:15200/callback/extension"
