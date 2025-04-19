@@ -2,16 +2,24 @@ from functools import lru_cache
 
 from fastapi import Depends
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 
 from app.core.agents.agent import Agent
 from app.core.cache.cached_agents import AgentCache
 from app.core.graph.base import GraphBuilder
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.memory.deps import get_checkpointer
-from app.services.extensions.deps import get_gmail_service, get_google_calendar_service, get_google_meet_service, \
-    get_google_maps_service, get_youtube_service, get_slack_service, get_outlook_service, get_google_drive_service, \
-    get_notion_service
+from app.services.extensions.deps import (
+    get_gmail_service,
+    get_google_calendar_service,
+    get_google_drive_service,
+    get_google_maps_service,
+    get_google_meet_service,
+    get_notion_service,
+    get_outlook_service,
+    get_slack_service,
+    get_youtube_service,
+)
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
 

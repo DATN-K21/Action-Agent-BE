@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import ensure_authenticated
+from app.api.auth import ensure_authenticated
 from app.schemas.base import ResponseWrapper
 
 router = APIRouter(prefix="", tags=["Tests"], responses={})

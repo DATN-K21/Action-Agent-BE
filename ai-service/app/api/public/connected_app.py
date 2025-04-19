@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import ensure_user_id
+from app.api.auth import ensure_user_id
 from app.core import logging
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse

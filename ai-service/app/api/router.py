@@ -19,8 +19,13 @@ validation_error_responses: dict = {
 
 router = APIRouter(responses=validation_error_responses)
 
-# Test routes
+# Ping routes
 router.include_router(test.router)
+
+# Private routes
+private_router = APIRouter(prefix="/private", tags=["Private"])
+private_router.include_router(internal_user.router)
+router.include_router(private_router)
 
 # Public routes v1
 prefix = "/api/v1"
@@ -35,7 +40,5 @@ router.include_router(extension.router, prefix=prefix)
 router.include_router(llm.router, prefix=prefix)
 router.include_router(user.router, prefix=prefix)
 
-# Private routes
-private_router = APIRouter(prefix="/private", tags=["Private"])
-private_router.include_router(internal_user.router)
-router.include_router(private_router)
+# Public routes v2
+prefix = "/api/v2"
