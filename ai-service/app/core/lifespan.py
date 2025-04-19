@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
         # Force IPv4: increase the speed when fetching data from Composio server
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
-        # Manually set up and tear down the connection
+        # Manually set up the PostgreSQL connection pool
         await AsyncPostgresPool.asetup()
 
         # Setup PostgreSQL migrations

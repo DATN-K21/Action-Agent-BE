@@ -2,12 +2,12 @@ import tiktoken
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage, trim_messages
 
 from app.core.settings import env_settings
-from app.services.model_service import MAX_TOKENS, get_chat_model
+from app.services.llm_service import MAX_TOKENS, get_llm_chat_model
 
 trimmer = trim_messages(
     max_tokens=MAX_TOKENS,
     strategy="last",
-    token_counter=get_chat_model(),
+    token_counter=get_llm_chat_model(),
     include_system=True,
     allow_partial=True,
 )

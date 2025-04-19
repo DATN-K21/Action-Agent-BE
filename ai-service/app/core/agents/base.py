@@ -14,11 +14,11 @@ from app.core.utils.streaming import MessagesStream
 
 class BaseAgent(ABC):
     def __init__(
-            self,
-            graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        graph: CompiledStateGraph,
+        logger: Optional[BoundLogger] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.id = str(uuid4())
         self.graph = graph
@@ -42,28 +42,33 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def async_handle_chat_interrupt(
-            self,
-            execute: bool,
-            tool_calls: Optional[list[ToolCall]] = None,
-            thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+        self,
+        execute: bool,
+        tool_calls: Optional[list[ToolCall]] = None,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
     ) -> AgentInterruptHandlingResult:
         """Handle the interrupt in the agent's graph"""
         pass
 
     @abstractmethod
-    async def async_stream(self, question: str, thread_id: Optional[str] = None,
-                           max_recursion: int = 10) -> MessagesStream:
+    async def async_stream(
+        self,
+        question: str,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
+    ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass
 
     @abstractmethod
     async def async_handle_stream_interrupt(
-            self,
-            execute: bool,
-            tool_calls: Optional[list[ToolCall]] = None,
-            thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+        self,
+        execute: bool,
+        tool_calls: Optional[list[ToolCall]] = None,
+        thread_id: Optional[str] = None,
+        max_recursion: int = 10,
     ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass
+

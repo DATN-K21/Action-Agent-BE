@@ -6,7 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import create_retriever_tool
 
 from app.core import logging
-from app.services.model_service import get_chat_model
+from app.services.llm_service import get_llm_chat_model
 from app.services.multi_agent.utils.helpers import AgentMetadata, AgentState, AvailableAgents
 
 logger = logging.get_logger(__name__)
@@ -39,7 +39,7 @@ def get_wikipedia_retriever_tool():
 async def wikipedia_node(state: AgentState, config: RunnableConfig):
     try:
         wikipedia_tool = get_wikipedia_retriever_tool()
-        model_forced_to_wikipedia = get_chat_model().bind_tools([wikipedia_tool], tool_choice="wikipedia_retriever_tool")
+        model_forced_to_wikipedia = get_llm_chat_model().bind_tools([wikipedia_tool], tool_choice="wikipedia_retriever_tool")
         result = await model_forced_to_wikipedia.ainvoke([state["question"]])
         messages = state["messages"]
 

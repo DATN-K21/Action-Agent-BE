@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 from sqlalchemy.exc import InvalidRequestError as SQLAlchemyInvalidRequestError
 from sqlalchemy.exc import OperationalError as SQLAlchemyOperationalError
 
-from app.schemas.base import ResponseWrapper
+from app.schemas._base import ResponseWrapper
 
 
 def handle_exceptions(logger: Logger, exc: Exception):

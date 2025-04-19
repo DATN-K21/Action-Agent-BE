@@ -8,7 +8,7 @@ from pydantic import SecretStr
 
 from app.core import logging
 from app.core.settings import env_settings
-from app.services.model_service import get_chat_model
+from app.services.llm_service import get_llm_chat_model
 from app.services.multi_agent.utils.helpers import AgentMetadata, AgentState, AvailableAgents
 
 logger = logging.get_logger(__name__)
@@ -36,7 +36,7 @@ tavily_tool = TavilySearchResults(max_results=MAX_RESULTS, name="tavily_search_t
 
 async def tavily_node(state: AgentState, config: RunnableConfig):
     try:
-        model_forced_to_tavily = get_chat_model().bind_tools([tavily_tool], tool_choice="tavily_search_tool")
+        model_forced_to_tavily = get_llm_chat_model().bind_tools([tavily_tool], tool_choice="tavily_search_tool")
         result = await model_forced_to_tavily.ainvoke([state["question"]])
         messages = state["messages"]
 

@@ -1,13 +1,13 @@
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.session import get_db_session
 from app.models.connected_app import ConnectedApp
-from app.schemas.base import PagingRequest
+from app.schemas._base import PagingRequest
 from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse
 
 logger = logging.get_logger(__name__)
@@ -18,10 +18,14 @@ class ConnectedAppService:
         self.db = db
 
     @logging.log_function_inputs(logger)
-    async def get_account_id(self, user_id: str, app_name) -> Optional[str]:
+    async def get_account_id(
+        self,
+        user_id: str,
+        app_name: str,
+    ) -> Optional[str]:
         """Get a connected account id by user_id and app_name."""
         try:
-            query = (
+            stmt = (
                 select(ConnectedApp.connected_account_id)
                 .where(
                     ConnectedApp.user_id == user_id,
@@ -31,17 +35,21 @@ class ConnectedAppService:
                 .limit(1)
             )
 
-            result = await self.db.execute(query)
+            result = await self.db.execute(stmt)
             connected_account_id = result.scalar_one()
             return connected_account_id
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             return None
 
     @logging.log_function_inputs(logger)
     async def create_connected_app(
-            self, user_id: str, app_name: str, connected_account_id: str, auth_scheme: str = "Bearer"
+        self,
+        user_id: str,
+        app_name: str,
+        connected_account_id: str,
+        auth_scheme: str = "Bearer",
     ) -> bool:
         """Create a connected app."""
         try:
@@ -57,37 +65,48 @@ class ConnectedAppService:
             return True
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return False
 
     @logging.log_function_inputs(logger)
-    async def delete_connected_app(self, user_id: str, app_name: str) -> bool:
+    async def delete_connected_app(
+        self,
+        user_id: str,
+        app_name: str,
+    ) -> bool:
         """Delete a connected app."""
         try:
-            query = (
-                select(ConnectedApp)
+            stmt = (
+                update(ConnectedApp)
                 .where(
                     ConnectedApp.user_id == user_id,
                     ConnectedApp.app_name == app_name,
                     ConnectedApp.is_deleted.is_(False),
                 )
+                .values(is_deleted=True)
             )
 
-            result = await self.db.execute(query)
-            connected_apps = result.scalars().all()
-            for connected_app in connected_apps:
-                connected_app.is_deleted = True
+            result = await self.db.execute(stmt)
+            if result.rowcount == 0:
+                logger.warning(f"Connected app not found for user_id: {user_id}, app_name: {app_name}")
+                return False
+
             await self.db.commit()
+            logger.info(f"Connected app deleted for user_id: {user_id}, app_name: {app_name}")
             return True
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return False
 
     @logging.log_function_inputs(logger)
-    async def get_connected_app(self, user_id: str, app_name: str) -> Optional[GetConnectedAppResponse]:
+    async def get_connected_app(
+        self,
+        user_id: str,
+        app_name: str,
+    ) -> Optional[GetConnectedAppResponse]:
         """Get a connected app by user_id and app_name."""
         try:
             query = (
@@ -106,11 +125,15 @@ class ConnectedAppService:
             return GetConnectedAppResponse.model_validate(connected_app)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             return None
 
     @logging.log_function_inputs(logger)
-    async def get_all_connected_apps(self, user_id: str, paging: PagingRequest) -> GetAllConnectedAppsRequest:
+    async def get_all_connected_apps(
+        self,
+        user_id: str,
+        paging: PagingRequest,
+    ) -> GetAllConnectedAppsRequest:
         """Get all connected apps by user_id."""
         try:
             page_number = paging.page_number
@@ -147,8 +170,7 @@ class ConnectedAppService:
 
             result = await self.db.execute(query)
             connected_apps = result.scalars().all()
-            wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in
-                                      connected_apps]
+            wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in connected_apps]
             return GetAllConnectedAppsRequest(
                 connected_apps=wrapped_connected_apps,
                 page_number=page_number,
@@ -157,7 +179,7 @@ class ConnectedAppService:
             )
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             return GetAllConnectedAppsRequest(
                 connected_apps=[],
                 page_number=paging.page_number,

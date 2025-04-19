@@ -3,8 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.schemas.base import BaseResponse, PagingResponse
-
+from app.schemas._base import BaseResponse, PagingResponse
 
 ##################################################
 ########### REQUEST SCHEMAS ######################

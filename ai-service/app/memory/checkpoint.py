@@ -1,13 +1,15 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from langgraph.checkpoint.postgres._ainternal import Conn
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from psycopg.rows import dict_row
+from psycopg import AsyncConnection
+from psycopg.rows import DictRow, dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.core import logging
 from app.core.settings import env_settings
+
+Conn = AsyncConnection[DictRow] | AsyncConnectionPool[AsyncConnection[DictRow]]
 
 logger = logging.get_logger(__name__)
 

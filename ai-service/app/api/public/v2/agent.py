@@ -9,12 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import ensure_authenticated, ensure_user_id
 from app.core import logging
-from app.core.graph.baseV2 import AgentMngr, get_agent_managerV2
+from app.core.graph.v2.baseV2 import AgentMngr, get_agent_managerV2
 from app.core.session import get_db_session
 from app.models.agent import BuiltinAgent, CustomAgent
 from app.models.thread import Thread
+from app.schemas._base import ResponseWrapper
 from app.schemas.agent import AgentChatRequest, GetAgentV2ListResponse, GetAgentV2Response
-from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 

@@ -1,6 +1,7 @@
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Optional, Tuple, Union, List
+from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class AgentCache:
@@ -66,3 +67,12 @@ class AgentCache:
         Clear all cached agents.
         """
         self.cache.clear()
+
+@lru_cache()
+def get_agent_cache():
+    """
+    Get the agent cache instance.
+    :return: The agent cache instance.
+    """
+
+    return AgentCache()

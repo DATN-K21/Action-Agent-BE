@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import Field, field_validator
 
 from app.core.enums import LlmProvider
-from app.schemas.base import BaseRequest, BaseResponse
+from app.schemas._base import BaseRequest, BaseResponse
 
 
 ##################################################

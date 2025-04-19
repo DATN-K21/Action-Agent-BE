@@ -8,13 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import ensure_user_id
 from app.core import logging
-from app.core.agents.agent_manager import AgentManager
-from app.core.agents.deps import get_agent_manager
+from app.core.agents.agent_manager import AgentManager, get_agent_manager
 from app.core.session import get_db_session
-from app.core.utils.convert_messages_to_dict import convert_messages_to_dicts
+from app.core.utils.convert_dict_message import convert_messages_to_dicts
 from app.core.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
 from app.models.thread import Thread
-from app.schemas.base import CursorPagingRequest, ResponseWrapper
+from app.schemas._base import CursorPagingRequest, ResponseWrapper
 from app.schemas.history import GetHistoryResponse
 from app.schemas.ingest import IngestFileResponse
 from app.schemas.thread import (

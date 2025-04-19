@@ -9,9 +9,8 @@ from app.core import logging
 from app.core.constants import SYSTEM, TRIAL_TOKENS
 from app.core.enums import LlmProvider
 from app.core.session import get_db_session
-from app.models import User
-from app.models.user_api_key import UserApiKey
-from app.schemas.base import PagingRequest, ResponseWrapper
+from app.models import User, UserApiKey
+from app.schemas._base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -66,7 +65,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception("Has error: %s", str(e), exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -101,7 +100,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exc_info=True)
+            logger.exception(f"Has error: {str(e)}")
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -157,7 +156,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exc_info=True)
+            logger.exception(f"Has error: {str(e)}")
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
@@ -186,7 +185,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exc_info=True)
+            logger.exception(f"Has error: {str(e)}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -216,7 +215,7 @@ class UserService:
             return ResponseWrapper.wrap(status=200, data=DeleteUserResponse(id=deleted_user_id))
 
         except Exception as e:
-            logger.exception(f"Has error: {str(e)}", exc_info=True)
+            logger.exception(f"Has error: {str(e)}")
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 

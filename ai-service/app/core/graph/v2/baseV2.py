@@ -10,7 +10,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.core.logging import get_logger
 from app.memory.checkpoint import get_checkpointer
-from app.services.model_service import get_chat_model
+from app.services.llm_service import get_llm_chat_model
 
 logger = get_logger(__name__)
 
@@ -69,7 +69,7 @@ def get_agent_managerV2(checkpointer: AsyncPostgresSaver = Depends(get_checkpoin
     # Register chat agent
     chat_agent = build_basic_agent(
         name="chat-agent",
-        model=get_chat_model(),
+        model=get_llm_chat_model(),
         tools=[],
         checkpointer=checkpointer,
         prompt="You are a helpful assistant named Doraemon.",

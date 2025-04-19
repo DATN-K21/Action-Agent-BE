@@ -6,14 +6,13 @@ from starlette.responses import StreamingResponse
 
 from app.api.auth import ensure_authenticated, ensure_user_id
 from app.core import logging
-from app.core.cache.cached_agents import AgentCache
-from app.core.cache.deps import get_agent_cache
+from app.core.cache.cached_agents import AgentCache, get_agent_cache
 from app.core.graph.deps import get_extension, get_extension_builder_manager
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 from app.core.session import get_db_session
 from app.core.utils.streaming import format_extension_interrupt_sse, format_extension_stream_sse
 from app.models import Thread
-from app.schemas.base import ResponseWrapper
+from app.schemas._base import ResponseWrapper
 from app.schemas.extension import (
     ActiveAccountResponse,
     CheckConnectionResponse,

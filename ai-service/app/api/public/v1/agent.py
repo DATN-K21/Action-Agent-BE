@@ -6,13 +6,12 @@ from sse_starlette import EventSourceResponse
 
 from app.api.auth import ensure_authenticated, ensure_user_id
 from app.core import logging
-from app.core.agents.agent_manager import AgentManager
-from app.core.agents.deps import get_agent_manager
+from app.core.agents.agent_manager import AgentManager, get_agent_manager
 from app.core.session import get_db_session
 from app.core.utils.streaming import to_sse
 from app.models.thread import Thread
+from app.schemas._base import ResponseWrapper
 from app.schemas.agent import AgentChatRequest, AgentChatResponse, GetAgentsResponse
-from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 

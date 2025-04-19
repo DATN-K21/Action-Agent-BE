@@ -10,27 +10,29 @@ from app.core.agents.base import BaseAgent
 from app.core.graph.base import HumanEditingData, ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import MessagesStream, astream_state, LanggraphNodeEnum
+from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_state
+
+logger = logging.get_logger(__name__)
 
 
 class Agent(BaseAgent):
     def __init__(
-            self,
-            graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        graph: CompiledStateGraph,
+        logger: Optional[BoundLogger] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         if logger is None:
-            logger = logging.get_logger(self.__class__.__name__)
+            logger = logger
         super().__init__(graph=graph, logger=logger, name=name, config=config)
 
     async def async_chat(
-            self,
-            question: str,
-            thread_id: Optional[str] = None,
-            timezone: Optional[str] = None,
-            max_recursion: Optional[int] = None,
+        self,
+        question: str,
+        thread_id: Optional[str] = None,
+        timezone: Optional[str] = None,
+        max_recursion: Optional[int] = None,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}

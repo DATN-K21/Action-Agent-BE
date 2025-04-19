@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core import logging
-from app.schemas.base import PagingRequest, ResponseWrapper
+from app.schemas._base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,

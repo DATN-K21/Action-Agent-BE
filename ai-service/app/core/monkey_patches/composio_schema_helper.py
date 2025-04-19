@@ -1,16 +1,17 @@
 import typing
 
+import composio
 from composio import Action
 from composio.client.files import FileDownloadable
 from composio.tools.toolset import FileIOHelper
 
 
-def composio_schemas_helper_substitute_file_downloads_recursively(
-        self,
-        schema: typing.Dict,
-        request: typing.Dict,
-        action: Action,
-        file_helper: FileIOHelper,
+def substitute_file_downloads_recursively(
+    self,
+    schema: typing.Dict,
+    request: typing.Dict,
+    action: Action,
+    file_helper: FileIOHelper,
 ) -> typing.Dict:
     if "properties" not in schema:
         return request
@@ -35,3 +36,7 @@ def composio_schemas_helper_substitute_file_downloads_recursively(
             continue
 
     return request
+
+
+def patch_substitute_file_downloads_recursively():
+    composio.tools.toolset.SchemaHelper._substitute_file_downloads_recursively = patch_substitute_file_downloads_recursively

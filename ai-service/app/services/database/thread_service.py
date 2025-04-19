@@ -6,13 +6,12 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.agents.agent_manager import AgentManager
-from app.core.agents.deps import get_agent_manager
+from app.core.agents.agent_manager import AgentManager, get_agent_manager
 from app.core.constants import SYSTEM
 from app.core.session import get_db_session
 from app.models.thread import Thread
 from app.prompts.prompt_templates import get_title_generation_prompt_template
-from app.schemas.base import CursorPagingRequest, ResponseWrapper
+from app.schemas._base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
     CreateThreadRequest,
     CreateThreadResponse,
@@ -22,7 +21,7 @@ from app.schemas.thread import (
     UpdateThreadRequest,
     UpdateThreadResponse,
 )
-from app.services.model_service import get_chat_model
+from app.services.llm_service import get_llm_chat_model
 
 logger = logging.get_logger(__name__)
 
@@ -49,7 +48,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -83,12 +82,15 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def get_all_threads(
-        self, user_id: str, paging: CursorPagingRequest, thread_type: Optional[str] = None
+        self,
+        user_id: str,
+        paging: CursorPagingRequest,
+        thread_type: Optional[str] = None,
     ) -> ResponseWrapper[GetListThreadsResponse]:
         """Get all threads of a user."""
         try:
@@ -101,7 +103,7 @@ class ThreadService:
                     Thread.created_at.label("created_at"),
                 )
                 .where(
-                    or_(Thread.thread_type == thread_type, thread_type is None),
+                    or_(Thread.thread_type == thread_type, thread_type is None),  # type: ignore
                     Thread.user_id == user_id,
                     Thread.is_deleted.is_(False),
                 )
@@ -132,7 +134,10 @@ class ThreadService:
 
     @logging.log_function_inputs(logger)
     async def update_thread(
-            self, user_id: str, thread_id: str, thread: UpdateThreadRequest
+        self,
+        user_id: str,
+        thread_id: str,
+        thread: UpdateThreadRequest,
     ) -> ResponseWrapper[CreateThreadResponse]:
         """Update a thread."""
         try:
@@ -159,13 +164,16 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def delete_thread(
-            self, user_id: str, thread_id: str, deleted_by: str = SYSTEM
+        self,
+        user_id: str,
+        thread_id: str,
+        deleted_by: str = SYSTEM,
     ) -> ResponseWrapper[DeleteThreadResponse]:
         """Delete a thread."""
         try:
@@ -193,7 +201,7 @@ class ThreadService:
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:
-            logger.error(f"Has error: {str(e)}", exc_info=True)
+            logger.exception("Has error: %s", str(e))
             await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
@@ -236,11 +244,12 @@ class ThreadService:
             thread_messages_str = "".join([f"{message.type}: {message.content}\n" for message in messages])
 
             # Invoke the model to generate a title
-            model = get_chat_model()
+            model = get_llm_chat_model()
             prompt = get_title_generation_prompt_template()
             chain = prompt | model
-            gen_title = await chain.ainvoke({"content": thread_messages_str})
-            logger.info(f"Generated title: |{gen_title.content}|")
+            llm_response = await chain.ainvoke({"content": thread_messages_str})
+            gen_title = llm_response.content.replace("'", "") if llm_response and isinstance(llm_response.content, str) else "General topic"
+            logger.info(f"Generated title: |{gen_title}|")
 
             # Update the thread title in the database
             stmt = (
@@ -250,7 +259,7 @@ class ThreadService:
                     Thread.id == thread_id,
                     Thread.is_deleted.is_(False),
                 )
-                .values(title=gen_title.content.replace('"', ""))
+                .values(title=gen_title)
                 .returning(
                     Thread.id.label("id"),
                     Thread.user_id.label("user_id"),

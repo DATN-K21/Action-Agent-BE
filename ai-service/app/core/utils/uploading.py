@@ -13,6 +13,10 @@ import mimetypes
 from typing import BinaryIO, List, Optional
 
 from fastapi import UploadFile
+from langchain_community.document_loaders.parsers import BS4HTMLParser, PyMuPDFParser
+from langchain_community.document_loaders.parsers.generic import MimeTypeBasedParser
+from langchain_community.document_loaders.parsers.msword import MsWordParser
+from langchain_community.document_loaders.parsers.txt import TextParser
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import ConfigurableField, RunnableConfig, RunnableSerializable
 from langchain_core.vectorstores import VectorStore
@@ -23,7 +27,23 @@ from pydantic import ConfigDict, SecretStr
 
 from app.core.settings import env_settings
 from app.core.utils.ingesting import ingest_blob
-from app.core.utils.parsing import MIMETYPE_BASED_PARSER
+
+HANDLERS = {
+    "application/pdf": PyMuPDFParser(),
+    "text/plain": TextParser(),
+    "text/html": BS4HTMLParser(),
+    "application/msword": MsWordParser(),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (MsWordParser()),
+}
+
+SUPPORTED_MIMETYPES = sorted(HANDLERS.keys())
+
+# PUBLIC API
+
+MIMETYPE_BASED_PARSER = MimeTypeBasedParser(
+    handlers=HANDLERS,
+    fallback_parser=None,
+)
 
 
 def _guess_mimetype(file_name: str, file_bytes: bytes) -> str:

@@ -1,7 +1,7 @@
 import functools
 import json
 from enum import StrEnum
-from typing import Any, AsyncIterator, Dict, Sequence, Union, Optional
+from typing import Any, AsyncIterator, Dict, Optional, Sequence, Union
 
 import orjson
 from langchain_core.messages import AnyMessage, BaseMessage, message_chunk_to_message
@@ -10,8 +10,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.core import logging
-from app.core.utils.convert_dict_message import convert_dict_message_to_tool_calls, convert_dict_message_to_message, \
-    convert_dict_message_to_output
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
 from app.schemas.extension import ExtensionResponse
 
 logger = logging.get_logger(__name__)
@@ -34,15 +33,19 @@ class Metadata(BaseModel):
     langgraph_node: str
 
 
-list_stream_nodes = [LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.SELECT_TOOL_NODE,
-                     LanggraphNodeEnum.HUMAN_EDITING_NODE, LanggraphNodeEnum.GENERATE_NODE]
+list_stream_nodes = [
+    LanggraphNodeEnum.AGENT_NODE,
+    LanggraphNodeEnum.SELECT_TOOL_NODE,
+    LanggraphNodeEnum.HUMAN_EDITING_NODE,
+    LanggraphNodeEnum.GENERATE_NODE,
+]
 
 
 async def astream_state(
-        app: Runnable,
-        input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
-        config: RunnableConfig,
-        allow_stream_nodes: Sequence[LanggraphNodeEnum] = None,
+    app: Runnable,
+    input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
+    config: RunnableConfig,
+    allow_stream_nodes: Optional[Sequence[LanggraphNodeEnum]] = None,
 ) -> MessagesStream:
     """Stream messages from the runnable."""
     messages: dict[str, BaseMessage] = {}
