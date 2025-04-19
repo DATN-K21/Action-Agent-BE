@@ -1,10 +1,5 @@
 const router = require('express').Router();
 
-
-router.get("/ping", (req, res) => {
-  res.status(200).json({ message: "pong" });
-});
-
 router.use('/log', require('./log.route'));
 router.use('/user', require('./user.route'));
 router.use('/access', require('./access.route'));
