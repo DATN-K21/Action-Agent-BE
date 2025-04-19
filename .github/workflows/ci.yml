@@ -1,0 +1,53 @@
+name: Build and Push Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Select the service to deploy'
+        required: true
+        type: choice
+        options:
+          - ai-service
+          - api-gateway
+          - user-service
+      environment:
+        description: 'Select the environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set environment-specific variables
+        id: env
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "acr_username=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "acr_password=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
+            echo "tag=prod" >> $GITHUB_OUTPUT
+          else
+            echo "acr_username=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "acr_password=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
+            echo "tag=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to ACR
+        run: echo "${{ steps.env.outputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ steps.env.outputs.acr_username }}" --password-stdin
+
+      - name: Build & Push Image
+        run: |
+          echo "Building and pushing ${{ github.event.inputs.service }} to actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}"
+          docker build -t actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }} ./${{ github.event.inputs.service }}
+          docker push actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}
+
+      - name: Send Discord Notification
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ github.event.inputs.environment | upper }} BUILD SUCCESS]**\\n- **Service:** \`${{ github.event.inputs.service }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
