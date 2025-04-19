@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
             slack_service=get_slack_service(),
             outlook_service=get_outlook_service(),
             google_drive_service=get_google_drive_service(),
-            notion_service=get_notion_service()
+            notion_service=get_notion_service(),
         )
 
         get_socketio_server().register_namespace(

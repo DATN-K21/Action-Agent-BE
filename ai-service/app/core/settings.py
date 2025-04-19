@@ -10,48 +10,37 @@ class Settings(BaseSettings):
         env_file=".env",
         case_sensitive=False,
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
     )
 
-    # FastAPI settings
-    PORT: int = 5001
-    HOST: str = "0.0.0.0"
-    DBG: bool = False
-    HTTPS: bool = False
+    # Debug mode
+    DEBUG_SERVER: bool = False
+    DEBUG_SQLALCHEMY: bool = False
 
-    # Logging settings
-    LOG_LEVEL: str = "INFO"
-    LOG_TO_CONSOLE: bool = True
+    # Logging
+    LOGGING_LOG_LEVEL: str = "INFO"
 
-    # Database settings
+    # LLM
+    LLM_DEFAULT_API_KEY: str = "<your-api-key>"
+    LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
+    LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
+
+    # Database
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "123456"
+    POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "ai-database"
 
-    # SQLAlchemy settings
-    SQLALCHEMY_DEBUG: bool = False
+    # Tool
+    TOOL_TAVILY_API_KEY: str = "<your-api-key>"
 
-    # Tool settings
-    TAVILY_API_KEY: str = "<your-api-key>"
-
-    # LLM service settings
-    DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
-    DEFAULT_MODEL: str = "gpt-4o-mini"
-    DEFAULT_API_KEY: str = "<your-api-key>"
-
-    # Langchain service settings
-    LANGCHAIN_TRACING_V2: bool = False
-    LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
-    LANGCHAIN_API_KEY: str = "<your-api-key>"
-    LANGCHAIN_PROJECT: str = "<your-project-id>"
-
-    # Composio service settings
+    # Composio
     COMPOSIO_LOGGING_LEVEL: str = "debug"
     COMPOSIO_API_KEY: str = "<your-api-key>"
-    COMPOSIO_REDIRECT_URL: str = "https://localhost:5001/callback/extension"
+    COMPOSIO_REDIRECT_URL: str = "http://localhost:15200/callback/extension"
 
-    # Frontend service settings
+    # Frontend service
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
     @property

@@ -1,0 +1,93 @@
+name: Deployment Pipelines
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_ai:
+        description: 'Build ai-service'
+        required: false
+        type: boolean
+      build_gateway:
+        description: 'Build api-gateway'
+        required: false
+        type: boolean
+      build_user:
+        description: 'Build user-service'
+        required: false
+        type: boolean
+      environment:
+        description: 'Select environment'
+        required: true
+        type: choice
+        options:
+          - DEV
+          - PROD
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.setenv.outputs.tag }}
+      label: ${{ steps.setenv.outputs.label }}
+    steps:
+      - name: Set ENV Tag and Credentials
+        id: setenv
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "PROD" ]; then
+            echo "tag=prod" >> $GITHUB_OUTPUT
+            echo "label=PROD" >> $GITHUB_OUTPUT
+          else
+            echo "tag=dev" >> $GITHUB_OUTPUT
+            echo "label=DEV" >> $GITHUB_OUTPUT
+          fi
+
+  ai_service:
+    if: ${{ github.event.inputs.build_ai == 'true' }}
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
+
+      - name: Build & Push ai-service
+        run: |
+          docker build -t actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }} ./ai-service
+          docker push actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }}
+
+      - name: Notify Discord
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`ai-service\`\\n- **Image:** \`actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  api_gateway:
+    if: ${{ github.event.inputs.build_gateway == 'true' }}
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ACR
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
+      - name: Build & Push api-gateway
+        run: |
+          docker build -t actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }} ./api-gateway
+          docker push actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }}
+      - name: Notify Discord
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  user_service:
+    if: ${{ github.event.inputs.build_user == 'true' }}
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to ACR
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
+      - name: Build & Push user-service
+        run: |
+          docker build -t actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }} ./user-service
+          docker push actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }}
+      - name: Notify Discord
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -30,7 +30,7 @@ class TavilyAgentMetadata(AgentMetadata):
     description: Final = TAVILY_DESCRIPTION
 
 
-api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TAVILY_API_KEY))
+api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TOOL_TAVILY_API_KEY))
 tavily_tool = TavilySearchResults(max_results=MAX_RESULTS, name="tavily_search_tool", api_wrapper=api_wrapper)
 
 

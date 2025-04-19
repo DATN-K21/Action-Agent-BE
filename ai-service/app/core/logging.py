@@ -59,15 +59,14 @@ def configure_logging():
             structlog.dev.ConsoleRenderer(colors=True),
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.make_filtering_bound_logger(env_settings.LOG_LEVEL),
+        wrapper_class=structlog.make_filtering_bound_logger(env_settings.LOGGING_LOG_LEVEL),
         context_class=dict,
     )
 
     # Ensure standard logging uses structlog
     handler = logging.StreamHandler(sys.stdout)
-    logging.basicConfig(format="%(message)s", level=env_settings.LOG_LEVEL, handlers=[handler])
+    logging.basicConfig(format="%(message)s", level=env_settings.LOGGING_LOG_LEVEL, handlers=[handler])
     logging.getLogger().handlers = [handler]
-
 
 
 def get_logger(name: str) -> BoundLogger:

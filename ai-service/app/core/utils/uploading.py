@@ -91,9 +91,7 @@ class IngestRunnable(RunnableSerializable[BinaryIO, List[str]]):
 
     @property
     def namespace(self) -> str:
-        if (self.assistant_id is None and self.thread_id is None) or (
-                self.assistant_id is not None and self.thread_id is not None
-        ):
+        if (self.assistant_id is None and self.thread_id is None) or (self.assistant_id is not None and self.thread_id is not None):
             raise ValueError("Exactly one of assistant_id or thread_id must be provided")
         return self.assistant_id if self.assistant_id is not None else self.thread_id  # type: ignore
 
@@ -119,15 +117,15 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 
 
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
-    if env_settings.DEFAULT_API_KEY:
+    if env_settings.LLM_DEFAULT_API_KEY:
         return PGVector(
-            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.DEFAULT_API_KEY)),  # type: ignore
+            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.LLM_DEFAULT_API_KEY)),  # type: ignore
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,
             async_mode=async_mode,
         )
 
-    raise ValueError("DEFAULT_API_KEY needs to be set for embeddings to work.")
+    raise ValueError("LLM_DEFAULT_API_KEY needs to be set for embeddings to work.")
 
 
 vstore = _get_openai_embeddings(async_mode=True)

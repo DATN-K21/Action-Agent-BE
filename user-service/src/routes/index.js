@@ -1,8 +1,7 @@
 const router = require('express').Router();
 
-
-router.get('/', (req, res) => {
-    res.render('index');
+router.get("/ping", (req, res) => {
+    res.status(200).json({ message: "pong" });
 });
 
 router.use('/api/v1/', require('./api_v1/index'))

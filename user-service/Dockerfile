@@ -22,6 +22,6 @@ WORKDIR /usr/src/app
 
 COPY --from=builder /usr/src/app .
 
-EXPOSE 8100
+EXPOSE 15100
 
 CMD ["npm", "start"]

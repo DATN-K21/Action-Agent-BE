@@ -14,7 +14,7 @@ from app.core.utils.uploading import vstore
 
 @lru_cache
 def get_search_tools(max_results: int = 5) -> Sequence[BaseTool | Runnable]:
-    api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TAVILY_API_KEY))
+    api_wrapper = TavilySearchAPIWrapper(tavily_api_key=SecretStr(env_settings.TOOL_TAVILY_API_KEY))
     tavily_tool = TavilySearchResults(
         max_results=max_results,
         name="tavily_search_tool",

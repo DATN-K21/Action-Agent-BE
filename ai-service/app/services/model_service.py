@@ -7,11 +7,12 @@ from app.core.settings import env_settings
 
 MAX_TOKENS = 10000
 
+
 def get_chat_model(
     *,
-    provider: LlmProvider = env_settings.DEFAULT_PROVIDER,
-    model: str = env_settings.DEFAULT_MODEL,
-    api_key: str = env_settings.DEFAULT_API_KEY,
+    provider: LlmProvider = env_settings.LLM_DEFAULT_PROVIDER,
+    model: str = env_settings.LLM_DEFAULT_MODEL,
+    api_key: str = env_settings.LLM_DEFAULT_API_KEY,
     temperature: float = 0,
     **kwargs,
 ) -> BaseChatModel:

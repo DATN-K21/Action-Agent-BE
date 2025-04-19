@@ -19,18 +19,24 @@ validation_error_responses: dict = {
 
 router = APIRouter(responses=validation_error_responses)
 
-# Public routes
+# Test routes
 router.include_router(test.router)
-router.include_router(callback.router)
 
-router.include_router(thread.router)
-router.include_router(connected_app.router)
+# Public routes v1
+prefix = "/api/v1"
+router.include_router(callback.router, prefix=prefix)
 
-router.include_router(agent.router)
+router.include_router(thread.router, prefix=prefix)
+router.include_router(connected_app.router, prefix=prefix)
+
+router.include_router(agent.router, prefix=prefix)
+router.include_router(multi_agent.router, prefix=prefix)
+router.include_router(extension.router, prefix=prefix)
+router.include_router(user.router, prefix=prefix)
+
+# Public routes v2
+prefix = "/api/v2"
 router.include_router(agentV2.router)
-router.include_router(multi_agent.router)
-router.include_router(extension.router)
-router.include_router(user.router)
 
 # Private routes
 private_router = APIRouter(prefix="/private", tags=["Private"])

@@ -2,7 +2,7 @@ const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
 
 class UserUtil {
   static USER_HEADER_REQUIRED_REQUEST_PATHS = [
-    `/api/v1/user/user/current`,
+    `/user/api/v1/user/current`,
   ]
 
   static checkIfUserHeaderIsRequired(path) {

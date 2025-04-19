@@ -1,8 +1,11 @@
 node_modules
 postman
-.env
 mock
 
 /uploads
 /keys
 /docs
+
+.env
+.env.local
+.env.production
