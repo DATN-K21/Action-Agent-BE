@@ -54,6 +54,11 @@ To run all services using Docker Compose:
    docker-compose up --pull always -d api-gateway ai-service user-service ai-database user-database
    ```
    (Currently we only develop apps with those services)
+4. Whenever there is a new build, you can run:
+   ```bash
+   docker-compose up --pull always -d api-gateway ai-service user-service ai-database user-database
+   ```
+   to pull the latest images and restart the services.
 
 ### Localhost with Native Applications
 For easier development, you can run the services natively:
