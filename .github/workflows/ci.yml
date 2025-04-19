@@ -29,8 +29,6 @@ jobs:
     outputs:
       tag: ${{ steps.setenv.outputs.tag }}
       label: ${{ steps.setenv.outputs.label }}
-      user: ${{ steps.setenv.outputs.user }}
-      pass: ${{ steps.setenv.outputs.pass }}
     steps:
       - name: Set ENV Tag and Credentials
         id: setenv
@@ -38,73 +36,58 @@ jobs:
           if [ "${{ github.event.inputs.environment }}" = "PROD" ]; then
             echo "tag=prod" >> $GITHUB_OUTPUT
             echo "label=PROD" >> $GITHUB_OUTPUT
-            echo "user=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "pass=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
           else
             echo "tag=dev" >> $GITHUB_OUTPUT
             echo "label=DEV" >> $GITHUB_OUTPUT
-            echo "user=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "pass=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
           fi
 
   ai_service:
     if: ${{ github.event.inputs.build_ai == 'true' }}
     needs: setup
     runs-on: ubuntu-latest
-    outputs:
-      ai_tag: ${{ needs.setup.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Login to ACR
-        run: echo "${{ needs.setup.outputs.pass }}" | docker login actionagent.azurecr.io -u ${{ needs.setup.outputs.user }} --password-stdin
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
+
       - name: Build & Push ai-service
         run: |
           docker build -t actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }} ./ai-service
           docker push actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }}
 
+      - name: Notify Discord
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`ai-service\`\\n- **Image:** \`actionagent.azurecr.io/ai-service:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+
   api_gateway:
     if: ${{ github.event.inputs.build_gateway == 'true' }}
     needs: setup
     runs-on: ubuntu-latest
-    outputs:
-      gateway_tag: ${{ needs.setup.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Login to ACR
-        run: echo "${{ needs.setup.outputs.pass }}" | docker login actionagent.azurecr.io -u ${{ needs.setup.outputs.user }} --password-stdin
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
       - name: Build & Push api-gateway
         run: |
           docker build -t actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }} ./api-gateway
           docker push actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }}
+      - name: Notify Discord
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   user_service:
     if: ${{ github.event.inputs.build_user == 'true' }}
     needs: setup
     runs-on: ubuntu-latest
-    outputs:
-      user_tag: ${{ needs.setup.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Login to ACR
-        run: echo "${{ needs.setup.outputs.pass }}" | docker login actionagent.azurecr.io -u ${{ needs.setup.outputs.user }} --password-stdin
+        run: echo "${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_PASSWORD' || 'DEV_ACR_PASSWORD'] }}" | docker login actionagent.azurecr.io -u ${{ secrets[needs.setup.outputs.label == 'PROD' && 'PROD_ACR_USERNAME' || 'DEV_ACR_USERNAME'] }} --password-stdin
       - name: Build & Push user-service
         run: |
           docker build -t actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }} ./user-service
           docker push actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }}
-
-  send_notification:
-    if: ${{ always() }}
-    needs: [ai_service, api_gateway, user_service]
-    runs-on: ubuntu-latest
-    steps:
       - name: Notify Discord
         run: |
-          if [ "${{ needs.ai_service.outputs.ai_tag }}" ]; then
-            curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"✅ [${{ needs.setup.outputs.label }} BUILD] ai-service\\nImage: \`ai-service:${{ needs.setup.outputs.ai_tag }}\`\\nBy: ${{ github.actor }}\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
-          fi
-          if [ "${{ needs.api_gateway.outputs.gateway_tag }}" ]; then
-            curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"✅ [${{ needs.setup.outputs.label }} BUILD] api-gateway\\nImage: \`api-gateway:${{ needs.setup.outputs.gateway_tag }}\`\\nBy: ${{ github.actor }}\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
-          fi
-          if [ "${{ needs.user_service.outputs.user_tag }}" ]; then
-            curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"✅ [${{ needs.setup.outputs.label }} BUILD] user-service\\nImage: \`user-service:${{ needs.setup.outputs.user_tag }}\`\\nBy: ${{ github.actor }}\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
-          fi
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ needs.setup.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ needs.setup.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
