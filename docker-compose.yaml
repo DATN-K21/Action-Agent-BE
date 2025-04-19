@@ -28,7 +28,7 @@ services:
     environment:
       NODE_ENV: dev
       PORT: 15100
-      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017"
+      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
       EMAIL_USERNAME: <EMAIL_USERNAME>
       EMAIL_PASSWORD: <EMAIL_PASSWORD>
       GOOGLE_APP_CLIENT_ID: <YOUR_GOOGLE_CLIENT_ID>

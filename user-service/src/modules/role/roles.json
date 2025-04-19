@@ -1,0 +1,413 @@
+[
+    {
+        "_id": {
+            "$oid": "673f6fce3701fd2a32f72b36"
+        },
+        "slug": "16da1128a3",
+        "name": "User",
+        "description": "User of the system",
+        "status": "active",
+        "grants": [
+            {
+                "resource": {
+                    "$oid": "673f7151c0747b5b3dda90a4"
+                },
+                "actions": [
+                    "create:own",
+                    "read:any",
+                    "update:own",
+                    "delete:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7354b348c3e98b424c4d"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7162c0747b5b3dda90a9"
+                },
+                "actions": [
+                    "create:own",
+                    "read:own",
+                    "update:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7373b348c3e98b424c55"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7171c0747b5b3dda90ae"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f738bb348c3e98b424c5e"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f717fc0747b5b3dda90b3"
+                },
+                "actions": [
+                    "read:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73a0b348c3e98b424c68"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f718ec0747b5b3dda90b8"
+                },
+                "actions": [
+                    "create:own",
+                    "read:own",
+                    "update:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73b6b348c3e98b424c73"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "674151b28a1686faf8403817"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "6741531d8a1686faf84038a9"
+                }
+            }
+        ],
+        "owners": [
+            {
+                "$oid": "673f6eefe729b5f170c190e9"
+            }
+        ],
+        "createdAt": {
+            "$date": "2024-11-21T17:37:18.585Z"
+        },
+        "updatedAt": {
+            "$date": "2024-11-23T03:59:25.261Z"
+        },
+        "__v": 6
+    },
+    {
+        "_id": {
+            "$oid": "673f6f893701fd2a32f72b2c"
+        },
+        "slug": "93dfbb3bfb",
+        "name": "Admin",
+        "description": "Admin extended from user",
+        "status": "active",
+        "grants": [
+            {
+                "resource": {
+                    "$oid": "673f7151c0747b5b3dda90a4"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f72d0b348c3e98b424c1b"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7162c0747b5b3dda90a9"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f72deb348c3e98b424c23"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7171c0747b5b3dda90ae"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f72eab348c3e98b424c2c"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f717fc0747b5b3dda90b3"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:own",
+                    "delete:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7307b348c3e98b424c3b"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f718ec0747b5b3dda90b8"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7321b348c3e98b424c46"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "674151b28a1686faf8403817"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:own",
+                    "delete:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "674152e78a1686faf8403888"
+                }
+            }
+        ],
+        "owners": [
+            {
+                "$oid": "673f6eefe729b5f170c190e9"
+            }
+        ],
+        "createdAt": {
+            "$date": "2024-11-21T17:36:09.358Z"
+        },
+        "updatedAt": {
+            "$date": "2024-11-23T03:58:31.331Z"
+        },
+        "__v": 6
+    },
+    {
+        "_id": {
+            "$oid": "673f6faf3701fd2a32f72b31"
+        },
+        "slug": "661d5a8594",
+        "name": "Super Admin",
+        "description": "Super Admin extended from Admin of the user",
+        "status": "active",
+        "grants": [
+            {
+                "resource": {
+                    "$oid": "673f7151c0747b5b3dda90a4"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7250b348c3e98b424bee"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7162c0747b5b3dda90a9"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f7280b348c3e98b424bf6"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7171c0747b5b3dda90ae"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f729eb348c3e98b424bff"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f717fc0747b5b3dda90b3"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f72aab348c3e98b424c09"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f718ec0747b5b3dda90b8"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f72b5b348c3e98b424c14"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "674151b28a1686faf8403817"
+                },
+                "actions": [
+                    "create:any",
+                    "read:any",
+                    "update:any",
+                    "delete:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "674151fc8a1686faf8403836"
+                }
+            }
+        ],
+        "owners": [
+            {
+                "$oid": "673f6eefe729b5f170c190e9"
+            }
+        ],
+        "createdAt": {
+            "$date": "2024-11-21T17:36:47.240Z"
+        },
+        "updatedAt": {
+            "$date": "2024-11-23T03:56:25.053Z"
+        },
+        "__v": 7
+    },
+    {
+        "_id": {
+            "$oid": "673f6fe93701fd2a32f72b3b"
+        },
+        "slug": "a1d196e982",
+        "name": "Anonymous",
+        "description": "Anonymous guest of the system who is not log in yet",
+        "status": "active",
+        "grants": [
+            {
+                "resource": {
+                    "$oid": "673f7151c0747b5b3dda90a4"
+                },
+                "actions": [
+                    "create:own"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73e4b348c3e98b424c7a"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7162c0747b5b3dda90a9"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73eeb348c3e98b424c82"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f7171c0747b5b3dda90ae"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73f6b348c3e98b424c8b"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f717fc0747b5b3dda90b3"
+                },
+                "actions": [
+                    "read:any"
+                ],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f73feb348c3e98b424c95"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "673f718ec0747b5b3dda90b8"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "673f740bb348c3e98b424ca0"
+                }
+            },
+            {
+                "resource": {
+                    "$oid": "674151b28a1686faf8403817"
+                },
+                "actions": [],
+                "attributes": "*",
+                "_id": {
+                    "$oid": "6741532d8a1686faf84038ca"
+                }
+            }
+        ],
+        "owners": [
+            {
+                "$oid": "673f6eefe729b5f170c190e9"
+            }
+        ],
+        "createdAt": {
+            "$date": "2024-11-21T17:37:45.239Z"
+        },
+        "updatedAt": {
+            "$date": "2024-11-23T03:59:41.472Z"
+        },
+        "__v": 6
+    }
+]
