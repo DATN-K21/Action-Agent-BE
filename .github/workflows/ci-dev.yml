@@ -1,34 +1,27 @@
 name: Dev CI/CD
 
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
+    inputs:
+      build_ai_service:
+        description: 'Build AI Service'
+        required: false
+        type: boolean
+        default: false
+      build_api_gateway:
+        description: 'Build API Gateway'
+        required: false
+        type: boolean
+        default: false
+      build_user_service:
+        description: 'Build User Service'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      ai-service: ${{ steps.filter.outputs.ai-service }}
-      api-gateway: ${{ steps.filter.outputs.api-gateway }}
-      user-service: ${{ steps.filter.outputs.user-service }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        id: filter
-        uses: dorny/paths-filter@v2
-        with:
-          filters: |
-            ai-service: 'ai-service/**'
-            api-gateway: 'api-gateway/**'
-            user-service: 'user-service/**'
-
   build-and-push:
     runs-on: ubuntu-latest
-    needs: detect-changes
     strategy:
       matrix:
         service: [ai-service, api-gateway, user-service]
@@ -36,29 +29,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Check for changes and skip if none
+      - name: Check if build is selected
         id: check
         run: |
-          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
-          echo "changed=$changed" >> $GITHUB_OUTPUT
+          selected=false
+          if [[ "${{ matrix.service }}" == "ai-service" && "${{ github.event.inputs.build_ai_service }}" == "true" ]]; then selected=true; fi
+          if [[ "${{ matrix.service }}" == "api-gateway" && "${{ github.event.inputs.build_api_gateway }}" == "true" ]]; then selected=true; fi
+          if [[ "${{ matrix.service }}" == "user-service" && "${{ github.event.inputs.build_user_service }}" == "true" ]]; then selected=true; fi
+          echo "selected=$selected" >> $GITHUB_OUTPUT
+        shell: bash
 
-          if [ "$changed" != "true" ]; then
-            echo "No changes in ${{ matrix.service }}, skipping."
-            exit 0
-          fi
-      
+      - name: Skip if not selected
+        if: steps.check.outputs.selected != 'true'
+        run: echo "Service not selected. Skipping."
+
       - name: Login to ACR
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.selected == 'true'
         run: echo "${{ secrets.DEV_ACR_PASSWORD }}" | docker login actionagent.azurecr.io -u ${{ secrets.DEV_ACR_USERNAME }} --password-stdin
 
       - name: Build & Push Image for ${{ matrix.service }}
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.selected == 'true'
         run: |
           echo "Building and pushing ${{ matrix.service }} to actionagent.azurecr.io/${{ matrix.service }}:dev"
           docker build -t actionagent.azurecr.io/${{ matrix.service }}:dev ./${{ matrix.service }}
           docker push actionagent.azurecr.io/${{ matrix.service }}:dev
 
       - name: Send Discord Notification
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.selected == 'true'
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [DEV BUILD SUCCESS]**\\n- **Service:** \`${{ matrix.service }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ matrix.service }}:dev\`\\n- **Commit:** \`${{ github.sha }}\` — _${{ github.event.head_commit.message }}_\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [DEV BUILD SUCCESS]**\\n- **Service:** \`${{ matrix.service }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ matrix.service }}:dev\`\\n- **Commit:** \`${{ github.sha }}\`\\n- _${{ github.event.head_commit.message || 'Manual trigger' }}_\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
