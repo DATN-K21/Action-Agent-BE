@@ -43,10 +43,15 @@ Each service provides a `/ping` endpoint to check its health:
 
 ### Localhost with Docker Compose
 To run all services using Docker Compose:
-1. Copy the `docker-compose.override.yaml` file from the NDA.
-2. Run the following command:
+1. Login to Docker Hub:
    ```bash
-   docker-compose up -d --build api-gateway ai-service user-service ai-database user-database
+   docker login --username <your-username> --password <your-password>
+   ```
+   (You need to have a Docker Hub account and the credentials from NDA)
+2. Copy the `docker-compose.override.yaml` file from NDA (to have the correct environment variables).
+3. Run the following command:
+   ```bash
+   docker-compose up --pull always -d api-gateway ai-service user-service ai-database user-database
    ```
    (Currently we only develop apps with those services)
 
