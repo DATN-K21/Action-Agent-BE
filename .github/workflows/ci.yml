@@ -1,53 +1,83 @@
-name: Build and Push Docker Image
+name: Deployment Pipelines
 
 on:
   workflow_dispatch:
     inputs:
-      service:
-        description: 'Select the service to deploy'
-        required: true
-        type: choice
-        options:
-          - ai-service
-          - api-gateway
-          - user-service
+      build_ai:
+        description: 'Build ai-service'
+        required: false
+        type: boolean
+      build_gateway:
+        description: 'Build api-gateway'
+        required: false
+        type: boolean
+      build_user:
+        description: 'Build user-service'
+        required: false
+        type: boolean
       environment:
-        description: 'Select the environment'
+        description: 'Select environment'
         required: true
         type: choice
         options:
-          - dev
-          - prod
+          - DEV
+          - PROD
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set environment-specific variables
+      - name: Set ENV Tag and Credentials
         id: env
         run: |
-          if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
-            echo "acr_username=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event.inputs.environment }}" = "PROD" ]; then
             echo "tag=prod" >> $GITHUB_OUTPUT
+            echo "label=PROD" >> $GITHUB_OUTPUT
+            echo "user=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "pass=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
           else
-            echo "acr_username=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
             echo "tag=dev" >> $GITHUB_OUTPUT
+            echo "label=DEV" >> $GITHUB_OUTPUT
+            echo "user=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "pass=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Login to ACR
-        run: echo "${{ steps.env.outputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ steps.env.outputs.acr_username }}" --password-stdin
+        run: echo "${{ steps.env.outputs.pass }}" | docker login actionagent.azurecr.io -u ${{ steps.env.outputs.user }} --password-stdin
 
-      - name: Build & Push Image
+      - name: Build & Push ai-service
+        if: ${{ github.event.inputs.build_ai == 'true' }}
         run: |
-          echo "Building and pushing ${{ github.event.inputs.service }} to actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}"
-          docker build -t actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }} ./${{ github.event.inputs.service }}
-          docker push actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}
+          docker build -t actionagent.azurecr.io/ai-service:${{ steps.env.outputs.tag }} ./ai-service
+          docker push actionagent.azurecr.io/ai-service:${{ steps.env.outputs.tag }}
 
-      - name: Send Discord Notification
+      - name: Build & Push api-gateway
+        if: ${{ github.event.inputs.build_gateway == 'true' }}
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ github.event.inputs.environment | upper }} BUILD SUCCESS]**\\n- **Service:** \`${{ github.event.inputs.service }}\`\\n- **Image:** \`actionagent.azurecr.io/${{ github.event.inputs.service }}:${{ steps.env.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          docker build -t actionagent.azurecr.io/api-gateway:${{ steps.env.outputs.tag }} ./api-gateway
+          docker push actionagent.azurecr.io/api-gateway:${{ steps.env.outputs.tag }}
+
+      - name: Build & Push user-service
+        if: ${{ github.event.inputs.build_user == 'true' }}
+        run: |
+          docker build -t actionagent.azurecr.io/user-service:${{ steps.env.outputs.tag }} ./user-service
+          docker push actionagent.azurecr.io/user-service:${{ steps.env.outputs.tag }}
+
+      # Discord Notifications
+      - name: Notify for ai-service
+        if: ${{ github.event.inputs.build_ai == 'true' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ steps.env.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`ai-service\`\\n- **Image:** \`actionagent.azurecr.io/ai-service:${{ steps.env.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify for api-gateway
+        if: ${{ github.event.inputs.build_gateway == 'true' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ steps.env.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ steps.env.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify for user-service
+        if: ${{ github.event.inputs.build_user == 'true' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ steps.env.outputs.label }} BUILD SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ steps.env.outputs.tag }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
