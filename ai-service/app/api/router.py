@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public import agent, callback, connected_app, extension, multi_agent, test, thread, llm, user
+from app.api.public import agent, callback, connected_app, extension, llm, multi_agent, test, thread, user
 
 
 class ValidationErrorResponse(BaseModel):
@@ -19,18 +19,21 @@ validation_error_responses: dict = {
 
 router = APIRouter(responses=validation_error_responses)
 
-# Public routes
+# Test routes
 router.include_router(test.router)
-router.include_router(callback.router)
 
-router.include_router(thread.router)
-router.include_router(connected_app.router)
+# Public routes v1
+prefix = "/api/v1"
+router.include_router(callback.router, prefix=prefix)
 
-router.include_router(agent.router)
-router.include_router(multi_agent.router)
-router.include_router(extension.router)
-router.include_router(llm.router)
-router.include_router(user.router)
+router.include_router(thread.router, prefix=prefix)
+router.include_router(connected_app.router, prefix=prefix)
+
+router.include_router(agent.router, prefix=prefix)
+router.include_router(multi_agent.router, prefix=prefix)
+router.include_router(extension.router, prefix=prefix)
+router.include_router(llm.router, prefix=prefix)
+router.include_router(user.router, prefix=prefix)
 
 # Private routes
 private_router = APIRouter(prefix="/private", tags=["Private"])
