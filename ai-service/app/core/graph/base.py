@@ -62,12 +62,12 @@ class HumanEditingData(BaseModel):
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
-            self,
-            checkpointer: AsyncPostgresSaver,
-            tools: Optional[list[BaseTool | Runnable]] = None,
-            tool_choice: Optional[str] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        checkpointer: AsyncPostgresSaver,
+        tools: Optional[list[BaseTool | Runnable]] = None,
+        tool_choice: Optional[str] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.checkpointer = checkpointer
         self.tools = tools

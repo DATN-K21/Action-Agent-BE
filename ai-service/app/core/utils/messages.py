@@ -13,7 +13,7 @@ trimmer = trim_messages(
 )
 
 
-def truncate_text(text: str, max_tokens: int = MAX_TOKENS, model: str = env_settings.DEFAULT_MODEL) -> str:
+def truncate_text(text: str, max_tokens: int = MAX_TOKENS, model: str = env_settings.LLM_DEFAULT_MODEL) -> str:
     """Truncate text if the token count exceeds the limit."""
     encoding = tiktoken.encoding_for_model(model)
     tokens = encoding.encode(text)

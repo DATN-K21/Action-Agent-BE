@@ -18,7 +18,7 @@ from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/agent-v2", tags=["Agent-V2"])
+router = APIRouter(prefix="/agent", tags=["API-V2"])
 
 
 @router.get("/get-all", summary="Get all agents.", response_model=ResponseWrapper[GetAgentV2ListResponse])
