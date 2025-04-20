@@ -10,32 +10,28 @@ on:
         options:
           - build_and_push
           - deploy
-      dev:
-        description: 'Deploy to dev environment'
+        multiple: true
+
+      environment:
+        description: 'Environment(s)'
         required: true
-        type: boolean
-      stg:
-        description: 'Deploy to stg environment'
-        required: true
-        type: boolean
-      prod:
-        description: 'Deploy to prod environment'
-        required: true
-        type: boolean
+        type: choice
+        options:
+          - dev
+          - stg
+          - prod
+        multiple: true
 
 jobs:
   setup:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: ${{ github.event.inputs.environment }}
     outputs:
       tag: ${{ steps.setenv.outputs.tag }}
       acr_username: ${{ steps.setenv.outputs.acr_username }}
       acr_password: ${{ steps.setenv.outputs.acr_password }}
-    strategy:
-      matrix:
-        env: 
-          - dev: ${{ github.event.inputs.dev }}
-          - stg: ${{ github.event.inputs.stg }}
-          - prod: ${{ github.event.inputs.prod }}
     steps:
       - name: Set Tag and Credentials
         id: setenv
@@ -54,12 +50,12 @@ jobs:
           fi
 
   build_and_push:
-    if: ${{ github.event.inputs.steps_to_run == 'build_and_push' }}
+    if: contains(github.event.inputs.steps_to_run, 'build_and_push')
     needs: setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: ${{ github.event.inputs.dev || github.event.inputs.stg || github.event.inputs.prod }}
+        env: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,28 +68,27 @@ jobs:
           docker push actionagent.azurecr.io/api-gateway:${{ matrix.env }}
 
       - name: Get Last Commit Message
-        id: commit_message
+        id: last_commit
         run: |
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_ENV
+          echo "msg=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
 
       - name: Notify Discord (Build)
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Last Commit Message:** \\`${{ env.commit_message }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Commit:** \`${{ steps.last_commit.outputs.msg }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   deploy:
-    if: ${{ github.event.inputs.steps_to_run == 'deploy' }}
+    if: contains(github.event.inputs.steps_to_run, 'deploy')
     needs: [setup, build_and_push]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: ${{ github.event.inputs.dev || github.event.inputs.stg || github.event.inputs.prod }}
+        env: ${{ github.event.inputs.environment }}
     steps:
       - name: Deploy api-gateway
         run: |
           echo "Deploying API Gateway to ${{ matrix.env }}..."
-          # Add your deployment script here
+          # Add your deployment logic here
 
       - name: Notify Discord (Deploy)
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Last Commit Message:** \\`${{ env.commit_message }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}

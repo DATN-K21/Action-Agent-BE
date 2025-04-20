@@ -10,18 +10,14 @@ on:
         options:
           - build_and_push
           - deploy
-      dev:
-        description: 'Deploy to dev environment'
+      environment:
+        description: 'Environment(s)'
         required: true
-        type: boolean
-      stg:
-        description: 'Deploy to stg environment'
-        required: true
-        type: boolean
-      prod:
-        description: 'Deploy to prod environment'
-        required: true
-        type: boolean
+        type: multiselect
+        options:
+          - dev
+          - stg
+          - prod
 
 jobs:
   setup:
@@ -32,10 +28,7 @@ jobs:
       acr_password: ${{ steps.setenv.outputs.acr_password }}
     strategy:
       matrix:
-        env: 
-          - dev: ${{ github.event.inputs.dev }}
-          - stg: ${{ github.event.inputs.stg }}
-          - prod: ${{ github.event.inputs.prod }}
+        env: ${{ github.event.inputs.environment }}
     steps:
       - name: Set Tag and Credentials
         id: setenv
@@ -59,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: ${{ github.event.inputs.dev || github.event.inputs.stg || github.event.inputs.prod }}
+        env: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -71,15 +64,9 @@ jobs:
           docker build -t actionagent.azurecr.io/user-service:${{ matrix.env }} ./user-service
           docker push actionagent.azurecr.io/user-service:${{ matrix.env }}
 
-      - name: Get Last Commit Message
-        id: commit_message
-        run: |
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_ENV
-
       - name: Notify Discord (Build)
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Last Commit Message:** \\`${{ env.commit_message }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
 
   deploy:
     if: ${{ github.event.inputs.steps_to_run == 'deploy' }}
@@ -87,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: ${{ github.event.inputs.dev || github.event.inputs.stg || github.event.inputs.prod }}
+        env: ${{ github.event.inputs.environment }}
     steps:
       - name: Deploy user-service
         run: |
@@ -96,4 +83,4 @@ jobs:
 
       - name: Notify Discord (Deploy)
         run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Last Commit Message:** \\`${{ env.commit_message }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`user-service\`\\n- **Image:** \`actionagent.azurecr.io/user-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
