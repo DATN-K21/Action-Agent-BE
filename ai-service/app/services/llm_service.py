@@ -12,7 +12,6 @@ def _get_openai_model(
     model: str,
     temperature: float,
     api_key: SecretStr,
-    streaming: bool,
     timeout: int = 60,
     max_retries: int = 3,
     **kwargs,
@@ -22,8 +21,7 @@ def _get_openai_model(
     """
     return ChatOpenAI(
         temperature=temperature,
-        streaming=streaming,
-        stream_usage=streaming,
+        stream_usage=kwargs.get("streaming", False),
         model=model,
         api_key=api_key,
         timeout=timeout,
