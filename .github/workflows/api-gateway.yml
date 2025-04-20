@@ -31,85 +31,130 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set environments and get last commit message
+      - name: Set environment and get last commit message
         id: setup
         run: |
-          # Initialize variables
-          ENV_TAGS=""
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-
-          # Set environment tags based on selected options
+          # Set environment tags for staging and production
           if [ "${{ github.event.inputs.build_and_push_stg }}" == "true" ]; then
-            ENV_TAGS="${ENV_TAGS}stg "
+            echo "STG_TAG=stg" >> $GITHUB_ENV
           fi
           if [ "${{ github.event.inputs.build_and_push_prod }}" == "true" ]; then
-            ENV_TAGS="${ENV_TAGS}prod"
+            echo "PROD_TAG=prod" >> $GITHUB_ENV
           fi
-
-          # Save variables to environment for later use
-          echo "ENV_TAGS=${ENV_TAGS}" >> $GITHUB_ENV
-          echo "COMMIT_MSG=${COMMIT_MSG}" >> $GITHUB_ENV
           
-          # Output variables for debugging purposes
-          echo "ENV_TAGS=${{ env.ENV_TAGS }}"
+          # Get the last commit message
+          echo "COMMIT_MSG=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+          
+          # Output the variables for use in later steps
+          echo "STG_TAG=${{ env.STG_TAG }}"
+          echo "PROD_TAG=${{ env.PROD_TAG }}"
           echo "COMMIT_MSG=${{ env.COMMIT_MSG }}"
 
-  build_and_push:
+  build_and_push_stg:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.build_and_push_stg == 'true' || github.event.inputs.build_and_push_prod == 'true' }}
+    if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
     needs: setup
-    strategy:
-      matrix:
-        env: [${{ fromJson(env.ENV_TAGS) }}]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Docker Build & Push for ${{ matrix.env }}
+      - name: Docker Build & Push for Staging
         uses: ./.github/actions/docker-build-push
         with:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'api-gateway'
-          tag: ${{ matrix.env }}
+          tag: ${{ env.STG_TAG }}
           folder: './api-gateway'
 
-      - name: Send notification to Discord (Build ${{ matrix.env }})
+      - name: Send notification to Discord (Build Staging)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'api-gateway'
-          image: 'actionagent.azurecr.io/api-gateway:${{ matrix.env }}'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.STG_TAG }}'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'BUILD'
+
+  deploy_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_stg == 'true' }}
+    needs: [setup, build_and_push_stg]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy API Gateway to Staging
+        uses: ./.github/actions/deploy
+        with:
+          environment: ${{ env.STG_TAG }}
+          deploy_command: 'kubectl apply -f deployment.yaml'
+
+      - name: Send notification to Discord (Deploy Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.STG_TAG }}'
+          branch: 'main'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEPLOY'
+
+  build_and_push_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+  
+      - name: Docker Build & Push for Production
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'api-gateway'
+          tag: ${{ env.PROD_TAG }}
+          folder: './api-gateway'
+
+      - name: Send notification to Discord (Build Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.PROD_TAG }}'
           branch: 'dev'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           action: 'BUILD'
 
-  deploy:
+  deploy_prod:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.deploy_stg == 'true' || github.event.inputs.deploy_prod == 'true' }}
-    needs: [setup, build_and_push]
-    strategy:
-      matrix:
-        env: [${{ fromJson(env.ENV_TAGS) }}]
+    if: ${{ github.event.inputs.deploy_prod == 'true' }}
+    needs: [setup, build_and_push_prod]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy API Gateway to ${{ matrix.env }}
+      - name: Deploy API Gateway to Production
         uses: ./.github/actions/deploy
         with:
-          environment: ${{ matrix.env }}
+          environment: ${{ env.PROD_TAG }}
           deploy_command: 'kubectl apply -f deployment.yaml'
 
-      - name: Send notification to Discord (Deploy ${{ matrix.env }})
+      - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'api-gateway'
-          image: 'actionagent.azurecr.io/api-gateway:${{ matrix.env }}'
-          branch: 'main'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.PROD_TAG }}'
+          branch: '${{ github.ref_name }}'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
