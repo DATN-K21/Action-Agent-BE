@@ -1,3 +1,4 @@
+
 import typing
 
 import composio
@@ -22,8 +23,7 @@ def substitute_file_downloads_recursively(
             continue
 
         if self._file_downloadable(schema=params[_param]):
-            request[_param] = str(
-                FileDownloadable(**request[_param]).download(file_helper.outdir / action.app / action.slug))
+            request[_param] = str(FileDownloadable(**request[_param]).download(file_helper.outdir / action.app / action.slug))
             continue
 
         if isinstance(request[_param], dict) and params[_param].get("type") == "object":
@@ -39,4 +39,4 @@ def substitute_file_downloads_recursively(
 
 
 def patch_substitute_file_downloads_recursively():
-    composio.tools.toolset.SchemaHelper._substitute_file_downloads_recursively = patch_substitute_file_downloads_recursively
+    composio.tools.toolset.SchemaHelper._substitute_file_downloads_recursively = substitute_file_downloads_recursively
