@@ -82,11 +82,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # - name: Deploy API Gateway to Staging
-      #   uses: ./.github/actions/deploy
-      #   with:
-      #     environment: ${{ env.STG_TAG }}
-      #     deploy_command: 'kubectl apply -f deployment.yaml'
+      - name: Deploy API Gateway to Staging
+        uses: ./.github/actions/deploy
+        with:
+          ssh_host: ${{ secrets.STG_SSH_HOST }}
+          ssh_user: ${{ secrets.STG_SSH_USER }}
+          ssh_key: ${{ secrets.STG_SSH_KEY }}
+          service: 'api-gateway'
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord

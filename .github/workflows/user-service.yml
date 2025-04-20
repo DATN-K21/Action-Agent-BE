@@ -82,11 +82,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # - name: Deploy User Service to Staging
-      #   uses: ./.github/actions/deploy
-      #   with:
-      #     environment: ${{ env.STG_TAG }}
-      #     deploy_command: 'kubectl apply -f deployment.yaml'
+      - name: Deploy User Service to Staging
+        uses: ./.github/actions/deploy
+        with:
+          ssh_host: ${{ secrets.STG_SSH_HOST }}
+          ssh_user: ${{ secrets.STG_SSH_USER }}
+          ssh_key: ${{ secrets.STG_SSH_KEY }}
+          service: 'user-service'
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
