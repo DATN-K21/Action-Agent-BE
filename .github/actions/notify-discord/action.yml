@@ -34,5 +34,5 @@ runs:
       shell: bash
       run: |
         curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"**✅ [${{ inputs.action }} [${{ inputs.service }}] SUCCESS]**\\n- **Action:** \`${{ inputs.action }}\`\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${{ inputs.commit_message }}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
+          -d "{\"content\": \"**✅ [${{ inputs.action }} SUCCESS]**\\n- **Action:** \`${{ inputs.action }}\`\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${{ inputs.commit_message }}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
           "${{ inputs.webhook_url }}"

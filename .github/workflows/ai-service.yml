@@ -91,7 +91,7 @@ jobs:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
           image: 'actionagent.azurecr.io/ai-service:${{ env.STG_TAG }}'
-          branch: 'main'
+          branch: '${{ github.ref_name }}'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
@@ -120,7 +120,7 @@ jobs:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
           image: 'actionagent.azurecr.io/ai-service:${{ env.PROD_TAG }}'
-          branch: 'dev'
+          branch: '${{ github.ref_name }}'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')

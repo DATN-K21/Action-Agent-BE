@@ -31,15 +31,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set environment and get last commit message
         id: setup
         run: |          
-          # Get the last commit message
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
-
-          # Output the variables for use in later steps
           echo "COMMIT_MSG=$COMMIT_MSG"
 
   build_and_push_stg:
@@ -91,7 +90,7 @@ jobs:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
           image: 'actionagent.azurecr.io/user-service:${{ env.STG_TAG }}'
-          branch: 'main'
+          branch: '${{ github.ref_name }}'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
@@ -120,7 +119,7 @@ jobs:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
           image: 'actionagent.azurecr.io/user-service:${{ env.PROD_TAG }}'
-          branch: 'dev'
+          branch: '${{ github.ref_name }}'
           commit_message: '${{ env.COMMIT_MSG }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
