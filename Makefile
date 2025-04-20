@@ -1,15 +1,15 @@
 .PHONY: down restart pull up git-pull
 
-# Define the services
-SERVICES = ai-service user-service api-gateway user-database ai-database
+# Default list of services (can be overridden via CLI)
+SERVICES ?= ai-service user-service api-gateway user-database ai-database
 
 # Pull latest code from Git
 git-pull:
 	git pull
 
-# Bring down the services
+# Bring down specific services (or all if none specified)
 down:
-	docker compose down
+	docker compose down $(SERVICES)
 
 # Pull the latest Docker images
 pull:
@@ -19,5 +19,9 @@ pull:
 up:
 	docker compose up -d $(SERVICES)
 
-# Restart the services: git pull, down, pull docker images, up
-restart: git-pull down pull up
+# Restart the services: git pull, stop/remove, pull images, up
+restart:
+	$(MAKE) git-pull
+	$(MAKE) down SERVICES="$(SERVICES)"
+	$(MAKE) pull SERVICES="$(SERVICES)"
+	$(MAKE) up SERVICES="$(SERVICES)"
