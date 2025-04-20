@@ -1,4 +1,5 @@
-name: API Gateway Pipelines
+name: API Gateway CI/CD
+description: CI/CD pipeline for API Gateway
 
 on:
   workflow_dispatch:
@@ -33,22 +34,13 @@ jobs:
 
       - name: Set environment and get last commit message
         id: setup
-        run: |
-          # Set environment tags for staging and production
-          if [ "${{ github.event.inputs.build_and_push_stg }}" == "true" ]; then
-            echo "STG_TAG=stg" >> $GITHUB_ENV
-          fi
-          if [ "${{ github.event.inputs.build_and_push_prod }}" == "true" ]; then
-            echo "PROD_TAG=prod" >> $GITHUB_ENV
-          fi
-          
+        run: |          
           # Get the last commit message
-          echo "COMMIT_MSG=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
-          
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+
           # Output the variables for use in later steps
-          echo "STG_TAG=${{ env.STG_TAG }}"
-          echo "PROD_TAG=${{ env.PROD_TAG }}"
-          echo "COMMIT_MSG=${{ env.COMMIT_MSG }}"
+          echo "COMMIT_MSG=$COMMIT_MSG"
 
   build_and_push_stg:
     runs-on: ubuntu-latest
@@ -64,7 +56,7 @@ jobs:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'api-gateway'
-          tag: ${{ env.STG_TAG }}
+          tag: 'stg'
           folder: './api-gateway'
 
       - name: Send notification to Discord (Build Staging)
@@ -87,11 +79,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy API Gateway to Staging
-        uses: ./.github/actions/deploy
-        with:
-          environment: ${{ env.STG_TAG }}
-          deploy_command: 'kubectl apply -f deployment.yaml'
+      # - name: Deploy API Gateway to Staging
+      #   uses: ./.github/actions/deploy
+      #   with:
+      #     environment: ${{ env.STG_TAG }}
+      #     deploy_command: 'kubectl apply -f deployment.yaml'
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
@@ -119,7 +111,7 @@ jobs:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'api-gateway'
-          tag: ${{ env.PROD_TAG }}
+          tag: 'prod'
           folder: './api-gateway'
 
       - name: Send notification to Discord (Build Production)
@@ -142,11 +134,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy API Gateway to Production
-        uses: ./.github/actions/deploy
-        with:
-          environment: ${{ env.PROD_TAG }}
-          deploy_command: 'kubectl apply -f deployment.yaml'
+      # - name: Deploy API Gateway to Production
+      #   uses: ./.github/actions/deploy
+      #   with:
+      #     environment: ${{ env.PROD_TAG }}
+      #     deploy_command: 'kubectl apply -f deployment.yaml'
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord

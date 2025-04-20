@@ -1,5 +1,6 @@
 name: 'Deploy'
 description: 'Deploy the application to the specified environment'
+
 inputs:
   environment:
     description: 'The environment to deploy to (dev, staging, prod)'
@@ -7,10 +8,12 @@ inputs:
   deploy_command:
     description: 'The command to execute for deployment'
     required: true
+
 runs:
-  using: 'bash'
+  using: 'composite'
   steps:
     - name: Deploy to environment
+      shell: bash
       run: |
         echo "Deploying to ${{ inputs.environment }}..."
-        ${{ inputs.deploy_command }}
+        eval "${{ inputs.deploy_command }}"

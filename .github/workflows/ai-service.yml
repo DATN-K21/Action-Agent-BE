@@ -1,86 +1,153 @@
-name: AI Service Pipelines
+name: AI Service CI/CD
+description: CI/CD pipeline for AI Service
 
 on:
   workflow_dispatch:
     inputs:
-      steps_to_run:
-        description: 'Steps to run'
-        required: true
-        type: choice
-        options:
-          - build_and_push
-          - deploy
-      environment:
-        description: 'Environment(s)'
-        required: true
-        type: multiselect
-        options:
-          - dev
-          - stg
-          - prod
+      build_and_push_stg:
+        description: 'Run Build & Push for Staging'
+        required: false
+        default: false
+        type: boolean
+      deploy_stg:
+        description: 'Run Deploy for Staging'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_prod:
+        description: 'Run Build & Push for Production'
+        required: false
+        default: false
+        type: boolean
+      deploy_prod:
+        description: 'Run Deploy for Production'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   setup:
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.setenv.outputs.tag }}
-      acr_username: ${{ steps.setenv.outputs.acr_username }}
-      acr_password: ${{ steps.setenv.outputs.acr_password }}
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
     steps:
-      - name: Set Tag and Credentials
-        id: setenv
-        run: |
-          echo "tag=${{ matrix.env }}" >> $GITHUB_OUTPUT
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-          if [ "${{ matrix.env }}" = "dev" ]; then
-            echo "acr_username=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.env }}" = "stg" ]; then
-            echo "acr_username=${{ secrets.STG_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.STG_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.env }}" = "prod" ]; then
-            echo "acr_username=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
-          fi
+      - name: Set environment and get last commit message
+        id: setup
+        run: |          
+          # Get the last commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
 
-  build_and_push:
-    if: ${{ github.event.inputs.steps_to_run == 'build_and_push' }}
+          # Output the variables for use in later steps
+          echo "COMMIT_MSG=$COMMIT_MSG"
+
+  build_and_push_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
     needs: setup
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Login to ACR
-        run: echo "${{ needs.setup.outputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ needs.setup.outputs.acr_username }}" --password-stdin
+      - name: Docker Build & Push for Staging
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'ai-service'
+          tag: 'stg'
+          folder: './ai-service'
 
-      - name: Build & Push ai-service
-        run: |
-          docker build -t actionagent.azurecr.io/ai-service:${{ matrix.env }} ./ai-service
-          docker push actionagent.azurecr.io/ai-service:${{ matrix.env }}
+      - name: Send notification to Discord (Build Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'ai-service'
+          image: 'actionagent.azurecr.io/ai-service:${{ env.STG_TAG }}'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'BUILD'
 
-      - name: Notify Discord (Build)
-        run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`ai-service\`\\n- **Image:** \`actionagent.azurecr.io/ai-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
-
-  deploy:
-    if: ${{ github.event.inputs.steps_to_run == 'deploy' }}
-    needs: [setup, build_and_push]
+  deploy_stg:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
+    if: ${{ github.event.inputs.deploy_stg == 'true' }}
+    needs: [setup, build_and_push_stg]
     steps:
-      - name: Deploy ai-service
-        run: |
-          echo "Deploying AI Service to ${{ matrix.env }}..."
-          # Add your deployment script here
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Notify Discord (Deploy)
-        run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`ai-service\`\\n- **Image:** \`actionagent.azurecr.io/ai-service:${{ matrix.env }}\`\\n- **Branch:** \\`${{ github.ref_name }}\`\\n- **Triggered by:** \\`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+      # - name: Deploy AI Service to Staging
+      #   uses: ./.github/actions/deploy
+      #   with:
+      #     environment: ${{ env.STG_TAG }}
+      #     deploy_command: 'kubectl apply -f deployment.yaml'
+
+      - name: Send notification to Discord (Deploy Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'ai-service'
+          image: 'actionagent.azurecr.io/ai-service:${{ env.STG_TAG }}'
+          branch: 'main'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEPLOY'
+
+  build_and_push_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+  
+      - name: Docker Build & Push for Production
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'ai-service'
+          tag: 'prod'
+          folder: './ai-service'
+
+      - name: Send notification to Discord (Build Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'ai-service'
+          image: 'actionagent.azurecr.io/ai-service:${{ env.PROD_TAG }}'
+          branch: 'dev'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'BUILD'
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_prod == 'true' }}
+    needs: [setup, build_and_push_prod]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # - name: Deploy AI Service to Production
+      #   uses: ./.github/actions/deploy
+      #   with:
+      #     environment: ${{ env.PROD_TAG }}
+      #     deploy_command: 'kubectl apply -f deployment.yaml'
+
+      - name: Send notification to Discord (Deploy Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'ai-service'
+          image: 'actionagent.azurecr.io/ai-service:${{ env.PROD_TAG }}'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEPLOY'

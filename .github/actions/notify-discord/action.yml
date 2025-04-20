@@ -1,5 +1,6 @@
 name: 'Notify Discord'
 description: 'Send notifications to Discord about the build or deploy status.'
+
 inputs:
   webhook_url:
     description: 'Discord Webhook URL'
@@ -25,11 +26,13 @@ inputs:
   action:
     description: 'The type of action (BUILD or DEPLOY)'
     required: true
+
 runs:
-  using: 'bash'
+  using: 'composite'
   steps:
     - name: Send notification to Discord
+      shell: bash
       run: |
         curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\": \"**✅ [${{ inputs.action }} [${{ inputs.service }}] SUCCESS]**\\n- **Action:** \`${{ inputs.action }}\`\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${{ inputs.commit_message }}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
-          ${{ inputs.webhook_url }}
+          "${{ inputs.webhook_url }}"
