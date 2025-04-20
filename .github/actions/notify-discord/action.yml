@@ -33,14 +33,14 @@ runs:
     - name: Log input parameters
       shell: bash
       run: |
-      echo "Webhook URL: ${{ inputs.webhook_url }}"
-      echo "Service: ${{ inputs.service }}"
-      echo "Image: ${{ inputs.image }}"
-      echo "Branch: ${{ inputs.branch }}"
-      echo "Commit Message: ${{ inputs.commit_message }}"
-      echo "Triggered By: ${{ inputs.triggered_by }}"
-      echo "Time: ${{ inputs.time }}"
-      echo "Action: ${{ inputs.action }}"
+        echo "Webhook URL: ${{ inputs.webhook_url }}"
+        echo "Service: ${{ inputs.service }}"
+        echo "Image: ${{ inputs.image }}"
+        echo "Branch: ${{ inputs.branch }}"
+        echo "Commit Message: ${{ inputs.commit_message }}"
+        echo "Triggered By: ${{ inputs.triggered_by }}"
+        echo "Time: ${{ inputs.time }}"
+        echo "Action: ${{ inputs.action }}"
 
     - name: Send notification to Discord
       shell: bash

@@ -28,19 +28,22 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    outputs:
+      commit_info: ${{ steps.set_commit_info.outputs.commit_info }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set environment and get last commit message
-        id: setup
-        run: |          
-          # Get the last commit message
+      - name: Set commit message and hash
+        id: set_commit_info
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
           COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+          COMMIT_INFO="$COMMIT_HASH - $COMMIT_MSG"
 
-          # Output the variables for use in later steps
-          echo "COMMIT_MSG=$COMMIT_MSG"
+          echo "commit_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_INFO" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   build_and_push_stg:
     runs-on: ubuntu-latest
@@ -66,7 +69,7 @@ jobs:
           service: 'api-gateway'
           image: 'actionagent.azurecr.io/api-gateway:${{ env.STG_TAG }}'
           branch: '${{ github.ref_name }}'
-          commit_message: '${{ env.COMMIT_MSG }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           action: 'BUILD'
@@ -92,7 +95,7 @@ jobs:
           service: 'api-gateway'
           image: 'actionagent.azurecr.io/api-gateway:${{ env.STG_TAG }}'
           branch: '${{ github.ref_name }}'
-          commit_message: '${{ env.COMMIT_MSG }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           action: 'DEPLOY'
@@ -121,7 +124,7 @@ jobs:
           service: 'api-gateway'
           image: 'actionagent.azurecr.io/api-gateway:${{ env.PROD_TAG }}'
           branch: '${{ github.ref_name }}'
-          commit_message: '${{ env.COMMIT_MSG }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           action: 'BUILD'
@@ -147,7 +150,7 @@ jobs:
           service: 'api-gateway'
           image: 'actionagent.azurecr.io/api-gateway:${{ env.PROD_TAG }}'
           branch: '${{ github.ref_name }}'
-          commit_message: '${{ env.COMMIT_MSG }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           action: 'DEPLOY'
