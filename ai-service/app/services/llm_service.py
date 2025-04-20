@@ -49,7 +49,6 @@ def get_llm_chat_model(
                 model=model,
                 temperature=temperature,
                 api_key=SecretStr(api_key),
-                streaming=True,
                 **kwargs,
             )
         case _:
