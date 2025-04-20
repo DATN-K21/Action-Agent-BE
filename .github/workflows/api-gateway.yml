@@ -3,92 +3,145 @@ name: API Gateway Pipelines
 on:
   workflow_dispatch:
     inputs:
-      steps_to_run:
-        description: 'Steps to run'
-        required: true
-        type: choice
-        options:
-          - build_and_push
-          - deploy
-        multiple: true
-
-      environment:
-        description: 'Environment(s)'
-        required: true
-        type: choice
-        options:
-          - dev
-          - stg
-          - prod
-        multiple: true
+      build_and_push_stg:
+        description: 'Run Build & Push for Staging'
+        required: false
+        default: false
+        type: boolean
+      deploy_stg:
+        description: 'Run Deploy for Staging'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_prod:
+        description: 'Run Build & Push for Production'
+        required: false
+        default: false
+        type: boolean
+      deploy_prod:
+        description: 'Run Deploy for Production'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   setup:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
-    outputs:
-      tag: ${{ steps.setenv.outputs.tag }}
-      acr_username: ${{ steps.setenv.outputs.acr_username }}
-      acr_password: ${{ steps.setenv.outputs.acr_password }}
     steps:
-      - name: Set Tag and Credentials
-        id: setenv
-        run: |
-          echo "tag=${{ matrix.env }}" >> $GITHUB_OUTPUT
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-          if [ "${{ matrix.env }}" = "dev" ]; then
-            echo "acr_username=${{ secrets.DEV_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.DEV_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.env }}" = "stg" ]; then
-            echo "acr_username=${{ secrets.STG_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.STG_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.env }}" = "prod" ]; then
-            echo "acr_username=${{ secrets.PROD_ACR_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "acr_password=${{ secrets.PROD_ACR_PASSWORD }}" >> $GITHUB_OUTPUT
+      - name: Set environment and get last commit message
+        id: setup
+        run: |
+          # Set environment and commit message for staging
+          if [ "${{ github.event.inputs.build_and_push_stg }}" == "true" ]; then
+            echo "ENV_TAG=stg" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.build_and_push_prod }}" == "true" ]; then
+            echo "ENV_TAG=prod" >> $GITHUB_ENV
           fi
+          
+          # Get the last commit message
+          echo "COMMIT_MSG=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+          
+          # Output the variables for use in later steps
+          echo "ENV_TAG=${{ env.ENV_TAG }}"
+          echo "COMMIT_MSG=${{ env.COMMIT_MSG }}"
 
-  build_and_push:
-    if: contains(github.event.inputs.steps_to_run, 'build_and_push')
+  build_and_push_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
     needs: setup
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Docker Build & Push for Staging
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'api-gateway'
+          tag: ${{ env.ENV_TAG }}
+          folder: './api-gateway'
 
-      - name: Login to ACR
-        run: echo "${{ needs.setup.outputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ needs.setup.outputs.acr_username }}" --password-stdin
+      - name: Send notification to Discord (Build Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.ENV_TAG }}'
+          branch: 'dev'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'BUILD'
 
-      - name: Build & Push api-gateway
-        run: |
-          docker build -t actionagent.azurecr.io/api-gateway:${{ matrix.env }} ./api-gateway
-          docker push actionagent.azurecr.io/api-gateway:${{ matrix.env }}
-
-      - name: Get Last Commit Message
-        id: last_commit
-        run: |
-          echo "msg=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
-
-      - name: Notify Discord (Build)
-        run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} BUILD SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Commit:** \`${{ steps.last_commit.outputs.msg }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
-
-  deploy:
-    if: contains(github.event.inputs.steps_to_run, 'deploy')
-    needs: [setup, build_and_push]
+  deploy_stg:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: ${{ github.event.inputs.environment }}
+    if: ${{ github.event.inputs.deploy_stg == 'true' }}
+    needs: setup
     steps:
-      - name: Deploy api-gateway
-        run: |
-          echo "Deploying API Gateway to ${{ matrix.env }}..."
-          # Add your deployment logic here
+      - name: Deploy API Gateway to Staging
+        uses: ./.github/actions/deploy
+        with:
+          environment: ${{ env.ENV_TAG }}
+          deploy_command: 'kubectl apply -f deployment.yaml'
 
-      - name: Notify Discord (Deploy)
-        run: |
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"**✅ [${{ matrix.env }} DEPLOY SUCCESS]**\\n- **Service:** \`api-gateway\`\\n- **Image:** \`actionagent.azurecr.io/api-gateway:${{ matrix.env }}\`\\n- **Branch:** \`${{ github.ref_name }}\`\\n- **Triggered by:** \`${{ github.actor }}\`\\n- **Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+      - name: Send notification to Discord (Deploy Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.ENV_TAG }}'
+          branch: 'main'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEPLOY'
+
+  build_and_push_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Docker Build & Push for Production
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'api-gateway'
+          tag: ${{ env.ENV_TAG }}
+          folder: './api-gateway'
+
+      - name: Send notification to Discord (Build Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.ENV_TAG }}'
+          branch: 'dev'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'BUILD'
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Deploy API Gateway to Production
+        uses: ./.github/actions/deploy
+        with:
+          environment: ${{ env.ENV_TAG }}
+          deploy_command: 'kubectl apply -f deployment.yaml'
+
+      - name: Send notification to Discord (Deploy Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:${{ env.ENV_TAG }}'
+          branch: 'main'
+          commit_message: '${{ env.COMMIT_MSG }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEPLOY'

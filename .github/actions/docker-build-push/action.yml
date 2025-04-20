@@ -1,0 +1,28 @@
+name: 'Docker Build and Push'
+description: 'Build and push a Docker image to Azure Container Registry (ACR)'
+inputs:
+  acr_username:
+    description: 'Azure Container Registry Username'
+    required: true
+  acr_password:
+    description: 'Azure Container Registry Password'
+    required: true
+  image_name:
+    description: 'The name of the Docker image'
+    required: true
+  tag:
+    description: 'The tag for the Docker image'
+    required: true
+  folder:
+    description: 'The folder containing the Dockerfile and build context'
+    required: true
+runs:
+  using: 'bash'
+  steps:
+    - name: Login to ACR
+      run: echo "${{ inputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
+
+    - name: Build & Push Docker Image
+      run: |
+        docker build -t actionagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
+        docker push actionagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}
