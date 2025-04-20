@@ -67,12 +67,12 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:${{ env.STG_TAG }}'
+          image: 'actionagent.azurecr.io/ai-service:stg'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          action: 'BUILD'
+          action: 'STG BUILD'
 
   deploy_stg:
     runs-on: ubuntu-latest
@@ -95,12 +95,12 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:${{ env.STG_TAG }}'
+          image: 'actionagent.azurecr.io/ai-service:stg'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          action: 'DEPLOY'
+          action: 'STG DEPLOY'
 
   build_and_push_prod:
     runs-on: ubuntu-latest
@@ -124,12 +124,12 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:${{ env.PROD_TAG }}'
+          image: 'actionagent.azurecr.io/ai-service:prod'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          action: 'BUILD'
+          action: 'PROD BUILD'
 
   deploy_prod:
     runs-on: ubuntu-latest
@@ -141,18 +141,15 @@ jobs:
 
       # - name: Deploy AI Service to Production
       #   uses: ./.github/actions/deploy
-      #   with:
-      #     environment: ${{ env.PROD_TAG }}
-      #     deploy_command: 'kubectl apply -f deployment.yaml'
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:${{ env.PROD_TAG }}'
+          image: 'actionagent.azurecr.io/ai-service:prod'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
           time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          action: 'DEPLOY'
+          action: 'PROD DEPLOY'

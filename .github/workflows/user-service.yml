@@ -95,7 +95,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'actionagent.azurecr.io/user-service:${{ env.STG_TAG }}'
+          image: 'actionagent.azurecr.io/user-service:stg'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -141,16 +141,13 @@ jobs:
 
       # - name: Deploy User Service to Production
       #   uses: ./.github/actions/deploy
-      #   with:
-      #     environment: ${{ env.PROD_TAG }}
-      #     deploy_command: 'kubectl apply -f deployment.yaml'
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'actionagent.azurecr.io/user-service:${{ env.PROD_TAG }}'
+          image: 'actionagent.azurecr.io/user-service:prod'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
