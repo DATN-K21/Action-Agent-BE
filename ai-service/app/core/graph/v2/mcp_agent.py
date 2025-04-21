@@ -4,7 +4,7 @@ from app.core.cache.cached_mcp_agents import McpAgentCache
 from app.core.graph.v2.base_v2 import build_basic_agent
 from app.services.database.connected_mcp_service import ConnectedMcpService
 from app.services.llm_service import get_llm_chat_model
-from app.services.mcps.mcp_client import McpClient
+from app.services.mcps.mcp_service import McpClient
 
 
 async def create_mcp_agent(
@@ -42,7 +42,7 @@ async def create_mcp_agent(
     return agent, client
 
 
-async def get_mcp_agent(
+async def get_or_create_mcp_agent(
         user_id: str,
         mcp_agent_cache: McpAgentCache,
         connected_mcp_service: ConnectedMcpService,

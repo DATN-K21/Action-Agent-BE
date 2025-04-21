@@ -10,29 +10,29 @@ from app.core.agents.base import BaseAgent
 from app.core.graph.base import HumanEditingData, ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_state
+from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_state, list_stream_nodes
 
 logger = logging.get_logger(__name__)
 
 
 class Agent(BaseAgent):
     def __init__(
-        self,
-        graph: CompiledStateGraph,
-        logger: Optional[BoundLogger] = None,
-        name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
+            self,
+            graph: CompiledStateGraph,
+            logger: Optional[BoundLogger] = None,
+            name: Optional[str] = None,
+            config: Optional[Dict[str, Any]] = None,
     ):
         if logger is None:
             logger = logger
         super().__init__(graph=graph, logger=logger, name=name, config=config)
 
     async def async_chat(
-        self,
-        question: str,
-        thread_id: Optional[str] = None,
-        timezone: Optional[str] = None,
-        max_recursion: Optional[int] = None,
+            self,
+            question: str,
+            thread_id: Optional[str] = None,
+            timezone: Optional[str] = None,
+            max_recursion: Optional[int] = None,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
@@ -106,7 +106,7 @@ class Agent(BaseAgent):
                 timezone=timezone,
                 recursion_limit=max_recursion,
             )
-            return astream_state(app=self.graph, input_=state, config=config)
+            return astream_state(app=self.graph, input_=state, config=config, allow_stream_nodes=list_stream_nodes)
         except Exception as e:
             self.logger.error(f"Error in executing graph: {str(e)}")
             raise

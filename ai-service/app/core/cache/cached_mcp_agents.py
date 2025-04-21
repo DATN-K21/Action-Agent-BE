@@ -3,7 +3,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, Optional
 
-from app.services.mcps.mcp_client import McpClient
+from app.services.mcps.mcp_service import McpClient
 
 
 class McpAgentCache:

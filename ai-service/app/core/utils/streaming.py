@@ -10,7 +10,8 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from app.core import logging
-from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, \
+    convert_dict_message_to_tool_calls
 from app.schemas.extension import ExtensionResponse
 
 logger = logging.get_logger(__name__)
@@ -42,25 +43,22 @@ list_stream_nodes = [
 
 
 async def astream_state(
-    app: Runnable,
-    input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
-    config: RunnableConfig,
-    allow_stream_nodes: Optional[Sequence[LanggraphNodeEnum]] = None,
+        app: Runnable,
+        input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
+        config: RunnableConfig,
+        allow_stream_nodes: Optional[Sequence[LanggraphNodeEnum]] = None,
 ) -> MessagesStream:
     """Stream messages from the runnable."""
     messages: dict[str, BaseMessage] = {}
     run_id: Optional[str] = None
-
-    if allow_stream_nodes is None:
-        allow_stream_nodes = list_stream_nodes
 
     async for event in app.astream_events(input_, config, version="v1", stream_mode="all"):
         metadata = event.get("metadata")
         langgraph_node = metadata.get("langgraph_node")
 
         if event["event"] == "on_chat_model_stream":
-            if (langgraph_node in LanggraphNodeEnum.__members__.values()
-                    and LanggraphNodeEnum(langgraph_node) in allow_stream_nodes
+            if allow_stream_nodes is None or (langgraph_node in LanggraphNodeEnum.__members__.values()
+                                              and LanggraphNodeEnum(langgraph_node) in allow_stream_nodes
             ):
                 if run_id != event["run_id"]:
                     run_id = event["run_id"]
@@ -72,6 +70,38 @@ async def astream_state(
                 else:
                     messages[message.id] += message  # type: ignore
                 yield [messages[message.id]]  # type: ignore
+
+
+async def astream_state_v2(
+        app: Runnable,
+        input_: Union[Sequence[AnyMessage], Dict[str, Any], Command[Any]],
+        config: RunnableConfig,
+        allow_stream_nodes: Optional[Sequence[LanggraphNodeEnum]] = None,
+) -> MessagesStream:
+    """Stream messages from the runnable."""
+    messages: dict[str, BaseMessage] = {}
+    run_id: Optional[str] = None
+
+    async for event in app.astream_events(input_, config, version="v1", stream_mode="all"):
+        metadata = event.get("metadata")
+        langgraph_node = metadata.get("langgraph_node")
+        print("[event]", event)
+        if event["event"] == "on_chat_model_stream":
+            if allow_stream_nodes is None or (langgraph_node in LanggraphNodeEnum.__members__.values()
+                                              and LanggraphNodeEnum(langgraph_node) in allow_stream_nodes
+            ):
+                if run_id != event["run_id"]:
+                    run_id = event["run_id"]
+                    yield Metadata(run_id=run_id, langgraph_node=langgraph_node).model_dump_json()
+
+                message: BaseMessage = event["data"]["chunk"]  # type: ignore
+                if message.id not in messages:
+                    messages[message.id] = message  # type: ignore
+                else:
+                    messages[message.id] += message  # type: ignore
+                yield [messages[message.id]]  # type: ignore
+
+        print("end")
 
 
 def _default(obj) -> Any:

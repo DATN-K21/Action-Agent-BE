@@ -10,16 +10,16 @@ from app.schemas.base import BaseResponse, PagingResponse, BaseRequest
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class CreateConnectedMcpRequest(BaseRequest):
-    id: Optional[str] = None
-    mcp_name: str = Field(..., min_length=3, max_length=50)
-    url: str = Field(..., min_length=3, max_length=200)
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50)
+    id: Optional[str] = Field(None, min_length=3, max_length=50, examples=["id"])
+    mcp_name: str = Field(..., min_length=3, max_length=50, examples=["mcpname"])
+    url: str = Field(..., min_length=3, max_length=200, examples=["url"])
+    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["sse"])
 
 
 class UpdateConnectedMcpRequest(BaseRequest):
-    mcp_name: Optional[str] = Field(None, min_length=3, max_length=50)
-    url: Optional[str] = Field(None, min_length=3, max_length=200)
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50)
+    mcp_name: Optional[str] = Field(None, min_length=3, max_length=50, examples=["mcpname"])
+    url: Optional[str] = Field(None, min_length=3, max_length=200, examples=["url"])
+    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["sse"])
 
 
 ##################################################

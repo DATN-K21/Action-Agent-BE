@@ -2,6 +2,7 @@ from typing import Optional, Any
 
 from pydantic import Field
 
+from app.core.utils.models import Action
 from app.schemas.base import BaseResponse, BaseRequest
 
 
@@ -10,18 +11,14 @@ from app.schemas.base import BaseResponse, BaseRequest
 ##################################################
 class McpRequest(BaseRequest):
     input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(None, ge=1, le=20, title="Max Recursion", examples=[10])
+    max_recursion: Optional[int] = Field(None, ge=1, le=50, title="Max Recursion", examples=[20])
 
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 class GetMcpActionsResponse(BaseResponse):
-    actions: list[str] = Field(..., title="List of actions", examples=[["action1", "action2"]])
-
-
-class GetMcpsResponse(BaseResponse):
-    extensions: list[str] = Field(..., title="List of extensions", examples=[["extension1", "extension2"]])
+    actions: list[Action] = Field(..., title="List of actions")
 
 
 class McpResponse(BaseResponse):
