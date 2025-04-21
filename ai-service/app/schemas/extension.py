@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 from app.core.graph.base import ToolCall
-from app.schemas._base import BaseRequest, BaseResponse
+from app.schemas.base import BaseRequest, BaseResponse
 
 
 ##################################################

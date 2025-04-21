@@ -11,7 +11,7 @@ from app.core.constants import SYSTEM
 from app.core.session import get_db_session
 from app.models.thread import Thread
 from app.prompts.prompt_templates import get_title_generation_prompt_template
-from app.schemas._base import CursorPagingRequest, ResponseWrapper
+from app.schemas.base import CursorPagingRequest, ResponseWrapper
 from app.schemas.thread import (
     CreateThreadRequest,
     CreateThreadResponse,
@@ -87,10 +87,10 @@ class ThreadService:
 
     @logging.log_function_inputs(logger)
     async def get_all_threads(
-        self,
-        user_id: str,
-        paging: CursorPagingRequest,
-        thread_type: Optional[str] = None,
+            self,
+            user_id: str,
+            paging: CursorPagingRequest,
+            thread_type: Optional[str] = None,
     ) -> ResponseWrapper[GetListThreadsResponse]:
         """Get all threads of a user."""
         try:
@@ -134,10 +134,10 @@ class ThreadService:
 
     @logging.log_function_inputs(logger)
     async def update_thread(
-        self,
-        user_id: str,
-        thread_id: str,
-        thread: UpdateThreadRequest,
+            self,
+            user_id: str,
+            thread_id: str,
+            thread: UpdateThreadRequest,
     ) -> ResponseWrapper[CreateThreadResponse]:
         """Update a thread."""
         try:
@@ -170,10 +170,10 @@ class ThreadService:
 
     @logging.log_function_inputs(logger)
     async def delete_thread(
-        self,
-        user_id: str,
-        thread_id: str,
-        deleted_by: str = SYSTEM,
+            self,
+            user_id: str,
+            thread_id: str,
+            deleted_by: str = SYSTEM,
     ) -> ResponseWrapper[DeleteThreadResponse]:
         """Delete a thread."""
         try:
@@ -207,9 +207,9 @@ class ThreadService:
 
     @logging.log_function_inputs(logger)
     async def generate_thread_title(
-        self,
-        user_id: str,
-        thread_id: str,
+            self,
+            user_id: str,
+            thread_id: str,
     ) -> ResponseWrapper[UpdateThreadResponse]:
         """
         Generate a thread title based on the thread's messages.
@@ -248,7 +248,8 @@ class ThreadService:
             prompt = get_title_generation_prompt_template()
             chain = prompt | model
             llm_response = await chain.ainvoke({"content": thread_messages_str})
-            gen_title = llm_response.content.replace("'", "") if llm_response and isinstance(llm_response.content, str) else "General topic"
+            gen_title = llm_response.content.replace("'", "") if llm_response and isinstance(llm_response.content,
+                                                                                             str) else "General topic"
             logger.info(f"Generated title: |{gen_title}|")
 
             # Update the thread title in the database
@@ -285,7 +286,7 @@ class ThreadService:
 
 
 def get_thread_service(
-    db: AsyncSession = Depends(get_db_session),
-    agent_manager: AgentManager = Depends(get_agent_manager),
+        db: AsyncSession = Depends(get_db_session),
+        agent_manager: AgentManager = Depends(get_agent_manager),
 ):
     return ThreadService(db=db, agent_manager=agent_manager)
