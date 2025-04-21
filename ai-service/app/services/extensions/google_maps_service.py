@@ -28,10 +28,10 @@ class GoogleMapsService(ExtensionService):
 
     def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_toolset()
-        tools = toolset.get_tools(actions=self._supported_actions)
+        tools = toolset.get_tools
         return tools
 
     def get_authed_tools(self, user_id) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_user_toolset(user_id)
-        tools = toolset.get_tools(actions=self._supported_actions)
+        tools = toolset.get_tools
         return tools

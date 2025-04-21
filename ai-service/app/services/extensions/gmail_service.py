@@ -48,32 +48,12 @@ class GmailService(ExtensionService):
 
     def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_toolset()
-        tools = toolset.get_tools(
-            processors={
-                "schema": {
-                    Action.GMAIL_SEND_EMAIL: _send_email_schema_processor,
-                },
-                "post": {
-                    Action.GMAIL_FETCH_EMAILS: _fetch_emails_post_processor,
-                },
-            },
-            actions=self._supported_actions,
-        )
+        tools = toolset.get_tools
         return tools
 
     def get_authed_tools(self, user_id: str) -> Sequence[Union[BaseTool, Callable]]:
         toolset = ComposioService.get_user_toolset(user_id=user_id)
 
-        tools = toolset.get_tools(
-            processors={
-                "schema": {
-                    Action.GMAIL_SEND_EMAIL: _send_email_schema_processor,
-                },
-                "post": {
-                    Action.GMAIL_FETCH_EMAILS: _fetch_emails_post_processor,
-                },
-            },
-            actions=self._supported_actions,
-        )
+        tools = toolset.get_tools
 
         return tools

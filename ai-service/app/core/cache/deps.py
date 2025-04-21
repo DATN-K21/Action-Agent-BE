@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from app.core.cache.cached_agents import AgentCache
+from app.core.cache.cached_mcp_agents import McpAgentCache
 
 
 @lru_cache()
@@ -20,4 +21,4 @@ def get_mcp_agent_cache():
     :return: The MCP agent cache instance.
     """
 
-    return AgentCache()
+    return McpAgentCache()

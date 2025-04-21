@@ -140,10 +140,34 @@ class ConnectedMcpService:
             )
 
     @logging.log_function_inputs(logger)
-    async def get_all_connected_mcps(self, user_id: str, paging: PagingRequest) -> ResponseWrapper[
+    async def get_all_connected_mcps(self, user_id: str, paging: Optional[PagingRequest] = None) -> ResponseWrapper[
         GetAllConnectedMcpsRequest]:
         """Get all connected apps by user_id."""
         try:
+            if paging is None:
+                query = (
+                    select(ConnectedMcp)
+                    .where(
+                        ConnectedMcp.user_id == user_id,
+                        ConnectedMcp.is_deleted.is_(False),
+                    )
+                    .order_by(ConnectedMcp.created_at.desc())
+                )
+
+                result = await self.db.execute(query)
+                connected_mcps = result.scalars().all()
+                wrapped_connected_mcps = [GetConnectedMcpResponse.model_validate(connected_mcp) for connected_mcp in
+                                          connected_mcps]
+                return ResponseWrapper.wrap(
+                    status=200,
+                    data=GetAllConnectedMcpsRequest(
+                        connected_mcps=wrapped_connected_mcps,
+                        page_number=1,
+                        max_per_page=len(connected_mcps),
+                        total_page=1
+                    )
+                )
+
             page_number = paging.page_number
             max_per_page = paging.max_per_page
 

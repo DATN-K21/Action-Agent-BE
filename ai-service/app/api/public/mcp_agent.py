@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import ensure_user_id
 from app.core import logging
-from app.core.cache.cached_agents import AgentCache
+from app.core.cache.cached_mcp_agents import McpAgentCache
 from app.core.cache.deps import get_mcp_agent_cache
 from app.core.langchain_agents.deps import get_mcp_agent
 from app.core.session import get_db_session
@@ -14,8 +14,6 @@ from app.schemas.base import ResponseWrapper
 from app.schemas.mcp_agent import McpResponse, McpRequest
 from app.services.database.connected_mcp_service import ConnectedMcpService
 from app.services.database.deps import get_connected_mcp_service
-from app.services.mcps.deps import get_mcp_service
-from app.services.mcps.mcp_service import McpService
 
 logger = logging.get_logger(__name__)
 
@@ -70,9 +68,8 @@ async def chat(
         thread_id: str,
         connected_mcp_id: str,
         request: McpRequest,
-        mcp_agent_cache: AgentCache = Depends(get_mcp_agent_cache),
+        mcp_agent_cache: McpAgentCache = Depends(get_mcp_agent_cache),
         connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),
-        mcp_service: McpService = Depends(get_mcp_service),
         db: AsyncSession = Depends(get_db_session),
         _: bool = Depends(ensure_user_id),
 ):
@@ -91,12 +88,10 @@ async def chat(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        agent = await get_mcp_agent(
+        agent, client = await get_mcp_agent(
             user_id=user_id,
-            connected_mcp_id=connected_mcp_id,
             mcp_agent_cache=mcp_agent_cache,
             connected_mcp_service=connected_mcp_service,
-            mcp_service=mcp_service
         )
 
         config = get_invocation_config(
