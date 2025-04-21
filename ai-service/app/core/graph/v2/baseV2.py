@@ -16,13 +16,13 @@ logger = get_logger(__name__)
 
 
 def build_basic_agent(
-    *,
-    name: str,
-    model: BaseLanguageModel,
-    tools: list[BaseTool],
-    checkpointer: AsyncPostgresSaver,
-    prompt: Optional[str] = None,
-    interupt_before: Optional[list[str]] = None,
+        *,
+        name: str,
+        model: BaseLanguageModel,
+        tools: list[BaseTool],
+        checkpointer: AsyncPostgresSaver,
+        prompt: Optional[str] = None,
+        interrupt_before: Optional[list[str]] = None,
 ) -> CompiledGraph:
     """
     Constructs a LangGraph ReAct agent with the specified tools and language model.
@@ -37,7 +37,7 @@ def build_basic_agent(
         tools=tools,
         checkpointer=checkpointer,
         prompt=prompt,
-        interrupt_before=interupt_before,
+        interrupt_before=interrupt_before,
     )
     return agent
 
@@ -73,7 +73,7 @@ def get_agent_managerV2(checkpointer: AsyncPostgresSaver = Depends(get_checkpoin
         tools=[],
         checkpointer=checkpointer,
         prompt="You are a helpful assistant named Doraemon.",
-        interupt_before=None,
+        interrupt_before=None,
     )
     manager.register_agent(chat_agent)
 
