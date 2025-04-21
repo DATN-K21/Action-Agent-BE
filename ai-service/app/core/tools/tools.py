@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Sequence
 
+from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_community.tools import TavilySearchResults
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_core.runnables import ConfigurableField, Runnable
@@ -22,14 +23,11 @@ def get_search_tools(max_results: int = 5) -> Sequence[BaseTool | Runnable]:
         description="Search and return information from Tavily",
     )
 
-    # wikipedia_retriever = WikipediaRetriever(wiki_client=None)
-    # wikipedia_retriever_tool = create_retriever_tool(
-    #     wikipedia_retriever,
-    #     "wikipedia_retriever_tool",
-    #     "Search and return information from Wikipedia"
-    # )
+    wikipedia_retriever = WikipediaRetriever(wiki_client=None)
+    wikipedia_retriever_tool = create_retriever_tool(wikipedia_retriever, "wikipedia_retriever_tool", "Search and return information from Wikipedia")
 
-    return [tavily_tool]
+    # return [tavily_tool]
+    return [tavily_tool, wikipedia_retriever_tool]
 
 
 def get_rag_tools() -> Sequence[BaseTool | Runnable]:

@@ -60,6 +60,28 @@ You are an intelligent assistant responsible for selecting the appropriate tools
         input_variables=["tool_calls"],
     )
 
+@lru_cache()
+def get_search_enhancement_prompt_template():
+    return PromptTemplate(
+        template="""You are a **search query optimizer** with access to the following retrieval tools:
+            {tools}
+
+            Your job is to take the user's raw input below:
+            {query}
+            And then:
+            1. Produce an **enhanced_query**: a clear, unambiguous, keyword-rich version optimized for those tools.  
+            2. For each tool, assign a **bias score** between 0.0 and 1.0 (1.0 = most relevant/unbiased for this query).  
+            3. Select the **top-5** tools by descending bias score.
+
+            **Output** *only* a JSON object with exactly three keys, and **no** extra text:
+
+            ```json
+            {{"enhanced_query":"History of Rome from 753BC to 476AD","tool_bias_scores":{{"Wiki":0.9,"Tavily":0.7}},"selected_tools":["Wiki","Tavily"]}}
+            ```
+            """,
+        input_variables=["tools", "query"],
+    )
+
 
 @lru_cache()
 def get_enhanced_prompt_template():
@@ -687,3 +709,24 @@ the action you will take and then invoke the appropriate tool with correctly for
     ]
 
     return SystemMessage(system_message)
+
+@lru_cache()
+def get_answer_reranking_prompt_template() -> PromptTemplate:
+    return PromptTemplate(
+        template="""You are an answer-level reranker.  
+            You will be given a list of candidate answers, each annotated by its source tool name like below: 
+            {answers}
+            For each candidate, assign a relevance **score** between 0.0 and 1.0.  
+            Return **only** a JSON array of objects sorted by descending score, where each object has exactly three keys:
+                
+            ```json
+            [
+                {{ "tool": "ToolA", "answer": "…string…", "score": 0.87 }},
+                {{ "tool": "ToolB", "answer": "…string…", "score": 0.42 }},
+                …
+            ]
+            ```
+            Do not include any extra text, explanation, or formatting such as triple backticks. Output only valid JSON.
+         """,
+        input_variables=["answers"],
+    )

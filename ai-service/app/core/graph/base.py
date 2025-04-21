@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Any, Dict, Literal, Optional, Sequence, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -16,17 +17,20 @@ from app.core.monkey_patches.deps import patch_lib
 from app.core.tools.tools import get_date_parser_tools
 from app.core.utils.messages import trimmer, truncate_text
 from app.prompts.prompt_templates import (
+    get_answer_reranking_prompt_template,
     get_enhanced_prompt_template,
     get_human_in_loop_evaluation_prompt_template,
     get_markdown_answer_generating_prompt_template,
     get_openai_function_prompt_template,
     get_regenerate_tool_calls_prompt_template,
+    get_search_enhancement_prompt_template,
     get_simple_agent_prompt_template,
 )
 from app.services.model_service import get_openai_model
 
 logger = logging.get_logger(__name__)
 
+TOP_ANSWER_COUNT = 5
 
 class ToolCall(BaseModel):
     name: str
@@ -35,7 +39,13 @@ class ToolCall(BaseModel):
     type: Optional[str] = None
 
 
-class State(TypedDict):
+class AnswerScore(BaseModel):
+    tool: str
+    answer: str
+    score: float
+
+
+class State(TypedDict, total=False):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_calls: list[ToolCall]
     tool_messages: list[AIMessage]
@@ -43,6 +53,10 @@ class State(TypedDict):
     next: str
     interrupted: bool
 
+    # new, optional keys for search‑enhancement
+    tool_bias_scores: Dict[str, float]
+    selected_tools: Sequence[str]
+    top_answers: Sequence[AnswerScore]
 
 class BinaryScore(TypedDict):
     score: Literal["yes", "no"]
@@ -57,6 +71,11 @@ class StreamData(BaseModel):
 class HumanEditingData(BaseModel):
     execute: bool
     tool_calls: Optional[list[ToolCall]] = None
+
+class SearchEnhancementOutput(BaseModel):
+    enhanced_query: str
+    tool_bias_scores: Dict[str, float] = {}
+    selected_tools: Sequence[str]
 
 
 # noinspection PyMethodMayBeStatic
@@ -78,6 +97,36 @@ class GraphBuilder:
 
         # Add date parser tools to the enhanced question tools
         self.enhanced_question_tools.extend(get_date_parser_tools())
+
+    async def _async_search_enhance_node(self, state: State, config: RunnableConfig) -> Dict[str, Any]:
+        logger.info("---SEARCH ENHANCE NODE---")
+        question = state.get("question")
+        model = get_openai_model(temperature=0, streaming=False)
+        tool_name_list: list[str] = [name for name in (t.name for t in (self.tools or [])) if name is not None]
+        tool_names = ", ".join(tool_name_list)
+
+        try:
+            prompt = get_search_enhancement_prompt_template()
+            chain = prompt | model.with_structured_output(SearchEnhancementOutput)
+
+            # run the chain
+            raw = await chain.ainvoke(
+                {"tools": tool_names, "query": question},
+                config=config,
+            )
+
+            result = TypeAdapter(SearchEnhancementOutput).validate_python(raw)
+
+            # write back into state
+            state["question"] = result.enhanced_query
+            state["tool_bias_scores"] = result.tool_bias_scores
+            state["selected_tools"] = result.selected_tools
+
+            logger.info(f"[search-agent] selected tools: {result.selected_tools}")
+            return {"question": result.enhanced_query}
+        except Exception as e:
+            logger.error(f"[_async_search_enhance_node] Error in invoking chain: {str(e)}")
+            raise
 
     async def _async_enhance_prompt_node(self, state: State, config: RunnableConfig):
         logger.info("---ENHANCE PROMPT NODE---")
@@ -126,16 +175,19 @@ class GraphBuilder:
 
             model = get_openai_model(temperature=0)
             prompt = get_openai_function_prompt_template()
-            if self.tool_choice is not None:
-                model = model.bind_tools(tools=self.tools, tool_choice=self.tool_choice)
+
+            selected_names = state.get("selected_tools")
+            if self.name == "search-agent" and selected_names:
+                tools_to_bind = [t for t in (self.tools or []) if t.name in selected_names]
             else:
-                model = model.bind_tools(self.tools)
+                tools_to_bind = self.tools or []
+            if self.tool_choice is not None:
+                model = model.bind_tools(tools=tools_to_bind, tool_choice=self.tool_choice)
+            else:
+                model = model.bind_tools(tools_to_bind)
+
             chain = prompt | trimmer | model
-            response = await chain.ainvoke({
-                "input": question,
-                "chat_history": messages,
-                "agent_scratchpad": []
-            })
+            response = await chain.ainvoke({"input": question, "chat_history": messages, "agent_scratchpad": []})
 
             if response.content is not None and response.content != "":
                 return {
@@ -146,8 +198,7 @@ class GraphBuilder:
             adapter = TypeAdapter(list[ToolCall])
             print("[tool_calls]", response.tool_calls)
 
-            return {"tool_calls": adapter.validate_python(response.tool_calls),
-                    "next": "evaluate_human_in_loop_node"}
+            return {"tool_calls": adapter.validate_python(response.tool_calls), "next": "evaluate_human_in_loop_node"}
 
         except Exception as e:
             logger.error(f"[_async_select_tool_node] Error in invoking chain: {str(e)}")
@@ -180,11 +231,7 @@ class GraphBuilder:
 
         await chain.ainvoke(input={"tool_calls": str_tool_message})
 
-        data = interrupt(
-            {
-                "tool_calls": state.get("tool_calls")
-            }
-        )
+        data = interrupt({"tool_calls": state.get("tool_calls")})
 
         adapter = TypeAdapter(HumanEditingData)
         data = adapter.validate_python(data)
@@ -195,9 +242,7 @@ class GraphBuilder:
             if human_tool_calls is not None:
                 tool_calls = state.get("tool_calls")
                 for human_tool_call in human_tool_calls:
-                    index = next((i for i, item in enumerate(tool_calls)
-                                  if item.name == human_tool_call.name
-                                  ), -1)
+                    index = next((i for i, item in enumerate(tool_calls) if item.name == human_tool_call.name), -1)
                     tool_calls[index].args = human_tool_call.args
 
                 state["tool_calls"] = tool_calls
@@ -235,6 +280,44 @@ class GraphBuilder:
 
         except Exception as e:
             logger.error(f"[_tool_node] Error in invoking tool: {str(e)}")
+            raise e
+
+    async def _async_answer_rerank_node(self, state: State, config: RunnableConfig):
+        logger.info("---ANSWER RERANK NODE---")
+
+        # pair each tool_message with its tool_call by index
+        tool_calls = state.get("tool_calls", [])
+        tool_messages = state.get("tool_messages", [])
+        candidates = []
+        for i, msg in enumerate(tool_messages):
+            if i < len(tool_calls):
+                candidates.append({"tool": tool_calls[i].name, "answer": msg.content})
+
+        prompt = get_answer_reranking_prompt_template()
+        model = get_openai_model(temperature=0, streaming=False)
+        chain = prompt | model
+        try:
+            raw = await chain.ainvoke({"answers": candidates}, config=config)
+            if hasattr(raw, "content"):
+                raw_content = str(raw.content)
+            else:
+                raw_content = str(raw)
+
+            try:
+                parsed_output = json.loads(raw_content)
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse JSON: {raw_content}")
+                raise ValueError("Invalid JSON format")
+
+            scored: list[AnswerScore] = TypeAdapter(list[AnswerScore]).validate_python(parsed_output)
+
+            # pick top‑TOP_ANSWER_COUNT
+            top_answers = scored[:TOP_ANSWER_COUNT]
+            state["top_answers"] = top_answers
+            logger.info(f"[search-agent] top-{TOP_ANSWER_COUNT} answers with tools: {[f'{a.tool}:{a.answer}' for a in top_answers]}")
+            return {}
+        except Exception as e:
+            logger.error(f"[_async_answer_rerank_node] Error in invoking chain: {str(e)}")
             raise e
 
     async def _async_generate_node(self, state: State):
@@ -277,15 +360,19 @@ class GraphBuilder:
             logger.error(f"[_generate_node] Error in invoking chain: {str(e)} ")
             raise
 
-    def build_graph(
-            self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False
-    ) -> CompiledStateGraph:
+    def build_graph(self, perform_action: Optional[bool] = False, has_human_acceptance_flow: Optional[bool] = False) -> CompiledStateGraph:
         # Define a new graph
         workflow = StateGraph(State)
+        if self.name == "search-agent" and perform_action:
+            workflow.add_node("search_enhance_node", self._async_search_enhance_node)
 
         if self.tools is None or len(self.tools) == 0 or not perform_action:
             workflow.add_node("agent_node", self._async_agent_node)
-            workflow.add_edge(START, "agent_node")
+            if self.name == "search-agent":
+                workflow.add_edge(START, "search_enhance_node")
+                workflow.add_edge("search_enhance_node", "agent_node")
+            else:
+                workflow.add_edge(START, "agent_node")
             workflow.add_edge("agent_node", END)
 
         elif not has_human_acceptance_flow:
@@ -293,22 +380,36 @@ class GraphBuilder:
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "select_tool_node")
-            workflow.add_conditional_edges("select_tool_node",
-                                           lambda state: END if state.get("next") == END else "tool_node")
-            workflow.add_edge("tool_node", "generate_node")
+            # workflow.add_edge(START, "select_tool_node")
+            logger.info(f"[search-agent] name: {self.name}")
+            if self.name == "search-agent":
+                workflow.add_node("answer_rerank_node", self._async_answer_rerank_node)
+                workflow.add_edge(START, "search_enhance_node")
+                workflow.add_edge("search_enhance_node", "select_tool_node")
+                workflow.add_conditional_edges("select_tool_node", lambda state: END if state.get("next") == END else "tool_node")
+                workflow.add_edge("tool_node", "answer_rerank_node")
+                workflow.add_edge("answer_rerank_node", "generate_node")
+            else:
+                workflow.add_edge(START, "select_tool_node")
+                workflow.add_conditional_edges("select_tool_node", lambda state: END if state.get("next") == END else "tool_node")
+                workflow.add_edge("tool_node", "generate_node")
             workflow.add_edge("generate_node", END)
 
         else:
-            workflow.add_node("enhance_prompt_node", self._async_enhance_prompt_node)
+            if self.name != "search-agent":
+                workflow.add_node("enhance_prompt_node", self._async_enhance_prompt_node)
             workflow.add_node("select_tool_node", self._async_select_tool_node)  # agent
             workflow.add_node("evaluate_human_in_loop_node", self._async_evaluate_human_in_loop_node)
             workflow.add_node("human_editing_node", self._async_human_editing_node)  # human edit
             workflow.add_node("tool_node", self._async_tool_node)  # retrieval
             workflow.add_node("generate_node", self._async_generate_node)
 
-            workflow.add_edge(START, "enhance_prompt_node")
-            workflow.add_edge("enhance_prompt_node", "select_tool_node")
+            if self.name == "search-agent":
+                workflow.add_edge(START, "search_enhance_node")
+                workflow.add_edge("search_enhance_node", "select_tool_node")
+            else:
+                workflow.add_edge(START, "enhance_prompt_node")
+                workflow.add_edge("enhance_prompt_node", "select_tool_node")
             workflow.add_conditional_edges("select_tool_node", lambda state: state.get("next"))
             workflow.add_conditional_edges("evaluate_human_in_loop_node", lambda state: state.get("next"))
             workflow.add_conditional_edges("human_editing_node", lambda state: state.get("next"))
