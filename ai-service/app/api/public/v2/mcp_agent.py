@@ -11,7 +11,7 @@ from app.core.cache.cached_mcp_agents import McpAgentCache, get_mcp_agent_cache
 from app.core.graph.v2.mcp_agent import get_or_create_mcp_agent
 from app.core.session import get_db_session
 from app.core.utils.config_helper import get_invocation_config
-from app.core.utils.streaming import to_sse, astream_state_v2
+from app.core.utils.streaming import astream_state, to_sse
 from app.memory.checkpoint import get_checkpointer
 from app.models import Thread
 from app.schemas.base import ResponseWrapper
@@ -166,6 +166,6 @@ async def stream(
         recursion_limit=request.max_recursion,
     )
 
-    response = astream_state_v2(app=agent, input_=request.input, config=config, allow_stream_nodes=None)
+    response = astream_state(app=agent, input_={"messages": [request.input]}, config=config, allow_stream_nodes=None)
 
     return EventSourceResponse(to_sse(response))
