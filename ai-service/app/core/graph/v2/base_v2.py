@@ -38,6 +38,7 @@ def build_basic_agent(
         checkpointer=checkpointer,
         prompt=prompt,
         interrupt_before=interrupt_before,
+        debug=True
     )
     return agent
 
