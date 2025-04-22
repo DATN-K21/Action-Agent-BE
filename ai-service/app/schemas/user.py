@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.schemas._base import BaseRequest, BaseResponse, PagingResponse
+from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
 ##################################################

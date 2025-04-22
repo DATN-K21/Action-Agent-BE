@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import Field, field_validator
 
 from app.core.enums import LlmProvider
-from app.schemas._base import BaseRequest, BaseResponse
+from app.schemas.base import BaseRequest, BaseResponse
 
 
 ##################################################
@@ -75,6 +75,7 @@ class UpsertApiKeyResponse(BaseResponse):
     user_id: str
     provider: LlmProvider
     is_default: bool
+
 
 class DeleteApiKeyResponse(BaseResponse):
     pass

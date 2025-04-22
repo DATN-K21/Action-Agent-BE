@@ -1,7 +1,6 @@
-
 from pydantic import Field
 
-from app.schemas._base import BaseResponse
+from app.schemas.base import BaseResponse
 
 
 ##################################################

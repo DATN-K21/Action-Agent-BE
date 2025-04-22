@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.schemas._base import BaseRequest, BaseResponse
+from app.schemas.base import BaseRequest, BaseResponse
 
 
 ##################################################
@@ -28,7 +28,7 @@ class GetAgentsResponse(BaseResponse):
 class AgentChatResponse(BaseResponse):
     thread_id: str = Field(..., title="Thread ID", examples=["abcdef"])
     output: Optional[str] = Field(None, title="Output", examples=["Hello!"])
-    
+
 
 class GetAgentV2Response(BaseResponse):
     name: str = Field(..., title="Agent Name", examples=["chat-agent"])
@@ -37,8 +37,8 @@ class GetAgentV2Response(BaseResponse):
     tools: Optional[list[str]] = Field(None, title="Tools", examples=[["tool1", "tool2"]])
     child_agents: Optional[list[str]] = Field(None, title="Child Agents", examples=[["child-agent1", "child-agent2"]])
     is_public: Optional[bool] = Field(None, title="Is Public", examples=[True])
-   
-    
+
+
 class GetAgentV2ListResponse(BaseResponse):
     agents: list[GetAgentV2Response] = Field(..., title="Agents", examples=[[
         {

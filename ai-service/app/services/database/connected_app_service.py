@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import logging
 from app.core.session import get_db_session
 from app.models.connected_app import ConnectedApp
-from app.schemas._base import PagingRequest
+from app.schemas.base import PagingRequest
 from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse
 
 logger = logging.get_logger(__name__)
@@ -19,9 +19,9 @@ class ConnectedAppService:
 
     @logging.log_function_inputs(logger)
     async def get_account_id(
-        self,
-        user_id: str,
-        app_name: str,
+            self,
+            user_id: str,
+            app_name: str,
     ) -> Optional[str]:
         """Get a connected account id by user_id and app_name."""
         try:
@@ -45,11 +45,11 @@ class ConnectedAppService:
 
     @logging.log_function_inputs(logger)
     async def create_connected_app(
-        self,
-        user_id: str,
-        app_name: str,
-        connected_account_id: str,
-        auth_scheme: str = "Bearer",
+            self,
+            user_id: str,
+            app_name: str,
+            connected_account_id: str,
+            auth_scheme: str = "Bearer",
     ) -> bool:
         """Create a connected app."""
         try:
@@ -71,9 +71,9 @@ class ConnectedAppService:
 
     @logging.log_function_inputs(logger)
     async def delete_connected_app(
-        self,
-        user_id: str,
-        app_name: str,
+            self,
+            user_id: str,
+            app_name: str,
     ) -> bool:
         """Delete a connected app."""
         try:
@@ -103,9 +103,9 @@ class ConnectedAppService:
 
     @logging.log_function_inputs(logger)
     async def get_connected_app(
-        self,
-        user_id: str,
-        app_name: str,
+            self,
+            user_id: str,
+            app_name: str,
     ) -> Optional[GetConnectedAppResponse]:
         """Get a connected app by user_id and app_name."""
         try:
@@ -130,9 +130,9 @@ class ConnectedAppService:
 
     @logging.log_function_inputs(logger)
     async def get_all_connected_apps(
-        self,
-        user_id: str,
-        paging: PagingRequest,
+            self,
+            user_id: str,
+            paging: PagingRequest,
     ) -> GetAllConnectedAppsRequest:
         """Get all connected apps by user_id."""
         try:
@@ -170,7 +170,8 @@ class ConnectedAppService:
 
             result = await self.db.execute(query)
             connected_apps = result.scalars().all()
-            wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in connected_apps]
+            wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in
+                                      connected_apps]
             return GetAllConnectedAppsRequest(
                 connected_apps=wrapped_connected_apps,
                 page_number=page_number,

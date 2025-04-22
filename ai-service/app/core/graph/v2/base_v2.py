@@ -63,7 +63,7 @@ class AgentMngr:
 
 
 @lru_cache()
-def get_agent_managerV2(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
+def get_agent_manager_v2(checkpointer: AsyncPostgresSaver = Depends(get_checkpointer)):
     manager = AgentMngr()
 
     # Register chat agent

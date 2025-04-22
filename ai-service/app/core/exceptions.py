@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 
 from app.core import logging
-from app.schemas._base import ResponseWrapper
+from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
