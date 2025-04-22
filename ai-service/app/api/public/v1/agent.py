@@ -10,8 +10,8 @@ from app.core.agents.agent_manager import AgentManager, get_agent_manager
 from app.core.session import get_db_session
 from app.core.utils.streaming import to_sse
 from app.models.thread import Thread
-from app.schemas._base import ResponseWrapper
 from app.schemas.agent import AgentChatRequest, AgentChatResponse, GetAgentsResponse
+from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
@@ -20,8 +20,8 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 @router.get("/get-all", summary="Get all agent names.", response_model=ResponseWrapper[GetAgentsResponse])
 async def get_agents(
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    _: bool = Depends(ensure_authenticated),
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        _: bool = Depends(ensure_authenticated),
 ):
     """
     Get all agent names.
@@ -36,15 +36,16 @@ async def get_agents(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.", response_model=ResponseWrapper[AgentChatResponse])
+@router.post("/chat/{user_id}/{thread_id}/{agent_name}", summary="Chat with the agent.",
+             response_model=ResponseWrapper[AgentChatResponse])
 async def execute(
-    user_id: str,
-    thread_id: str,
-    agent_name: str,
-    request: AgentChatRequest,
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_user_id),
+        user_id: str,
+        thread_id: str,
+        agent_name: str,
+        request: AgentChatRequest,
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
     try:
         # Get the agent
@@ -86,15 +87,16 @@ async def execute(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.", response_class=StreamingResponse)
+@router.post("/stream/{user_id}/{thread_id}/{agent_name}", summary="Stream with the agent.",
+             response_class=StreamingResponse)
 async def stream(
-    user_id: str,
-    thread_id: str,
-    agent_name: str,
-    request: AgentChatRequest,
-    agent_manager: AgentManager = Depends(get_agent_manager),
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_user_id),
+        user_id: str,
+        thread_id: str,
+        agent_name: str,
+        request: AgentChatRequest,
+        agent_manager: AgentManager = Depends(get_agent_manager),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
     try:
         # Get the agent

@@ -9,22 +9,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import ensure_authenticated, ensure_user_id
 from app.core import logging
-from app.core.graph.v2.baseV2 import AgentMngr, get_agent_managerV2
+from app.core.graph.v2.base_v2 import AgentMngr, get_agent_manager_v2
 from app.core.session import get_db_session
 from app.models.agent import BuiltinAgent, CustomAgent
 from app.models.thread import Thread
-from app.schemas._base import ResponseWrapper
 from app.schemas.agent import AgentChatRequest, GetAgentV2ListResponse, GetAgentV2Response
+from app.schemas.base import ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/agent", tags=["API-V2"])
+router = APIRouter(prefix="/agent", tags=["API-V2 | Agent"])
 
 
 @router.get("/get-all", summary="Get all agents.", response_model=ResponseWrapper[GetAgentV2ListResponse])
 async def get_agents(
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_authenticated),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_authenticated),
 ):
     """
     Get all agents.
@@ -81,15 +81,16 @@ def db_add_message(timestamp: str, role: str, content: str):
 executor = ThreadPoolExecutor(max_workers=2)
 
 
-@router.post("/{agent_name}/stream/{user_id}/{thread_id}/", summary="Stream with the agent.", response_class=StreamingResponse)
+@router.post("/{agent_name}/stream/{user_id}/{thread_id}/", summary="Stream with the agent.",
+             response_class=StreamingResponse)
 async def stream(
-    agent_name: str,
-    user_id: str,
-    thread_id: str,
-    request: AgentChatRequest,
-    agent_manager: AgentMngr = Depends(get_agent_managerV2),
-    db: AsyncSession = Depends(get_db_session),
-    _: bool = Depends(ensure_user_id),
+        agent_name: str,
+        user_id: str,
+        thread_id: str,
+        request: AgentChatRequest,
+        agent_manager: AgentMngr = Depends(get_agent_manager_v2),
+        db: AsyncSession = Depends(get_db_session),
+        _: bool = Depends(ensure_user_id),
 ):
     try:
         # Check the thread
@@ -115,9 +116,9 @@ async def stream(
         config = RunnableConfig(configurable={"thread_id": thread_id})
         input = {"messages": HumanMessage(content=request.input)}
         async for step in agent.astream(
-            input=input,
-            config=config,
-            stream_mode=["messages", "debug"],
+                input=input,
+                config=config,
+                stream_mode=["messages", "debug"],
         ):
             if not isinstance(step, tuple):
                 continue
@@ -147,7 +148,8 @@ async def stream(
                     if messages:
                         last_msg = messages[-1]
                         content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
-                        role = "ai" if isinstance(last_msg, AIMessage) else "human" if isinstance(last_msg, HumanMessage) else "unknown"
+                        role = "ai" if isinstance(last_msg, AIMessage) else "human" if isinstance(last_msg,
+                                                                                                  HumanMessage) else "unknown"
 
                     # # Run DB insert in background to avoid blocking
                     # asyncio.create_task(asyncio.get_event_loop().run_in_executor(executor, db_add_message, timestamp, role, content))

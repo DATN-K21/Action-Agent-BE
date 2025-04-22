@@ -10,7 +10,7 @@ from app.core.constants import SYSTEM, TRIAL_TOKENS
 from app.core.enums import LlmProvider
 from app.core.session import get_db_session
 from app.models import User, UserApiKey
-from app.schemas._base import PagingRequest, ResponseWrapper
+from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -19,7 +19,8 @@ from app.schemas.user import (
     GetUserResponse,
     UpdateUserRequest,
 )
-from app.schemas.user_api_key import DeleteApiKeyResponse, GetApiKeysResponse, SetDefaultApiKeyResponse, UpsertApiKeyResponse
+from app.schemas.user_api_key import DeleteApiKeyResponse, GetApiKeysResponse, SetDefaultApiKeyResponse, \
+    UpsertApiKeyResponse
 
 logger = logging.get_logger(__name__)
 
@@ -233,7 +234,8 @@ class UserService:
                     UserApiKey.provider.label("provider"),
                     UserApiKey.created_at.label("created_at"),
                 )
-                .join(UserApiKey, and_((User.id == UserApiKey.user_id), (UserApiKey.is_deleted.is_(False))), isouter=True)
+                .join(UserApiKey, and_((User.id == UserApiKey.user_id), (UserApiKey.is_deleted.is_(False))),
+                      isouter=True)
                 .where(
                     User.id == user_id,
                     User.is_deleted.is_(False),
@@ -280,7 +282,8 @@ class UserService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def set_default_api_key(self, user_id: str, provider: Optional[LlmProvider]) -> ResponseWrapper[SetDefaultApiKeyResponse]:
+    async def set_default_api_key(self, user_id: str, provider: Optional[LlmProvider]) -> ResponseWrapper[
+        SetDefaultApiKeyResponse]:
         """Set default API key for a user."""
         try:
             if not provider:
@@ -331,7 +334,8 @@ class UserService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def upsert_api_key(self, user_id: str, provider: LlmProvider, encrypted_value: str) -> ResponseWrapper[UpsertApiKeyResponse]:
+    async def upsert_api_key(self, user_id: str, provider: LlmProvider, encrypted_value: str) -> ResponseWrapper[
+        UpsertApiKeyResponse]:
         """Upsert API key for a user."""
         try:
             # Check if the API key already exists

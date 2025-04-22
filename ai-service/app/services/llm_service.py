@@ -5,16 +5,16 @@ from pydantic import SecretStr
 from app.core.enums import LlmProvider
 from app.core.settings import env_settings
 
-MAX_TOKENS = 10000
+MAX_TOKENS = 20000
 
 
 def _get_openai_model(
-    model: str,
-    temperature: float,
-    api_key: SecretStr,
-    timeout: int = 60,
-    max_retries: int = 3,
-    **kwargs,
+        model: str,
+        temperature: float,
+        api_key: SecretStr,
+        timeout: int = 60,
+        max_retries: int = 3,
+        **kwargs,
 ) -> ChatOpenAI:
     """
     Get an OpenAI language model.
@@ -31,12 +31,12 @@ def _get_openai_model(
 
 
 def get_llm_chat_model(
-    *,
-    provider: LlmProvider = env_settings.LLM_DEFAULT_PROVIDER,
-    model: str = env_settings.LLM_DEFAULT_MODEL,
-    api_key: str = env_settings.LLM_DEFAULT_API_KEY,
-    temperature: float = 0,
-    **kwargs,
+        *,
+        provider: LlmProvider = env_settings.LLM_DEFAULT_PROVIDER,
+        model: str = env_settings.LLM_DEFAULT_MODEL,
+        api_key: str = env_settings.LLM_DEFAULT_API_KEY,
+        temperature: float = 0,
+        **kwargs,
 ) -> BaseChatModel:
     """
     Get a chat model based on the provider.
@@ -51,4 +51,3 @@ def get_llm_chat_model(
             )
         case _:
             raise ValueError(f"Unsupported provider: {provider}. Supported are: {LlmProvider.supported_values()}")
-

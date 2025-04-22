@@ -4,11 +4,11 @@ from langgraph.graph import END, START, StateGraph
 
 from app.core import logging
 from app.core.utils.messages import get_message_prefix, trimmer
-from app.core.utils.streaming import MessagesStream, astream_state
+from app.core.utils.streaming import MessagesStream, astream_state, list_stream_nodes
 from app.memory.checkpoint import AsyncPostgresSaver
 from app.prompts.prompt_templates import get_retriever_prompt_template
-from app.schemas._base import ResponseWrapper
 from app.schemas.agent import AgentChatResponse
+from app.schemas.base import ResponseWrapper
 from app.services.llm_service import get_llm_chat_model
 from app.services.multi_agent.core.teams_management import team_management_node
 from app.services.multi_agent.utils.helpers import AgentState
@@ -62,7 +62,7 @@ class MultiAgentService:
 
     @logging.log_function_inputs(logger)
     async def execute_multi_agent(
-        self, thread_id: str, user_input: str, max_recursion: int = 10
+            self, thread_id: str, user_input: str, max_recursion: int = 10
     ) -> ResponseWrapper[AgentChatResponse]:
         try:
             config = RunnableConfig(
@@ -91,7 +91,7 @@ class MultiAgentService:
             query = HumanMessage(content=user_input)
             graph = self.create_workflow()
             state = {"messages": [query], "question": user_input}
-            return astream_state(graph, state, config)
+            return astream_state(graph, state, config, allow_stream_nodes=list_stream_nodes)
         except Exception as e:
             logger.error(f"Has error: {str(e)}", exc_info=True)
             return self.error_stream()
