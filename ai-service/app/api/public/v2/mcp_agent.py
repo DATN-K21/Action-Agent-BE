@@ -8,7 +8,7 @@ from starlette.responses import StreamingResponse
 from app.api.auth import ensure_user_id
 from app.core import logging
 from app.core.cache.cached_mcp_agents import McpAgentCache, get_mcp_agent_cache
-from app.core.graph.v2.mcp_agent import get_or_create_mcp_agent
+from app.core.graph.v2.mcp_agent import create_mcp_agent_no_cache
 from app.core.session import get_db_session
 from app.core.utils.config_helper import get_invocation_config
 from app.core.utils.streaming import astream_state, to_sse
@@ -97,31 +97,28 @@ async def chat(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        agent, client = await get_or_create_mcp_agent(
-            user_id=user_id,
-            mcp_agent_cache=mcp_agent_cache,
-            connected_mcp_service=connected_mcp_service,
-            checkpointer=checkpointer
-        )
-
         config = get_invocation_config(
             thread_id=thread_id,
             recursion_limit=request.max_recursion,
         )
-
-        response = await agent.ainvoke(
-            input={"messages": [request.input]},
-            config=config
-        )
-
-        return ResponseWrapper.wrap(
-            status=200,
-            data=McpResponse(
+        async with create_mcp_agent_no_cache(
                 user_id=user_id,
-                thread_id=thread_id,
-                output=response["messages"][-1].content
+                connected_mcp_service=connected_mcp_service,
+                checkpointer=checkpointer
+        ) as agent:
+            response = await agent.ainvoke(
+                input={"messages": [request.input]},
+                config=config
             )
-        ).to_response()
+
+            return ResponseWrapper.wrap(
+                status=200,
+                data=McpResponse(
+                    user_id=user_id,
+                    thread_id=thread_id,
+                    output=response["messages"][-1].content
+                )
+            ).to_response()
 
     except Exception as e:
         logger.error(f"Has error: {str(e)}", exc_info=True)
@@ -134,7 +131,6 @@ async def stream(
         user_id: str,
         thread_id: str,
         request: McpRequest,
-        mcp_agent_cache: McpAgentCache = Depends(get_mcp_agent_cache),
         connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),
         checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
         db: AsyncSession = Depends(get_db_session),
@@ -154,18 +150,17 @@ async def stream(
     if db_thread is None:
         return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-    agent, client = await get_or_create_mcp_agent(
-        user_id=user_id,
-        mcp_agent_cache=mcp_agent_cache,
-        connected_mcp_service=connected_mcp_service,
-        checkpointer=checkpointer
-    )
-
     config = get_invocation_config(
         thread_id=thread_id,
         recursion_limit=request.max_recursion,
     )
 
-    response = astream_state(app=agent, input_={"messages": [request.input]}, config=config, allow_stream_nodes=None)
+    async with create_mcp_agent_no_cache(
+            user_id=user_id,
+            connected_mcp_service=connected_mcp_service,
+            checkpointer=checkpointer
+    ) as agent:
+        response = astream_state(app=agent, input_={"messages": [request.input]}, config=config,
+                                 allow_stream_nodes=None)
 
-    return EventSourceResponse(to_sse(response))
+        return EventSourceResponse(to_sse(response))

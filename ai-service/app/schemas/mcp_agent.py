@@ -24,6 +24,4 @@ class GetMcpActionsResponse(BaseResponse):
 class McpResponse(BaseResponse):
     user_id: Optional[str] = Field(None, min_length=1, max_length=100, title="User ID", examples=["userid"])
     thread_id: Optional[str] = Field(None, min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
-    connected_mcp_id: Optional[str] = Field(None, min_length=1, max_length=100, title="Connected MCP ID",
-                                            examples=["connected_mcp_id"])
     output: Optional[str | dict | list[Any]] = Field(None, title="Output", examples=["Hello"])
