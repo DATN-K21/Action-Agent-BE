@@ -12,6 +12,7 @@ const { generateOtpCode } = require('../../utils/otpCode.util');
 const GoogleHelper = require('../../helpers/google.helper');
 const { jwtSecret } = require('../../configs/jwt.config');
 const { syncData } = require("../../helpers/sync.helper");
+const emailConfig = require('../../configs/email.config');
 class AccessService {
     constructor() {
         this.userModel = UserModel;
@@ -175,51 +176,51 @@ class AccessService {
         };
     }
 
-    async sendOTPToVerifyEmail(userEmail) {
-        const otp = generateOtpCode();
-        const user = await this.userModel.findOne({ email: userEmail });
-        if (!user) {
-            throw new BadRequestResponse('User not found', 1010403);
-        } else if (user.email_verified === true) {
-            throw new BadRequestResponse('Email is already verified', 1010404);
-        }
+    // async sendOTPToVerifyEmail(userEmail) {
+    //     const otp = generateOtpCode();
+    //     const user = await this.userModel.findOne({ email: userEmail });
+    //     if (!user) {
+    //         throw new BadRequestResponse('User not found', 1010403);
+    //     } else if (user.email_verified === true) {
+    //         throw new BadRequestResponse('Email is already verified', 1010404);
+    //     }
 
-        const foundAccess = await this.accessModel.findOne({
-            user_id: MongooseUtil.convertToMongooseObjectIdType(user._id)
-        });
-        if (!foundAccess) {
-            throw new BadRequestResponse('Invalid access to account', 1010405);
-        }
-        const now = new Date();
-        const otpCount = foundAccess.otp_count || 0;
+    //     const foundAccess = await this.accessModel.findOne({
+    //         user_id: MongooseUtil.convertToMongooseObjectIdType(user._id)
+    //     });
+    //     if (!foundAccess) {
+    //         throw new BadRequestResponse('Invalid access to account', 1010405);
+    //     }
+    //     const now = new Date();
+    //     const otpCount = foundAccess.otp_count || 0;
 
-        //30 seconds from now as default to avoid error
-        const lastOtpSent = foundAccess.last_otp_sent;
+    //     //30 seconds from now as default to avoid error
+    //     const lastOtpSent = foundAccess.last_otp_sent;
 
-        // Check số lần gửi OTP
-        if (otpCount >= 5 && lastOtpSent && now - lastOtpSent < 3600000) {
-            throw new BadRequestResponse('Reached the maximum number of OTP requests per hour', 1010409);
-        }
+    //     // Check số lần gửi OTP
+    //     if (otpCount >= 5 && lastOtpSent && now - lastOtpSent < 3600000) {
+    //         throw new BadRequestResponse('Reached the maximum number of OTP requests per hour', 1010409);
+    //     }
 
-        // Kiểm tra delay giữa các lần gửi
-        if (lastOtpSent && now - lastOtpSent < 30000) {
-            throw new BadRequestResponse('Please wait 30 seconds before requesting another OTP.', 1010410);
-        }
+    //     // Kiểm tra delay giữa các lần gửi
+    //     if (lastOtpSent && now - lastOtpSent < 30000) {
+    //         throw new BadRequestResponse('Please wait 30 seconds before requesting another OTP.', 1010410);
+    //     }
 
-        try {
-            await EmailHelper.sendEmail(user.email, otp.code);
-            let result = await this.saveOTP(user._id, otp, now, otpCount);
-            if (!result) {
-                throw new ConflictResponse('Something went wrong', 1010406);
-            }
-        } catch (emailError) {
-            if (emailError instanceof ConflictResponse || emailError instanceof BadRequestResponse) {
-                throw emailError;
-            }
-            throw new InternalServerErrorResponse('Failed to send OTP via email', 1010407);
-        }
+    //     try {
+    //         await EmailHelper.sendEmail(user.email, otp.code);
+    //         let result = await this.saveOTP(user._id, otp, now, otpCount);
+    //         if (!result) {
+    //             throw new ConflictResponse('Something went wrong', 1010406);
+    //         }
+    //     } catch (emailError) {
+    //         if (emailError instanceof ConflictResponse || emailError instanceof BadRequestResponse) {
+    //             throw emailError;
+    //         }
+    //         throw new InternalServerErrorResponse('Failed to send OTP via email', 1010407);
+    //     }
 
-    }
+    // }
 
     async saveOTP(userId, otp, now) {
         return await this.accessModel.updateOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(userId) }, {
@@ -239,33 +240,33 @@ class AccessService {
         });
     }
 
-    async verifyOTP(userEmail, otpCode) {
-        const user = await this.userModel.findOne({ email: userEmail });
-        if (!user) {
-            throw new BadRequestResponse('User not found', 1010505);
-        } else if (user.email_verified === true) {
-            throw new BadRequestResponse('Email is already verified', 1010506);
-        }
+    // async verifyOTP(userEmail, otpCode) {
+    //     const user = await this.userModel.findOne({ email: userEmail });
+    //     if (!user) {
+    //         throw new BadRequestResponse('User not found', 1010505);
+    //     } else if (user.email_verified === true) {
+    //         throw new BadRequestResponse('Email is already verified', 1010506);
+    //     }
 
-        const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user._id) });
-        if (!foundAccess) {
-            throw new ConflictResponse('Invalid access to account', 1010507);
-        } else if (!foundAccess?.otp?.code || !foundAccess?.otp?.expiredAt) {
-            throw new ConflictResponse('OTP code not exists', 1010508);
-        }
+    //     const foundAccess = await this.accessModel.findOne({ user_id: MongooseUtil.convertToMongooseObjectIdType(user._id) });
+    //     if (!foundAccess) {
+    //         throw new ConflictResponse('Invalid access to account', 1010507);
+    //     } else if (!foundAccess?.otp?.code || !foundAccess?.otp?.expiredAt) {
+    //         throw new ConflictResponse('OTP code not exists', 1010508);
+    //     }
 
-        const otp = foundAccess.otp;
-        if (otp.code !== otpCode) {
-            throw new ConflictResponse('OTP code is incorrect', 1010509);
-        } else if (new Date() > new Date(otp.expiredAt)) {
-            throw new ConflictResponse('OTP code is expired', 101051010);
-        }
-        //Update verified email status to true
-        const newUser = await this.userModel.updateOne({ email: user.email }, {
-            email_verified: true
-        }, { new: true });
-        return newUser;
-    }
+    //     const otp = foundAccess.otp;
+    //     if (otp.code !== otpCode) {
+    //         throw new ConflictResponse('OTP code is incorrect', 1010509);
+    //     } else if (new Date() > new Date(otp.expiredAt)) {
+    //         throw new ConflictResponse('OTP code is expired', 101051010);
+    //     }
+    //     //Update verified email status to true
+    //     const newUser = await this.userModel.updateOne({ email: user.email }, {
+    //         email_verified: true
+    //     }, { new: true });
+    //     return newUser;
+    // }
 
     async loginWithGoogle(idToken) {
         try {
@@ -425,8 +426,8 @@ class AccessService {
     }
 
     async sendOTPToResetPassword(userEmail) {
-        const otp = generateOtpCode();
         const user = await this.userModel.findOne({ email: userEmail });
+
         if (!user) {
             throw new BadRequestResponse('User not found', 1011203);
         }
@@ -437,14 +438,18 @@ class AccessService {
         if (!foundAccess) {
             throw new BadRequestResponse('Invalid access to account', 1011204);
         }
+
+        if (user.email_verified === false) {
+            throw new BadRequestResponse('Account is not verified', 1011205);
+        }
+
         const now = new Date();
         const otpCount = foundAccess.otp_reset_password_count || 0;
 
-        // 5 day from now as default to avoid error
-        const lastOtpSent = foundAccess.last_otp_reset_password_sent ?? null;
+        const lastOtpSent = foundAccess.last_otp_reset_password_sent;
 
-        // Check số lần gửi OTP
-        if (otpCount >= 5 && now - lastOtpSent < 3600000) {
+        // Chỉ cho phép gửi tối đa 3 OTP trong 1 giờ
+        if (otpCount >= 3 && now - lastOtpSent < 3600000) {
             throw new BadRequestResponse('Reached the maximum number of OTP requests per hour', 1011205);
         }
 
@@ -454,8 +459,42 @@ class AccessService {
         }
 
         try {
-            await EmailHelper.sendResetPasswordEmail(user.email, otp.code);
-            let result = await this.saveOTPResetPassword(user._id, otp, now);
+            //Generate OTP code
+            const otpPasscode = generateOtpCode();
+
+            const otpValue = otpPasscode.code;
+
+            //Send otp to email
+            const emailHelper = new EmailHelper({
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                auth: {
+                    user: emailConfig.user,
+                    pass: emailConfig.pass,
+                },
+            });
+
+            const otpMessage = `
+                <p>You have requested to reset your password on HCMUS Action-AI Agent. Your OTP code is:</p>
+                <h2>${otpValue}</h2>
+                <p>Please enter this code to reset your password.</p>
+                <strong>Note: The One-Time Password (OTP) is valid for 5 minutes.</strong>
+            `;
+
+            const sendEmailResult = await emailHelper.sendEmail({
+                from: emailConfig.user,
+                to: user.email,
+                subject: "[HCMUS Action AI Agent] OTP To Reset Password",
+                html: otpMessage,
+            });
+
+            if (!sendEmailResult) {
+                throw new InternalServerErrorResponse('Failed to send OTP via email', 1011207);
+            }
+
+            //Save otp to access model
+            let result = await this.saveOTPResetPassword(user._id, otpPasscode, now);
             if (!result) {
                 throw new ConflictResponse('Something went wrong', 1011207);
             }
@@ -472,6 +511,7 @@ class AccessService {
             .findOne({ email: userEmail })
             .populate('role')
             .lean();
+
         if (!user) {
             throw new BadRequestResponse('User not found', 1011103);
         }
@@ -479,11 +519,46 @@ class AccessService {
             throw new BadRequestResponse('Email is already verified', 1011104);
         }
 
+        // const now = new Date();
+        // const activationLinkSentCount = user.activation_link_sent_count || 0;
+
+        // const lastActivationLinkSent = user.last_activation_link_sent;
+
+        // // Chỉ cho phép gửi tối đa 3 activation link trong 1 giờ
+        // if (activationLinkSentCount >= 3 && now - lastActivationLinkSent < 3600000) {
+        //     throw new BadRequestResponse('Reached the maximum number of activation link requests per hour', 1011105);
+        // }
+
         const activationToken = JWTHelper.generateActivationToken(user, jwtSecret);
-        // Send email
         try {
-            await EmailHelper.sendActivationEmail(user.email, activationToken);
-            //Save activation token to access model
+
+            //Send activation email
+            const emailHelper = new EmailHelper({
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                auth: {
+                    user: emailConfig.user,
+                    pass: emailConfig.pass,
+                },
+            });
+
+            const activationMessage = `
+                <p>Thank you for registering an account on HCMUS Action-AI Agent. Please click the link below to activate your account:</p>
+                <a href="${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}">Activate Account</a><br>
+                <strong>Note: The activation link is valid for 15 minutes.</strong>
+             `;
+
+            const sendEmailResult = await emailHelper.sendEmail({
+                from: emailConfig.user,
+                to: user.email,
+                subject: "[HCMUS Action AI Agent] Activate account",
+                html: activationMessage,
+            });
+
+            if (!sendEmailResult) {
+                throw new InternalServerErrorResponse('Failed to send OTP via email', 1011207);
+            }
 
         } catch (error) {
             throw new InternalServerErrorResponse('Failed to send activation email', 1011107);
