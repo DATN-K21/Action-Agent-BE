@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.api.internal import user as internal_user
 from app.api.public.v1 import agent, callback, connected_app, extension, multi_agent, test, thread, user, connected_mcp
 from app.api.public.v2 import agent as agent_v2, mcp_agent
+from app.api.public.v2_1 import agent as agent_v2_1, mcp_agent as mcp_agent_v2_1
 
 
 class ValidationErrorResponse(BaseModel):
@@ -45,3 +46,8 @@ router.include_router(connected_mcp.router, prefix=prefix)
 prefix = "/api/v2"
 router.include_router(agent_v2.router, prefix=prefix)
 router.include_router(mcp_agent.router, prefix=prefix)
+
+# Public routes v2.1
+prefix = "/api/v2.1"
+router.include_router(agent_v2_1.router, prefix=prefix)
+router.include_router(mcp_agent_v2_1.router, prefix=prefix)

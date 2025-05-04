@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from langchain_core.runnables import RunnableConfig
 
 
-def get_invocation_config(
+def create_invocation_config(
         thread_id: Optional[str] = None,
         timezone: Optional[str] = None,
         recursion_limit: Optional[int] = None,
@@ -22,5 +22,5 @@ def get_invocation_config(
             recursion_limit=recursion_limit,
             configurable=configurable,
         )
-    
+
     return RunnableConfig(configurable=configurable)

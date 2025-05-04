@@ -9,7 +9,7 @@ from app.core import logging
 from app.core.agents.base import BaseAgent
 from app.core.graph.base import HumanEditingData, ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
-from app.core.utils.config_helper import get_invocation_config
+from app.core.utils.config_helper import create_invocation_config
 from app.core.utils.streaming import LanggraphNodeEnum, MessagesStream, astream_state, list_stream_nodes
 
 logger = logging.get_logger(__name__)
@@ -36,7 +36,7 @@ class Agent(BaseAgent):
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
-            config = get_invocation_config(
+            config = create_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
                 recursion_limit=max_recursion,
@@ -70,7 +70,7 @@ class Agent(BaseAgent):
             max_recursion: Optional[int] = None,
     ) -> AgentInterruptHandlingResult:
         try:
-            config = get_invocation_config(
+            config = create_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
                 recursion_limit=max_recursion,
@@ -101,7 +101,7 @@ class Agent(BaseAgent):
     ) -> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
-            config = get_invocation_config(
+            config = create_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
                 recursion_limit=max_recursion,
@@ -120,7 +120,7 @@ class Agent(BaseAgent):
             max_recursion: Optional[int] = None,
     ) -> MessagesStream:
         try:
-            config = get_invocation_config(
+            config = create_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
                 recursion_limit=max_recursion,
