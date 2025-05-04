@@ -11,14 +11,14 @@ from app.schemas.base import BaseRequest, BaseResponse
 ##################################################
 class HTTPExtensionRequest(BaseRequest):
     input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(None, ge=1, le=20, title="Max Recursion", examples=[10])
+    recursion_limit: Optional[int] = Field(None, ge=1, le=50, title="Max Recursion", examples=[20])
 
 
 class HTTPExtensionCallbackRequest(BaseRequest):
     execute: bool = Field(..., title="Continue executing the action", examples=[True])
     tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
                                                  examples=["..."])
-    max_recursion: Optional[int] = Field(None, ge=1, le=20, title="Max Recursion", examples=[10])
+    recursion_limit: Optional[int] = Field(None, ge=1, le=50, title="Max Recursion", examples=[20])
 
 
 ##################################################
@@ -70,7 +70,7 @@ class SocketioExtensionRequest(BaseRequest):
     thread_id: str = Field(min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
     extension_name: str = Field(min_length=1, max_length=100, title="Extension Name", examples=["extension1"])
     input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])
+    recursion_limit: Optional[int] = Field(20, ge=1, le=50, title="Max Recursion", examples=[20])
 
 
 ##################################################
@@ -83,4 +83,4 @@ class SocketioExtensionCallback(BaseModel):
     execute: bool = Field(..., title="Continue executing the action", examples=[True])
     tool_calls: Optional[list[ToolCall]] = Field(None, title="Update args of executing the action",
                                                  examples=["..."])
-    max_recursion: Optional[int] = Field(10, ge=1, le=20, title="Max Recursion", examples=[10])
+    recursion_limit: Optional[int] = Field(20, ge=1, le=50, title="Max Recursion", examples=[20])

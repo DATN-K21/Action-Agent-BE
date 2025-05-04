@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
-from structlog.stdlib import BoundLogger
 
 from app.core import logging
 from app.core.agents.base import BaseAgent
@@ -19,27 +18,24 @@ class Agent(BaseAgent):
     def __init__(
             self,
             graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
     ):
-        if logger is None:
-            logger = logger
-        super().__init__(graph=graph, logger=logger, name=name, config=config)
+        super().__init__(graph=graph, name=name, config=config)
 
     async def async_chat(
             self,
             question: str,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: Optional[int] = None,
+            recursion_limit: Optional[int] = None,
     ) -> AgentExecutionResult:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
             )
             response = await self.graph.ainvoke(input=state, config=config)
 
@@ -58,7 +54,7 @@ class Agent(BaseAgent):
                 output=response["messages"][-1].content,
             )
         except Exception as e:
-            self.logger.error(f"Error in executing graph: {str(e)}")
+            logger.error(f"Error in executing graph: {str(e)}")
             raise
 
     async def async_handle_chat_interrupt(
@@ -67,13 +63,13 @@ class Agent(BaseAgent):
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: Optional[int] = None,
+            recursion_limit: Optional[int] = None,
     ) -> AgentInterruptHandlingResult:
         try:
             config = get_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
             )
             response = await self.graph.ainvoke(
                 Command(
@@ -90,25 +86,25 @@ class Agent(BaseAgent):
             )
 
         except Exception as e:
-            self.logger.error(f"Error in executing graph: {str(e)}")
+            logger.error(f"Error in executing graph: {str(e)}")
             raise
 
     async def async_stream(
             self, question: str,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: Optional[int] = None,
+            recursion_limit: Optional[int] = None,
     ) -> MessagesStream:
         try:
             state = {"messages": [HumanMessage(question)], "question": question}
             config = get_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
             )
             return astream_state(app=self.graph, input_=state, config=config, allow_stream_nodes=list_stream_nodes)
         except Exception as e:
-            self.logger.error(f"Error in executing graph: {str(e)}")
+            logger.error(f"Error in executing graph: {str(e)}")
             raise
 
     async def async_handle_stream_interrupt(
@@ -117,13 +113,13 @@ class Agent(BaseAgent):
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
             timezone: Optional[str] = None,
-            max_recursion: Optional[int] = None,
+            recursion_limit: Optional[int] = None,
     ) -> MessagesStream:
         try:
             config = get_invocation_config(
                 thread_id=thread_id,
                 timezone=timezone,
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
             )
             return astream_state(
                 app=self.graph,
@@ -137,5 +133,5 @@ class Agent(BaseAgent):
                 allow_stream_nodes=[LanggraphNodeEnum.AGENT_NODE, LanggraphNodeEnum.GENERATE_NODE],
             )
         except Exception as e:
-            self.logger.error(f"Error in executing graph: {str(e)}")
+            logger.error(f"Error in executing graph: {str(e)}")
             raise

@@ -6,7 +6,7 @@ from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,
     DeleteUserResponse,
-    GetListUsersResponse,
+    GetUsersResponse,
     GetUserResponse,
     UpdateUserRequest,
     UpdateUserResponse,
@@ -56,7 +56,7 @@ async def delete_user(
     return response.to_response()
 
 
-@router.get("/get-all", summary="Get all users.", response_model=ResponseWrapper[GetListUsersResponse])
+@router.get("/get-all", summary="Get all users.", response_model=ResponseWrapper[GetUsersResponse])
 async def get_all_users(
         paging: PagingRequest = Depends(),
         user_service: UserService = Depends(get_user_service),

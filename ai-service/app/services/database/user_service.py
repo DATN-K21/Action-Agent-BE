@@ -15,7 +15,7 @@ from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,
     DeleteUserResponse,
-    GetListUsersResponse,
+    GetUsersResponse,
     GetUserResponse,
     UpdateUserRequest,
 )
@@ -105,7 +105,7 @@ class UserService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_all_users(self, paging: PagingRequest) -> ResponseWrapper[GetListUsersResponse]:
+    async def get_all_users(self, paging: PagingRequest) -> ResponseWrapper[GetUsersResponse]:
         """Get all users."""
         try:
             page_number = paging.page_number
@@ -117,7 +117,7 @@ class UserService:
             total_users = count_result.scalar_one()
             logger.info(f"total_users: {total_users}")
             if total_users == 0:
-                response_data = GetListUsersResponse(
+                response_data = GetUsersResponse(
                     users=[],
                     page_number=page_number,
                     max_per_page=max_per_page,
@@ -148,7 +148,7 @@ class UserService:
             db_users = result.mappings().all()
 
             users = [GetUserResponse.model_validate(db_user) for db_user in db_users]
-            response_data = GetListUsersResponse(
+            response_data = GetUsersResponse(
                 users=users,
                 page_number=paging.page_number,
                 max_per_page=paging.max_per_page,

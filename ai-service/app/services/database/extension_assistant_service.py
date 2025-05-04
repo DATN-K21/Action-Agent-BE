@@ -11,8 +11,9 @@ from app.core.session import get_db_session
 from app.models.extension_assistant import ExtensionAssistant
 from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.extension_assistant import CreateExtensionAssistantRequest, CreateExtensionAssistantResponse, \
-    GetListExtensionAssistantsResponse, GetExtensionAssistantResponse, UpdateExtensionAssistantRequest, \
-    UpdateExtensionAssistantResponse, DeleteExtensionAssistantResponse
+    GetExtensionAssistantsResponse, GetExtensionAssistantResponse, UpdateExtensionAssistantRequest, \
+    UpdateExtensionAssistantResponse, DeleteExtensionAssistantResponse, GetExtensionsOfAssistantResponse, \
+    GetExtensionOfAssistantResponse
 
 logger = logging.get_logger(__name__)
 
@@ -74,12 +75,12 @@ class ExtensionAssistantService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_list_extension_assistants(
+    async def list_extension_assistants(
             self,
             paging: PagingRequest,
             assistant_id: Optional[str] = None,
             extension_id: Optional[str] = None,
-    ) -> ResponseWrapper[GetListExtensionAssistantsResponse]:
+    ) -> ResponseWrapper[GetExtensionAssistantsResponse]:
         """Get list of extension-assistants of a user."""
         try:
             page_number = paging.page_number
@@ -96,7 +97,7 @@ class ExtensionAssistantService:
             logger.info(f"total_extension_assistants: {total_extension_assistants}")
             if total_extension_assistants == 0:
                 return ResponseWrapper.wrap(status=200, data=
-                GetListExtensionAssistantsResponse(
+                GetExtensionAssistantsResponse(
                     extension_assistants=[],
                     page_number=page_number,
                     max_per_page=max_per_page,
@@ -120,12 +121,13 @@ class ExtensionAssistantService:
             )
 
             result = await self.db.execute(query)
-            extension_assistant = result.scalars().all()
-            wrapped_extension_assistant = [GetExtensionAssistantResponse.model_validate(connected_app) for connected_app
+            extension_assistants = result.scalars().all()
+            wrapped_extension_assistant = [GetExtensionAssistantResponse.model_validate(extension_assistant) for
+                                           extension_assistant
                                            in
-                                           extension_assistant]
+                                           extension_assistants]
             return ResponseWrapper.wrap(status=200, data=
-            GetListExtensionAssistantsResponse(
+            GetExtensionAssistantsResponse(
                 extension_assistants=wrapped_extension_assistant,
                 page_number=page_number,
                 max_per_page=max_per_page,
@@ -171,7 +173,7 @@ class ExtensionAssistantService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def delete_assistant(
+    async def delete_extension_assistant(
             self,
             extension_assistant_id: str,
     ) -> ResponseWrapper[DeleteExtensionAssistantResponse]:
@@ -206,6 +208,76 @@ class ExtensionAssistantService:
         except Exception as e:
             logger.exception("Has error: %s", str(e))
             await self.db.rollback()
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def list_extensions_of_assistant(
+            self,
+            assistant_id: str,
+            paging: PagingRequest,
+    ) -> ResponseWrapper[GetExtensionsOfAssistantResponse]:
+        """List all extensions of an assistant"""
+        try:
+            page_number = paging.page_number
+            max_per_page = paging.max_per_page
+
+            # COUNT total connected apps
+            count_stmt = select(func.count(ExtensionAssistant.id)).where(
+                ExtensionAssistant.assistant_id == assistant_id,
+                ExtensionAssistant.is_deleted.is_(False),
+            )
+            count_result = await self.db.execute(count_stmt)
+            total_extension_assistants = count_result.scalar_one()
+            logger.info(f"total_extension_assistants: {total_extension_assistants}")
+            if total_extension_assistants == 0:
+                return ResponseWrapper.wrap(status=200, data=
+                GetExtensionsOfAssistantResponse(
+                    extensions=[],
+                    page_number=page_number,
+                    max_per_page=max_per_page,
+                    total_page=0
+                )
+                                            )
+            total_pages = (total_extension_assistants + max_per_page - 1) // max_per_page
+
+            # GET connected apps
+            query = (
+                select(ExtensionAssistant)
+                .where(
+                    ExtensionAssistant.assistant_id == assistant_id,
+                    ExtensionAssistant.is_deleted.is_(False),
+                )
+                .offset((page_number - 1) * max_per_page)
+                .limit(max_per_page)
+                .order_by(ExtensionAssistant.created_at.desc())
+            )
+
+            result = await self.db.execute(query)
+            extension_assistants = result.scalars().all()
+            wrapped_extensions = [GetExtensionOfAssistantResponse(
+                id=extension_assistant.id,
+                user_id=extension_assistant.extension.user_id,
+                assistant_id=extension_assistant.assistant_id,
+                extension_id=extension_assistant.extension_id,
+                app_name=extension_assistant.extension.app_name,
+                connected_account_id=extension_assistant.extension.connected_account_id,
+                auth_scheme=extension_assistant.extension.auth_scheme,
+                auth_value=extension_assistant.extension.auth_value,
+                created_at=extension_assistant.created_at
+            ) for
+                extension_assistant
+                in
+                extension_assistants]
+            return ResponseWrapper.wrap(status=200, data=
+            GetExtensionsOfAssistantResponse(
+                extensions=wrapped_extensions,
+                page_number=page_number,
+                max_per_page=max_per_page,
+                total_page=total_pages
+            )
+                                        )
+        except Exception as e:
+            logger.exception("Has error: %s", str(e))
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 

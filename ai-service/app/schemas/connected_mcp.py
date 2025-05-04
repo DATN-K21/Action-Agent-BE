@@ -43,7 +43,7 @@ class GetConnectedMcpResponse(BaseResponse):
     created_at: Optional[datetime] = Field(None, title="Created At", examples=["2022-01-01T00:00:00Z"])
 
 
-class GetAllConnectedMcpsRequest(PagingResponse):
+class GetConnectedMcpsResponse(PagingResponse):
     connected_mcps: list[GetConnectedMcpResponse] = Field(..., title="List of connected mcps")
 
 

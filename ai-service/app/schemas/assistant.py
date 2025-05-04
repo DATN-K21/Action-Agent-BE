@@ -43,7 +43,7 @@ class GetAssistantResponse(BaseResponse):
     created_at: datetime
 
 
-class GetListAssistantsResponse(PagingResponse):
+class GetAssistantsResponse(PagingResponse):
     assistants: list[GetAssistantResponse]
 
 

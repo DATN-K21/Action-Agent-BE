@@ -23,5 +23,5 @@ class GetConnectedAppResponse(BaseResponse):
     created_at: Optional[datetime] = Field(None, title="Created At", examples=["2022-01-01T00:00:00Z"])
 
 
-class GetAllConnectedAppsRequest(PagingResponse):
+class GetConnectedAppsResponse(PagingResponse):
     connected_apps: list[GetConnectedAppResponse] = Field(..., title="List of connected apps")

@@ -223,7 +223,7 @@ async def chat(
             question=request.input,
             thread_id=thread_id,
             timezone='Asia/Ho_Chi_Minh',
-            max_recursion=request.max_recursion,
+            recursion_limit=request.recursion_limit,
         )
 
         return ResponseWrapper.wrap(
@@ -289,7 +289,7 @@ async def chat_interrupt(
             tool_calls=tool_calls,
             thread_id=thread_id,
             timezone='Asia/Ho_Chi_Minh',
-            max_recursion=request.max_recursion,
+            recursion_limit=request.recursion_limit,
         )
 
         if execute:
@@ -362,7 +362,7 @@ async def stream(
             question=request.input,
             thread_id=thread_id,
             timezone='Asia/Ho_Chi_Minh',
-            max_recursion=request.max_recursion,
+            recursion_limit=request.recursion_limit,
         )
 
         return EventSourceResponse(format_extension_stream_sse(response))
@@ -415,7 +415,7 @@ async def stream_interrupt(
             tool_calls=tool_calls,
             thread_id=thread_id,
             timezone='Asia/Ho_Chi_Minh',
-            max_recursion=request.max_recursion,
+            recursion_limit=request.recursion_limit,
         )
 
         return EventSourceResponse(format_extension_interrupt_sse(result))

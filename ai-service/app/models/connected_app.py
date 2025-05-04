@@ -10,8 +10,15 @@ class ConnectedApp(BaseEntity):
     """
     __tablename__ = "connected_apps"
 
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     app_name = Column(String, nullable=False)
     connected_account_id = Column(String, nullable=False)
     auth_value = Column(String, nullable=True)
     auth_scheme = Column(String, nullable=True)
+
+    # extension_assistants = relationship(
+    #     "ExtensionAssistant",
+    #     back_populates="assistant",
+    #     cascade="all, delete-orphan",
+    #     passive_deletes=True
+    # )

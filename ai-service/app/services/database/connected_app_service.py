@@ -8,7 +8,7 @@ from app.core import logging
 from app.core.session import get_db_session
 from app.models.connected_app import ConnectedApp
 from app.schemas.base import PagingRequest
-from app.schemas.connected_app import GetAllConnectedAppsRequest, GetConnectedAppResponse
+from app.schemas.connected_app import GetConnectedAppsResponse, GetConnectedAppResponse
 
 logger = logging.get_logger(__name__)
 
@@ -129,11 +129,11 @@ class ConnectedAppService:
             return None
 
     @logging.log_function_inputs(logger)
-    async def get_all_connected_apps(
+    async def list_connected_apps(
             self,
             user_id: str,
-            paging: PagingRequest,
-    ) -> GetAllConnectedAppsRequest:
+            paging: PagingRequest
+    ) -> GetConnectedAppsResponse:
         """Get all connected apps by user_id."""
         try:
             page_number = paging.page_number
@@ -148,7 +148,7 @@ class ConnectedAppService:
             total_connected_apps = count_result.scalar_one()
             logger.info(f"total_connected_apps: {total_connected_apps}")
             if total_connected_apps == 0:
-                return GetAllConnectedAppsRequest(
+                return GetConnectedAppsResponse(
                     connected_apps=[],
                     page_number=page_number,
                     max_per_page=max_per_page,
@@ -172,7 +172,7 @@ class ConnectedAppService:
             connected_apps = result.scalars().all()
             wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in
                                       connected_apps]
-            return GetAllConnectedAppsRequest(
+            return GetConnectedAppsResponse(
                 connected_apps=wrapped_connected_apps,
                 page_number=page_number,
                 max_per_page=max_per_page,
@@ -181,7 +181,7 @@ class ConnectedAppService:
 
         except Exception as e:
             logger.exception("Has error: %s", str(e))
-            return GetAllConnectedAppsRequest(
+            return GetConnectedAppsResponse(
                 connected_apps=[],
                 page_number=paging.page_number,
                 max_per_page=paging.max_per_page,

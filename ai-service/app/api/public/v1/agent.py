@@ -71,7 +71,7 @@ async def execute(
         response = await agent.async_chat(
             question=request.input,
             thread_id=thread_id,
-            max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
+            recursion_limit=request.recursion_limit if request.recursion_limit is not None else 5,
         )
 
         return ResponseWrapper.wrap(
@@ -122,7 +122,7 @@ async def stream(
         response = await agent.async_stream(
             question=request.input,
             thread_id=thread_id,
-            max_recursion=request.recursion_limit if request.recursion_limit is not None else 5,
+            recursion_limit=request.recursion_limit if request.recursion_limit is not None else 5,
         )
 
         return EventSourceResponse(to_sse(response))

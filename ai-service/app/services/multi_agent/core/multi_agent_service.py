@@ -62,11 +62,11 @@ class MultiAgentService:
 
     @logging.log_function_inputs(logger)
     async def execute_multi_agent(
-            self, thread_id: str, user_input: str, max_recursion: int = 10
+            self, thread_id: str, user_input: str, recursion_limit: int = 10
     ) -> ResponseWrapper[AgentChatResponse]:
         try:
             config = RunnableConfig(
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
                 configurable={"thread_id": thread_id},
             )
             query = HumanMessage(content=user_input)
@@ -82,10 +82,10 @@ class MultiAgentService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def stream_multi_agent(self, thread_id: str, user_input: str, max_recursion: int = 10) -> MessagesStream:
+    async def stream_multi_agent(self, thread_id: str, user_input: str, recursion_limit: int = 10) -> MessagesStream:
         try:
             config = RunnableConfig(
-                recursion_limit=max_recursion,
+                recursion_limit=recursion_limit,
                 configurable={"thread_id": thread_id},
             )
             query = HumanMessage(content=user_input)

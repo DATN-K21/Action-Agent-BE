@@ -34,7 +34,7 @@ class GetMcpAssistantResponse(CreateMcpAssistantResponse):
     pass
 
 
-class GetListMcpAssistantsResponse(PagingResponse):
+class GetMcpAssistantsResponse(PagingResponse):
     mcp_assistants: list[GetMcpAssistantResponse]
 
 
@@ -46,3 +46,18 @@ class DeleteMcpAssistantResponse(BaseResponse):
     id: str
     assistant_id: str
     mcp_id: str
+
+
+class GetMcpOfAssistantResponse(BaseResponse):
+    id: str
+    user_id: str
+    assistant_id: str
+    mcp_id: str
+    mcp_name: str
+    url: str
+    connection_type: str
+    created_at: Optional[datetime]
+
+
+class GetMcpsOfAssistantResponse(PagingResponse):
+    mcps: list[GetMcpOfAssistantResponse]

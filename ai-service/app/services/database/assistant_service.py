@@ -8,7 +8,7 @@ from app.core import logging
 from app.core.session import get_db_session
 from app.models.assistant import Assistant
 from app.schemas.assistant import CreateAssistantRequest, CreateAssistantResponse, GetAssistantResponse, \
-    GetListAssistantsResponse, UpdateAssistantRequest, DeleteAssistantResponse
+    GetAssistantsResponse, UpdateAssistantRequest, DeleteAssistantResponse
 from app.schemas.base import ResponseWrapper, PagingRequest
 
 logger = logging.get_logger(__name__)
@@ -76,11 +76,11 @@ class AssistantService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_list_assistants(
+    async def list_assistants(
             self,
             user_id: str,
             paging: PagingRequest,
-    ) -> ResponseWrapper[GetListAssistantsResponse]:
+    ) -> ResponseWrapper[GetAssistantsResponse]:
         """Get all assistants of a user."""
         try:
             page_number = paging.page_number
@@ -96,7 +96,7 @@ class AssistantService:
             logger.info(f"total_assistants: {total_assistants}")
             if total_assistants == 0:
                 return ResponseWrapper.wrap(status=200, data=
-                GetListAssistantsResponse(
+                GetAssistantsResponse(
                     assistants=[],
                     page_number=page_number,
                     max_per_page=max_per_page,
@@ -123,7 +123,7 @@ class AssistantService:
             wrapped_assistants = [GetAssistantResponse.model_validate(assistant) for assistant in
                                   assistants]
             return ResponseWrapper.wrap(status=200, data=
-            GetListAssistantsResponse(
+            GetAssistantsResponse(
                 assistants=wrapped_assistants,
                 page_number=page_number,
                 max_per_page=max_per_page,
