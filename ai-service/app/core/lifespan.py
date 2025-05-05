@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
         # Setup PostgreSQL migrations
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            logger.info(f"SQLAlchemy tables: {Base.metadata.tables.keys()}")
             logger.info("SQLAlchemy tables created")
 
         # Manually resolve dependencies at startup

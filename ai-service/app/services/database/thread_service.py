@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.agents.agent_manager import AgentManager, get_agent_manager
-from app.core.constants import SYSTEM
 from app.core.session import get_db_session
 from app.models.thread import Thread
 from app.prompts.prompt_templates import get_title_generation_prompt_template
@@ -16,7 +15,7 @@ from app.schemas.thread import (
     CreateThreadRequest,
     CreateThreadResponse,
     DeleteThreadResponse,
-    GetListThreadsResponse,
+    GetThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
     UpdateThreadResponse,
@@ -62,6 +61,7 @@ class ThreadService:
                     Thread.user_id.label("user_id"),
                     Thread.title.label("title"),
                     Thread.thread_type.label("thread_type"),
+                    Thread.assistant_id.label("assistant_id"),
                     Thread.created_at.label("created_at"),
                 )
                 .where(
@@ -91,7 +91,8 @@ class ThreadService:
             user_id: str,
             paging: CursorPagingRequest,
             thread_type: Optional[str] = None,
-    ) -> ResponseWrapper[GetListThreadsResponse]:
+            assistant_id: Optional[str] = None,
+    ) -> ResponseWrapper[GetThreadsResponse]:
         """Get all threads of a user."""
         try:
             stmt = (
@@ -100,10 +101,12 @@ class ThreadService:
                     Thread.user_id.label("user_id"),
                     Thread.title.label("title"),
                     Thread.thread_type.label("thread_type"),
+                    Thread.assistant_id.label("assistant_id"),
                     Thread.created_at.label("created_at"),
                 )
                 .where(
-                    or_(Thread.thread_type == thread_type, thread_type is None),  # type: ignore
+                    or_(thread_type is None, Thread.thread_type == thread_type),  # type: ignore
+                    or_(assistant_id is None, Thread.assistant_id == assistant_id),  # type: ignore
                     Thread.user_id == user_id,
                     Thread.is_deleted.is_(False),
                 )
@@ -120,7 +123,7 @@ class ThreadService:
             prev_cursor = db_threads[0].created_at.isoformat() if db_threads else None
             next_cursor = db_threads[-1].created_at.isoformat() if db_threads else None
 
-            response_data = GetListThreadsResponse(
+            response_data = GetThreadsResponse(
                 threads=[GetThreadResponse.model_validate(db_thread) for db_thread in db_threads],
                 cursor=paging.cursor,
                 next_cursor=next_cursor,
@@ -173,7 +176,6 @@ class ThreadService:
             self,
             user_id: str,
             thread_id: str,
-            deleted_by: str = SYSTEM,
     ) -> ResponseWrapper[DeleteThreadResponse]:
         """Delete a thread."""
         try:
@@ -188,7 +190,11 @@ class ThreadService:
                     is_deleted=True,
                     deleted_at=datetime.now(),
                 )
-                .returning(Thread.id.label("id"), Thread.user_id.label("user_id"))
+                .returning(
+                    Thread.id.label("id"),
+                    Thread.user_id.label("user_id"),
+                    Thread.assistant_id.label("assistant_id")
+                )
             )
 
             result = await self.db.execute(stmt)
@@ -266,6 +272,7 @@ class ThreadService:
                     Thread.user_id.label("user_id"),
                     Thread.title.label("title"),
                     Thread.thread_type.label("thread_type"),
+                    Thread.assistant_id.label("assistant_id"),
                     Thread.created_at.label("created_at"),
                 )
             )
@@ -276,7 +283,7 @@ class ThreadService:
                 return ResponseWrapper.wrap(status=404, message="Thread not found")
 
             await self.db.commit()
-            response_data = CreateThreadResponse.model_validate(db_thread)
+            response_data = UpdateThreadResponse.model_validate(db_thread)
             return ResponseWrapper.wrap(status=200, data=response_data)
 
         except Exception as e:

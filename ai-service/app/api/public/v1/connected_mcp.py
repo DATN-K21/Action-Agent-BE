@@ -4,7 +4,7 @@ from app.api.auth import ensure_user_id
 from app.core import logging
 from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.connected_mcp import CreateConnectedMcpResponse
-from app.schemas.connected_mcp import GetAllConnectedMcpsRequest, CreateConnectedMcpRequest, GetConnectedMcpResponse, \
+from app.schemas.connected_mcp import GetConnectedMcpsResponse, CreateConnectedMcpRequest, GetConnectedMcpResponse, \
     UpdateConnectedMcpRequest, DeleteConnectedMcpResponse
 from app.schemas.thread import (
     UpdateThreadResponse,
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/mcp", tags=["MCP"])
 
 
 @router.get("/{user_id}/get-all", summary="Get all connected mcps of a user.",
-            response_model=ResponseWrapper[GetAllConnectedMcpsRequest])
+            response_model=ResponseWrapper[GetConnectedMcpsResponse])
 async def get_all_connected_mcps(
         user_id: str,
         connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),

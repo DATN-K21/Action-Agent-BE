@@ -11,7 +11,7 @@ from app.schemas.base import BaseResponse, BaseRequest
 ##################################################
 class McpRequest(BaseRequest):
     input: str = Field(min_length=1, max_length=5000, title="Input", examples=["Hello"])
-    max_recursion: Optional[int] = Field(None, ge=1, le=50, title="Max Recursion", examples=[20])
+    recursion_limit: Optional[int] = Field(None, ge=1, le=50, title="Recursion limit", examples=[20])
 
 
 ##################################################

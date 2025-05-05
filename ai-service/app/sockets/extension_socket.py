@@ -5,7 +5,8 @@ from socketio import AsyncNamespace
 from app.core import logging
 from app.core.agents.agent import Agent
 from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, convert_dict_message_to_tool_calls
+from app.core.utils.convert_dict_message import convert_dict_message_to_message, convert_dict_message_to_output, \
+    convert_dict_message_to_tool_calls
 from app.core.utils.socket_decorate import validate_event
 from app.core.utils.streaming import LanggraphNodeEnum, to_sse
 from app.schemas.extension import SocketioExtensionCallback, SocketioExtensionRequest, ExtensionResponse
@@ -88,7 +89,7 @@ class ExtensionNamespace(AsyncNamespace):
             tool_calls=tool_calls,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
-            max_recursion=data.max_recursion if data.max_recursion is not None else 10,
+            recursion_limit=data.recursion_limit if data.recursion_limit is not None else 10,
         )
 
         if execute:
@@ -117,7 +118,7 @@ class ExtensionNamespace(AsyncNamespace):
                 question=data.input,
                 thread_id=data.thread_id,
                 timezone=self.session_to_timezone[sid],
-                max_recursion=data.max_recursion if data.max_recursion is not None else 10,
+                recursion_limit=data.recursion_limit if data.recursion_limit is not None else 10,
             )
 
             # emit response to the client
@@ -152,7 +153,7 @@ class ExtensionNamespace(AsyncNamespace):
             tool_calls=tool_calls,
             thread_id=data.thread_id,
             timezone=self.session_to_timezone[sid],
-            max_recursion=data.max_recursion if data.max_recursion is not None else 10,
+            recursion_limit=data.recursion_limit if data.recursion_limit is not None else 10,
         )
 
         if execute:
@@ -200,7 +201,7 @@ class ExtensionNamespace(AsyncNamespace):
                 question=data.input,
                 thread_id=data.thread_id,
                 timezone=self.session_to_timezone[sid],
-                max_recursion=data.max_recursion if data.max_recursion is not None else 10,
+                recursion_limit=data.recursion_limit if data.recursion_limit is not None else 10,
             )
 
             interrupted = False

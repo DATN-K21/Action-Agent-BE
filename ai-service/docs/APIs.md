@@ -85,7 +85,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 - **thread_id:** String type - Thread ID (required)
 - **extension_name:** String type - Extension name (required)
 - **input:** String type - Input message (required)
-- **max_recursion:** Specifies the recursion limit when executing the graph (optional)
+- **recursion_limit:** Specifies the recursion limit when executing the graph (optional)
 
 ### 2.2 Schema for chat_response and stream_response events (send to client - ExtensionResponse)
 
@@ -106,7 +106,7 @@ Otherwise, output is a string representing the AI's response to your question.
 - **extension_name:** String type - Extension name (required)
 - **execute:** Boolean type - Indicates whether to continue executing the action (required)
 - **tool_calls:** List type - List of the updated tool calls (Optional)
-- **max_recursion:** Specifies the recursion limit when executing the graph (optional)
+- **recursion_limit:** Specifies the recursion limit when executing the graph (optional)
 
 ### 2.4 Schema for chat_interrupt and stream_interrupt events (send to client - ExtensionResponse)
 

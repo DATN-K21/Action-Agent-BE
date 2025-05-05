@@ -21,7 +21,7 @@ from app.schemas.thread import (
     CreateThreadResponse,
     DeleteThreadResponse,
     FilterThreadRequest,
-    GetListThreadsResponse,
+    GetThreadsResponse,
     GetThreadResponse,
     UpdateThreadRequest,
     UpdateThreadResponse,
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/thread", tags=["Thread"])
 
 
 @router.get("/{user_id}/get-all", summary="Get threads of a user.",
-            response_model=ResponseWrapper[GetListThreadsResponse])
+            response_model=ResponseWrapper[GetThreadsResponse])
 async def get_all_threads(
         user_id: str,
         _filter: FilterThreadRequest = Depends(),

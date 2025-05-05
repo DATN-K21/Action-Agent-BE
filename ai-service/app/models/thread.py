@@ -11,6 +11,7 @@ class Thread(BaseEntity):
     """
     __tablename__ = "threads"
 
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=True)
     thread_type = Column(String, nullable=True)
+    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=True)
