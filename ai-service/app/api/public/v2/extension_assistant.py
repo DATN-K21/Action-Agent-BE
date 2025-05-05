@@ -15,7 +15,7 @@ router = APIRouter(prefix="/extension-assistant", tags=["API-V2 | Extension-Assi
 
 @router.get("/{user_id}/{assistant_id}/get-all", summary="Get extensions of user's assistant.",
             response_model=ResponseWrapper[GetExtensionsOfAssistantResponse])
-async def list_extensions(
+async def list_extensions_of_assistant(
         assistant_id: str,
         paging: PagingRequest = Depends(),
         extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
@@ -53,7 +53,7 @@ async def update_extension_assistant(
 
 @router.delete("/{user_id}/{extension_assistant_id}/delete", summary="Delete an extension-assistant.",
                response_model=ResponseWrapper[DeleteExtensionAssistantResponse])
-async def delete_thread(
+async def delete_extension_assistant(
         extension_assistant_id: str,
         extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
         _: bool = Depends(ensure_user_id),

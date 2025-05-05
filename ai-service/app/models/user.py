@@ -19,34 +19,6 @@ class User(BaseEntity):
     default_api_key_id = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
     remain_trial_tokens = Column(Integer, nullable=False, default=0)
 
-    # threads = relationship(
-    #     "Thread",
-    #     back_populates="user",
-    #     cascade="all, delete-orphan",
-    #     passive_deletes=True
-    # )
-    #
-    # connected_apps = relationship(
-    #     "ConnectedApp",
-    #     back_populates="user",
-    #     cascade="all, delete-orphan",
-    #     passive_deletes=True
-    # )
-    #
-    # connected_mcps = relationship(
-    #     "ConnectedMcp",
-    #     back_populates="user",
-    #     cascade="all, delete-orphan",
-    #     passive_deletes=True
-    # )
-    #
-    # assistants = relationship(
-    #     "Assistant",
-    #     back_populates="user",
-    #     cascade="all, delete-orphan",
-    #     passive_deletes=True
-    # )
-
     __table_args__ = (
         Index(
             "idx_users_username_email",

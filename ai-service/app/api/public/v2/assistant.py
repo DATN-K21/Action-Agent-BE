@@ -68,7 +68,7 @@ async def update_assistant(
 
 @router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.",
                response_model=ResponseWrapper[DeleteThreadResponse])
-async def delete_thread(
+async def delete_assistant(
         user_id: str,
         assistant_id: str,
         assistant_service: AssistantService = Depends(get_assistant_service),

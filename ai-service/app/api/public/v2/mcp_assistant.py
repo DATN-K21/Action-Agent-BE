@@ -10,12 +10,12 @@ from app.services.database.mcp_assistant_service import get_mcp_assistant_servic
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/extension-assistant", tags=["API-V2 | Extension-Assistant"])
+router = APIRouter(prefix="/mcp-assistant", tags=["API-V2 | MCP-Assistant"])
 
 
 @router.get("/{user_id}/{assistant_id}/get-all", summary="Get MCPs of user's assistant.",
             response_model=ResponseWrapper[GetMcpsOfAssistantResponse])
-async def list_extensions(
+async def list_mcps_of_assistant(
         assistant_id: str,
         paging: PagingRequest = Depends(),
         mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),

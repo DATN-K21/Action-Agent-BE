@@ -1,4 +1,5 @@
 from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy.orm import relationship
 
 from app.models.base_entity import BaseEntity
 
@@ -11,9 +12,9 @@ class ConnectedMcp(BaseEntity):
     url = Column(String, nullable=False)
     connection_type = Column(String, nullable=False, default="sse")
 
-    # mcp_assistants = relationship(
-    #     "McpAssistant",
-    #     back_populates="assistant",
-    #     cascade="all, delete-orphan",
-    #     passive_deletes=True
-    # )
+    mcp_assistants = relationship(
+        "McpAssistant",
+        back_populates="mcp",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
