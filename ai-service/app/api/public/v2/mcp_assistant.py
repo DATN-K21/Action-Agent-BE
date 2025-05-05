@@ -13,7 +13,7 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/mcp-assistant", tags=["API-V2 | MCP-Assistant"])
 
 
-@router.get("/{user_id}/{assistant_id}/get-all", summary="Get MCPs of user's assistant.",
+@router.get("/{user_id}/{assistant_id}/get-mcps", summary="Get MCPs of user's assistant.",
             response_model=ResponseWrapper[GetMcpsOfAssistantResponse])
 async def list_mcps_of_assistant(
         assistant_id: str,
@@ -28,7 +28,7 @@ async def list_mcps_of_assistant(
 @router.post("/{user_id}/create", summary="Add an MCP into the assistant.",
              response_model=ResponseWrapper[CreateAssistantResponse])
 async def create_new_mcp_assistant(
-        request: CreateMcpAssistantRequest = Depends(),
+        request: CreateMcpAssistantRequest,
         mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
         _: bool = Depends(ensure_user_id),
 ):

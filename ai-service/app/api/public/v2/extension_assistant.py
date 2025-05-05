@@ -13,7 +13,7 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/extension-assistant", tags=["API-V2 | Extension-Assistant"])
 
 
-@router.get("/{user_id}/{assistant_id}/get-all", summary="Get extensions of user's assistant.",
+@router.get("/{user_id}/{assistant_id}/get-extensions", summary="Get extensions of user's assistant.",
             response_model=ResponseWrapper[GetExtensionsOfAssistantResponse])
 async def list_extensions_of_assistant(
         assistant_id: str,
@@ -28,7 +28,7 @@ async def list_extensions_of_assistant(
 @router.post("/{user_id}/create", summary="Add an extension into the assistant.",
              response_model=ResponseWrapper[CreateAssistantResponse])
 async def create_new_extension_assistant(
-        request: CreateExtensionAssistantRequest = Depends(),
+        request: CreateExtensionAssistantRequest,
         extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
         _: bool = Depends(ensure_user_id),
 ):

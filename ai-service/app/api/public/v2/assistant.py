@@ -35,8 +35,6 @@ async def create_new_assistant(
         assistant_service: AssistantService = Depends(get_assistant_service),
         _: bool = Depends(ensure_user_id),
 ):
-    if request.thread_type is None:
-        request.thread_type = "default"
     response = await assistant_service.create_assistant(user_id, request)
     return response.to_response()
 

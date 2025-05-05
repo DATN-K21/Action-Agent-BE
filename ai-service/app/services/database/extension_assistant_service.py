@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import Depends
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
 
 from app.core import logging
@@ -243,6 +244,9 @@ class ExtensionAssistantService:
             # GET connected apps
             query = (
                 select(ExtensionAssistant)
+                .options(
+                    selectinload(ExtensionAssistant.extension)
+                )
                 .where(
                     ExtensionAssistant.assistant_id == assistant_id,
                     ExtensionAssistant.is_deleted.is_(False),

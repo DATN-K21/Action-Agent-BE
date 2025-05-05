@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import Depends
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
 
 from app.core import logging
@@ -242,6 +243,9 @@ class McpAssistantService:
             # GET connected apps
             query = (
                 select(McpAssistant)
+                .options(
+                    selectinload(McpAssistant.mcp)
+                )
                 .where(
                     McpAssistant.assistant_id == assistant_id,
                     McpAssistant.is_deleted.is_(False),
