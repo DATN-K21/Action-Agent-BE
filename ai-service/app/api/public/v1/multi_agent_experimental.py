@@ -15,7 +15,7 @@ from app.services.multi_agent.deps import get_multi_agent_service
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/multi-agent", tags=["Multi agent"])
+router = APIRouter(prefix="/multi-agent-experimental", tags=["Multi agent experimental"])
 
 
 @router.post("/chat/{user_id}/{thread_id}", summary="Chat with a complex multi-agent system.",

@@ -13,7 +13,7 @@ class MessageResponse(BaseResponse):
 
 class GetHistoryResponse(BaseResponse):
     messages: list[MessageResponse] = Field(
-        [],
+        ...,
         title="List of messages",
         examples=[[{"role": "human", "content": "Hello"}, {"role": "ai", "content": "Hi"}]],
     )

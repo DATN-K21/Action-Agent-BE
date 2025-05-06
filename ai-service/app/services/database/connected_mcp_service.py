@@ -10,7 +10,7 @@ from app.core.constants import SYSTEM
 from app.core.session import get_db_session
 from app.models.connected_mcp import ConnectedMcp
 from app.schemas.base import PagingRequest, ResponseWrapper
-from app.schemas.connected_mcp import GetConnectedMcpResponse, GetAllConnectedMcpsRequest, CreateConnectedMcpResponse, \
+from app.schemas.connected_mcp import GetConnectedMcpResponse, GetConnectedMcpsResponse, CreateConnectedMcpResponse, \
     UpdateConnectedMcpRequest, UpdateConnectedMcpResponse, DeleteConnectedMcpResponse
 
 logger = logging.get_logger(__name__)
@@ -143,7 +143,7 @@ class ConnectedMcpService:
 
     @logging.log_function_inputs(logger)
     async def get_all_connected_mcps(self, user_id: str, paging: Optional[PagingRequest] = None) -> ResponseWrapper[
-        GetAllConnectedMcpsRequest]:
+        GetConnectedMcpsResponse]:
         """Get all connected apps by user_id."""
         try:
             if paging is None:
@@ -162,7 +162,7 @@ class ConnectedMcpService:
                                           connected_mcps]
                 return ResponseWrapper.wrap(
                     status=200,
-                    data=GetAllConnectedMcpsRequest(
+                    data=GetConnectedMcpsResponse(
                         connected_mcps=wrapped_connected_mcps,
                         page_number=1,
                         max_per_page=len(connected_mcps),
@@ -184,7 +184,7 @@ class ConnectedMcpService:
             if total_connected_apps == 0:
                 return ResponseWrapper.wrap(
                     status=200,
-                    data=GetAllConnectedMcpsRequest(
+                    data=GetConnectedMcpsResponse(
                         connected_mcps=[],
                         page_number=page_number,
                         max_per_page=max_per_page,
@@ -212,7 +212,7 @@ class ConnectedMcpService:
                                       connected_mcps]
             return ResponseWrapper.wrap(
                 status=200,
-                data=GetAllConnectedMcpsRequest(
+                data=GetConnectedMcpsResponse(
                     connected_mcps=wrapped_connected_mcps,
                     page_number=page_number,
                     max_per_page=max_per_page,

@@ -99,7 +99,7 @@ async def chat(
 
         config = create_invocation_config(
             thread_id=thread_id,
-            recursion_limit=request.max_recursion,
+            recursion_limit=request.recursion_limit,
         )
         async with create_mcp_agent_no_cache(
                 user_id=user_id,
@@ -152,7 +152,7 @@ async def stream(
 
     config = create_invocation_config(
         thread_id=thread_id,
-        recursion_limit=request.max_recursion,
+        recursion_limit=request.recursion_limit,
     )
 
     async with create_mcp_agent_no_cache(

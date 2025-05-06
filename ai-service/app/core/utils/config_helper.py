@@ -6,7 +6,7 @@ from langchain_core.runnables import RunnableConfig
 def create_invocation_config(
         thread_id: Optional[str] = None,
         timezone: Optional[str] = None,
-        recursion_limit: Optional[int] = None,
+        recursion_limit: Optional[int] = 20,
 ) -> RunnableConfig:
     configurable: Dict[str, Any] = {}
 

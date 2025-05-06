@@ -102,51 +102,51 @@ class AccessController {
         }
     }
 
-    handleVerifyEmail = async (req, res, next) => {
-        const validationResult = AccessValidator.validateVerifyEmail(req);
-        if (validationResult?.error === true) {
-            throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
-        }
-        const { userEmail } = validationResult?.data;
+    // handleVerifyEmail = async (req, res, next) => {
+    //     const validationResult = AccessValidator.validateVerifyEmail(req);
+    //     if (validationResult?.error === true) {
+    //         throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
+    //     }
+    //     const { userEmail } = validationResult?.data;
 
-        try {
-            await this.accessService.sendOTPToVerifyEmail(userEmail);
-            return new OKSuccessResponse({
-                message: 'Send email to user email success',
-                data: {
-                    email: userEmail
-                },
-                code: 1010400
-            }).send(res);
-        } catch (error) {
-            if (MongooseUtil.isMongooseError(error)) {
-                throw new BadRequestResponse("Something went wrong", 1010408);
-            }
-            throw error;
-        }
-    }
+    //     try {
+    //         await this.accessService.sendOTPToVerifyEmail(userEmail);
+    //         return new OKSuccessResponse({
+    //             message: 'Send email to user email success',
+    //             data: {
+    //                 email: userEmail
+    //             },
+    //             code: 1010400
+    //         }).send(res);
+    //     } catch (error) {
+    //         if (MongooseUtil.isMongooseError(error)) {
+    //             throw new BadRequestResponse("Something went wrong", 1010408);
+    //         }
+    //         throw error;
+    //     }
+    // }
 
-    handleVerifyOTP = async (req, res, next) => {
-        const validationResult = AccessValidator.validateVerifyOTP(req);
-        if (validationResult?.error === true) {
-            throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
-        }
+    // handleVerifyOTP = async (req, res, next) => {
+    //     const validationResult = AccessValidator.validateVerifyOTP(req);
+    //     if (validationResult?.error === true) {
+    //         throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
+    //     }
 
-        const { userEmail, otp } = validationResult?.data;
-        try {
-            const response = await this.accessService.verifyOTP(userEmail, otp);
-            return new OKSuccessResponse({
-                message: 'Verify OTP success',
-                data: response,
-                code: 1010500
-            }).send(res);
-        } catch (error) {
-            if (MongooseUtil.isMongooseError(error)) {
-                throw new BadRequestResponse("Something went wrong", 1010511);
-            }
-            throw error;
-        }
-    }
+    //     const { userEmail, otp } = validationResult?.data;
+    //     try {
+    //         const response = await this.accessService.verifyOTP(userEmail, otp);
+    //         return new OKSuccessResponse({
+    //             message: 'Verify OTP success',
+    //             data: response,
+    //             code: 1010500
+    //         }).send(res);
+    //     } catch (error) {
+    //         if (MongooseUtil.isMongooseError(error)) {
+    //             throw new BadRequestResponse("Something went wrong", 1010511);
+    //         }
+    //         throw error;
+    //     }
+    // }
 
     handleLoginWithGoogle = async (req, res, next) => {
         const validationResult = AccessValidator.validateGoogleLogin(req);
