@@ -3,7 +3,7 @@ import inspect
 from typing import Optional, TypedDict, Annotated, Sequence, Union, Callable, Any, TypeVar, Type, cast, Literal
 
 from langchain_core.language_models import LanguageModelLike, LanguageModelInput, BaseChatModel
-from langchain_core.messages import BaseMessage, SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage, SystemMessage, AIMessage, ToolMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig, Runnable, RunnableBinding
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -17,6 +17,7 @@ from langgraph.utils.runnable import RunnableCallable
 from openai import BaseModel
 
 from app.core import logging
+from app.core.settings import env_settings
 from app.core.utils.messages import trimmer
 from app.services.database.assistant_service import AssistantService
 from app.services.database.extension_assistant_service import ExtensionAssistantService
@@ -38,6 +39,7 @@ class MultiAgentState(TypedDict):
     structured_response: StructuredResponse
     question: str
     next: str
+    traversal: list[str]
 
 
 StateSchema = TypeVar("StateSchema", bound=MultiAgentState)
@@ -269,6 +271,8 @@ def _get_multi_agent_system_prompt(workers: list[Worker]):
         " respond with the worker to act next.\n Each worker will perform a"
         " task and respond with their results and status.\n When finished,"
         " respond with FINISH.\n If you cannot identify an appropriate worker for the task, respond with FINISH.\n"
+        " When you see that a worker has completed a task and provided a result, determine and assign the next "
+        " task accordingly.\n"
         "# Details of the workers are as follows: \n"
         f"\n{metadata}\n"
     )
@@ -330,7 +334,7 @@ class MultiAgentGraphBuilder:
         self.workers.append(Worker(name=node_name, description=node_description))
 
     async def _acall_model(self, state: MultiAgentState, config: RunnableConfig):
-        logger.info("---CALL MODEL---")
+        logger.info("[NODE] CALL MODEL")
 
         response = cast(AIMessage, await self.model_runnable.ainvoke(state, config))
         # add agent name to the AIMessage
@@ -344,7 +348,7 @@ class MultiAgentGraphBuilder:
     async def _agenerate_structured_response(
             self, state: MultiAgentState, config: RunnableConfig
     ):
-        logger.info("---GENERATE STRUCTURED RESPONSE---")
+        logger.info("[NODE] GENERATE STRUCTURED RESPONSE")
         # NOTE: we exclude the last message because there is enough information
         # for the LLM to generate the structured response
         messages = state["messages"][:-1]
@@ -360,11 +364,14 @@ class MultiAgentGraphBuilder:
         return {"structured_response": response, "next": END}
 
     async def _supervisor_node(self, state: MultiAgentState, config: RunnableConfig):
-        logger.info("---SUPERVISOR NODE---")
+        logger.info("[NODE] SUPERVISOR NODE")
 
         system_prompt = _get_multi_agent_system_prompt(self.workers)
 
         messages = [SystemMessage(content=system_prompt)] + state["messages"]  # type: ignore
+
+        if messages[-1] and not isinstance(messages[-1], HumanMessage):
+            messages = messages + [HumanMessage(content=state["question"])]
         messages = await trimmer.ainvoke(messages)
 
         model = _get_model(self.model)
@@ -378,10 +385,17 @@ class MultiAgentGraphBuilder:
         response = await model.with_structured_output(WorkerRouter).ainvoke(messages, config)
         next_ = response["next"]  # type: ignore
 
+        traversal = state.get("traversal") if state.get("traversal") else []
+
+        if next_ in traversal:
+            next_ = END
+        traversal.append(next_)
+
         if next_ == "FINISH":
             next_ = "agent"
 
-        return {"next": next_}
+        logger.info(f"[NODE] {next_} ")
+        return {"next": next_, "traversal": traversal}
 
     def build_graph(self) -> CompiledGraph:
         """
@@ -442,6 +456,7 @@ async def acreate_multi_agent(
                 model=get_llm_chat_model(),
                 checkpointer=checkpointer,
                 name=extension.app_name,
+                debug=env_settings.DEBUG_AGENT,
             )
 
             builder.add_subgraph(subgraph, node_name=extension.app_name)

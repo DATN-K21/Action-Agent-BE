@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
 
     # Debug mode
+    DEBUG_AGENT: bool = False
     DEBUG_SERVER: bool = False
     DEBUG_SQLALCHEMY: bool = False
 

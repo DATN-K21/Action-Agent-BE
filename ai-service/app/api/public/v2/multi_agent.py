@@ -70,7 +70,7 @@ async def chat(
 
         # Chat with the agent
         response = await multi_agent.ainvoke(
-            input={"messages": [request.input]},
+            input={"messages": [request.input], "question": request.input},
             config=config
         )
 
