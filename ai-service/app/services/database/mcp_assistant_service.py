@@ -214,22 +214,29 @@ class McpAssistantService:
     async def list_mcps_of_assistant(
             self,
             assistant_id: str,
-            paging: PagingRequest,
+            paging: Optional[PagingRequest] = None,
     ) -> ResponseWrapper[GetMcpsOfAssistantResponse]:
         """List all extensions of an assistant"""
         try:
-            page_number = paging.page_number
-            max_per_page = paging.max_per_page
-
-            # COUNT total connected apps
+            # COUNT total connected mcps
             count_stmt = select(func.count(McpAssistant.id)).where(
                 McpAssistant.assistant_id == assistant_id,
                 McpAssistant.is_deleted.is_(False),
             )
             count_result = await self.db.execute(count_stmt)
-            total_extension_assistants = count_result.scalar_one()
-            logger.info(f"total_extension_assistants: {total_extension_assistants}")
-            if total_extension_assistants == 0:
+            total_mcp_assistants = count_result.scalar_one()
+            logger.info(f"total_mcp_assistants: {total_mcp_assistants}")
+
+            if paging is None:
+                paging = PagingRequest(
+                    page_number=1,
+                    max_per_page=total_mcp_assistants
+                )
+
+            page_number = paging.page_number
+            max_per_page = paging.max_per_page
+
+            if total_mcp_assistants == 0:
                 return ResponseWrapper.wrap(status=200, data=
                 GetMcpsOfAssistantResponse(
                     mcps=[],
@@ -238,7 +245,7 @@ class McpAssistantService:
                     total_page=0
                 )
                                             )
-            total_pages = (total_extension_assistants + max_per_page - 1) // max_per_page
+            total_pages = (total_mcp_assistants + max_per_page - 1) // max_per_page
 
             # GET connected apps
             query = (

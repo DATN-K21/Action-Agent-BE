@@ -10,7 +10,7 @@ from app.core import logging
 from app.core.cache.cached_mcp_agents import McpAgentCache, get_mcp_agent_cache
 from app.core.graph.v2.mcp_agent import create_mcp_agent_no_cache
 from app.core.session import get_db_session
-from app.core.utils.config_helper import get_invocation_config
+from app.core.utils.config_helper import create_invocation_config
 from app.core.utils.streaming import astream_state, to_sse
 from app.memory.checkpoint import get_checkpointer
 from app.models import Thread
@@ -97,7 +97,7 @@ async def chat(
         if db_thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-        config = get_invocation_config(
+        config = create_invocation_config(
             thread_id=thread_id,
             recursion_limit=request.recursion_limit,
         )
@@ -150,7 +150,7 @@ async def stream(
     if db_thread is None:
         return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
 
-    config = get_invocation_config(
+    config = create_invocation_config(
         thread_id=thread_id,
         recursion_limit=request.recursion_limit,
     )
