@@ -49,6 +49,7 @@ services:
     image: actionagent.azurecr.io/ai-service:stg
     container_name: ai-service
     environment:
+      DEBUG_AGENT: False
       DEBUG_SERVER: False
       DEBUG_SQLALCHEMY: False
       LOGGING_LOG_LEVEL: INFO
