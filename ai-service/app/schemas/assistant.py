@@ -4,8 +4,6 @@ from typing import Optional
 from pydantic import Field
 
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
-from app.schemas.connected_extension import GetConnectedExtensionResponse
-from app.schemas.connected_mcp import GetConnectedMcpResponse
 
 
 ##################################################
@@ -25,11 +23,18 @@ class UpdateAssistantRequest(BaseRequest):
 
 
 class CreateFullInfoAssistantRequest(BaseRequest):
-    pass
+    id: Optional[str] = None
+    name: str = Field(..., min_length=3, max_length=50)
+    description: Optional[str] = Field(None, min_length=3, max_length=500)
+    type: str = Field(..., min_length=3, max_length=50)
+    worker_ids: list[str] = Field(..., examples=["workerid1", "workerid2"])
 
 
 class UpdateFullInfoAssistantRequest(BaseRequest):
-    pass
+    name: Optional[str] = Field(None, min_length=3, max_length=50)
+    description: Optional[str] = Field(None, min_length=3, max_length=500)
+    type: Optional[str] = Field(None, min_length=3, max_length=50)
+    worker_ids: Optional[list[str]] = Field(None, examples=["workerid1", "workerid2"])
 
 
 ##################################################
@@ -67,17 +72,34 @@ class DeleteAssistantResponse(BaseResponse):
     user_id: str
 
 
-class CreateFullInfoAssistantResponse(BaseResponse):
-    pass
+class ExtensionData(BaseResponse):
+    extension_id: str
+    extension_name: str
+    connected_account_id: str = Field(..., title="Connected Account ID", examples=["connectedaccountid"])
+    auth_scheme: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
+    auth_value: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
+    created_at: Optional[datetime]
+
+
+class McpData(BaseResponse):
+    mcp_id: str
+    mcp_name: str
+    url: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
+    connection_type: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
+    created_at: Optional[datetime]
 
 
 class GetFullInfoAssistantResponse(GetAssistantResponse):
-    workers: Optional[list[GetConnectedExtensionResponse | GetConnectedMcpResponse]]
+    workers: Optional[list[ExtensionData | McpData]]
 
 
-class GetFullInfoAssistantsResponse(GetAssistantResponse):
+class GetFullInfoAssistantsResponse(BaseResponse):
     full_info_assistants: list[GetFullInfoAssistantResponse]
 
 
-class UpdateFullInfoAssistantResponse(BaseResponse):
+class CreateFullInfoAssistantResponse(CreateAssistantResponse):
+    workers: Optional[list[ExtensionData | McpData]] = Field(..., title="List of workers")
+
+
+class UpdateFullInfoAssistantResponse(CreateFullInfoAssistantResponse):
     pass

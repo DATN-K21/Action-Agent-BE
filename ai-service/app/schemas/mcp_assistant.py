@@ -61,3 +61,7 @@ class GetMcpOfAssistantResponse(BaseResponse):
 
 class GetMcpsOfAssistantResponse(PagingResponse):
     mcps: list[GetMcpOfAssistantResponse]
+
+
+class DeleteAllMcpsOfAssistantResponse(BaseResponse):
+    mcp_assistants: list[DeleteMcpAssistantResponse]

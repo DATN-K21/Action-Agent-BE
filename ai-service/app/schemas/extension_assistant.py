@@ -53,7 +53,7 @@ class GetExtensionOfAssistantResponse(BaseResponse):
     user_id: str
     assistant_id: str
     extension_id: str
-    app_name: str
+    extension_name: str
     connected_account_id: str = Field(..., title="Connected Account ID", examples=["connectedaccountid"])
     auth_scheme: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
     auth_value: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
@@ -62,3 +62,7 @@ class GetExtensionOfAssistantResponse(BaseResponse):
 
 class GetExtensionsOfAssistantResponse(PagingResponse):
     extensions: list[GetExtensionOfAssistantResponse]
+
+
+class DeleteAllExtensionsOfAssistantResponse(BaseResponse):
+    extension_assistants: list[DeleteExtensionAssistantResponse]
