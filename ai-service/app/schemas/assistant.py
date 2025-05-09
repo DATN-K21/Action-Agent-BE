@@ -4,6 +4,8 @@ from typing import Optional
 from pydantic import Field
 
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
+from app.schemas.connected_extension import GetConnectedExtensionResponse
+from app.schemas.connected_mcp import GetConnectedMcpResponse
 
 
 ##################################################
@@ -22,9 +24,18 @@ class UpdateAssistantRequest(BaseRequest):
     type: Optional[str] = Field(None, min_length=3, max_length=50)
 
 
+class CreateFullInfoAssistantRequest(BaseRequest):
+    pass
+
+
+class UpdateFullInfoAssistantRequest(BaseRequest):
+    pass
+
+
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
+
 class CreateAssistantResponse(BaseResponse):
     id: str
     user_id: str
@@ -54,3 +65,19 @@ class UpdateAssistantResponse(CreateAssistantResponse):
 class DeleteAssistantResponse(BaseResponse):
     id: str
     user_id: str
+
+
+class CreateFullInfoAssistantResponse(BaseResponse):
+    pass
+
+
+class GetFullInfoAssistantResponse(GetAssistantResponse):
+    workers: Optional[list[GetConnectedExtensionResponse | GetConnectedMcpResponse]]
+
+
+class GetFullInfoAssistantsResponse(GetAssistantResponse):
+    full_info_assistants: list[GetFullInfoAssistantResponse]
+
+
+class UpdateFullInfoAssistantResponse(BaseResponse):
+    pass

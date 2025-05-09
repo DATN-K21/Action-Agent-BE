@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import Depends
 from sqlalchemy import select, update, func
@@ -79,13 +80,10 @@ class AssistantService:
     async def list_assistants(
             self,
             user_id: str,
-            paging: PagingRequest,
+            paging: Optional[PagingRequest] = None,
     ) -> ResponseWrapper[GetAssistantsResponse]:
         """Get all assistants of a user."""
         try:
-            page_number = paging.page_number
-            max_per_page = paging.max_per_page
-
             # COUNT total connected apps
             count_stmt = select(func.count(Assistant.id)).where(
                 Assistant.user_id == user_id,
@@ -94,6 +92,16 @@ class AssistantService:
             count_result = await self.db.execute(count_stmt)
             total_assistants = count_result.scalar_one()
             logger.info(f"total_assistants: {total_assistants}")
+
+            if paging is None:
+                paging = PagingRequest(
+                    page_number=1,
+                    max_per_page=total_assistants
+                )
+
+            page_number = paging.page_number
+            max_per_page = paging.max_per_page
+
             if total_assistants == 0:
                 return ResponseWrapper.wrap(status=200, data=
                 GetAssistantsResponse(
