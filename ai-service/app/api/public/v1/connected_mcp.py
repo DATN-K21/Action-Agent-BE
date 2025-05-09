@@ -13,7 +13,7 @@ from app.services.database.connected_mcp_service import ConnectedMcpService, get
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/mcp", tags=["MCP"])
+router = APIRouter(prefix="/mcp", tags=["Connected MCP"])
 
 
 @router.get("/{user_id}/get-all", summary="Get all connected mcps of a user.",

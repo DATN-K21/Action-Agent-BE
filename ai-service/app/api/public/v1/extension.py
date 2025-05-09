@@ -23,7 +23,7 @@ from app.schemas.extension import (
     HTTPExtensionCallbackRequest,
     HTTPExtensionRequest,
 )
-from app.services.database.connected_app_service import ConnectedAppService, get_connected_app_service
+from app.services.database.connected_extension_service import get_connected_extension_service, ConnectedExtensionService
 from app.services.extensions.deps import get_extension_service_manager
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 
@@ -103,7 +103,7 @@ async def active(
 async def disconnect(
         user_id: str,
         extension_name: str,
-        connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+        connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
         _: bool = Depends(ensure_user_id),
 ):
@@ -114,7 +114,7 @@ async def disconnect(
             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
 
         # Get the account id
-        account_id = await connected_app_service.get_account_id(user_id, extension_name)
+        account_id = await connected_extension_service.get_account_id(user_id, extension_name)
         if account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
 
@@ -123,7 +123,7 @@ async def disconnect(
 
         # Delete the account from the database
         if response_data.status == "success":
-            result = await connected_app_service.delete_connected_app(user_id, extension_name)
+            result = await connected_extension_service.delete_connected_extension(user_id, extension_name)
             if not result:
                 return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 

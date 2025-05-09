@@ -13,4 +13,4 @@ class ExtensionAssistant(BaseEntity):
     # relationship with the Assistant model
     assistant = relationship("Assistant", back_populates="extension_assistants", passive_deletes=True)
     # relationship with the ConnectedApp model
-    extension = relationship("ConnectedApp", back_populates="extension_assistants", passive_deletes=True)
+    extension = relationship("ConnectedExtension", back_populates="extension_assistants", passive_deletes=True)

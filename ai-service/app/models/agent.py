@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, String
+wfrom sqlalchemy import Boolean, Column, String
 
 from app.models.base_entity import BaseEntity
 from sqlalchemy.dialects.postgresql import ARRAY
