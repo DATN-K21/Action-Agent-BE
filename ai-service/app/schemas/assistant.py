@@ -27,14 +27,14 @@ class CreateFullInfoAssistantRequest(BaseRequest):
     name: str = Field(..., min_length=3, max_length=50)
     description: Optional[str] = Field(None, min_length=3, max_length=500)
     type: str = Field(..., min_length=3, max_length=50)
-    worker_ids: list[str] = Field(..., examples=["workerid1", "workerid2"])
+    worker_ids: list[str]
 
 
 class UpdateFullInfoAssistantRequest(BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = Field(None, min_length=3, max_length=500)
     type: Optional[str] = Field(None, min_length=3, max_length=50)
-    worker_ids: Optional[list[str]] = Field(None, examples=["workerid1", "workerid2"])
+    worker_ids: Optional[list[str]]
 
 
 ##################################################

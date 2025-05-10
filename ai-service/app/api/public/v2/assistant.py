@@ -120,7 +120,7 @@ async def create_full_info_assistant(
     if request.type == "mcp":
         for mcp_id in request.worker_ids:
             # Check if mcp_id is valid
-            connected_mcp_result = await connected_mcp_service.get_connected_mcp(user_id, mcp_id)
+            connected_mcp_result = await connected_mcp_service.get_connected_mcp_by_id(user_id, mcp_id)
             if connected_mcp_result.status != 200:
                 return ResponseWrapper.wrap(status=connected_mcp_result.status, message=connected_mcp_result.message)
 
@@ -148,15 +148,14 @@ async def create_full_info_assistant(
     elif request.type == "extension":
         for extension_id in request.worker_ids:
             # Check if extension_id is valid
-            connected_extension_result = await connected_extension_service.get_connected_extension(user_id,
-                                                                                                   extension_id)
+            connected_extension_result = await connected_extension_service.get_connected_extension_by_id(user_id,
+                                                                                                         extension_id)
             if connected_extension_result.status != 200:
                 return ResponseWrapper.wrap(status=connected_extension_result.status,
                                             message=connected_extension_result.message)
 
             # Create extension-assistant
             extension_result = await extension_assistant_service.create_extension_assistant(
-                user_id=user_id,
                 request=CreateExtensionAssistantRequest(
                     assistant_id=assistant.id,
                     extension_id=extension_id,

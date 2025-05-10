@@ -53,7 +53,7 @@ async def get_connected_mcp(
         connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response = await connected_mcp_service.get_connected_mcp(user_id, connected_mcp_id)
+    response = await connected_mcp_service.get_connected_mcp_by_id(user_id, connected_mcp_id)
     return response.to_response()
 
 

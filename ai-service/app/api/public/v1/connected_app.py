@@ -19,8 +19,8 @@ async def get_all(
         connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response_data = await connected_app_service.list_connected_apps(user_id=user_id, paging=paging)
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    response = await connected_app_service.list_connected_apps(user_id=user_id, paging=paging)
+    return response.to_response()
 
 
 @router.get("/{user_id}/{extension_name}/get-detail", summary="Get detail connection.",
@@ -31,8 +31,5 @@ async def get_detail(
         connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response_data = await connected_app_service.get_connected_app(user_id, extension_name)
-    if response_data is None:
-        return ResponseWrapper.wrap(status=404, message="Connected app not found").to_response()
-
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    response = await connected_app_service.get_connected_app(user_id, extension_name)
+    return response.to_response()

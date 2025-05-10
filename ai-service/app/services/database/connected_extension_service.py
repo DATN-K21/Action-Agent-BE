@@ -6,9 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.session import get_db_session
-from app.models.connected_app import ConnectedApp
 from app.models.connected_extension import ConnectedExtension
-from app.schemas.base import PagingRequest
+from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_extension import GetConnectedExtensionResponse, GetConnectedExtensionsResponse
 
 logger = logging.get_logger(__name__)
@@ -104,18 +103,18 @@ class ConnectedExtensionService:
             return False
 
     @logging.log_function_inputs(logger)
-    async def get_connected_extension(
+    async def get_connected_extension_by_id(
             self,
             user_id: str,
-            extension_name: str,
-    ) -> Optional[GetConnectedExtensionResponse]:
-        """Get a connected app by user_id and extension_name."""
+            connected_extension_id: str,
+    ) -> ResponseWrapper[GetConnectedExtensionResponse]:
+        """Get a connected extension by user_id and extension_name."""
         try:
             query = (
                 select(ConnectedExtension)
                 .where(
                     ConnectedExtension.user_id == user_id,
-                    ConnectedExtension.extension_name == extension_name,
+                    ConnectedExtension.id == connected_extension_id,
                     ConnectedExtension.is_deleted.is_(False),
                 )
                 .limit(1)
@@ -124,25 +123,32 @@ class ConnectedExtensionService:
             result = await self.db.execute(query)
             connected_extension = result.scalar_one()
 
-            return GetConnectedExtensionResponse.model_validate(connected_extension)
+            data = GetConnectedExtensionResponse.model_validate(connected_extension)
+
+            return ResponseWrapper.wrap(
+                status=200,
+                data=data,
+            )
 
         except Exception as e:
             logger.exception("Has error: %s", str(e))
-            return None
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def list_connected_extensions(
             self,
             user_id: str,
             paging: Optional[PagingRequest] = None
-    ) -> GetConnectedExtensionsResponse:
+    ) -> ResponseWrapper[GetConnectedExtensionsResponse]:
         """List connected extensions by user_id."""
         try:
             # COUNT total connected apps
-            count_stmt = select(func.count(ConnectedApp.id)).where(
-                ConnectedApp.user_id == user_id,
-                ConnectedApp.is_deleted.is_(False),
+            count_stmt = select(
+                func.count(ConnectedExtension.id)).where(
+                ConnectedExtension.user_id == user_id,
+                ConnectedExtension.is_deleted.is_(False),
             )
+
             count_result = await self.db.execute(count_stmt)
             total_connected_extensions = count_result.scalar_one()
             logger.info(f"total_connected_extensions: {total_connected_extensions}")
@@ -157,15 +163,19 @@ class ConnectedExtensionService:
             max_per_page = paging.max_per_page
 
             if total_connected_extensions == 0:
-                return GetConnectedExtensionsResponse(
-                    connected_extensions=[],
-                    page_number=page_number,
-                    max_per_page=max_per_page,
-                    total_page=0
+                return ResponseWrapper.wrap(
+                    status=200,
+                    data=GetConnectedExtensionsResponse(
+                        connected_extensions=[],
+                        page_number=page_number,
+                        max_per_page=max_per_page,
+                        total_page=0
+                    )
                 )
+
             total_pages = (total_connected_extensions + max_per_page - 1) // max_per_page
 
-            # GET connected apps
+            # GET connected extensions
             query = (
                 select(ConnectedExtension)
                 .where(
@@ -182,21 +192,19 @@ class ConnectedExtensionService:
             wrapped_connected_extensions = [GetConnectedExtensionResponse.model_validate(connected_extension) for
                                             connected_extension in
                                             connected_extensions]
-            return GetConnectedExtensionsResponse(
-                connected_extensions=wrapped_connected_extensions,
-                page_number=page_number,
-                max_per_page=max_per_page,
-                total_page=total_pages
+            return ResponseWrapper.wrap(
+                status=200,
+                data=GetConnectedExtensionsResponse(
+                    connected_extensions=wrapped_connected_extensions,
+                    page_number=page_number,
+                    max_per_page=max_per_page,
+                    total_page=total_pages
+                )
             )
 
         except Exception as e:
             logger.exception("Has error: %s", str(e))
-            return GetConnectedExtensionsResponse(
-                connected_extensions=[],
-                page_number=paging.page_number,
-                max_per_page=paging.max_per_page,
-                total_page=0
-            )
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
 def get_connected_extension_service(db: AsyncSession = Depends(get_db_session)):

@@ -19,20 +19,17 @@ async def get_all(
         connected_service_service: ConnectedExtensionService = Depends(get_connected_extension_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response_data = await connected_service_service.list_connected_extensions(user_id=user_id, paging=paging)
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    response = await connected_service_service.list_connected_extensions(user_id=user_id, paging=paging)
+    return response.to_response()
 
 
-@router.get("/{user_id}/{extension_name}/get-detail", summary="Get detail connection.",
+@router.get("/{user_id}/{extension_id}/get-detail", summary="Get detail connection.",
             response_model=ResponseWrapper[GetConnectedExtensionResponse])
 async def get_detail(
         user_id: str,
-        extension_name: str,
+        extension_id: str,
         connected_service_service: ConnectedExtensionService = Depends(get_connected_extension_service),
         _: bool = Depends(ensure_user_id),
 ):
-    response_data = await connected_service_service.get_connected_extension(user_id, extension_name)
-    if response_data is None:
-        return ResponseWrapper.wrap(status=404, message="Connected extension not found").to_response()
-
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    response = await connected_service_service.get_connected_extension_by_id(user_id, extension_id)
+    return response.to_response()

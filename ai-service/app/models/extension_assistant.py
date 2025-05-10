@@ -7,7 +7,7 @@ from app.models.base_entity import BaseEntity
 class ExtensionAssistant(BaseEntity):
     __tablename__ = "extension_assistants"
 
-    extension_id = Column(String, ForeignKey("connected_apps.id", ondelete="CASCADE"), nullable=False)
+    extension_id = Column(String, ForeignKey("connected_extensions.id", ondelete="CASCADE"), nullable=False)
     assistant_id = Column(String, ForeignKey("assistants.id", ondelete="CASCADE"), nullable=False)
 
     # relationship with the Assistant model

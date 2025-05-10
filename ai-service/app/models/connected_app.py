@@ -1,5 +1,4 @@
 from sqlalchemy import Column, ForeignKey, String
-from sqlalchemy.orm import relationship
 
 from app.models.base_entity import BaseEntity
 
@@ -16,10 +15,3 @@ class ConnectedApp(BaseEntity):
     connected_account_id = Column(String, nullable=False)
     auth_value = Column(String, nullable=True)
     auth_scheme = Column(String, nullable=True)
-
-    extension_assistants = relationship(
-        "ExtensionAssistant",
-        back_populates="extension",
-        cascade="all, delete-orphan",
-        passive_deletes=True
-    )
