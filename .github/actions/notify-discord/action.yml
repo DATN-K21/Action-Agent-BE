@@ -45,6 +45,7 @@ runs:
     - name: Send notification to Discord
       shell: bash
       run: |
+        ESCAPED_COMMIT_MSG=$(echo "${{ inputs.commit_message }}" | cut -c1-200 | sed 's/"/\\"/g; s/`/\\`/g')
         curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"**✅ [${{ inputs.action }} SUCCESS]**\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${{ inputs.commit_message }}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
+          -d "{\"content\": \"**✅ [${{ inputs.action }} SUCCESS]**\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${ESCAPED_COMMIT_MSG}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
           "${{ inputs.webhook_url }}"
