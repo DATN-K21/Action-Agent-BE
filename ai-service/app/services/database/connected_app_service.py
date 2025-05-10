@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import logging
 from app.core.session import get_db_session
 from app.models.connected_app import ConnectedApp
-from app.schemas.base import PagingRequest
+from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_app import GetConnectedAppsResponse, GetConnectedAppResponse
 
 logger = logging.get_logger(__name__)
@@ -106,7 +106,7 @@ class ConnectedAppService:
             self,
             user_id: str,
             app_name: str,
-    ) -> Optional[GetConnectedAppResponse]:
+    ) -> ResponseWrapper[GetConnectedAppResponse]:
         """Get a connected app by user_id and app_name."""
         try:
             query = (
@@ -122,18 +122,21 @@ class ConnectedAppService:
             result = await self.db.execute(query)
             connected_app = result.scalar_one()
 
-            return GetConnectedAppResponse.model_validate(connected_app)
+            return ResponseWrapper.wrap(
+                status=200,
+                data=GetConnectedAppResponse.model_validate(connected_app)
+            )
 
         except Exception as e:
             logger.exception("Has error: %s", str(e))
-            return None
+            return ResponseWrapper(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
     async def list_connected_apps(
             self,
             user_id: str,
             paging: PagingRequest
-    ) -> GetConnectedAppsResponse:
+    ) -> ResponseWrapper[GetConnectedAppsResponse]:
         """Get all connected apps by user_id."""
         try:
             page_number = paging.page_number
@@ -148,12 +151,16 @@ class ConnectedAppService:
             total_connected_apps = count_result.scalar_one()
             logger.info(f"total_connected_apps: {total_connected_apps}")
             if total_connected_apps == 0:
-                return GetConnectedAppsResponse(
-                    connected_apps=[],
-                    page_number=page_number,
-                    max_per_page=max_per_page,
-                    total_page=0
+                return ResponseWrapper(
+                    status=200,
+                    data=GetConnectedAppsResponse(
+                        connected_apps=[],
+                        page_number=page_number,
+                        max_per_page=max_per_page,
+                        total_page=0
+                    )
                 )
+
             total_pages = (total_connected_apps + max_per_page - 1) // max_per_page
 
             # GET connected apps
@@ -172,20 +179,21 @@ class ConnectedAppService:
             connected_apps = result.scalars().all()
             wrapped_connected_apps = [GetConnectedAppResponse.model_validate(connected_app) for connected_app in
                                       connected_apps]
-            return GetConnectedAppsResponse(
-                connected_apps=wrapped_connected_apps,
-                page_number=page_number,
-                max_per_page=max_per_page,
-                total_page=total_pages
+            return ResponseWrapper(
+                status=200,
+                data=GetConnectedAppsResponse(
+                    connected_apps=wrapped_connected_apps,
+                    page_number=page_number,
+                    max_per_page=max_per_page,
+                    total_page=total_pages
+                )
             )
 
         except Exception as e:
             logger.exception("Has error: %s", str(e))
-            return GetConnectedAppsResponse(
-                connected_apps=[],
-                page_number=paging.page_number,
-                max_per_page=paging.max_per_page,
-                total_page=0
+            return ResponseWrapper(
+                status=500,
+                message="Internal server error"
             )
 
 

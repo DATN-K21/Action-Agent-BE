@@ -113,7 +113,8 @@ class ConnectedMcpService:
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
     @logging.log_function_inputs(logger)
-    async def get_connected_mcp(self, user_id: str, connected_mcp_id: str) -> ResponseWrapper[GetConnectedMcpResponse]:
+    async def get_connected_mcp_by_id(self, user_id: str, connected_mcp_id: str) -> ResponseWrapper[
+        GetConnectedMcpResponse]:
         """Get a connected app by user_id and app_name."""
         try:
             query = (

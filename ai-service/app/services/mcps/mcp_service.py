@@ -123,7 +123,7 @@ async def aget_mcp_actions_in_a_server(
     :return: list of actions
     """
     # Assuming `self.client` is an instance of MultiServerMCPClient
-    result = await connected_mcp_service.get_connected_mcp(user_id=user_id, connected_mcp_id=connected_mcp_id)
+    result = await connected_mcp_service.get_connected_mcp_by_id(user_id=user_id, connected_mcp_id=connected_mcp_id)
     connected_mcps = result.data
 
     actions = []

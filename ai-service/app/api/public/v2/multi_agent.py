@@ -20,7 +20,7 @@ from app.services.extensions.extension_service_manager import ExtensionServiceMa
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/multi-agent", tags=["Multi agent"])
+router = APIRouter(prefix="/multi-agent", tags=["Multi Agent"])
 
 
 @router.post("/chat/{user_id}/{assistant_id}/{thread_id}", summary="Chat with the agent.",

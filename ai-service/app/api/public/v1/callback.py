@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from app.core import logging
 from app.core.settings import env_settings
-from app.services.database.connected_app_service import ConnectedAppService, get_connected_app_service
+from app.services.database.connected_extension_service import ConnectedExtensionService, get_connected_extension_service
 
 logger = logging.get_logger(__name__)
 
@@ -12,9 +12,9 @@ router = APIRouter(prefix="/callback", tags=["Callback"], include_in_schema=Fals
 
 @router.get("/extension/{user_id}", summary="Handle connection success.")
 async def connection_success(
-    user_id: str,
-    request: Request,
-    connected_app_service: ConnectedAppService = Depends(get_connected_app_service),
+        user_id: str,
+        request: Request,
+        connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
 ):
     url = env_settings.FRONTEND_REDIRECT_URL
 
@@ -30,8 +30,8 @@ async def connection_success(
         full_url = f"{url}?success=false&message=connection%20failed%20or%20is%20still%20pending"
         return RedirectResponse(full_url)
 
-    result = await connected_app_service.create_connected_app(
-        user_id=user_id, app_name=app_name, connected_account_id=connected_account_id
+    result = await connected_extension_service.create_connected_extension(
+        user_id=user_id, extension_name=app_name, connected_account_id=connected_account_id
     )
 
     if result:

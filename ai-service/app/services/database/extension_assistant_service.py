@@ -1,8 +1,7 @@
-from datetime import datetime
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, Delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
@@ -14,7 +13,7 @@ from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.extension_assistant import CreateExtensionAssistantRequest, CreateExtensionAssistantResponse, \
     GetExtensionAssistantsResponse, GetExtensionAssistantResponse, UpdateExtensionAssistantRequest, \
     UpdateExtensionAssistantResponse, DeleteExtensionAssistantResponse, GetExtensionsOfAssistantResponse, \
-    GetExtensionOfAssistantResponse
+    GetExtensionOfAssistantResponse, DeleteAllExtensionsOfAssistantResponse
 
 logger = logging.get_logger(__name__)
 
@@ -181,14 +180,10 @@ class ExtensionAssistantService:
         """Delete an extension-assistant."""
         try:
             stmt = (
-                update(ExtensionAssistant)
+                Delete(ExtensionAssistant)
                 .where(
                     ExtensionAssistant.id == extension_assistant_id,
                     ExtensionAssistant.is_deleted.is_(False),
-                )
-                .values(
-                    is_deleted=True,
-                    deleted_at=datetime.now(),
                 )
                 .returning(
                     ExtensionAssistant.id.label("id"),
@@ -267,7 +262,7 @@ class ExtensionAssistantService:
                 user_id=extension_assistant.extension.user_id,
                 assistant_id=extension_assistant.assistant_id,
                 extension_id=extension_assistant.extension_id,
-                app_name=extension_assistant.extension.app_name,
+                extension_name=extension_assistant.extension.extension_name,
                 connected_account_id=extension_assistant.extension.connected_account_id,
                 auth_scheme=extension_assistant.extension.auth_scheme,
                 auth_value=extension_assistant.extension.auth_value,
@@ -286,6 +281,50 @@ class ExtensionAssistantService:
                                         )
         except Exception as e:
             logger.exception("Has error: %s", str(e))
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def delete_all_extensions_of_assistant(
+            self,
+            assistant_id: str
+    ) -> ResponseWrapper[DeleteAllExtensionsOfAssistantResponse]:
+        try:
+            stmt = (
+                Delete(ExtensionAssistant)
+                .where(
+                    ExtensionAssistant.assistant_id == assistant_id,
+                    ExtensionAssistant.is_deleted.is_(False),
+                )
+                .returning(
+                    ExtensionAssistant.id.label("id"),
+                    ExtensionAssistant.assistant_id.label("assistant_id"),
+                    ExtensionAssistant.extension_id.label("extension_id")
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            deleted_extension_assistants = result.mappings().all()
+
+            if not deleted_extension_assistants:
+                return ResponseWrapper.wrap(status=404, message="Extension-Assistant not found")
+
+            await self.db.commit()
+
+            deleted_extension_assistants_wrap = [
+                DeleteExtensionAssistantResponse(
+                    id=deleted_extension_assistant.id,
+                    assistant_id=deleted_extension_assistant.assistant_id,
+                    extension_id=deleted_extension_assistant.extension_id
+                )
+                for deleted_extension_assistant in deleted_extension_assistants
+            ]
+
+            return ResponseWrapper.wrap(status=200, data=DeleteAllExtensionsOfAssistantResponse(
+                extension_assistants=deleted_extension_assistants_wrap
+            ))
+        except Exception as e:
+            logger.exception("Has error: %s", str(e))
+            await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 

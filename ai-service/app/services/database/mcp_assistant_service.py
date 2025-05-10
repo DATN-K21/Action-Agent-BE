@@ -1,8 +1,7 @@
-from datetime import datetime
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, Delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
@@ -13,7 +12,7 @@ from app.models.mcp_assistant import McpAssistant
 from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.mcp_assistant import CreateMcpAssistantRequest, CreateMcpAssistantResponse, GetMcpAssistantResponse, \
     GetMcpAssistantsResponse, UpdateMcpAssistantRequest, UpdateMcpAssistantResponse, DeleteMcpAssistantResponse, \
-    GetMcpsOfAssistantResponse, GetMcpOfAssistantResponse
+    GetMcpsOfAssistantResponse, GetMcpOfAssistantResponse, DeleteAllMcpsOfAssistantResponse
 
 logger = logging.get_logger(__name__)
 
@@ -180,14 +179,10 @@ class McpAssistantService:
         """Delete a mcp-assistant."""
         try:
             stmt = (
-                update(McpAssistant)
+                Delete(McpAssistant)
                 .where(
                     McpAssistant.id == mcp_assistant_id,
                     McpAssistant.is_deleted.is_(False),
-                )
-                .values(
-                    is_deleted=True,
-                    deleted_at=datetime.now(),
                 )
                 .returning(
                     McpAssistant.id.label("id"),
@@ -287,6 +282,49 @@ class McpAssistantService:
                                         )
         except Exception as e:
             logger.exception("Has error: %s", str(e))
+            return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+    @logging.log_function_inputs(logger)
+    async def delete_all_mcps_of_assistant(
+            self,
+            assistant_id: str
+    ) -> ResponseWrapper[DeleteAllMcpsOfAssistantResponse]:
+        try:
+            stmt = (
+                Delete(McpAssistant)
+                .where(
+                    McpAssistant.assistant_id == assistant_id,
+                    McpAssistant.is_deleted.is_(False),
+                )
+                .returning(
+                    McpAssistant.id.label("id"),
+                    McpAssistant.assistant_id.label("assistant_id"),
+                    McpAssistant.mcp_id.label("mcp_id")
+                )
+            )
+
+            result = await self.db.execute(stmt)
+            deleted_mcp_assistants = result.mappings().all()
+
+            if not deleted_mcp_assistants:
+                return ResponseWrapper.wrap(status=404, message="MCP-Assistant not found")
+
+            await self.db.commit()
+
+            deleted_mcp_assistants_wrap = [
+                DeleteMcpAssistantResponse(
+                    id=deleted_mcp_assistant.id,
+                    assistant_id=deleted_mcp_assistant.assistant_id,
+                    mcp_id=deleted_mcp_assistant.extension_id
+                )
+                for deleted_mcp_assistant in deleted_mcp_assistants
+            ]
+
+            return ResponseWrapper.wrap(status=200, data=DeleteAllMcpsOfAssistantResponse(
+                mcp_assistants=deleted_mcp_assistants_wrap))
+        except Exception as e:
+            logger.exception("Has error: %s", str(e))
+            await self.db.rollback()
             return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 

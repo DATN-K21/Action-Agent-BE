@@ -449,17 +449,17 @@ async def acreate_multi_agent(
         )
 
         for extension in extensions:
-            extension_service = extension_service_manager.get_extension_service(extension.app_name)
+            extension_service = extension_service_manager.get_extension_service(extension.extension_name)
             tools = extension_service.get_authed_tools(user_id=user_id)
             subgraph = create_react_agent(
                 tools=tools,
                 model=get_llm_chat_model(),
                 checkpointer=checkpointer,
-                name=extension.app_name,
+                name=extension.extension_name,
                 debug=env_settings.DEBUG_AGENT,
             )
 
-            builder.add_subgraph(subgraph, node_name=extension.app_name)
+            builder.add_subgraph(subgraph, node_name=extension.extension_name)
 
         return builder.build_graph()
 
