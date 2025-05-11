@@ -93,7 +93,7 @@ class GetFullInfoAssistantResponse(GetAssistantResponse):
     workers: Optional[list[ExtensionData | McpData]]
 
 
-class GetFullInfoAssistantsResponse(BaseResponse):
+class GetFullInfoAssistantsResponse(PagingResponse):
     full_info_assistants: list[GetFullInfoAssistantResponse]
 
 

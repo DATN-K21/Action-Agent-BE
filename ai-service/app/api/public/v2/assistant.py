@@ -83,7 +83,10 @@ async def list_full_info_assistants(
             )
 
     data = GetFullInfoAssistantsResponse(
-        full_info_assistants=full_info_assistants
+        full_info_assistants=full_info_assistants,
+        page_number=assistants_result.data.page_number,
+        max_per_page=assistants_result.data.max_per_page,
+        total_page=assistants_result.data.total_page,
     )
 
     return ResponseWrapper.wrap(status=200, data=data).to_response()
