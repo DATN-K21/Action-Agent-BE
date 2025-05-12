@@ -20,7 +20,7 @@ services:
       - "15000:15000"
     restart: always
     volumes:
-      - ./api-gateway/certs:/usr/src/app/certs:ro
+      - ./src/api-gateway/certs:/usr/src/app/certs:ro
 
   user-service:
     image: actionagent.azurecr.io/user-service:stg
