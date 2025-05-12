@@ -73,7 +73,7 @@ class DeleteAssistantResponse(BaseResponse):
 
 
 class ExtensionData(BaseResponse):
-    extension_id: str
+    id: str
     extension_name: str
     connected_account_id: str = Field(..., title="Connected Account ID", examples=["connectedaccountid"])
     auth_scheme: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
@@ -82,7 +82,7 @@ class ExtensionData(BaseResponse):
 
 
 class McpData(BaseResponse):
-    mcp_id: str
+    id: str
     mcp_name: str
     url: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
     connection_type: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
