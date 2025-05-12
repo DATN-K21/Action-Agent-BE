@@ -27,7 +27,7 @@ class ComposioClient:
 
         sanitized_data = []
         for item in data["items"]:
-            sanitized_item = sanitize_composio_app_data(item)
+            sanitized_item = sanitize_composio_app_data(data=item, type="all")
             sanitized_data.append(sanitized_item)
 
         if result.status_code == 200:
@@ -48,19 +48,21 @@ class ComposioClient:
     @classmethod
     def get_single_app(cls, app_enum: str):
         result = request("GET", f"{cls.base_url}apps/{app_enum}", headers=cls.headers)
+
         data = result.json()
+        sanitized_data = sanitize_composio_app_data(data=data, type="single")
 
         if result.status_code == 200:
             return GetSingleAppComposioResponse(
                 success=True,
                 message=None,
-                data=data,
+                data=sanitized_data,
             )
 
         return GetSingleAppComposioResponse(
             success=False,
             message=data["message"],
-            data=None,
+            data=sanitized_data,
         )
 
     @classmethod

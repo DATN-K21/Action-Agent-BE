@@ -37,13 +37,13 @@ class BaseAppResponse(BaseResponse):
     app_id: str = Field(..., title="App ID", examples=["12345"], description="Unique identifier (UUID) for the app")
     key: str = Field(..., title="App Key", examples=["app1"], description="Unique key/slug for the app, used in URLs and API references")
     name: str = Field(..., title="App Name", examples=["app1"], description="The name of the app")
-    display_name: str = Field(..., title="Display Name", examples=["App 1"], description="The display name of the app")
+    display_name: Optional[str] = Field(..., title="Display Name", examples=["App 1"], description="The display name of the app")
     description: str = Field(..., title="App Description", examples=["This is app1"], description="The description of the app")
     logo: Optional[str] = Field(..., title="Logo", examples=["http://example.com/icon.png"], description="The logo of the app")
     categories: Optional[list[str]] = Field(..., title="Categories", examples=[["category1", "category2"]], description="The categories of the app")
-    enabled: bool = Field(..., title="Enabled", examples=[True], description="Indicates if the app is enabled")
-    created_at: str = Field(..., title="Created At", examples=["2023-01-01T00:00:00Z"], description="The creation date of the app")
-    updated_at: str = Field(..., title="Updated At", examples=["2023-01-01T00:00:00Z"], description="The last update date of the app")
+    enabled: Optional[bool] = Field(..., title="Enabled", examples=[True], description="Indicates if the app is enabled")
+    created_at: Optional[str] = Field(..., title="Created At", examples=["2023-01-01T00:00:00Z"], description="The creation date of the app")
+    updated_at: Optional[str] = Field(..., title="Updated At", examples=["2023-01-01T00:00:00Z"], description="The last update date of the app")
     tags: Optional[list[str]] = Field(..., title="Tags", examples=[["tag1", "tag2"]], description="The tags of the app")
     no_auth: Optional[bool] = Field(..., title="No Auth", examples=[False], description="Indicates if the app has no authentication")
 
@@ -90,10 +90,10 @@ class SingleAppResponse(BaseAppResponse):
         examples=["foo"],
         description="The endpoint to get the current user",
     )
-    test_connectors: Optional[TestConnectorResponse] = Field(
+    test_connectors: Optional[list[TestConnectorResponse]] = Field(
         ...,
         title="Test Connectors",
-        examples=[{"id": "12345", "name": "Test Connector 1", "auth_schemes": "oauth2"}],
+        examples=[[{"id": "12345", "name": "Test Connector 1", "auth_schemes": "oauth2"}]],
         description="The test connectors available for the app. If this is not empty, it means composio allows you to setup this app without configuring and setting up your own auth app.",
     )
 
