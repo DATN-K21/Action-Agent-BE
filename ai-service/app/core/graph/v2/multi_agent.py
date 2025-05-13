@@ -15,6 +15,8 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.types import Checkpointer
 from langgraph.utils.runnable import RunnableCallable
 from openai import BaseModel
+from pydantic import Field
+from pydantic import create_model
 
 from app.core import logging
 from app.core.settings import env_settings
@@ -39,6 +41,8 @@ class MultiAgentState(TypedDict):
     structured_response: StructuredResponse
     question: str
     next: str
+    actions: list[dict]
+    current_action_index: int
 
 
 StateSchema = TypeVar("StateSchema", bound=MultiAgentState)
@@ -252,26 +256,49 @@ def _convert_models_to_str(models: list[BaseModel]) -> str:
     return str([model.model_dump_json() for model in models])
 
 
-def _get_dynamic_router(type_dict_name: str, fields: any):
+def _get_dynamic_router(name: str, fields: any, descriptions):
     """
-    Get a dynamic router for the workflow.
-    """
-    router = TypedDict(type_dict_name, fields)
-    return router
+       Dynamically create a Pydantic model with descriptions for each field.
+
+       Args:
+           name: The name of the model.
+           fields: A dict mapping field names to their types.
+           descriptions: A dict mapping field names to their descriptions.
+
+       Returns:
+           A dynamically created Pydantic model.
+       """
+    annotated_fields = {
+        name: (type_, Field(..., description=descriptions.get(name, "")))
+        for name, type_ in fields.items()
+    }
+    return create_model(name, **annotated_fields)
 
 
-def _get_multi_agent_system_prompt(workers: list[Worker]):
+def _get_planner_system_prompt(workers: list[Worker]):
     members = [worker.name for worker in workers]
-    metadata = [f"## Description of {worker.name}: {worker.description}\n"
-                for worker in workers]
+    metadata = "\n".join(
+        f"## Description of {worker.name}: {worker.description}"
+        for worker in workers
+    )
+
     system_prompt = (
-        "You are a supervisor tasked with managing a conversation between the"
-        f" following workers: {members}.\n Given the following user request,"
-        " respond with the worker to act next.\n Each worker will perform a"
-        " task and respond with their results and status.\n When finished,"
-        " respond with FINISH.\n If you cannot identify an appropriate worker for the task, respond with FINISH.\n"
-        "# Details of the workers are as follows: \n"
-        f"\n{metadata}\n"
+        "You are a planning assistant tasked with generating a structured plan to fulfill a user request.\n"
+        "The plan must be a sequence of steps, each with:\n"
+        "  - `task`: A clear description of the action to be performed (not the result or output)\n"
+        "  - `next`: The tool (worker) responsible for the task; must be one of the following: "
+        f"{', '.join(members)} or `FINISH`\n"
+        "\n"
+        "Guidelines:\n"
+        "- Each step must use one of the listed tools.\n"
+        "- Do not invent tools or use tools not listed.\n"
+        "- The final step must always use `next: FINISH`.\n"
+        "- The final step should summarize the overall plan outcome **based on the user request**, but `task` should describe the summary action (e.g., 'Summarize the search results and actions taken').\n"
+        "- Do NOT include actual content, responses, or email messages in `task` fields.\n"
+        "- Respond **only** with a list of steps in valid JSON format.\n"
+        "\n"
+        "# Details of the available tools (workers):\n"
+        f"{metadata}"
     )
 
     return system_prompt
@@ -330,12 +357,47 @@ class MultiAgentGraphBuilder:
         self.workflow.add_edge(node_name, "supervisor")
         self.workers.append(Worker(name=node_name, description=node_description))
 
+    async def _aplan(self, state: MultiAgentState, config: RunnableConfig):
+        logger.info("[NODE] PLAN")
+
+        model = _get_model(self.model)
+
+        options = ["FINISH"] + [worker.name for worker in self.workers]
+
+        system_prompt = _get_planner_system_prompt(self.workers)
+        messages = state.get("messages")
+        messages = [SystemMessage(content=system_prompt)] + list(messages)
+        messages = await trimmer.ainvoke(messages)
+        question = messages[-1].content
+
+        # noinspection PyPep8Naming
+        class ActionStep(TypedDict):
+            """
+            Represents one step in a plan.
+            - next: The tool to use in the next step (e.g., gmail, calendar).
+            - task: The action to perform with the selected tool.
+            """
+            # noinspection PyTypeHints
+            next: Literal[*options]
+            task: str
+
+        class StepList(TypedDict):
+            """
+            A sequence of steps to be executed in order.
+            - steps: List of ActionStep items.
+            """
+            steps: list[ActionStep]
+
+        response = await model.with_structured_output(StepList).ainvoke(messages, config)
+
+        logger.info(f"[Plan:] {response}")
+
+        return {"actions": response.get("steps"), "current_action_index": 0, "next": "supervisor", "question": question}
+
     async def _acall_model(self, state: MultiAgentState, config: RunnableConfig):
         logger.info("[NODE] CALL MODEL")
 
         response = cast(AIMessage, await self.model_runnable.ainvoke(state, config))
-        # add agent name to the AIMessage
-        response.name = self.name
 
         if self.response_format is not None:
             return {"messages": [response], "next": "generate_structured_response"}
@@ -360,44 +422,41 @@ class MultiAgentGraphBuilder:
         response = await model_with_structured_output.ainvoke(messages, config)
         return {"structured_response": response, "next": END}
 
-    async def _supervisor_node(self, state: MultiAgentState, config: RunnableConfig):
+    # noinspection PyMethodMayBeStatic
+    async def _supervisor_node(self, state: MultiAgentState):
         logger.info("[NODE] SUPERVISOR NODE")
 
-        system_prompt = _get_multi_agent_system_prompt(self.workers)
+        current_action_index = state["current_action_index"]
+        actions = state["actions"]
+        action = None
 
-        messages = [SystemMessage(content=system_prompt)] + state["messages"]  # type: ignore
-
-        if messages[-1] and not isinstance(messages[-1], HumanMessage):
-            messages = messages + [HumanMessage(content=state["question"])]
-        messages = await trimmer.ainvoke(messages)
-
-        model = _get_model(self.model)
-
-        options = ["FINISH"] + [worker.name for worker in self.workers]
-        # noinspection PyPep8Naming
-        WorkerRouter = _get_dynamic_router(
-            type_dict_name="WorkerRouter",
-            fields={"next": Literal[*options]}  # type: ignore
-        )
-        response = await model.with_structured_output(WorkerRouter).ainvoke(messages, config)
-        next_ = response["next"]  # type: ignore
+        if actions is None or current_action_index >= len(actions):
+            current_action_index = 0
+            next_ = END
+        else:
+            action = actions[current_action_index]
+            next_ = action["next"]
+            current_action_index += 1
 
         if next_ == "FINISH":
             next_ = "agent"
 
         logger.info(f"[NODE] {next_} ")
-        return {"next": next_}
+        return {"next": next_, "current_action_index": current_action_index,
+                "messages": [HumanMessage(content=action.get("task"))]}
 
     def build_graph(self) -> CompiledGraph:
         """
         Build the multi-agent graph.
         """
         # Add the supervisor node to the workflow
+        self.workflow.add_node("plan", self._aplan)
         self.workflow.add_node("supervisor", self._supervisor_node)
         self.workflow.add_node("agent", self._acall_model)
         self.workflow.add_node("generate_structured_response", self._agenerate_structured_response)
 
-        self.workflow.add_edge(START, "supervisor")
+        self.workflow.add_edge(START, "plan")
+        self.workflow.add_edge("plan", "supervisor")
         self.workflow.add_conditional_edges("supervisor", lambda state: state["next"])
         self.workflow.add_conditional_edges("agent", lambda state: state["next"])
         self.workflow.add_edge("generate_structured_response", END)
