@@ -51,7 +51,7 @@ async def list_full_info_assistants(
 
             mcps = [McpData(
                 mcp_name=mcp.mcp_name,
-                mcp_id=mcp.mcp_id,
+                id=mcp.id,
                 url=mcp.url,
                 connection_type=mcp.connection_type,
                 created_at=mcp.created_at,
@@ -68,7 +68,7 @@ async def list_full_info_assistants(
                 return ResponseWrapper.wrap(status=extensions_result.status, message=extensions_result.message)
 
             extensions = [ExtensionData(
-                extension_id=extension.extension_id,
+                id=extension.id,
                 extension_name=extension.extension_name,
                 connected_account_id=extension.connected_account_id,
                 auth_scheme=extension.auth_scheme,
@@ -83,7 +83,10 @@ async def list_full_info_assistants(
             )
 
     data = GetFullInfoAssistantsResponse(
-        full_info_assistants=full_info_assistants
+        full_info_assistants=full_info_assistants,
+        page_number=assistants_result.data.page_number,
+        max_per_page=assistants_result.data.max_per_page,
+        total_page=assistants_result.data.total_page,
     )
 
     return ResponseWrapper.wrap(status=200, data=data).to_response()
@@ -137,7 +140,7 @@ async def create_full_info_assistant(
 
             workers.append(
                 McpData(
-                    mcp_id=mcp_id,
+                    id=mcp_id,
                     mcp_name=connected_mcp_result.data.mcp_name,
                     url=connected_mcp_result.data.url,
                     connection_type=connected_mcp_result.data.connection_type,
@@ -167,7 +170,7 @@ async def create_full_info_assistant(
 
             workers.append(
                 ExtensionData(
-                    extension_id=extension_id,
+                    id=extension_id,
                     extension_name=connected_extension_result.data.extension_name,
                     connected_account_id=connected_extension_result.data.connected_account_id,
                     auth_scheme=connected_extension_result.data.auth_scheme,
@@ -210,7 +213,7 @@ async def get_full_info_assistant_by_id(
 
         mcps = [McpData(
             mcp_name=mcp.mcp_name,
-            mcp_id=mcp.mcp_id,
+            id=mcp.mcp_id,
             url=mcp.url,
             connection_type=mcp.connection_type,
             created_at=mcp.created_at,
@@ -227,7 +230,7 @@ async def get_full_info_assistant_by_id(
             return ResponseWrapper.wrap(status=extensions_result.status, message=extensions_result.message)
 
         extensions = [ExtensionData(
-            extension_id=extension.extension_id,
+            id=extension.extension_id,
             extension_name=extension.extension_name,
             connected_account_id=extension.connected_account_id,
             auth_scheme=extension.auth_scheme,
@@ -292,7 +295,7 @@ async def update_assistant(
 
                 workers.append(
                     McpData(
-                        mcp_id=mcp_id,
+                        id=mcp_id,
                         mcp_name=mcp_result.data.mcp_name,
                         url=mcp_result.data.url,
                         connection_type=mcp_result.data.connection_type,
@@ -321,7 +324,7 @@ async def update_assistant(
 
                 workers.append(
                     ExtensionData(
-                        extension_id=extension_id,
+                        id=extension_id,
                         extension_name=extension_result.data.extension_name,
                         connected_account_id=extension_result.data.connected_account_id,
                         auth_scheme=extension_result.data.auth_scheme,

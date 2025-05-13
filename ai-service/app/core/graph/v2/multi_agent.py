@@ -39,7 +39,6 @@ class MultiAgentState(TypedDict):
     structured_response: StructuredResponse
     question: str
     next: str
-    traversal: list[str]
 
 
 StateSchema = TypeVar("StateSchema", bound=MultiAgentState)
@@ -271,8 +270,6 @@ def _get_multi_agent_system_prompt(workers: list[Worker]):
         " respond with the worker to act next.\n Each worker will perform a"
         " task and respond with their results and status.\n When finished,"
         " respond with FINISH.\n If you cannot identify an appropriate worker for the task, respond with FINISH.\n"
-        " When you see that a worker has completed a task and provided a result, determine and assign the next "
-        " task accordingly.\n"
         "# Details of the workers are as follows: \n"
         f"\n{metadata}\n"
     )
@@ -385,17 +382,11 @@ class MultiAgentGraphBuilder:
         response = await model.with_structured_output(WorkerRouter).ainvoke(messages, config)
         next_ = response["next"]  # type: ignore
 
-        traversal = state.get("traversal") if state.get("traversal") else []
-
-        if next_ in traversal:
-            next_ = END
-        traversal.append(next_)
-
         if next_ == "FINISH":
             next_ = "agent"
 
         logger.info(f"[NODE] {next_} ")
-        return {"next": next_, "traversal": traversal}
+        return {"next": next_}
 
     def build_graph(self) -> CompiledGraph:
         """
