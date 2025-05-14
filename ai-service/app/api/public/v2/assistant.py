@@ -255,8 +255,11 @@ async def update_assistant(
         assistant_service: AssistantService = Depends(get_assistant_service),
         extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
         mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
+        connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),
+        connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
         _: bool = Depends(ensure_user_id),
 ):
+    # Update assistant information
     assistant_result = await assistant_service.update_assistant(
         user_id=user_id,
         assistant_id=assistant_id,
@@ -281,6 +284,12 @@ async def update_assistant(
 
             # Create new mcps
             for mcp_id in request.worker_ids:
+                # Check if mcp_id is valid
+                connected_mcp_result = await connected_mcp_service.get_connected_mcp_by_id(user_id, mcp_id)
+                if connected_mcp_result.status != 200:
+                    return ResponseWrapper.wrap(status=connected_mcp_result.status,
+                                                message=connected_mcp_result.message)
+
                 mcp_result = await mcp_assistant_service.create_mcp_assistant(
                     request=CreateMcpAssistantRequest(
                         mcp_id=mcp_id,
@@ -294,10 +303,10 @@ async def update_assistant(
                 workers.append(
                     McpData(
                         id=mcp_id,
-                        mcp_name=mcp_result.data.mcp_name,
-                        url=mcp_result.data.url,
-                        connection_type=mcp_result.data.connection_type,
-                        created_at=mcp_result.data.created_at,
+                        mcp_name=connected_mcp_result.data.mcp_name,
+                        url=connected_mcp_result.data.url,
+                        connection_type=connected_mcp_result.data.connection_type,
+                        created_at=connected_mcp_result.data.created_at,
                     )
                 )
 
@@ -309,8 +318,14 @@ async def update_assistant(
 
             # Create new extensions
             for extension_id in request.worker_ids:
+                # Check if extension_id is valid
+                connected_extension_result = await connected_extension_service.get_connected_extension_by_id(user_id,
+                                                                                                             extension_id)
+                if connected_extension_result.status != 200:
+                    return ResponseWrapper.wrap(status=connected_extension_result.status,
+                                                message=connected_extension_result.message)
+
                 extension_result = await extension_assistant_service.create_extension_assistant(
-                    user_id=user_id,
                     request=CreateExtensionAssistantRequest(
                         assistant_id=assistant.id,
                         extension_id=extension_id,
@@ -323,11 +338,11 @@ async def update_assistant(
                 workers.append(
                     ExtensionData(
                         id=extension_id,
-                        extension_name=extension_result.data.extension_name,
-                        connected_account_id=extension_result.data.connected_account_id,
-                        auth_scheme=extension_result.data.auth_scheme,
-                        auth_value=extension_result.data.auth_value,
-                        created_at=extension_result.data.created_at,
+                        extension_name=connected_extension_result.data.extension_name,
+                        connected_account_id=connected_extension_result.data.connected_account_id,
+                        auth_scheme=connected_extension_result.data.auth_scheme,
+                        auth_value=connected_extension_result.data.auth_value,
+                        created_at=connected_extension_result.data.created_at,
                     )
                 )
     else:

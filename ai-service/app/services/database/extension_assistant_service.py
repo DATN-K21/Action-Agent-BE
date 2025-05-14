@@ -221,8 +221,11 @@ class ExtensionAssistantService:
             count_result = await self.db.execute(count_stmt)
             total_extension_assistants = count_result.scalar_one()
 
-            if paging is None and total_extension_assistants > 0:
-                paging = PagingRequest(page_number=1, max_per_page=total_extension_assistants)
+            if paging is None:
+                paging = PagingRequest(
+                    page_number=1,
+                    max_per_page=total_extension_assistants if total_extension_assistants > 0 else 1
+                )
 
             page_number = paging.page_number
             max_per_page = paging.max_per_page
@@ -305,7 +308,7 @@ class ExtensionAssistantService:
             deleted_extension_assistants = result.mappings().all()
 
             if not deleted_extension_assistants:
-                return ResponseWrapper.wrap(status=404, message="Extension-Assistant not found")
+                deleted_extension_assistants = []
 
             await self.db.commit()
 

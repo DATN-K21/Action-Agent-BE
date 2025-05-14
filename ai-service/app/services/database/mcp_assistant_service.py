@@ -222,10 +222,10 @@ class McpAssistantService:
             total_mcp_assistants = count_result.scalar_one()
             logger.info(f"total_mcp_assistants: {total_mcp_assistants}")
 
-            if paging is None and total_mcp_assistants > 0:
+            if paging is None:
                 paging = PagingRequest(
                     page_number=1,
-                    max_per_page=total_mcp_assistants
+                    max_per_page=total_mcp_assistants if total_mcp_assistants > 0 else 1
                 )
 
             page_number = paging.page_number
@@ -307,7 +307,7 @@ class McpAssistantService:
             deleted_mcp_assistants = result.mappings().all()
 
             if not deleted_mcp_assistants:
-                return ResponseWrapper.wrap(status=404, message="MCP-Assistant not found")
+                deleted_mcp_assistants = []
 
             await self.db.commit()
 
