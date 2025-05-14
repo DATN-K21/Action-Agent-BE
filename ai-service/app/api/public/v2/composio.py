@@ -2,6 +2,8 @@ from fastapi import APIRouter
 
 from app.schemas.base import ResponseWrapper
 from app.schemas.composio_client import (
+    FilterComposioAppEnumsResponse,
+    FilterComposioAppsResponse,
     GetAllAppsComposioEnumsResponse,
     GetAllAppsComposioResponse,
     GetSingleAppComposioResponse,
@@ -20,17 +22,22 @@ def get_all_apps():
             message=response.message,
         ).to_response()
 
+    returned_data = FilterComposioAppsResponse(
+        items=response.items,
+        count=response.count,
+    )
+
     return ResponseWrapper.wrap(
         status=200,
         message="Get all apps successfully",
-        data=response,
+        data=returned_data,
     ).to_response()
 
 # Get single app
 @router.get("/apps/{app_enum}", summary="Get single app.", response_model=ResponseWrapper[GetSingleAppComposioResponse])
 def get_single_app(app_enum: str):
     response = ComposioClient.get_single_app(app_enum=app_enum)
-    if not response.success:
+    if not response.success or response.data is None:
         return ResponseWrapper.wrap(
             status=500,
             message=response.message,
@@ -39,7 +46,7 @@ def get_single_app(app_enum: str):
     return ResponseWrapper.wrap(
         status=200,
         message="Get single app successfully",
-        data=response,
+        data=response.data,
     ).to_response()
 
 
@@ -53,8 +60,13 @@ def get_all_app_enums():
             message=response.message,
         ).to_response()
 
+    returned_data = FilterComposioAppEnumsResponse(
+        items=response.items,
+        count=response.count,
+    )
+
     return ResponseWrapper.wrap(
         status=200,
         message="Get all app enums successfully",
-        data=response,
+        data=returned_data,
     ).to_response()

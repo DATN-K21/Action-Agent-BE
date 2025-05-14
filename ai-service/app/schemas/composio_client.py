@@ -66,8 +66,8 @@ class AppItemResponse(BaseAppResponse):
 class TestConnectorResponse(BaseResponse):
     id: str = Field(..., title="Test Connector ID", examples=["12345"], description="Unique identifier (UUID) for the test connector")
     name: str = Field(..., title="Test Connector Name", examples=["Test Connector 1"], description="The name of the test connector")
-    auth_schemes: str = Field(
-        ..., title="Auth Schemes", examples=["oauth2"], description="The authentication schemes supported by the test connector"
+    auth_scheme: str = Field(
+        ..., title="Test Connector Auth Scheme", examples=["oauth2"], description="The authentication schemes supported by the test connector"
     )
 
 
@@ -130,6 +130,27 @@ class SingleActionResponse(BaseActionResponse):
         ..., title="Available Versions", examples=[["1.0", "2.0"]], description="List of availavle versions of the action."
     )
     no_auth: bool = Field(..., title="No Auth", examples=[False], description="Whether or not the action requires auth or not")
+
+
+class FilterComposioAppsResponse(BaseResponse):
+    items: list[AppItemResponse] = Field(..., title="List of all apps", examples=[[]])
+    count: int = Field(..., title="Total number of apps", examples=[3])
+
+
+class FilterComposioSingleAppResponse(BaseResponse):
+    data: Optional[SingleAppResponse] = Field(..., title="App details", examples=[{}])  # Only None is returned when the app is not found
+
+
+class FilterComposioActionsResponse(BaseResponse):
+    items: list[ActionItemResponse] = Field(..., title="List of all actions", examples=[[]])
+    count: int = Field(..., title="Total number of actions", examples=[3])
+    page: int = Field(..., title="Page number", examples=[1])
+    total_pages: int = Field(..., title="Total number of pages", examples=[1])
+
+
+class FilterComposioAppEnumsResponse(BaseResponse):
+    items: list[str] = Field(..., title="List of all apps enums", examples=[["GMAIL", "GOOGLE_CANLENDAR"]])
+    count: int = Field(..., title="Total number of apps enums", examples=[3])
 
 
 # Doc: https://docs.composio.dev/api-reference/api-reference/v1/apps/get-apps

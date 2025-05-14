@@ -34,14 +34,14 @@ def sanitize_composio_app_data(data: dict, type: Literal["all", "single"] = "all
         sanitized_data["auth_schemes"] = data["authSchemes"] if "authSchemes" in data else None
         sanitized_data["docs"] = data["docs"] if "docs" in data else None
         sanitized_data["get_current_user_endpoint"] = data["get_current_user_endpoint"] if "get_current_user_endpoint" in data else None
-        if "test_connectors" in data:
+        if "testConnectors" in data:
             sanitized_data["test_connectors"] = [
                 {
                     "id": item["id"],
                     "name": item["name"],
-                    "auth_schemes": item["auth_schemes"],
+                    "auth_scheme": item["authScheme"],
                 }
-                for item in data["test_connectors"]
+                for item in data["testConnectors"]
             ]
 
         return SingleAppResponse(**sanitized_data)
