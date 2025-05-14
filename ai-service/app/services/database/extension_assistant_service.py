@@ -221,7 +221,7 @@ class ExtensionAssistantService:
             count_result = await self.db.execute(count_stmt)
             total_extension_assistants = count_result.scalar_one()
 
-            if paging is None:
+            if paging is None and total_extension_assistants > 0:
                 paging = PagingRequest(page_number=1, max_per_page=total_extension_assistants)
 
             page_number = paging.page_number
