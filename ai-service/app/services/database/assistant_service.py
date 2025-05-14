@@ -93,7 +93,7 @@ class AssistantService:
             total_assistants = count_result.scalar_one()
             logger.info(f"total_assistants: {total_assistants}")
 
-            if paging is None:
+            if paging is None and total_assistants > 0:
                 paging = PagingRequest(
                     page_number=1,
                     max_per_page=total_assistants

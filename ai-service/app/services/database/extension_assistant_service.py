@@ -104,7 +104,6 @@ class ExtensionAssistantService:
                     total_page=0
                 )
                                             )
-
             total_pages = (total_extension_assistants + max_per_page - 1) // max_per_page
 
             # GET connected apps
