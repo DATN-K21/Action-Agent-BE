@@ -151,6 +151,12 @@ class AssistantService:
     ) -> ResponseWrapper[CreateAssistantResponse]:
         """Update an assistant."""
         try:
+            update_values = {
+                key: value
+                for key, value in assistant.model_dump(exclude_unset=True).items()
+                if value is not None
+            }
+
             stmt = (
                 update(Assistant)
                 .where(
@@ -158,7 +164,7 @@ class AssistantService:
                     Assistant.id == assistant_id,
                     Assistant.is_deleted.is_(False),
                 )
-                .values(**assistant.model_dump(exclude_unset=True))
+                .values(**update_values)
                 .returning(Assistant)
             )
 

@@ -34,7 +34,7 @@ class UpdateFullInfoAssistantRequest(BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = Field(None, min_length=3, max_length=500)
     type: Optional[str] = Field(None, min_length=3, max_length=50)
-    worker_ids: Optional[list[str]]
+    worker_ids: Optional[list[str]] = None
 
 
 ##################################################

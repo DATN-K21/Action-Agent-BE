@@ -50,8 +50,8 @@ async def list_full_info_assistants(
                 return ResponseWrapper.wrap(status=mcps_result.status, message=mcps_result.message)
 
             mcps = [McpData(
+                id=mcp.mcp_id,
                 mcp_name=mcp.mcp_name,
-                id=mcp.id,
                 url=mcp.url,
                 connection_type=mcp.connection_type,
                 created_at=mcp.created_at,
@@ -68,7 +68,7 @@ async def list_full_info_assistants(
                 return ResponseWrapper.wrap(status=extensions_result.status, message=extensions_result.message)
 
             extensions = [ExtensionData(
-                id=extension.id,
+                id=extension.extension_id,
                 extension_name=extension.extension_name,
                 connected_account_id=extension.connected_account_id,
                 auth_scheme=extension.auth_scheme,
@@ -212,8 +212,8 @@ async def get_full_info_assistant_by_id(
             return ResponseWrapper.wrap(status=mcps_result.status, message=mcps_result.message)
 
         mcps = [McpData(
-            mcp_name=mcp.mcp_name,
             id=mcp.mcp_id,
+            mcp_name=mcp.mcp_name,
             url=mcp.url,
             connection_type=mcp.connection_type,
             created_at=mcp.created_at,
@@ -260,10 +260,8 @@ async def update_assistant(
     assistant_result = await assistant_service.update_assistant(
         user_id=user_id,
         assistant_id=assistant_id,
-        request=UpdateAssistantRequest(
-            name=request.name,
-            description=request.description,
-            type=request.type,
+        assistant=UpdateAssistantRequest(
+            **request.model_dump()
         )
     )
 
@@ -332,6 +330,35 @@ async def update_assistant(
                         created_at=extension_result.data.created_at,
                     )
                 )
+    else:
+        if assistant.type == "mcp":
+            mcps_result = await mcp_assistant_service.list_mcps_of_assistant(assistant.id)
+            if mcps_result.status != 200:
+                return ResponseWrapper.wrap(status=mcps_result.status, message=mcps_result.message)
+
+            mcps = [McpData(
+                id=mcp.mcp_id,
+                mcp_name=mcp.mcp_name,
+                url=mcp.url,
+                connection_type=mcp.connection_type,
+                created_at=mcp.created_at,
+            ) for mcp in mcps_result.data.mcps]
+            workers.extend(mcps)
+
+        if assistant.type == "extension":
+            extensions_result = await extension_assistant_service.list_extensions_of_assistant(assistant.id)
+            if extensions_result.status != 200:
+                return ResponseWrapper.wrap(status=extensions_result.status, message=extensions_result.message)
+
+            extensions = [ExtensionData(
+                id=extension.extension_id,
+                extension_name=extension.extension_name,
+                connected_account_id=extension.connected_account_id,
+                auth_scheme=extension.auth_scheme,
+                auth_value=extension.auth_value,
+                created_at=extension.created_at,
+            ) for extension in extensions_result.data.extensions]
+            workers.extend(extensions)
 
     data = UpdateFullInfoAssistantResponse(
         **assistant.model_dump(),
