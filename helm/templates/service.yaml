@@ -1,0 +1,29 @@
+{{- range $svc, $cfg := .Values }}
+{{- if $cfg.service }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc }}
+  labels:
+    app: {{ $svc }}
+spec:
+  type: {{ $cfg.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ $cfg.service.port }}
+      targetPort: {{ $cfg.service.port }}
+      name: http
+    {{- if $cfg.service.managementPort }}
+    - port: {{ $cfg.service.managementPort }}
+      targetPort: {{ $cfg.service.managementPort }}
+      name: management
+    {{- end }}
+    {{- if $cfg.service.prometheusPort }}
+    - port: {{ $cfg.service.prometheusPort }}
+      targetPort: {{ $cfg.service.prometheusPort }}
+      name: prometheus
+    {{- end }}
+  selector:
+    app: {{ $svc }}
+{{- end }}
+{{- end }}

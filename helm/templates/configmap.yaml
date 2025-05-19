@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: action-agent-be-config
+  labels:
+    app: action-agent-be
+data:
+  # Add non-sensitive config here
+  example: "value"

@@ -1,0 +1,169 @@
+# Global values for Action-Agent-BE
+
+apiGateway:
+  image: actionagent.azurecr.io/api-gateway:stg
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 15000
+  env:
+    HTTPS_PORT: 15000
+    SSL_KEY_PATH: certs/key.pem
+    SSL_CERT_PATH: certs/cert.pem
+    USER_SERVICE_URL: http://user-service:15100
+    AI_SERVICE_URL: http://ai-service:15200
+    ELASTICSEARCH_URL: http://elasticsearch:9200
+    RABBITMQ_URL: amqp://root:root@rabbitmq:5672
+    REDIS_URL: redis://root:root@redis:6379
+    MICROSERVICE_TIMEOUT: 300000
+  volumeMounts:
+    - name: certs
+      mountPath: /usr/src/app/certs
+      readOnly: true
+  volumes:
+    - name: certs
+      hostPath:
+        path: ./src/api-gateway/certs
+
+userService:
+  image: actionagent.azurecr.io/user-service:stg
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 15100
+  env:
+    NODE_ENV: dev
+    PORT: 15100
+    MONGODB_CONNECTION_STRING: mongodb://root:root@user-database:27017/user-service?authSource=admin
+    EMAIL_USERNAME: <EMAIL_USERNAME>
+    EMAIL_PASSWORD: <EMAIL_PASSWORD>
+    GOOGLE_APP_CLIENT_ID: <YOUR_GOOGLE_CLIENT_ID>
+    GOOGLE_APP_CLIENT_SECRET: <YOUR_GOOGLE_CLIENT_SECRET>
+    GOOGLE_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+    FACEBOOK_APP_CLIENT_ID: <YOUR_FACEBOOK_CLIENT_ID>
+    FACEBOOK_APP_CLIENT_SECRET: <YOUR_FACEBOOK_CLIENT_SECRET>
+    FACEBOOK_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/facebook/verify
+    API_GATEWAY_URL: https://localhost:15000
+    AI_SERVICE_URL: http://ai-service:15200
+    JWT_SECRET: <JWT_SECRET>
+    CLIENT_URL: http://localhost:3000
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_USER: default
+    REDIS_PASSWORD: root
+
+aiService:
+  image: actionagent.azurecr.io/ai-service:stg
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 15200
+  env:
+    DEBUG_AGENT: False
+    DEBUG_SERVER: False
+    DEBUG_SQLALCHEMY: False
+    LOGGING_LOG_LEVEL: INFO
+    LLM_DEFAULT_PROVIDER: openai
+    LLM_DEFAULT_MODEL: gpt-4o-mini
+    LLM_DEFAULT_API_KEY: <YOUR_OPENAI_API_KEY>
+    POSTGRES_HOST: ai-database
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: 123456
+    POSTGRES_DB: ai-database
+    TOOL_TAVILY_API_KEY: <YOUR_TAVILY_API_KEY>
+    COMPOSIO_LOGGING_LEVEL: debug
+    COMPOSIO_API_KEY: <YOUR_COMPOSIO_API_KEY>
+    COMPOSIO_REDIRECT_URL: https://localhost:15000/ai/api/v1/callback/extension
+    FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
+
+postgres:
+  image: pgvector/pgvector:pg16
+  service:
+    type: ClusterIP
+    port: 5432
+  env:
+    POSTGRES_DB: ai-database
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: 123456
+  persistence:
+    enabled: true
+    size: 5Gi
+
+mongo:
+  image: mongo:latest
+  service:
+    type: ClusterIP
+    port: 27017
+  env:
+    MONGO_INITDB_ROOT_USERNAME: root
+    MONGO_INITDB_ROOT_PASSWORD: root
+  persistence:
+    enabled: true
+    size: 5Gi
+
+elasticsearch:
+  image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+  service:
+    type: ClusterIP
+    port: 9200
+  env:
+    discovery.type: single-node
+    ES_JAVA_OPTS: -Xms1g -Xmx1g
+    xpack.security.enabled: false
+    http.host: 0.0.0.0
+    transport.host: 127.0.0.1
+    xpack.security.http.ssl.enabled: false
+  persistence:
+    enabled: true
+    size: 5Gi
+
+kibana:
+  image: docker.elastic.co/kibana/kibana:8.16.1
+  service:
+    type: ClusterIP
+    port: 5601
+  env:
+    ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    SERVER_NAME: kibana
+    XPACK_SECURITY_ENABLED: false
+
+rabbitmq:
+  image: rabbitmq:3-management
+  service:
+    type: ClusterIP
+    port: 5672
+    managementPort: 15672
+    prometheusPort: 15692
+  env:
+    RABBITMQ_DEFAULT_USER: root
+    RABBITMQ_DEFAULT_PASS: root
+  persistence:
+    enabled: true
+    size: 1Gi
+
+redis:
+  image: redis:latest
+  service:
+    type: ClusterIP
+    port: 6379
+  env:
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_USER: root
+    REDIS_PASSWORD: root
+  persistence:
+    enabled: true
+    size: 1Gi
+
+# Ingress example (edit as needed)
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []

@@ -1,0 +1,43 @@
+{{- /*
+  This is a simplified example. In production, split each service into its own deployment YAML or use Helm subcharts.
+*/ -}}
+
+{{- range $svc, $cfg := .Values }}
+{{- if $cfg.image }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc }}
+  labels:
+    app: {{ $svc }}
+spec:
+  replicas: {{ $cfg.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $svc }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svc }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: {{ $cfg.image }}
+          ports:
+            - containerPort: {{ $cfg.service.port }}
+          env:
+            {{- range $key, $val := $cfg.env }}
+            - name: {{ $key }}
+              value: "{{ $val }}"
+            {{- end }}
+          {{- if $cfg.volumeMounts }}
+          volumeMounts:
+            {{- toYaml $cfg.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if $cfg.volumes }}
+      volumes:
+        {{- toYaml $cfg.volumes | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

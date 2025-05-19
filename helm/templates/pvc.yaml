@@ -1,0 +1,15 @@
+{{- range $svc, $cfg := .Values }}
+{{- if and $cfg.persistence.enabled $cfg.persistence.size }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $svc }}-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $cfg.persistence.size }}
+{{- end }}
+{{- end }}
