@@ -24,9 +24,9 @@ from app.schemas.base import ResponseWrapper
 
 def handle_exceptions(logger: Logger, exc: Exception):
     if (
-        isinstance(exc, SQLAlchemyIntegrityError)
-        or isinstance(exec, PsycopgIntegrityError)
-        or isinstance(exec, SQLiteIntegrityError)
+            isinstance(exc, SQLAlchemyIntegrityError)
+            or isinstance(exec, PsycopgIntegrityError)
+            or isinstance(exec, SQLiteIntegrityError)
     ):
         logger.error("Request data violates a database constraint.", exc_info=exc)
         return ResponseWrapper.wrap(
@@ -35,9 +35,9 @@ def handle_exceptions(logger: Logger, exc: Exception):
         ).to_response()
 
     if (
-        isinstance(exec, SQLAlchemyOperationalError)
-        or isinstance(exec, PsycopgOperationalError)
-        or isinstance(exec, SQLiteOperationalError)
+            isinstance(exec, SQLAlchemyOperationalError)
+            or isinstance(exec, PsycopgOperationalError)
+            or isinstance(exec, SQLiteOperationalError)
     ):
         logger.error("Database connection issues or operational errors.", exc_info=exc)
         return ResponseWrapper.wrap(
@@ -64,11 +64,13 @@ def handle_exceptions(logger: Logger, exc: Exception):
 
     if isinstance(exc, SQLAlchemyDisconnectionError):
         logger.error("Database disconnection during operation", exc_info=exc)
-        return ResponseWrapper.wrap(status=503, message=f"Database disconnection during operation: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=503,
+                                    message=f"Database disconnection during operation: {str(exc)}").to_response()
 
     if isinstance(exc, TimeoutError):
         logger.error("A timeout occurred during execution.", exc_info=exc)
-        return ResponseWrapper.wrap(status=504, message=f"A timeout occurred during execution: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=504,
+                                    message=f"A timeout occurred during execution: {str(exc)}").to_response()
 
     if isinstance(exc, ConnectionError):
         logger.error("A connection error occurred during execution.", exc_info=exc)
@@ -117,7 +119,8 @@ def handle_exceptions(logger: Logger, exc: Exception):
 
     if isinstance(exc, OpenAIRateLimitError):
         logger.error("The request has exceeded the rate limit.", exc_info=exc)
-        return ResponseWrapper.wrap(status=429, message=f"The request has exceeded the rate limit: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=429,
+                                    message=f"The request has exceeded the rate limit: {str(exc)}").to_response()
 
     if isinstance(exc, OpenAIAPIError):
         logger.error("An error occurred during the OpenAI API request.", exc_info=exc)
@@ -128,15 +131,18 @@ def handle_exceptions(logger: Logger, exc: Exception):
 
     if isinstance(exc, ApiKeyNotProvidedError):
         logger.error("The composio API key is not provided.", exc_info=exc)
-        return ResponseWrapper.wrap(status=401, message=f"The composio API key is not provided: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=401,
+                                    message=f"The composio API key is not provided: {str(exc)}").to_response()
 
     if isinstance(exc, ComposioSDKError):
         logger.error("An error occurred within the Composio SDK.", exc_info=exc)
-        return ResponseWrapper.wrap(status=500, message=f"An error occurred within the Composio SDK: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=500,
+                                    message=f"An error occurred within the Composio SDK: {str(exc)}").to_response()
 
     if isinstance(exc, ComposioClientError):
         logger.error("An error occurred in the Composio client.", exc_info=exc)
-        return ResponseWrapper.wrap(status=400, message=f"An error occurred in the Composio client: {str(exc)}").to_response()
+        return ResponseWrapper.wrap(status=400,
+                                    message=f"An error occurred in the Composio client: {str(exc)}").to_response()
 
     if isinstance(exc, HTTPError):
         logger.error("An HTTP error that is related to the Composio occurred.", exc_info=exc)

@@ -1,7 +1,7 @@
-from typing import Annotated, Any, Dict, Optional, Sequence, TypedDict, Literal
+from typing import Annotated, Any, Dict, Literal, Optional, Sequence, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langchain_core.runnables import RunnableConfig, Runnable
+from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph, add_messages
@@ -12,16 +12,18 @@ from pydantic import BaseModel, TypeAdapter
 
 from app.core import logging
 from app.core.enums import MessageName
-from app.core.monkey_patches.deps import patch_lib
+from app.core.monkey_patches.composio_schema_helper import patch_substitute_file_downloads_recursively
 from app.core.tools.tools import get_date_parser_tools
 from app.core.utils.messages import trimmer, truncate_text
 from app.prompts.prompt_templates import (
+    get_enhanced_prompt_template,
+    get_human_in_loop_evaluation_prompt_template,
     get_markdown_answer_generating_prompt_template,
+    get_openai_function_prompt_template,
+    get_regenerate_tool_calls_prompt_template,
     get_simple_agent_prompt_template,
-    get_openai_function_prompt_template, get_human_in_loop_evaluation_prompt_template,
-    get_enhanced_prompt_template, get_regenerate_tool_calls_prompt_template,
 )
-from app.services.model_service import get_openai_model
+from app.services.llm_service import get_llm_chat_model
 
 logger = logging.get_logger(__name__)
 
@@ -60,12 +62,12 @@ class HumanEditingData(BaseModel):
 # noinspection PyMethodMayBeStatic
 class GraphBuilder:
     def __init__(
-            self,
-            checkpointer: AsyncPostgresSaver,
-            tools: Optional[list[BaseTool | Runnable]] = None,
-            tool_choice: Optional[str] = None,
-            name: Optional[str] = None,
-            config: Optional[Dict[str, Any]] = None,
+        self,
+        checkpointer: AsyncPostgresSaver,
+        tools: Optional[list[BaseTool | Runnable]] = None,
+        tool_choice: Optional[str] = None,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.checkpointer = checkpointer
         self.tools = tools
@@ -82,7 +84,7 @@ class GraphBuilder:
         try:
             question = state.get("question")
 
-            model = get_openai_model(temperature=0, streaming=False)
+            model = get_llm_chat_model(temperature=0, streaming=False)
             prompt = get_enhanced_prompt_template()
             agent = create_react_agent(
                 model=model,
@@ -104,7 +106,7 @@ class GraphBuilder:
         logger.info("---AGENT NODE---")
 
         try:
-            model = get_openai_model()
+            model = get_llm_chat_model()
             messages = trimmer.invoke(state.get("messages"))
             prompt = get_simple_agent_prompt_template()
             chain = prompt | model
@@ -122,7 +124,7 @@ class GraphBuilder:
             question = state.get("question")
             messages = trimmer.invoke(state.get("messages"))
 
-            model = get_openai_model(temperature=0)
+            model = get_llm_chat_model(temperature=0)
             prompt = get_openai_function_prompt_template()
             if self.tool_choice is not None:
                 model = model.bind_tools(tools=self.tools, tool_choice=self.tool_choice)
@@ -157,7 +159,7 @@ class GraphBuilder:
         str_tool_calls = str(tool_calls)
 
         prompt = get_human_in_loop_evaluation_prompt_template()
-        model = get_openai_model(model="gpt-4o-mini", temperature=0)
+        model = get_llm_chat_model(model="gpt-4o-mini", temperature=0)
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
@@ -171,7 +173,7 @@ class GraphBuilder:
 
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = str(state.get("tool_calls"))
-        model = get_openai_model(temperature=0)
+        model = get_llm_chat_model(temperature=0)
         model = model.bind_tools(self.tools)
         prompt = get_regenerate_tool_calls_prompt_template()
         chain = prompt | model
@@ -211,7 +213,7 @@ class GraphBuilder:
 
         try:
             # Fix composio library
-            patch_lib()
+            patch_substitute_file_downloads_recursively()
 
             tool_calls = state.get("tool_calls")
             messages = []
@@ -261,7 +263,7 @@ class GraphBuilder:
             docs = truncate_text(docs)
 
             prompt = get_markdown_answer_generating_prompt_template()
-            llm = get_openai_model(temperature=0.5)
+            llm = get_llm_chat_model(temperature=0.5)
             rag_chain = prompt | llm
 
             response = await rag_chain.ainvoke({"context": docs, "question": question})

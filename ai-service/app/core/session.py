@@ -10,10 +10,10 @@ logger = logging.get_logger(__name__)
 
 # Create async engine (Lazy connection pooling)
 DATABASE_URL = f"postgresql+asyncpg://{env_settings.POSTGRES_URL_PATH}"
-engine = create_async_engine(DATABASE_URL, echo=env_settings.SQLALCHEMY_DEBUG)
+engine = create_async_engine(DATABASE_URL, echo=env_settings.DEBUG_SQLALCHEMY)
 
 # Create session factory
-AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=True)
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:

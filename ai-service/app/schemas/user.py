@@ -49,7 +49,7 @@ class GetUserResponse(BaseResponse):
     created_at: Optional[datetime] = Field(None)
 
 
-class GetListUsersResponse(PagingResponse):
+class GetUsersResponse(PagingResponse):
     users: list[GetUserResponse]
 
 

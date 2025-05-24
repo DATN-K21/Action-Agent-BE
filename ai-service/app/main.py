@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.router import router
+from app.api.base import router
 from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
@@ -10,10 +10,10 @@ from app.core.socketio import get_socketio_asgi
 logging.configure_logging()
 
 logger = logging.get_logger(__name__)
-logger.info(f"Starting server... DebugMode = {env_settings.DEBUG}")
+logger.info(f"Starting server... DebugMode = {env_settings.DEBUG_SERVER}")
 
 app = FastAPI(
-    debug=env_settings.DEBUG,
+    debug=env_settings.DEBUG_SERVER,
     title="Action-Executing AI Service API",
     description="This is an AI Service API using FastAPI.",
     version="1.0.0",

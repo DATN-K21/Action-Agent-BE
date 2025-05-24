@@ -4,9 +4,7 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import StateSnapshot
-from structlog.stdlib import BoundLogger
 
-from app.core import logging
 from app.core.graph.base import ToolCall
 from app.core.models.agent_models import AgentExecutionResult, AgentInterruptHandlingResult
 from app.core.utils.streaming import MessagesStream
@@ -16,13 +14,11 @@ class BaseAgent(ABC):
     def __init__(
             self,
             graph: CompiledStateGraph,
-            logger: Optional[BoundLogger] = None,
             name: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
     ):
         self.id = str(uuid4())
         self.graph = graph
-        self.logger = logging.get_logger(self.__class__.__name__) if logger is None else logger
         self.name = name
         self.config = config
 
@@ -35,7 +31,7 @@ class BaseAgent(ABC):
             self,
             question: str,
             thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+            recursion_limit: int = 20,
     ) -> AgentExecutionResult:
         """Execute the agent's graph with given input"""
         pass
@@ -46,14 +42,18 @@ class BaseAgent(ABC):
             execute: bool,
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+            recursion_limit: int = 20,
     ) -> AgentInterruptHandlingResult:
         """Handle the interrupt in the agent's graph"""
         pass
 
     @abstractmethod
-    async def async_stream(self, question: str, thread_id: Optional[str] = None,
-                           max_recursion: int = 10) -> MessagesStream:
+    async def async_stream(
+            self,
+            question: str,
+            thread_id: Optional[str] = None,
+            recursion_limit: int = 20,
+    ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass
 
@@ -63,7 +63,7 @@ class BaseAgent(ABC):
             execute: bool,
             tool_calls: Optional[list[ToolCall]] = None,
             thread_id: Optional[str] = None,
-            max_recursion: int = 10,
+            recursion_limit: int = 20,
     ) -> MessagesStream:
         """Stream the agent's graph with given input"""
         pass

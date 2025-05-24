@@ -1,0 +1,51 @@
+name: 'Notify Discord'
+description: 'Send notifications to Discord about the build or deploy status.'
+
+inputs:
+  webhook_url:
+    description: 'Discord Webhook URL'
+    required: true
+  service:
+    description: 'The name of the service'
+    required: true
+  image:
+    description: 'The Docker image and tag (e.g., actionagent.azurecr.io/ai-service:dev)'
+    required: true
+  branch:
+    description: 'The branch name from which the action was triggered'
+    required: true
+  commit_message:
+    description: 'The last commit message'
+    required: true
+  triggered_by:
+    description: 'The GitHub user who triggered the action'
+    required: true
+  time:
+    description: 'Timestamp for when the action was triggered'
+    required: true
+  action:
+    description: 'The type of action (BUILD or DEPLOY)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Log input parameters
+      shell: bash
+      run: |
+        echo "Webhook URL: ${{ inputs.webhook_url }}"
+        echo "Service: ${{ inputs.service }}"
+        echo "Image: ${{ inputs.image }}"
+        echo "Branch: ${{ inputs.branch }}"
+        echo "Commit Message: ${{ inputs.commit_message }}"
+        echo "Triggered By: ${{ inputs.triggered_by }}"
+        echo "Time: ${{ inputs.time }}"
+        echo "Action: ${{ inputs.action }}"
+
+    - name: Send notification to Discord
+      shell: bash
+      run: |
+        ESCAPED_COMMIT_MSG=$(echo "${{ inputs.commit_message }}" | cut -c1-200 | sed 's/"/\\"/g; s/`/\\`/g')
+        curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\": \"**✅ [${{ inputs.action }} SUCCESS]**\\n- **Service:** \`${{ inputs.service }}\`\\n- **Image:** \`${{ inputs.image }}\`\\n- **Branch:** \`${{ inputs.branch }}\`\\n- **Commit Message:** \`${ESCAPED_COMMIT_MSG}\`\\n- **Triggered by:** \`${{ inputs.triggered_by }}\`\\n- **Time:** \`${{ inputs.time }}\`\"}" \
+          "${{ inputs.webhook_url }}"

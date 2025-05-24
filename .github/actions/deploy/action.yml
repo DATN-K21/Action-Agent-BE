@@ -1,0 +1,57 @@
+name: Deploy to Server
+
+description: SSH into server and deploy services
+
+inputs:
+  ssh_host:
+    description: IP or domain of the server
+    required: true
+  ssh_user:
+    description: SSH username
+    required: true
+  ssh_key:
+    description: SSH private key
+    required: true
+  service:
+    description: The name of the service to deploy
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup SSH key
+      shell: bash
+      run: |
+        echo "${{ inputs.ssh_key }}" > key.pem
+        chmod 600 key.pem
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
+
+    - name: SSH and deploy
+      id: deploy_step
+      shell: bash
+      run: |
+        DEPLOY_OUTPUT=$(ssh -i key.pem ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} bash << EOF
+          cd ~/Action-Agent-BE
+          make restart SERVICES=${{ inputs.service }}
+          if [ $? -ne 0 ]; then
+            echo "Deployment failed"
+            exit 1
+          fi
+          echo "Deployment successful"
+        EOF
+        )
+        echo "Deployment output: $DEPLOY_OUTPUT"
+        
+        # If the deploy result is successful, output the result. Else fail.
+        if [[ "$DEPLOY_OUTPUT" == *"Deployment successful"* ]]; then
+          echo "::set-output name=result::success"
+        else
+          echo "::set-output name=result::failure"
+          exit 1
+        fi
+
+    - name: Output deploy result
+      shell: bash
+      run: |
+        echo "Deploy Result: ${{ steps.deploy_step.outputs.result }}"

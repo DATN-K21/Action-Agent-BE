@@ -6,13 +6,12 @@ from app.schemas.user import (
     CreateUserRequest,
     CreateUserResponse,
     DeleteUserResponse,
-    GetListUsersResponse,
+    GetUsersResponse,
     GetUserResponse,
     UpdateUserRequest,
     UpdateUserResponse,
 )
-from app.services.database.deps import get_user_service
-from app.services.database.user_service import UserService
+from app.services.database.user_service import UserService, get_user_service
 
 logger = logging.get_logger(__name__)
 
@@ -21,45 +20,62 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 @router.post("/create", summary="Create a new user.", response_model=ResponseWrapper[CreateUserResponse])
 async def create_new_user(
-    request: CreateUserRequest,
-    user_service: UserService = Depends(get_user_service),
+        request: CreateUserRequest,
+        user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Create a new user.
+    """
     response = await user_service.create_user(request)
     return response.to_response()
 
 
 @router.patch("/{user_id}/update", summary="Update the given user.", response_model=ResponseWrapper[UpdateUserResponse])
 async def update_user(
-    user_id: str,
-    user: UpdateUserRequest,
-    user_service: UserService = Depends(get_user_service),
+        user_id: str,
+        user: UpdateUserRequest,
+        user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Update the given user.
+    """
     response = await user_service.update_user(user_id, user)
     return response.to_response()
 
 
-@router.delete("/{user_id}/delete", summary="Delete the given user.", response_model=ResponseWrapper[DeleteUserResponse])
+@router.delete("/{user_id}/delete", summary="Delete the given user.",
+               response_model=ResponseWrapper[DeleteUserResponse])
 async def delete_user(
-    user_id: str,
-    user_service: UserService = Depends(get_user_service),
+        user_id: str,
+        user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Delete the given user.
+    """
     response = await user_service.delete_user(user_id)
     return response.to_response()
 
 
-@router.get("/get-all", summary="Get all users.", response_model=ResponseWrapper[GetListUsersResponse])
+@router.get("/get-all", summary="Get all users.", response_model=ResponseWrapper[GetUsersResponse])
 async def get_all_users(
-    paging: PagingRequest = Depends(),
-    user_service: UserService = Depends(get_user_service),
+        paging: PagingRequest = Depends(),
+        user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Get all users.
+    """
     response = await user_service.get_all_users(paging)
     return response.to_response()
 
 
-@router.get("/{user_id}/get-detail", summary="Get details of the given user.", response_model=ResponseWrapper[GetUserResponse])
+@router.get("/{user_id}/get-detail", summary="Get details of the given user.",
+            response_model=ResponseWrapper[GetUserResponse])
 async def get_user_by_user_id(
-    user_id: str,
-    user_service: UserService = Depends(get_user_service),
+        user_id: str,
+        user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Get details of the given user.
+    """
     response = await user_service.get_user_by_id(user_id)
     return response.to_response()

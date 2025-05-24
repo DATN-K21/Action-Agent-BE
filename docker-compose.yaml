@@ -3,38 +3,107 @@ services:
   ####################################################
   ############### Services ###########################
   ####################################################
-  user-service:
-    image: actionagent.azurecr.io/user-service:latest
-    container_name: user-service
-
-  log-service:
-    image: actionagent.azurecr.io/log-service:latest
-    container_name: log-service
-
   api-gateway:
-    image: actionagent.azurecr.io/api-gateway:latest
+    image: actionagent.azurecr.io/api-gateway:stg
     container_name: api-gateway
+    environment:
+      HTTPS_PORT: 15000
+      SSL_KEY_PATH: "certs/key.pem"
+      SSL_CERT_PATH: "certs/cert.pem"
+      USER_SERVICE_URL: http://user-service:15100
+      AI_SERVICE_URL: http://ai-service:15200
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: amqp://root:root@rabbitmq:5672
+      REDIS_URL: redis://root:root@redis:6379
+      MICROSERVICE_TIMEOUT: 300000 # 5 minutes
+    ports:
+      - "15000:15000"
+    restart: always
+    volumes:
+      - ./api-gateway/certs:/usr/src/app/certs:ro
+
+  user-service:
+    image: actionagent.azurecr.io/user-service:stg
+    container_name: user-service
+    environment:
+      NODE_ENV: dev
+      PORT: 15100
+      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
+      EMAIL_USERNAME: <EMAIL_USERNAME>
+      EMAIL_PASSWORD: <EMAIL_PASSWORD>
+      GOOGLE_APP_CLIENT_ID: <YOUR_GOOGLE_CLIENT_ID>
+      GOOGLE_APP_CLIENT_SECRET: <YOUR_GOOGLE_CLIENT_SECRET>
+      GOOGLE_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+      FACEBOOK_APP_CLIENT_ID: <YOUR_FACEBOOK_CLIENT_ID>
+      FACEBOOK_APP_CLIENT_SECRET: <YOUR_FACEBOOK_CLIENT_SECRET>
+      FACEBOOK_APP_REDIRECT_URL: https://localhost:15000/user/api/v1/access/facebook/verify
+      API_GATEWAY_URL: https://localhost:15000
+      AI_SERVICE_URL: http://ai-service:15200
+      JWT_SECRET: c667d2a6dfcc7fbf5efe64de40fdf3e37dc8a00c1311cf9c449922cb92e4858e0d7c0fa010c883c4ff3edeb89ccfd72c3fc7b9cdd287c7da2e163bde933b1cca
+      CLIENT_URL: http://localhost:3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USER: default
+      REDIS_PASSWORD: root
+
+    ports:
+      - "15100:15100"
+    restart: always
 
   ai-service:
-    image: actionagent.azurecr.io/ai-service:latest
+    image: actionagent.azurecr.io/ai-service:stg
     container_name: ai-service
+    environment:
+      DEBUG_AGENT: False
+      DEBUG_SERVER: False
+      DEBUG_SQLALCHEMY: False
+      LOGGING_LOG_LEVEL: INFO
+      LLM_DEFAULT_PROVIDER: openai
+      LLM_DEFAULT_MODEL: gpt-4o-mini
+      LLM_DEFAULT_API_KEY: <YOUR_OPENAI_API_KEY>
+      POSTGRES_HOST: ai-database
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: ai-database
+      TOOL_TAVILY_API_KEY: <YOUR_TAVILY_API_KEY>
+      COMPOSIO_LOGGING_LEVEL: debug
+      COMPOSIO_API_KEY: <YOUR_COMPOSIO_API_KEY>
+      COMPOSIO_REDIRECT_URL: https://localhost:15000/ai/api/v1/callback/extension
+      FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
+    ports:
+      - "15200:15200"
+    restart: always
 
   ####################################################
   ################ Databases #########################
   ####################################################
-
   ai-database:
     image: pgvector/pgvector:pg16
     container_name: ai-database
-
-  migration:
-    image: migrate/migrate
-    depends_on:
-      ai-database:
-        condition: service_healthy
+    environment:
+      POSTGRES_DB: ai-database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_HOST: ai-database
+      POSTGRES_PORT: 5432
+    ports:
+      - "5433:5432"
     volumes:
-      - ./ai-service/migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://postgres:123456@ai-database:5432/ai-database?sslmode=disable", "up" ]
+      - ai-database:/var/lib/postgresql/data
+    restart: always
+
+  user-database:
+    image: mongo:latest
+    container_name: user-database
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - "27017:27017"
+    volumes:
+      - user-database:/data/db
+    restart: always
 
   ####################################################
   ############### Extensions #########################
@@ -42,21 +111,63 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
     container_name: elasticsearch
-
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.16.1
-    container_name: logstash
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+      xpack.security.enabled: false
+      http.host: 0.0.0.0
+      transport.host: 127.0.0.1
+      xpack.security.http.ssl.enabled: false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
     restart: always
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.16.1
     container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+      SERVER_NAME: "kibana"
+      XPACK_SECURITY_ENABLED: "false"
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: root
+      RABBITMQ_DEFAULT_PASS: root
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      - "15692:15692"
+    restart: always
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USER: root
+      REDIS_PASSWORD: root
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    restart: always
 
 volumes:
-  es_data:
-  logstash_data:
+  es-data:
   ai-database:
+  user-database:
+  rabbitmq:
+  redis:

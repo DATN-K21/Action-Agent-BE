@@ -1,0 +1,155 @@
+name: API Gateway CI/CD
+description: CI/CD pipeline for API Gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_and_push_stg:
+        description: 'Run Build & Push for Staging'
+        required: false
+        default: false
+        type: boolean
+      deploy_stg:
+        description: 'Run Deploy for Staging'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_prod:
+        description: 'Run Build & Push for Production'
+        required: false
+        default: false
+        type: boolean
+      deploy_prod:
+        description: 'Run Deploy for Production'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_info: ${{ steps.set_commit_info.outputs.commit_info }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set commit message and hash
+        id: set_commit_info
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_INFO="$COMMIT_HASH - $COMMIT_MSG"
+
+          echo "commit_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_INFO" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build_and_push_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Build & Push for Staging
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'api-gateway'
+          tag: 'stg'
+          folder: './api-gateway'
+
+      - name: Send notification to Discord (Build Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:stg'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'STG BUILD'
+
+  deploy_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_stg == 'true' }}
+    needs: [setup, build_and_push_stg]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy API Gateway to Staging
+        uses: ./.github/actions/deploy
+        with:
+          ssh_host: ${{ secrets.STG_SSH_HOST }}
+          ssh_user: ${{ secrets.STG_SSH_USER }}
+          ssh_key: ${{ secrets.STG_SSH_KEY }}
+          service: 'api-gateway'
+
+      - name: Send notification to Discord (Deploy Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:stg'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'STG DEPLOY'
+
+  build_and_push_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+  
+      - name: Docker Build & Push for Production
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'api-gateway'
+          tag: 'prod'
+          folder: './api-gateway'
+
+      - name: Send notification to Discord (Build Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:prod'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'PROD BUILD'
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_prod == 'true' }}
+    needs: [setup, build_and_push_prod]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # - name: Deploy API Gateway to Production
+      #   uses: ./.github/actions/deploy
+
+      - name: Send notification to Discord (Deploy Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'api-gateway'
+          image: 'actionagent.azurecr.io/api-gateway:prod'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'PROD DEPLOY'

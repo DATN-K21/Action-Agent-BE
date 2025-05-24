@@ -2,17 +2,17 @@ const AccessController = require('../../modules/access/access.controller');
 const handleAsync = require('../../utils/asyncHandler.util');
 const passport = require('passport');
 const AccessMiddleware = require('../../middlewares/access.middleware');
-
+const emailRateLimiter = require('../../middlewares/email.ratelimitter.middleware');
 const router = require('express').Router();
 
 router.post("/signup", handleAsync(AccessController.handleSignup));
 router.post("/login", handleAsync(AccessController.handleLogin));
-router.post("/verify/send-otp", handleAsync(AccessController.handleVerifyEmail));
-router.post("/verify/confirm-otp", handleAsync(AccessController.handleVerifyOTP));
+// router.post("/verify/send-otp", handleAsync(AccessController.handleVerifyEmail));
+// router.post("/verify/confirm-otp", handleAsync(AccessController.handleVerifyOTP));
 router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTokens));
 
 //New activate method
-router.post("/activate/send-link", handleAsync(AccessController.handleSendLinkToActivateAccount));
+router.post("/activate/send-link", emailRateLimiter, handleAsync(AccessController.handleSendLinkToActivateAccount));
 router.post("/activate/confirm", handleAsync(AccessController.handleActivateAccount));
 
 router.post('/google/auth', handleAsync(AccessController.handleLoginWithGoogle));
@@ -24,7 +24,7 @@ router.get('/facebook/verify',
     handleAsync(AccessController.handleLoginWithFacebook)
 );
 
-router.post("/reset-password/send-otp", handleAsync(AccessController.handleSendOTPToResetPassword));
+router.post("/reset-password/send-otp", emailRateLimiter, handleAsync(AccessController.handleSendOTPToResetPassword));
 router.post("/reset-password/confirm-otp", handleAsync(AccessController.handleConfirmOTPToResetPassword))
 router.post("/reset-password", handleAsync(AccessController.handleResetPassword));
 

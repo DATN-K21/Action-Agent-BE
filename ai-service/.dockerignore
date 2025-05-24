@@ -14,7 +14,6 @@ __pycache__/
 .venv/
 .ruff_cache/
 
-migrations/
-
 ruff.toml
 .env.example
+.env

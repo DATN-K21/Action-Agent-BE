@@ -13,6 +13,10 @@ import mimetypes
 from typing import BinaryIO, List, Optional
 
 from fastapi import UploadFile
+from langchain_community.document_loaders.parsers import BS4HTMLParser, PyMuPDFParser
+from langchain_community.document_loaders.parsers.generic import MimeTypeBasedParser
+from langchain_community.document_loaders.parsers.msword import MsWordParser
+from langchain_community.document_loaders.parsers.txt import TextParser
 from langchain_core.documents.base import Blob
 from langchain_core.runnables import ConfigurableField, RunnableConfig, RunnableSerializable
 from langchain_core.vectorstores import VectorStore
@@ -23,7 +27,23 @@ from pydantic import ConfigDict, SecretStr
 
 from app.core.settings import env_settings
 from app.core.utils.ingesting import ingest_blob
-from app.core.utils.parsing import MIMETYPE_BASED_PARSER
+
+HANDLERS = {
+    "application/pdf": PyMuPDFParser(),
+    "text/plain": TextParser(),
+    "text/html": BS4HTMLParser(),
+    "application/msword": MsWordParser(),
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (MsWordParser()),
+}
+
+SUPPORTED_MIMETYPES = sorted(HANDLERS.keys())
+
+# PUBLIC API
+
+MIMETYPE_BASED_PARSER = MimeTypeBasedParser(
+    handlers=HANDLERS,
+    fallback_parser=None,
+)
 
 
 def _guess_mimetype(file_name: str, file_bytes: bytes) -> str:
@@ -91,9 +111,7 @@ class IngestRunnable(RunnableSerializable[BinaryIO, List[str]]):
 
     @property
     def namespace(self) -> str:
-        if (self.assistant_id is None and self.thread_id is None) or (
-                self.assistant_id is not None and self.thread_id is not None
-        ):
+        if (self.assistant_id is None and self.thread_id is None) or (self.assistant_id is not None and self.thread_id is not None):
             raise ValueError("Exactly one of assistant_id or thread_id must be provided")
         return self.assistant_id if self.assistant_id is not None else self.thread_id  # type: ignore
 
@@ -119,15 +137,15 @@ PG_CONNECTION_STRING = PGVector.connection_string_from_db_params(
 
 
 def _get_openai_embeddings(async_mode: bool) -> PGVector:
-    if env_settings.OPENAI_API_KEY:
+    if env_settings.LLM_DEFAULT_API_KEY:
         return PGVector(
-            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.OPENAI_API_KEY)),  # type: ignore
+            OpenAIEmbeddings(openai_api_key=SecretStr(env_settings.LLM_DEFAULT_API_KEY)),  # type: ignore
             connection=PG_CONNECTION_STRING,
             use_jsonb=True,
             async_mode=async_mode,
         )
 
-    raise ValueError("OPENAI_API_KEY needs to be set for embeddings to work.")
+    raise ValueError("LLM_DEFAULT_API_KEY needs to be set for embeddings to work.")
 
 
 vstore = _get_openai_embeddings(async_mode=True)
