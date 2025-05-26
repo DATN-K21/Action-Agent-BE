@@ -7,7 +7,7 @@
 # from app.core import logging
 # from app.core.session import get_db_session
 # from app.core.utils.streaming import to_sse
-# from app.models.thread import Thread
+# from app.db_models.thread import Thread
 # from app.schemas.agent import AgentChatRequest, AgentChatResponse
 # from app.schemas.base import ResponseWrapper
 # from app.services.multi_agent.core.multi_agent_service import MultiAgentService

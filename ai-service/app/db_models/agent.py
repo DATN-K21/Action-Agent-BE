@@ -1,7 +1,7 @@
 from sqlalchemy import Boolean, Column, String
 from sqlalchemy.dialects.postgresql import ARRAY
 
-from app.models.base_entity import BaseEntity
+from app.db_models.base_entity import BaseEntity
 
 
 class BuiltinAgent(BaseEntity):

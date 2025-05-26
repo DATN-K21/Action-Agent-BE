@@ -8,7 +8,7 @@ from sqlalchemy.sql.elements import or_
 
 from app.core import logging
 from app.core.db_session import get_db_session
-from app.models.mcp_assistant import McpAssistant
+from app.db_models.mcp_assistant import McpAssistant
 from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.mcp_assistant import CreateMcpAssistantRequest, CreateMcpAssistantResponse, GetMcpAssistantResponse, \
     GetMcpAssistantsResponse, UpdateMcpAssistantRequest, UpdateMcpAssistantResponse, DeleteMcpAssistantResponse, \

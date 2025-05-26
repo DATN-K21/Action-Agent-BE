@@ -12,7 +12,7 @@
 # from app.core.session import get_db_session
 # from app.core.utils.convert_dict_message import convert_messages_to_dicts
 # from app.core.utils.uploading import convert_ingestion_input_to_blob, ingest_runnable
-# from app.models.thread import Thread
+# from app.db_models.thread import Thread
 # from app.schemas.base import CursorPagingRequest, ResponseWrapper
 # from app.schemas.history import GetHistoryResponse
 # from app.schemas.ingest import IngestFileResponse

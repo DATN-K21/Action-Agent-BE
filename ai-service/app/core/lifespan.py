@@ -6,8 +6,8 @@ from fastapi import FastAPI
 
 from app.core import logging
 from app.core.db_session import engine
+from app.db_models.base_entity import Base
 from app.memory.checkpoint import AsyncPostgresPool, get_checkpointer
-from app.models.base_entity import Base
 
 logger = logging.get_logger(__name__)
 

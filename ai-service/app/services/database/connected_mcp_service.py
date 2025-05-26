@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import logging
 from app.core.constants import SYSTEM
 from app.core.db_session import get_db_session
-from app.models.connected_mcp import ConnectedMcp
+from app.db_models.connected_mcp import ConnectedMcp
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_mcp import GetConnectedMcpResponse, GetConnectedMcpsResponse, CreateConnectedMcpResponse, \
     UpdateConnectedMcpRequest, UpdateConnectedMcpResponse, DeleteConnectedMcpResponse

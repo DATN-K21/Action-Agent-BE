@@ -9,7 +9,7 @@
 # from app.core.session import get_db_session
 # from app.core.utils.config_helper import create_invocation_config
 # from app.memory.checkpoint import get_checkpointer
-# from app.models.thread import Thread
+# from app.db_models.thread import Thread
 # from app.schemas.agent import AgentChatRequest, AgentChatResponse
 # from app.schemas.base import ResponseWrapper
 # from app.services.database.assistant_service import AssistantService, get_assistant_service

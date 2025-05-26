@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, Index, String
 
-from app.models.base_entity import BaseEntity
+from app.db_models.base_entity import BaseEntity
 
 
 class UserApiKey(BaseEntity):

@@ -13,7 +13,7 @@
 # from app.core.utils.config_helper import create_invocation_config
 # from app.core.utils.streaming import astream_state, to_sse
 # from app.memory.checkpoint import get_checkpointer
-# from app.models import Thread
+# from app.db_models import Thread
 # from app.schemas.base import ResponseWrapper
 # from app.schemas.mcp_agent import McpResponse, McpRequest, GetMcpActionsResponse
 # from app.services.database.connected_mcp_service import ConnectedMcpService, get_connected_mcp_service

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.db_session import get_db_session
-from app.models.connected_extension import ConnectedExtension
+from app.db_models.connected_extension import ConnectedExtension
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_extension import GetConnectedExtensionResponse, GetConnectedExtensionsResponse
 

@@ -11,7 +11,7 @@
 # from app.core.graph.extension_builder_manager import ExtensionBuilderManager
 # from app.core.session import get_db_session
 # from app.core.utils.streaming import format_extension_interrupt_sse, format_extension_stream_sse
-# from app.models import Thread
+# from app.db_models import Thread
 # from app.schemas.base import ResponseWrapper
 # from app.schemas.extension import (
 #     ActiveAccountResponse,

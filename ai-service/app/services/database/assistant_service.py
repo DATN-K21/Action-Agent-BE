@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.db_session import get_db_session
-from app.models.assistant import Assistant
+from app.db_models.assistant import Assistant
 from app.schemas.assistant import CreateAssistantRequest, CreateAssistantResponse, GetAssistantResponse, \
     GetAssistantsResponse, UpdateAssistantRequest, DeleteAssistantResponse
 from app.schemas.base import ResponseWrapper, PagingRequest

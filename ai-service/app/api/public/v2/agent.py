@@ -11,8 +11,8 @@
 # from app.core import logging
 # from app.core.graph.v2.base_v2 import AgentMngr, get_agent_manager_v2
 # from app.core.session import get_db_session
-# from app.models.agent import BuiltinAgent, CustomAgent
-# from app.models.thread import Thread
+# from app.db_models.agent import BuiltinAgent, CustomAgent
+# from app.db_models.thread import Thread
 # from app.schemas.agent import AgentChatRequest, GetAgentV2ListResponse, GetAgentV2Response
 # from app.schemas.base import ResponseWrapper
 #
