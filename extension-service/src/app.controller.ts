@@ -20,12 +20,13 @@ export class AppController {
   }
 
   @Post('crawl')
-  async crawl(): Promise<{ status: string; message: string }> {
+  async crawl(): Promise<{ status: string; message: string, data?: any }> {
     try {
-      await this.crawlerService.crawlAllAppsAndActions();
+      const result = await this.crawlerService.crawlAllAppsAndActions();
       return {
         status: 'success',
         message: 'Crawling completed successfully.',
+        data: result,
       }
     } catch (error) {
       console.error('Crawl failed:', error);

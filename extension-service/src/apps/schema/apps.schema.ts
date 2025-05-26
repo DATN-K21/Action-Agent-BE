@@ -1,13 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument } from 'mongoose';
+import { Document, HydratedDocument, Types } from 'mongoose';
 
 export type AppDocument = HydratedDocument<App>;
 
 @Schema({ timestamps: true, collection: 'Apps' })
-export class App extends Document {
-  @Prop({ required: true, unique: true })
-  id: string;
-    
+export class App extends Document {    
+
+  @Prop({
+    default: () => new Types.ObjectId(),
+    unique: true,
+  })
+  id: Types.ObjectId;
+
   @Prop({ required: true })
   key: string;
 
