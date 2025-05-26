@@ -1,13 +1,13 @@
 from datetime import datetime
 from typing import Optional
 
+from app.core.agents.agent_manager import AgentManager, get_agent_manager
 from fastapi import Depends
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.agents.agent_manager import AgentManager, get_agent_manager
-from app.core.session import get_db_session
+from app.core.db_session import get_db_session
 from app.models.thread import Thread
 from app.prompts.prompt_templates import get_title_generation_prompt_template
 from app.schemas.base import CursorPagingRequest, ResponseWrapper

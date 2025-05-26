@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.constants import SYSTEM, TRIAL_TOKENS
+from app.core.db_session import get_db_session
 from app.core.enums import LlmProvider
-from app.core.session import get_db_session
 from app.models import User, UserApiKey
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (

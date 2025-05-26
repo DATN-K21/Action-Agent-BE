@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
 
 from app.core import logging
-from app.core.session import get_db_session
+from app.core.db_session import get_db_session
 from app.models.extension_assistant import ExtensionAssistant
 from app.schemas.base import ResponseWrapper, PagingRequest
 from app.schemas.extension_assistant import CreateExtensionAssistantRequest, CreateExtensionAssistantResponse, \

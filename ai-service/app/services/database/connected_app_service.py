@@ -5,7 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.session import get_db_session
+from app.core.db_session import get_db_session
 from app.models.connected_app import ConnectedApp
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_app import GetConnectedAppsResponse, GetConnectedAppResponse
