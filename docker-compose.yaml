@@ -75,6 +75,21 @@ services:
       - "15200:15200"
     restart: always
 
+  extension-service:
+    build:
+      context: ./extension-service
+      dockerfile: Dockerfile
+    container_name: extension-service
+    environment:
+      NODE_ENV: dev
+      PORT: 15300
+      COMPOSIO_API_BASE_URL: https://backend.composio.dev/api
+      COMPOSIO_API_KEY: d04n821zcnqtop53g98fx
+      DATABASE_URL: mongodb://localhost:27017/datn-extension-database
+    ports:
+      - "15300:15300"
+    restart: always
+
   ####################################################
   ################ Databases #########################
   ####################################################
