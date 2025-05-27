@@ -6,11 +6,9 @@ import axios from 'axios';
 import { Model, Types } from 'mongoose';
 import { Action, ActionDocument } from '../actions/schema/action.schema';
 import { App, AppDocument } from '../apps/schema/apps.schema';
-import { getPLimit } from '../helpers/pLimit.helper';
 
 @Injectable()
 export class CrawlerService {
-
   constructor(
     @InjectModel(App.name) private appModel: Model<AppDocument>,
     @InjectModel(Action.name) private actionModel: Model<ActionDocument>,
@@ -28,59 +26,63 @@ export class CrawlerService {
     const startTimer = Date.now();
     console.log(`[CRAWL] ${totalApps} apps found.`);
 
-    // 2. Limit concurrency to avoid rate limits (e.g., 5 at a time)
-    const pLimit = await getPLimit();
-    const limit = pLimit(5);
-
     // 3. For each app, fetch details and actions, then save
-    await Promise.all(
-      apps.items.map((app: any, index: number) =>
-        limit(async () => {
-          const progressHeaderText = `${index + 1}/${totalApps}. `;
-          console.log(`[CRAWL] ${progressHeaderText}Crawling app: ${app?.key}`);
-          try {
-            // Fetch app detail (optional, if needed)
-            const appDetail = await this.fetchWithRetry(`${ComposioEndpointConfig.COMPOSIO_APP_ENDPOINT}/${app.key}`);
-            let appActionsNumber = 0;
+    // Keep the order of apps as they are in the response
+    for (let index = 0; index < apps.items.length; index++) {
+      const app = apps.items[index];
+      const progressHeaderText = `${index + 1}/${totalApps}. `;
+      console.log(`[CRAWL] ${progressHeaderText}Crawling app: ${app?.key}`);
+      try {
+        // Fetch app detail
+        const appDetail = await this.fetchWithRetry(`${ComposioEndpointConfig.COMPOSIO_APP_ENDPOINT}/${app.key}`);
+        let appActionsNumber = 0;
 
-            // Fetch actions for this app
-            const actionsRes = await this.fetchWithRetry(`${ComposioEndpointConfig.COMPOSIO_ACTION_ENDPOINT}/list/all?apps=${app.key}`);
-            console.log(`[CRAWL] ${progressHeaderText}${actionsRes.items?.length || 0} actions found for app ${app.key}.`);
-            if (actionsRes.items) {
-              appActionsNumber = actionsRes.items.length;
-              for(let i = 0; i < actionsRes.items.length; i++) {
-                console.log(`[CRAWL] ${progressHeaderText}Processing action ${i + 1}/${actionsRes.items.length}: ${actionsRes.items[i].enum}`);
-                const action = actionsRes.items[i];
+        // Fetch actions for this app
+        const actionsRes = await this.fetchWithRetry(`${ComposioEndpointConfig.COMPOSIO_ACTION_ENDPOINT}/list/all?apps=${app.key}`);
+        console.log(`[CRAWL] ${progressHeaderText}${actionsRes.items?.length || 0} actions found for app ${app.key}.`);
+        if (actionsRes.items) {
+          appActionsNumber = actionsRes.items.length;
+          await Promise.all(
+            actionsRes.items.map(async (action: any, i: number) => {
+              const fetchedAction = await this.fetchWithRetry(`${ComposioEndpointConfig.COMPOSIO_ACTION_ENDPOINT}/${action.enum}`);
+              console.log(`[CRAWL] ${progressHeaderText}Processing action ${i + 1}/${actionsRes.items.length}: ${action.enum}`);
+              await this.actionModel.updateOne(
+                { enum: action.enum },
+                { 
+                  $set: { 
+                    ...fetchedAction,
+                    appKey: app.key ?? fetchedAction?.appId,
+                    availableVersions: fetchedAction?.availableVersions ?? fetchedAction?.available_versions,
+                    noAuth: fetchedAction?.noAuth ?? fetchedAction?.no_auth,
+                  },
+                  $setOnInsert: { id: new Types.ObjectId() },
+                },
+                { upsert: true }
+              );
+            })
+          );
+        }
+        // Save app to DB (upsert)
+        await this.appModel.updateOne(
+          { key: app.key },
+          {
+            $set: {
+              ...appDetail,
+              actionsCount: appActionsNumber,
+              noAuth: appDetail?.noAuth ?? appDetail?.no_auth,
+              isCustomApp: appDetail?.meta?.isCustomApp ?? appDetail?.meta?.is_custom_app,
+              triggerCount: appDetail?.meta?.triggerCount ?? appDetail?.meta?.trigger_count,
+            },
+            $setOnInsert: { id: new Types.ObjectId() },
+          },
+          { upsert: true }
+        );
+        console.log(`[CRAWL] ${progressHeaderText} DONE.\n----------------------------------------------------`);
+      } catch (err) {
+        console.error(`Failed to crawl app ${app.key}: ${err.message}`);
+      }
+    }
 
-                // Save action to DB (upsert)
-                await this.actionModel.updateOne(
-                  { enum: action.enum },
-                  { $set: { ...action, appKey: app.key } },
-                  { upsert: true }
-                );
-              }
-            }
-            // Save app to DB (upsert)
-            await this.appModel.updateOne(
-              { key: app.key },
-              {
-                $set: {
-                  ...appDetail,
-                  actionsCount: appActionsNumber,
-                },
-                $setOnInsert: {
-                  id: new Types.ObjectId(),
-                },
-              },
-              { upsert: true }
-            );
-            console.log(`[CRAWL] ${progressHeaderText} DONE.\n----------------------------------------------------`);
-          } catch (err) {
-            console.error(`Failed to crawl app ${app.key}: ${err.message}`);
-          }
-        })
-      )
-    );
     console.log('[CRAWL] CRAWLING COMPLETED !!!');
     return {
       totalApps: totalApps,

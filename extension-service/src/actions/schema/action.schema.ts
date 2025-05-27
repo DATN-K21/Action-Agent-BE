@@ -1,10 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument } from 'mongoose';
+import { Document, HydratedDocument, Types } from 'mongoose';
 
 export type ActionDocument = HydratedDocument<Action>;
 
 @Schema({ timestamps: true, collection: 'Actions' })
 export class Action extends Document {
+  @Prop({
+      default: () => new Types.ObjectId(),
+      unique: true,
+    })
+    id: Types.ObjectId;
+
   @Prop({ required: true, ref: 'App' })
   appKey: string;
 
@@ -37,6 +43,22 @@ export class Action extends Document {
 
   @Prop({ default: false })
   noAuth: boolean;
+
+  @Prop({ type: Object, default: {} })
+  parameters: {
+    properties?: Record<string, any>;
+    required?: string[];
+    title?: string;
+    type?: string;
+  };
+
+  @Prop({ type: Object, default: {} })
+  responses: {
+    properties?: Record<string, any>;
+    required?: string[];
+    title?: string;
+    type?: string;
+  }
 }
 
 export const ActionSchema = SchemaFactory.createForClass(Action);
