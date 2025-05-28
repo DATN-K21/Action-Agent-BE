@@ -5,7 +5,6 @@ from app.api.base import router
 from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
-from app.core.socketio import get_socketio_asgi
 
 logging.configure_logging()
 
@@ -35,6 +34,3 @@ swagger.set_custom_openapi(app)
 exceptions.register_exception_handlers(app)
 
 app.include_router(router)
-
-
-app.mount("/", get_socketio_asgi())

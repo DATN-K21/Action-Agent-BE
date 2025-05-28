@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from app.core import logging
 from app.core.db_session import engine
 from app.db_models.base_entity import Base
-from app.memory.checkpoint import AsyncPostgresPool, get_checkpointer
+from app.memory.checkpoint import AsyncPostgresPool
 
 logger = logging.get_logger(__name__)
 
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
             logger.info("SQLAlchemy tables created")
 
         # Manually resolve dependencies at startup
-        checkpointer = await get_checkpointer()
+        # checkpointer = await get_checkpointer()
 
         yield
     finally:

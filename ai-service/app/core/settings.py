@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     LLM_DEFAULT_API_KEY: str = "<your-api-key>"
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
+    EMBEDDING_PROVIDER: str = "openai"
 
     # Database
     POSTGRES_HOST: str = "localhost"
@@ -43,6 +44,16 @@ class Settings(BaseSettings):
 
     # Frontend service
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
+
+    # Security keys
+    SECRET_KEY: str = "<secret-key>"
+    MODEL_PROVIDER_ENCRYPTION_KEY: str = "<encryption-key>"
+
+    # Vectorstore
+    PGVECTOR_COLLECTION: str = "<collection-name>"
+
+    # Graph
+    RECURSION_LIMIT: str = "<recursion-limit>"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:

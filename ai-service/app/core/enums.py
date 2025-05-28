@@ -1,16 +1,54 @@
-from enum import StrEnum
+from enum import StrEnum, Enum
 
 
-class HumanAction(StrEnum):
+class UploadStatus(str, Enum):
+    IN_PROGRESS = "In Progress"
+    COMPLETED = "Completed"
+    FAILED = "Failed"
+
+
+class ThreadType(str, Enum):
+    MCPS_ASSISTANT = "Mcp Assistant"
+    EXTENSIONS_ASSISTANT = "Extensions Assistant"
+    MCP_AGENT = "Mcp Agent"
+    EXTENSION_AGENT = "Extension Agent"
+    DEFAULT = "Default"
+
+
+class ChatMessageType(str, Enum):
+    human = "human"
+    ai = "ai"
+
+
+class InterruptType(str, Enum):
+    TOOL_REVIEW = "tool_review"
+    OUTPUT_REVIEW = "output_review"
+    CONTEXT_INPUT = "context_input"
+
+
+class InterruptDecision(str, Enum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    REPLIED = "replied"
+    UPDATE = "update"
+    FEEDBACK = "feedback"
+    REVIEW = "review"
+    EDIT = "edit"
     CONTINUE = "continue"
-    REFUSE = "refuse"
 
 
-class MessageName(StrEnum):
-    AI = "AI"
-    HUMAN = "HUMAN"
-    TOOL = "TOOL"
-    ASSISTANT = "ASSISTANT"
+class ModelCategory(str, Enum):
+    LLM = "llm"
+    CHAT = "chat"
+    TEXT_EMBEDDING = "text-embedding"
+    RERANK = "rerank"
+    SPEECH_TO_TEXT = "speech-to-text"
+    TEXT_TO_SPEECH = "text-to-speech"
+
+
+class ModelCapability(str, Enum):
+    VISION = "vision"
+
 
 class LlmProvider(StrEnum):
     OPENAI = "openai"
