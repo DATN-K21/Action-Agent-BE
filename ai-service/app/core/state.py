@@ -7,7 +7,7 @@ from langgraph.graph import add_messages
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired, TypedDict
 
-from app.core.rag.pgvector import QdrantStore
+from app.core.rag.pgvector import PGVectorWrapper
 from app.core.tools import managed_tools
 from app.core.tools.api_tool import dynamic_api_tool
 from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
@@ -33,12 +33,12 @@ class GraphSkill(BaseModel):
 class GraphUpload(BaseModel):
     name: str = Field(description="Name of the upload")
     description: str = Field(description="Description of the upload")
-    owner_id: int = Field(description="Id of the user that owns this upload")
+    owner_id: str = Field(description="Id of the user that owns this upload")
     upload_id: str = Field(description="Id of the upload")
 
     @property
     def tool(self) -> BaseTool:
-        retriever = QdrantStore().retriever(self.owner_id, self.upload_id)
+        retriever = PGVectorWrapper().retriever(self.owner_id, self.upload_id)
         return create_retriever_tool_custom_modified(retriever)
 
 
@@ -158,7 +158,7 @@ class WorkflowTeamState(TypedDict):
     node_outputs: Annotated[dict[str, Any], update_node_outputs]  # 修改这一行
 
 
-# When returning teamstate, is it possible to exclude fields that you dont want to update
+# When returning teamstate, is it possible to exclude fields that you don't want to update
 class ReturnWorkflowTeamState(TypedDict):
     all_messages: NotRequired[list[AnyMessage]]
     messages: NotRequired[list[AnyMessage]]

@@ -56,6 +56,49 @@ class TempEnum(str, Enum):
     """Convert dict into Enum"""
 
 
+def structured_tool_to_definition(tool: StructuredTool) -> dict:
+    """
+    Convert a StructuredTool instance to a serializable definition dict.
+    """
+    # Extract name and description
+    name = getattr(tool, "name", None)
+    description = getattr(tool, "description", None)
+
+    # Extract HTTP info if present (Composio tools may have these)
+    url = getattr(tool, "url", None)
+    method = getattr(tool, "method", None)
+    headers = getattr(tool, "headers", None)
+
+    # Extract argument schema from Pydantic model
+    args_schema = getattr(tool, "args_schema", None)
+    if args_schema is None:
+        raise ValueError("Tool does not have an args_schema")
+    schema = args_schema.schema()
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+
+    # Build the function definition
+    function = {
+        "name": name,
+        "description": description,
+        "parameters": {
+            "properties": properties,
+            "required": required,
+        }
+    }
+
+    # Build the full definition
+    definition = {
+        "name": name,
+        "description": description,
+        "url": url,
+        "method": method,
+        "headers": headers,
+        "function": function,
+    }
+    return definition
+
+
 def dynamic_api_tool(tool_definition: dict[str, Any]) -> StructuredTool:
     """
     Create a dynamic API tool from a JSON definition.

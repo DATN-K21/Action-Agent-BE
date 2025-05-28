@@ -177,7 +177,7 @@ class PGVectorWrapper:
             logger.error(f"Error in search: {str(e)}", exc_info=True)
             return []
 
-    def retriever(self, user_id: int, upload_id: int):
+    def retriever(self, user_id: str, upload_id: str):
         logger.debug(
             f"Creating retriever for user_id: {user_id}, upload_id: {upload_id}"
         )
