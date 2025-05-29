@@ -49,11 +49,15 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "<secret-key>"
     MODEL_PROVIDER_ENCRYPTION_KEY: str = "<encryption-key>"
 
-    # Vectorstore
+    # Vectorstore settings
     PGVECTOR_COLLECTION: str = "<collection-name>"
 
-    # Graph
+    # Graph settings
     RECURSION_LIMIT: str = "<recursion-limit>"
+
+    # Cache settings
+    MAX_PERSONAL_TOOLS_PER_USER: str = "<max-personal-tools-per-user>"
+    MAX_CACHED_USERS: str = "<max-cached-users>"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:

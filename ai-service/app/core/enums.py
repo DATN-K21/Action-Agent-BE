@@ -1,4 +1,4 @@
-from enum import StrEnum, Enum
+from enum import Enum
 
 
 class UploadStatus(str, Enum):
@@ -50,7 +50,7 @@ class ModelCapability(str, Enum):
     VISION = "vision"
 
 
-class LlmProvider(StrEnum):
+class LlmProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
@@ -60,4 +60,10 @@ class LlmProvider(StrEnum):
 
     @classmethod
     def supported_values(cls) -> list[str]:
-        return [member.value for member in cls]
+        return [member for member in cls]
+
+
+class StorageStrategy(str, Enum):
+    PERSONAL_TOOL_CACHE = "personal_tool_cache"
+    GLOBAL_TOOLS = "global_tools"
+    DEFINITION = "definition"
