@@ -8,9 +8,9 @@ from typing import Any, Dict, OrderedDict as OrderedDictType
 from langchain.tools import BaseTool
 from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
-from pydantic import BaseModel
 
 from app.core import logging
+from app.core.models import ToolInfo
 from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
@@ -73,14 +73,6 @@ def create_unique_personal_tool_name(skill_id: str, skill_name: str) -> str:
         return standardized_id  # Return only the id part
 
     return f"{standardized_id}-{standardized_name}"
-
-
-class ToolInfo(BaseModel):
-    description: str
-    tool: BaseTool
-    display_name: str = "NO NAME PROVIDED"
-    input_parameters: Dict[str, Any] | None = None
-    credentials: Dict[str, Any] | None = None
 
 
 class ToolManager:

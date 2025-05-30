@@ -4,15 +4,15 @@ from typing import Dict, OrderedDict as OrderedDictType, Optional
 
 from app.core import logging
 from app.core.settings import env_settings
-from app.services.extensions.extension_service import ExtensionServiceInfo
+from app.services.extensions.extension_client import ExtensionServiceInfo
 
 logger = logging.get_logger(__name__)
 
 # --- Constants ---
-MAX_CACHED_TOOL_EXTENSION_SERVICES = env_settings.MAX_CACHED_TOOL_EXTENSION_SERVICES
+MAX_CACHED_EXTENSION_SERVICES = env_settings.MAX_CACHED_EXTENSION_SERVICES
 
 
-class ExtensionToolServiceManager:
+class ExtensionServiceManager:
     """
     Manages and provides access to various extension services.
     It maintains a list of all available services and an LRU cache for frequently used active services.
@@ -36,7 +36,7 @@ class ExtensionToolServiceManager:
         # Lock for ensuring thread-safety when accessing/modifying the active_service_cache.
         self.cache_lock = threading.Lock()
 
-        if MAX_CACHED_TOOL_EXTENSION_SERVICES <= 0:
+        if MAX_CACHED_EXTENSION_SERVICES <= 0:
             logger.info(
                 "MAX_CACHED_SERVICES is non-positive. Active service caching will be disabled. Services will be fetched from all_defined_services directly.")
 
@@ -72,7 +72,7 @@ class ExtensionToolServiceManager:
         """
         with self.cache_lock:  # Ensure thread-safe access to the cache
             # 1. Handle disabled cache scenario
-            if MAX_CACHED_TOOL_EXTENSION_SERVICES <= 0:
+            if MAX_CACHED_EXTENSION_SERVICES <= 0:
                 if service_name in self.all_defined_services:
                     logger.debug(
                         f"Service caching disabled. Returning '{service_name}' directly from defined services.")
@@ -92,10 +92,10 @@ class ExtensionToolServiceManager:
             # 3. Service not in active cache, check all_defined_services
             if service_name in self.all_defined_services:
                 # Check if cache is full before adding
-                if len(self.active_service_cache) >= MAX_CACHED_TOOL_EXTENSION_SERVICES:
+                if len(self.active_service_cache) >= MAX_CACHED_EXTENSION_SERVICES:
                     # Evict the least recently used service (oldest item)
                     evicted_service_name, _ = self.active_service_cache.popitem(last=False)
-                    logger.info(f"Active service cache limit ({MAX_CACHED_TOOL_EXTENSION_SERVICES}) reached. "
+                    logger.info(f"Active service cache limit ({MAX_CACHED_EXTENSION_SERVICES}) reached. "
                                 f"Evicted '{evicted_service_name}' to make space for '{service_name}'.")
 
                 # Add the new service to the active cache

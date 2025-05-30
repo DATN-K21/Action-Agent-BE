@@ -53,12 +53,14 @@ class Settings(BaseSettings):
     PGVECTOR_COLLECTION: str = "<collection-name>"
 
     # Graph settings
-    RECURSION_LIMIT: str = "<recursion-limit>"
+    RECURSION_LIMIT: int = 25
 
     # Cache settings
-    MAX_PERSONAL_TOOLS_PER_USER: str = "<max-personal-tools-per-user>"
-    MAX_CACHED_USERS: str = "<max-cached-users>"
-    MAX_CACHED_TOOL_EXTENSION_SERVICES: str = "<max-cached-tool-extension-services>"
+    MAX_PERSONAL_TOOLS_PER_USER: int = 200
+    MAX_CACHED_USERS: int = 100
+    MAX_CACHED_EXTENSION_SERVICES: int = 400
+    MAX_CACHED_MCP_USERS: int = 100
+    MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
 
     @property
     def POSTGRES_URL_PATH(self) -> str:

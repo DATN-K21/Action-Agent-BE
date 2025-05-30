@@ -9,7 +9,7 @@ from app.schemas.extension import DeleteConnectionResponse
 logger = logging.get_logger(__name__)
 
 
-class ComposioService:
+class ComposioClient:
     @classmethod
     def get_or_initiate_integration(cls, app_enum: App):
         logger.info(f"Creating integration for {app_enum}")

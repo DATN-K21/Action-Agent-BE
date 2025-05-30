@@ -1,8 +1,17 @@
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
+from crewai.tools import BaseTool
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.enums import ChatMessageType, InterruptType, InterruptDecision
+
+
+class ToolInfo(BaseModel):
+    description: str | None = None
+    tool: BaseTool
+    display_name: str | None = None
+    input_parameters: Dict[str, Any] | None = None
+    credentials: Dict[str, Any] | None = None
 
 
 class ChatMessage(BaseModel):
