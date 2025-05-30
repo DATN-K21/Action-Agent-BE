@@ -1,62 +1,32 @@
-# from abc import ABC, abstractmethod
-# from typing import Sequence, Union, Callable
-# from uuid import uuid4
-#
-# from composio import App
-# from composio_langgraph import Action
-# from langchain_core.tools import BaseTool
-#
-# from app.core import logging
-# from app.core.settings import env_settings
-# from app.services.extensions.composio_service import ComposioService
-#
-# logger = logging.get_logger(__name__)
-#
-#
-# # noinspection PyMethodMayBeStatic
-# class ExtensionService(ABC):
-#     def __init__(self, name: str, app_enum: App, supported_actions: Sequence[Action]):
-#         self._name = name
-#         self._app_enum = app_enum
-#         self._supported_actions = supported_actions
-#         self._id = str(uuid4)
-#         self._redirect_url = env_settings.COMPOSIO_REDIRECT_URL
-#         self._integration_id = ComposioService.initiate_integration(app_enum=self._app_enum)
-#
-#     def initialize_connection(self, user_id: str):
-#         if self._app_enum is None:
-#             raise ValueError("App enum is not set")
-#         if self._redirect_url is None:
-#             raise ValueError("Redirect URL is not set")
-#
-#         result = ComposioService.initiate_app_connection(user_id, self._app_enum, self._redirect_url)
-#         return result
-#
-#     def disconnect(self, connected_account_id: str):
-#         return ComposioService.delete_connection(connected_account_id)
-#
-#     def check_connection(self, user_id: str):
-#         return ComposioService.check_app_connection(user_id, self._app_enum)
-#
-#     def get_name(self) -> str:
-#         return self._name
-#
-#     def get_app_enum(self) -> App:
-#         return self._app_enum
-#
-#     def get_actions(self) -> Sequence[Action]:
-#         return self._supported_actions
-#
-#     def get_action_names(self) -> Sequence[str]:
-#         tool_names = [str(action) for action in self._supported_actions]
-#         return tool_names
-#
-#     @abstractmethod
-#     def get_tools(self) -> Sequence[Union[BaseTool, Callable]]:
-#         """Get the tools"""
-#         pass
-#
-#     @abstractmethod
-#     def get_authed_tools(self, user_id: str) -> Sequence[Union[BaseTool, Callable]]:
-#         """Get the tools with the auth parameters"""
-#         pass
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from app.core import logging
+
+logger = logging.get_logger(__name__)
+
+
+class ExtensionServiceInfo(BaseModel):
+    """
+    Holds information about a specific extension service.
+    """
+    name: str = Field(..., description="The unique identifier name for the service (e.g., 'Maps_directions_api').")
+    display_name: str | None = Field(None,
+                                     description="A human-readable name for the service (e.g., 'Google Maps Directions API').")
+    description: str | None = Field(None, description="A brief description of what the service does.")
+    # The actual service object or client. This could be an instantiated class,
+    # a function, or any other relevant Python object.
+    tool_service_object: Any = Field(None,
+                                     description="The actual service instance or a callable to interact with the service.")
+    version: str = "1.0"
+
+
+class ExtensionService:
+    """
+    Connect to the Extension Service (Extension service container)
+    and get information about the available services.
+    """
+
+    def __init__(self, service_info: ExtensionServiceInfo):
+        pass

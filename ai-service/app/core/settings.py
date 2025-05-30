@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # Cache settings
     MAX_PERSONAL_TOOLS_PER_USER: str = "<max-personal-tools-per-user>"
     MAX_CACHED_USERS: str = "<max-cached-users>"
+    MAX_CACHED_TOOL_EXTENSION_SERVICES: str = "<max-cached-tool-extension-services>"
 
     @property
     def POSTGRES_URL_PATH(self) -> str:
