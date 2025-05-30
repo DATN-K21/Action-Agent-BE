@@ -9,13 +9,13 @@ class Model(BaseEntity):
     __tablename__ = "models"
 
     # AI model name with max length 128 characters, cannot be null
-    ai_model_name = Column(String(128), nullable=False)
+    ai_model_name: str = Column(String(128), nullable=False)
 
     # Foreign key reference to ModelProvider table
-    provider_id = Column(String, ForeignKey("model_providers.id"), nullable=False)
+    provider_id: str = Column(String, ForeignKey("model_providers.id"), nullable=False)
 
     # Categories stored as PostgreSQL string array
-    categories = Column(ARRAY(String), nullable=True)
+    categories: str | None = Column(ARRAY(String), nullable=True)
 
     # Capabilities stored as PostgreSQL string array, default empty list
     capabilities = Column(ARRAY(String), nullable=False, default=[])

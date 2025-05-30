@@ -13,11 +13,12 @@ class Thread(BaseEntity):
     """
     __tablename__ = "threads"
 
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String, nullable=True)
-    thread_type = Column(SQLEnum(ThreadType), nullable=True)
-    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=True)
-    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    user_id: str = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: str | None = Column(String, nullable=True)
+    thread_type: str | None = Column(SQLEnum(ThreadType), nullable=True)
+    assistant_id: str | None = Column(String, ForeignKey("assistants.id"), nullable=True)
+    team_id: str | None = Column(String, ForeignKey("teams.id"), nullable=True)
+    query: str | None = Column(String, nullable=True)
 
     # Relationships
     team = relationship("Team", back_populates="threads")

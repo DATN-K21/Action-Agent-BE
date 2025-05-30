@@ -7,20 +7,20 @@ from app.db_models.base_entity import BaseEntity
 class Team(BaseEntity):
     __tablename__ = "teams"
 
-    name = Column(String(64), unique=True, nullable=False)
-    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    name: str = Column(String(64), unique=True, nullable=False)
+    user_id: str = Column(String, ForeignKey("users.id"), nullable=False)
 
-    description = Column(String, nullable=True)
-    icon = Column(String, nullable=True)  # Add an icon field for the team
+    description: str | None = Column(String, nullable=True)
+    icon: str | None = Column(String, nullable=True)  # Add an icon field for the team
+    workflow: str | None = Column(String, nullable=True)
 
     # Relationships
-    owner = relationship("User", back_populates="teams")
+    user = relationship("User", back_populates="teams")
     members = relationship(
         "Member",
         back_populates="belongs",
         cascade="all, delete-orphan"
     )
-    workflow = Column(String, nullable=False)
     threads = relationship(
         "Thread",
         back_populates="team",

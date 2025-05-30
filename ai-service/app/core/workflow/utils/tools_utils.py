@@ -16,6 +16,6 @@ def get_tool(tool_name: str) -> BaseTool:
 
 
 @cache
-def get_retrieval_tool(tool_name: str, description: str, owner_id: int, kb_id: int):
-    retriever = PGVectorWrapper().retriever(owner_id, kb_id)
+def get_retrieval_tool(tool_name: str, description: str, user_id: str, kb_id: str):
+    retriever = PGVectorWrapper().retriever(user_id, kb_id)
     return create_retriever_tool(retriever, name=tool_name, description=description)

@@ -9,23 +9,23 @@ class ModelProvider(BaseEntity):
     __tablename__ = "model_providers"
 
     # Provider name with a max length of 64 characters, cannot be null
-    provider_name = Column(String(64), nullable=False)
+    provider_name: str = Column(String(64), nullable=False)
 
     # Optional base URL string column
-    base_url = Column(String, nullable=True)
+    base_url: str | None = Column(String, nullable=True)
 
     # Optional API key stored as a string (encrypted)
-    api_key = Column(String, nullable=True)
+    api_key: str | None = Column(String, nullable=True)
 
     # Optional icon URL or identifier
-    icon = Column(String, nullable=True)
+    icon: str | None = Column(String, nullable=True)
 
     # Optional description with max length of 256 characters
-    description = Column(String(256), nullable=True)
+    description: str | None = Column(String(256), nullable=True)
 
     # Relationship to Models table, cascade deletes models when provider is deleted
     models = relationship(
-        "Models",
+        "Model",
         back_populates="provider",
         cascade="all, delete-orphan"
     )

@@ -1,4 +1,8 @@
+from datetime import datetime
+from typing import Any
+
 from sqlalchemy import Column, ForeignKey, DateTime, func, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import BaseEntity  # Adjust if needed
@@ -7,20 +11,13 @@ from app.db_models.base_entity import BaseEntity  # Adjust if needed
 class Graph(BaseEntity):
     __tablename__ = "graphs"
 
-    # Foreign key referencing user.id; the owner of the graph
-    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
-
-    # Relationship to User model for the owner
-    owner = relationship("User", back_populates="graphs")
-
-    # Foreign key referencing team.id; the team this graph belongs to
-    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
-
-    # Relationship to Team model
-    team = relationship("Team", back_populates="graphs")
-
-    # Timestamp for creation time, automatically set by the DB
-    created_at = Column(
+    user_id: str = Column(String, ForeignKey("users.id"), nullable=False)
+    team_id: str = Column(String, ForeignKey("teams.id"), nullable=False)
+    name = Column(String(64), nullable=False, unique=True)
+    description: str | None = Column(String, nullable=True)
+    config: dict[Any, Any] = Column(JSONB, nullable=False, server_default="{}")
+    metadata_: dict[Any, Any] = Column(JSONB, nullable=False, server_default="{}")
+    created_at: datetime = Column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
@@ -28,10 +25,14 @@ class Graph(BaseEntity):
     )
 
     # Timestamp for last update time, automatically updated on change
-    updated_at = Column(
+    updated_at: datetime = Column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         onupdate=func.now(),
         server_default=func.now(),
     )
+
+    # Relationships
+    user = relationship("User", back_populates="graphs")
+    team = relationship("Team", back_populates="graphs")

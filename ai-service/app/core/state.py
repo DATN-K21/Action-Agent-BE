@@ -15,7 +15,7 @@ from app.core.tools.tool_manager import global_tools, tool_manager
 
 
 class GraphSkill(BaseModel):
-    owner_id: str = Field(description="The id of the owner")
+    user_id: str = Field(description="The id of the owner")
     name: str = Field(description="The name of the skill")
     definition: dict[str, Any] | None = Field(
         description="The skill definition. For api tool calling. Optional."
@@ -28,7 +28,7 @@ class GraphSkill(BaseModel):
         if self.strategy == StorageStrategy.GLOBAL_TOOLS:
             return global_tools[self.name].tool
         if self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
-            return tool_manager.aget_personal_tool(self.owner_id, self.name)
+            return tool_manager.aget_personal_tool(self.user_id, self.name)
         elif self.strategy == StorageStrategy.DEFINITION and self.definition:
             return dynamic_api_tool(self.definition)
         else:
@@ -38,12 +38,12 @@ class GraphSkill(BaseModel):
 class GraphUpload(BaseModel):
     name: str = Field(description="Name of the upload")
     description: str = Field(description="Description of the upload")
-    owner_id: str = Field(description="Id of the user that owns this upload")
+    user_id: str = Field(description="Id of the user that owns this upload")
     upload_id: str = Field(description="Id of the upload")
 
     @property
     def tool(self) -> BaseTool:
-        retriever = PGVectorWrapper().retriever(self.owner_id, self.upload_id)
+        retriever = PGVectorWrapper().retriever(self.user_id, self.upload_id)
         return create_retriever_tool_custom_modified(retriever)
 
 

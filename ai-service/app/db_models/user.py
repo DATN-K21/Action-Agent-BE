@@ -1,4 +1,5 @@
 from sqlalchemy import Column, ForeignKey, Index, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import BaseEntity
 
@@ -11,13 +12,20 @@ class User(BaseEntity):
     """
     __tablename__ = "users"
 
-    username = Column(String, unique=True, nullable=False, index=True)
-    email = Column(String, unique=True, nullable=False, index=True)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
+    username: str = Column(String, unique=True, nullable=False, index=True)
+    email: str = Column(String, unique=True, nullable=False, index=True)
+    first_name: str | None = Column(String, nullable=True)
+    last_name: str | None = Column(String, nullable=True)
+    language: str = Column(String, default="en-US")
 
-    default_api_key_id = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
-    remain_trial_tokens = Column(Integer, nullable=False, default=0)
+    default_api_key_id: str | None = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
+    remain_trial_tokens: str = Column(Integer, nullable=False, default=0)
+
+    teams = relationship("Team", back_populates="user")
+    skills = relationship("Skill", back_populates="user")
+    uploads = relationship("Upload", back_populates="user")
+    graphs = relationship("Graph", back_populates="user")
+    subgraphs = relationship("Subgraph", back_populates="user")
 
     __table_args__ = (
         Index(

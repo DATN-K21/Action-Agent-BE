@@ -101,7 +101,7 @@ def convert_hierarchical_team_to_dict(members: list[Member]
                 tools = [
                     GraphSkill(
                         name=skill.name,
-                        managed=skill.managed,
+                        strategy=skill.strategy,
                         definition=skill.tool_definition,
                     )
                     for skill in member.skills
@@ -110,11 +110,11 @@ def convert_hierarchical_team_to_dict(members: list[Member]
                     GraphUpload(
                         name=upload.name,
                         description=upload.description,
-                        owner_id=upload.owner_id,
+                        user_id=upload.user_id,
                         upload_id=str(upload.id),
                     )
                     for upload in member.uploads
-                    if upload.owner_id is not None
+                    if upload.user_id is not None
                 ]
                 teams[leader_name].members[member_name] = GraphMember(
                     name=member_name,
@@ -173,7 +173,7 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
         tools = [
             GraphSkill(
                 name=skill.name,
-                managed=skill.managed,
+                strategy=skill.strategy,
                 definition=skill.tool_definition,
             )
             for skill in member.skills
@@ -182,11 +182,11 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
             GraphUpload(
                 name=upload.name,
                 description=upload.description,
-                owner_id=upload.owner_id,
+                user_id=upload.user_id,
                 upload_id=str(upload.id),
             )
             for upload in member.uploads
-            if upload.owner_id is not None
+            if upload.user_id is not None
         ]
         graph_member = GraphMember(
             name=member.name,
@@ -222,26 +222,26 @@ def convert_chatbot_chatrag_team_to_dict(
             GraphUpload(
                 name=upload.name,
                 description=upload.description,
-                owner_id=upload.owner_id,
+                user_id=upload.user_id,
                 upload_id=str(upload.id),
             )
             for upload in member.uploads
-            if upload.owner_id is not None
+            if upload.user_id is not None
         ]
     elif workflow_type == "chatbot":
         tools = [
                     GraphUpload(
                         name=upload.name,
                         description=upload.description,
-                        owner_id=upload.owner_id,
+                        user_id=upload.user_id,
                         upload_id=str(upload.id),
                     )
                     for upload in member.uploads
-                    if upload.owner_id is not None
+                    if upload.user_id is not None
                 ] + [
                     GraphSkill(
                         name=skill.name,
-                        managed=skill.managed,
+                        strategy=skill.strategy,
                         definition=skill.tool_definition,
                     )
                     for skill in member.skills
