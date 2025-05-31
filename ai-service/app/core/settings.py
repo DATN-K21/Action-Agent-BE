@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     MAX_CACHED_MCP_USERS: int = 100
     MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
 
+    PROTECTED_NAMES = ["user", "ignore", "error"]
+
     @property
     def POSTGRES_URL_PATH(self) -> str:
         return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

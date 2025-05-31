@@ -3,8 +3,7 @@ from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
 from app.api.public.v1 import callback, connected_app, connected_mcp, test, \
-    user
-from app.api.public.v2 import assistant, connected_extension
+    user, connected_extension, assistant
 
 
 class ValidationErrorResponse(BaseModel):
