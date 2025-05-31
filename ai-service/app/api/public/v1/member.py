@@ -1,7 +1,6 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from posthog.ai.openai.openai import WrappedResponses
 from sqlalchemy import col, func, select, update
 
 from app.api.deps import SessionDep
@@ -9,6 +8,7 @@ from app.core import logging
 from app.core.settings import env_settings
 from app.db_models import Member, Team, Skill, Upload
 from app.schemas.base import MessageResponse
+from app.schemas.base import ResponseWrapper
 from app.schemas.member import CreateMemberRequest, UpdateMemberRequest, MembersResponse, MemberResponse
 
 router = APIRouter()
@@ -17,7 +17,7 @@ logger = logging.get_logger(__name__)
 
 
 def validate_name_on_create(
-        session: SessionDep, team_id: int, member_in: CreateMemberRequest
+        session: SessionDep, team_id: str, member_in: CreateMemberRequest
 ) -> None:
     """Check if (name, team_id) is unique and name is not a protected name"""
     if member_in.name in env_settings.PROTECTED_NAMES:
@@ -37,7 +37,7 @@ def validate_name_on_create(
 
 
 def validate_names_on_update(
-        session: SessionDep, team_id: int, member_in: UpdateMemberRequest, member_id: int
+        session: SessionDep, team_id: str, member_in: UpdateMemberRequest, member_id: str
 ) -> None:
     """Check if (name, team_id) is unique and name is not a protected name"""
     if member_in.name in env_settings.PROTECTED_NAMES:
@@ -57,10 +57,10 @@ def validate_names_on_update(
         )
 
 
-@router.get("/", response_model=WrappedResponses[MembersResponse])
+@router.get("/", response_model=ResponseWrapper[MembersResponse])
 def read_members(
         session: SessionDep,
-        team_id: int,
+        team_id: str,
         skip: int = 0,
         limit: int = 100,
         x_user_id: str = Header(None),
@@ -104,17 +104,17 @@ def read_members(
             members = session.exec(statement).all()
 
         data = MembersResponse(members=members, count=count)
-        return WrappedResponses.wrap(status=200, data=data)
+        return ResponseWrapper.wrap(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error retrieving members: {e}", exc_info=True)
-        return WrappedResponses(status=500, message="Internal server error")
+        return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.get("/{id}", response_model=WrappedResponses[MemberResponse])
+@router.get("/{id}", response_model=ResponseWrapper[MemberResponse])
 def read_member(
         session: SessionDep,
-        team_id: int,
-        member_id: int,
+        team_id: str,
+        member_id: str,
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),
 ) -> Any:
@@ -143,19 +143,19 @@ def read_member(
             member = session.exec(statement).first()
 
         if not member:
-            return WrappedResponses(status=404, message="Member not found")
+            return ResponseWrapper(status=404, message="Member not found").to_response()
 
-        return WrappedResponses.wrap(status=200, data=member.data)
+        return ResponseWrapper.wrap(status=200, data=member.data).to_response()
     except Exception as e:
         logger.error(f"Error retrieving member: {e}", exc_info=True)
-        return WrappedResponses(status=500, message="Internal server error")
+        return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.post("/", response_model=WrappedResponses[MemberResponse])
+@router.post("/", response_model=ResponseWrapper[MemberResponse])
 def create_member(
         *,
         session: SessionDep,
-        team_id: int,
+        team_id: str,
         member_in: CreateMemberRequest,
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),
@@ -166,13 +166,15 @@ def create_member(
     """
     try:
         user_id = x_user_id
+        team = session.get(Team, team_id)
+        if not team:
+            return ResponseWrapper(status=404, message="Team not found").to_response()
+
         if x_user_role.lower() != "admin":
-            team = session.get(Team, team_id)
-            if not team:
-                return WrappedResponses(status=404, message="Team not found")
             if team.user_id != x_user_id:
-                user_id = team.user_id
-                return WrappedResponses(status=403, message="Not enough permissions")
+                return ResponseWrapper(status=403, message="Not enough permissions").to_response()
+        else:
+            user_id = team.user_id
 
         member_data = member_in.model_dump()
         member_data["team_id"] = team_id
@@ -184,15 +186,15 @@ def create_member(
         return member
     except Exception as e:
         logger.error(f"Error creating new member: {e}", exc_info=True)
-        return WrappedResponses(status=500, message="Internal server error")
+        return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.put("/{id}", response_model=WrappedResponses[MemberResponse])
+@router.put("/{id}", response_model=ResponseWrapper[MemberResponse])
 def update_member(
         *,
         session: SessionDep,
-        team_id: int,
-        member_id: int,
+        team_id: str,
+        member_id: str,
         member_in: UpdateMemberRequest,
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),
@@ -227,7 +229,7 @@ def update_member(
             member = session.exec(statement).first()
 
         if not member:
-            return WrappedResponses(status=404, message="Member not found")
+            return ResponseWrapper(status=404, message="Member not found").to_response()
 
         # update member's skills if required
         if member_in.skills is not None:
@@ -263,20 +265,20 @@ def update_member(
         session.exec(statement)
         session.commit()
         session.refresh(member)
-        return WrappedResponses.wrap(status=200, data=member)
+        return ResponseWrapper.wrap(status=200, data=member).to_response()
     except Exception as e:
         logger.error(f"Error updating member: {e}", exc_info=True)
-        return WrappedResponses(status=500, message="Internal server error")
+        return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=ResponseWrapper[MessageResponse])
 def delete_member(
         session: SessionDep,
-        team_id: int,
-        member_id: int,
+        team_id: str,
+        member_id: str,
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),
-) -> WrappedResponses[MessageResponse]:
+):
     """
     Delete a member.
     """
@@ -301,7 +303,7 @@ def delete_member(
             member = session.exec(statement).first()
 
         if not member:
-            raise HTTPException(status_code=404, detail="Member not found")
+            return ResponseWrapper(status=404, message="Member not found").to_response()
 
         statement = (
             update(Member)
@@ -315,10 +317,11 @@ def delete_member(
                 deleted_at=func.now()
             )
         )
+        session.exec(statement)
         session.commit()
         data = MessageResponse(message="Member deleted successfully")
-        return WrappedResponses.wrap(status=200, data=data)
+        return ResponseWrapper.wrap(status=200, data=data).to_response()
 
     except Exception as e:
         logger.error(f"Error deleting member: {e}", exc_info=True)
-        return WrappedResponses(status=500, message="Internal server error")
+        return ResponseWrapper(status=500, message="Internal server error").to_response()

@@ -46,7 +46,7 @@ class UpdateMemberRequest(MemberBase, BaseRequest):
 
 
 ##################################################
-########### REQUEST SCHEMAS ######################
+########### RESPONSE SCHEMAS #####################
 ##################################################
 
 class MemberResponse(MemberBase, BaseResponse):
