@@ -1,23 +1,15 @@
 from typing import Any
 
-from app.api.deps import CurrentUser, SessionDep
-from app.models import (
-    Message,
-    Skill,
-    SkillCreate,
-    SkillOut,
-    SkillsOut,
-    SkillUpdate,
-    ToolDefinitionValidate,
-)
 from fastapi import APIRouter, HTTPException
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from loguru import logger
 from pydantic import ValidationError
 from sqlmodel import col, func, or_, select
 
+from app.core import logging
 from app.core.tools.api_tool import ToolDefinition
 from app.core.tools.tool_invoker import ToolInvokeResponse, invoke_tool
+
+logger = logging.get_logger(__name__)
 
 router = APIRouter()
 

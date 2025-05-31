@@ -184,7 +184,7 @@
 #                 .where(
 #                     Thread.user_id == user_id,
 #                     Thread.id == thread_id,
-#                     Thread.is_deleted.is_(False),
+#                     Threadư,
 #                 )
 #                 .values(
 #                     is_deleted=True,

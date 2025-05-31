@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from posthog.ai.openai.openai import WrappedResponses
-from sqlmodel import col, func, select
+from sqlalchemy import col, func, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -27,6 +27,7 @@ def validate_name_on_create(
     statement = select(Member).where(
         Member.name == member_in.name,
         Member.team_id == team_id,
+        Member.is_deleted.is_(False)
     )
     member_unique = session.exec(statement).first()
     if member_unique:
@@ -47,6 +48,7 @@ def validate_names_on_update(
         Member.name == member_in.name,
         Member.team_id == team_id,
         Member.id != member_id,
+        Member.is_deleted.is_(False)
     )
     member_unique = session.exec(statement).first()
     if member_unique:
@@ -81,13 +83,21 @@ def read_members(
                 select(func.count())
                 .select_from(Member)
                 .join(Team)
-                .where(Team.user_id == x_user_id, Member.team_id == team_id)
+                .where(
+                    Team.user_id == x_user_id,
+                    Member.team_id == team_id,
+                    Member.is_deleted.is_(False)
+                )
             )
             count = session.exec(count_statement).one()
             statement = (
                 select(Member)
                 .join(Team)
-                .where(Team.user_id == x_user_id, Member.team_id == team_id)
+                .where(
+                    Team.user_id == x_user_id,
+                    Member.team_id == team_id,
+                    Member.is_deleted.is_(False)
+                )
                 .offset(skip)
                 .limit(limit)
             )
@@ -127,6 +137,7 @@ def read_member(
                     Member.id == member_id,
                     Member.team_id == team_id,
                     Team.user_id == x_user_id,
+                    Member.is_deleted.is_(False)
                 )
             )
             member = session.exec(statement).first()
@@ -154,15 +165,18 @@ def create_member(
     Create new member.
     """
     try:
+        user_id = x_user_id
         if x_user_role.lower() != "admin":
             team = session.get(Team, team_id)
             if not team:
                 return WrappedResponses(status=404, message="Team not found")
             if team.user_id != x_user_id:
+                user_id = team.user_id
                 return WrappedResponses(status=403, message="Not enough permissions")
 
         member_data = member_in.model_dump()
         member_data["team_id"] = team_id
+        member_data["user_id"] = user_id
         member = Member(**member_data)
         session.add(member)
         session.commit()
@@ -187,48 +201,72 @@ def update_member(
     """
     Update a member.
     """
-    if x_user_role.lower() == "admin":
+    try:
+        if x_user_role.lower() == "admin":
+            statement = (
+                select(Member)
+                .join(Team)
+                .where(
+                    Member.id == member_id,
+                    Member.team_id == team_id,
+                    Member.is_deleted.is_(False)
+                )
+            )
+            member = session.exec(statement).first()
+        else:
+            statement = (
+                select(Member)
+                .join(Team)
+                .where(
+                    Member.id == member_id,
+                    Member.team_id == team_id,
+                    Team.user_id == x_user_id,
+                    Member.is_deleted.is_(False)
+                )
+            )
+            member = session.exec(statement).first()
+
+        if not member:
+            return WrappedResponses(status=404, message="Member not found")
+
+        # update member's skills if required
+        if member_in.skills is not None:
+            skill_ids = [skill.id for skill in member_in.skills]
+            skills = session.exec(
+                select(Skill)
+                .where(col(Skill.id).in_(skill_ids), Skill.is_deleted.is_(False))
+            ).all()
+            member.skills = list(skills)
+
+        # update member's accessible uploads if required
+        if member_in.uploads is not None:
+            upload_ids = [upload.id for upload in member_in.uploads]
+            uploads = session.exec(
+                select(Upload)
+                .where(
+                    col(Upload.id).in_(upload_ids),
+                    Upload.is_deleted.is_(False)
+                )
+            ).all()
+            member.uploads = list(uploads)
+
+        update_dict = member_in.model_dump(exclude_unset=True)
         statement = (
-            select(Member)
-            .join(Team)
-            .where(Member.id == member_id, Member.team_id == team_id)
-        )
-        member = session.exec(statement).first()
-    else:
-        statement = (
-            select(Member)
-            .join(Team)
+            update(Member)
             .where(
                 Member.id == member_id,
                 Member.team_id == team_id,
-                Team.user_id == x_user_id,
+                Member.is_deleted.is_(False)
             )
+            .values(**update_dict)
         )
-        member = session.exec(statement).first()
-
-    if not member:
-        raise HTTPException(status_code=404, detail="Member not found")
-
-    # update member's skills if required
-    if member_in.skills is not None:
-        skill_ids = [skill.id for skill in member_in.skills]
-        skills = session.exec(select(Skill).where(col(Skill.id).in_(skill_ids))).all()
-        member.skills = list(skills)
-
-    # update member's accessible uploads if required
-    if member_in.uploads is not None:
-        upload_ids = [upload.id for upload in member_in.uploads]
-        uploads = session.exec(
-            select(Upload).where(col(Upload.id).in_(upload_ids))
-        ).all()
-        member.uploads = list(uploads)
-
-    update_dict = member_in.model_dump(exclude_unset=True)
-    member.sqlmodel_update(update_dict)
-    session.add(member)
-    session.commit()
-    session.refresh(member)
-    return member
+        session.exec(statement)
+        session.commit()
+        session.refresh(member)
+        return WrappedResponses.wrap(status=200, data=member)
+    except Exception as e:
+        logger.error(f"Error updating member: {e}", exc_info=True)
+        return WrappedResponses(status=500, message="Internal server error")
 
 
 @router.delete("/{id}")
@@ -265,7 +303,18 @@ def delete_member(
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        session.delete(member)
+        statement = (
+            update(Member)
+            .where(
+                Member.id == member_id,
+                Member.team_id == team_id,
+                Member.is_deleted.is_(False)
+            )
+            .values(
+                is_deleted=True,
+                deleted_at=func.now()
+            )
+        )
         session.commit()
         data = MessageResponse(message="Member deleted successfully")
         return WrappedResponses.wrap(status=200, data=data)
