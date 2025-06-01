@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
-from sqlalchemy import col, func, or_, select, update
+from sqlalchemy import func, or_, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -54,7 +54,7 @@ def read_skills(
             statement = (
                 select(Skill)
                 .where(Skill.is_deleted.is_(False))
-                .order_by(col(Skill.id).desc())
+                .order_by(Skill.id.desc())
                 .offset(skip)
                 .limit(limit)
             )
@@ -75,7 +75,7 @@ def read_skills(
                     or_(Skill.strategy == StorageStrategy.GLOBAL_TOOLS, Skill.user_id == x_user_id),
                     Skill.is_deleted.is_(False)
                 )
-                .order_by(col(Skill.id).desc())
+                .order_by(Skill.id.desc())
                 .offset(skip)
                 .limit(limit)
             )
@@ -194,7 +194,7 @@ def update_skill(
 @router.delete("/{id}", response_model=ResponseWrapper[MessageResponse])
 def delete_skill(
         session: SessionDep,
-        skill_id: int,
+        skill_id: str,
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),
 ) -> Any:
@@ -209,10 +209,22 @@ def delete_skill(
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
         if skill.Strategy == StorageStrategy.GLOBAL_TOOLS:
             return ResponseWrapper(status=400, message="Cannot delete global tools").to_response()
-        session.delete(skill)
+
+        statement = (
+            update(Skill)
+            .where(
+                Skill.id == skill_id,
+                Skill.is_deleted.is_(False)
+            )
+            .values(
+                is_deleted=True
+            )
+        )
+        session.exec(statement)
         session.commit()
-        message = MessageResponse(message="Skill deleted successfully")
-        return ResponseWrapper(status=200, data=message).to_response()
+
+        data = MessageResponse(message="Skill deleted successfully")
+        return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error deleting skill with ID {skill_id}: {str(e)}")
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
@@ -246,7 +258,7 @@ def invoke_tools(tool_name: str, args: dict) -> ToolInvokeResponse:
 def update_skill_credentials(
         *,
         session: SessionDep,
-        skill_id: int,
+        skill_id: str,
         credentials: dict[str, dict[str, Any]],
         x_user_id: str = Header(None),
         x_user_role: str = Header(None),

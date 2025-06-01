@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from sqlalchemy import col, func, select, update
+from sqlalchemy import func, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -103,7 +103,8 @@ def read_members(
             )
             members = session.exec(statement).all()
 
-        data = MembersResponse(members=members, count=count)
+        converted_members = [MemberResponse.model_validate(member) for member in members]
+        data = MembersResponse(members=converted_members, count=count)
         return ResponseWrapper.wrap(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error retrieving members: {e}", exc_info=True)
@@ -145,7 +146,8 @@ def read_member(
         if not member:
             return ResponseWrapper(status=404, message="Member not found").to_response()
 
-        return ResponseWrapper.wrap(status=200, data=member.data).to_response()
+        data = MemberResponse.model_validate(member)
+        return ResponseWrapper.wrap(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error retrieving member: {e}", exc_info=True)
         return ResponseWrapper(status=500, message="Internal server error").to_response()
@@ -165,7 +167,6 @@ def create_member(
     Create new member.
     """
     try:
-        user_id = x_user_id
         team = session.get(Team, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
@@ -173,17 +174,16 @@ def create_member(
         if x_user_role.lower() != "admin":
             if team.user_id != x_user_id:
                 return ResponseWrapper(status=403, message="Not enough permissions").to_response()
-        else:
-            user_id = team.user_id
 
         member_data = member_in.model_dump()
         member_data["team_id"] = team_id
-        member_data["user_id"] = user_id
         member = Member(**member_data)
         session.add(member)
         session.commit()
         session.refresh(member)
-        return member
+
+        data = MemberResponse.model_validate(member)
+        return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error creating new member: {e}", exc_info=True)
         return ResponseWrapper(status=500, message="Internal server error").to_response()
@@ -236,7 +236,7 @@ def update_member(
             skill_ids = [skill.id for skill in member_in.skills]
             skills = session.exec(
                 select(Skill)
-                .where(col(Skill.id).in_(skill_ids), Skill.is_deleted.is_(False))
+                .where(Skill.id.in_(skill_ids), Skill.is_deleted.is_(False))
             ).all()
             member.skills = list(skills)
 
@@ -246,7 +246,7 @@ def update_member(
             uploads = session.exec(
                 select(Upload)
                 .where(
-                    col(Upload.id).in_(upload_ids),
+                    Upload.id.in_(upload_ids),
                     Upload.is_deleted.is_(False)
                 )
             ).all()
@@ -265,7 +265,9 @@ def update_member(
         session.exec(statement)
         session.commit()
         session.refresh(member)
-        return ResponseWrapper.wrap(status=200, data=member).to_response()
+
+        data = MemberResponse.model_validate(member)
+        return ResponseWrapper.wrap(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error updating member: {e}", exc_info=True)
         return ResponseWrapper(status=500, message="Internal server error").to_response()
@@ -319,6 +321,7 @@ def delete_member(
         )
         session.exec(statement)
         session.commit()
+
         data = MessageResponse(message="Member deleted successfully")
         return ResponseWrapper.wrap(status=200, data=data).to_response()
 

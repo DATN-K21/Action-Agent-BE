@@ -52,7 +52,6 @@ class UpdateMemberRequest(MemberBase, BaseRequest):
 class MemberResponse(MemberBase, BaseResponse):
     id: int
     belongs_to: int
-    user_id: int | None
     skills: list["Skill"]
     uploads: list["Upload"]
 

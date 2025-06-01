@@ -16,7 +16,6 @@ class Member(BaseEntity):
     backstory: str | None = Column(String, nullable=True)
     role: str | None = Column(String, nullable=True)
     type: str | None = Column(String, nullable=True)  # one of: leader, worker, freelancer
-    user_id: str | None = Column(String, nullable=True)
     position_x: float | None = Column(Numeric, nullable=True)
     position_y: float | None = Column(Numeric, nullable=True)
     source: str | None = Column(String, nullable=True)

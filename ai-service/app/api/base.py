@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public.v1 import callback, connected_app, connected_mcp, test, \
+from app.api.public.v1 import callback, connected_mcp, test, \
     user, connected_extension, assistant
 
 
@@ -33,7 +33,6 @@ prefix = "/api/v1"
 router.include_router(callback.router, prefix=prefix)
 
 # router.include_router(thread.router, prefix=prefix)
-router.include_router(connected_app.router, prefix=prefix)
 
 # router.include_router(agent.router, prefix=prefix)
 # router.include_router(multi_agent_experimental.router, prefix=prefix)
