@@ -4,7 +4,7 @@ from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 from zhipuai import ZhipuAI
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 
 class ImageUnderstandingInput(BaseModel):
@@ -14,7 +14,7 @@ class ImageUnderstandingInput(BaseModel):
     image_url: str = Field(description="the path or the url of the image")
 
 
-def img_4v(image_url: str, qry: str):
+async def img_4v(image_url: str, qry: str):
     if image_url is None:
         return "Please provide an image path or url"
 
@@ -31,7 +31,7 @@ def img_4v(image_url: str, qry: str):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    api_key = get_credential_value("Image Understanding", "ZHIPUAI_API_KEY")
+    api_key = await aget_credential_value("Image Understanding", "ZHIPUAI_API_KEY")
 
     if not api_key:
         return "Error: ZhipuAI API Key is not set."

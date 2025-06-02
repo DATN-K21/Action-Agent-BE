@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
         await AsyncPostgresPool.asetup()
 
         # Setup PostgreSQL migrations
+        # TODO: Use Alembic for migrations instead of this
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             logger.info(f"SQLAlchemy tables: {Base.metadata.tables.keys()}")

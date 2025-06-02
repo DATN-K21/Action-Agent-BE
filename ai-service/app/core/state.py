@@ -1,4 +1,5 @@
 import re
+from enum import Enum
 from typing import Annotated, Any
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
@@ -28,7 +29,7 @@ class GraphSkill(BaseModel):
         if self.strategy == StorageStrategy.GLOBAL_TOOLS:
             return global_tools[self.name].tool
         if self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
-            return tool_manager.aget_personal_tool(self.user_id, self.name)
+            return tool_manager.get_personal_tool(self.user_id, self.name).tool
         elif self.strategy == StorageStrategy.DEFINITION and self.definition:
             return dynamic_api_tool(self.definition)
         else:
@@ -113,7 +114,7 @@ def format_messages(messages: list[AnyMessage]) -> str:
     """Format list of messages to string"""
     message_str: str = ""
     for message in messages:
-        # 确定消息名称
+        # Determine message name
         name = (
             message.name
             if message.name
@@ -124,16 +125,16 @@ def format_messages(messages: list[AnyMessage]) -> str:
             )
         )
 
-        # 处理消息内容为列表的情况（包含图片的消息）
+        # Handle cases where message content is a list (messages containing images)
         if isinstance(message.content, list):
-            # 提取所有文本内容
+            # Extract all text content
             text_contents = []
             for item in message.content:
                 if isinstance(item, dict):
                     if item.get("type") == "text":
                         text_contents.append(item.get("text", ""))
                     elif item.get("type") == "image_url":
-                        text_contents.append("[图片]")
+                        text_contents.append("[Image]")
             content = " ".join(text_contents)
         else:
             content = message.content
@@ -142,9 +143,7 @@ def format_messages(messages: list[AnyMessage]) -> str:
     return message_str
 
 
-def update_node_outputs(
-        node_outputs: dict[str, Any], new_outputs: dict[str, Any]
-) -> dict[str, Any]:
+def update_node_outputs(node_outputs: dict[str, Any], new_outputs: dict[str, Any]) -> dict[str, Any]:
     """Update node_outputs with new outputs. If new_outputs is empty, return the original node_outputs."""
     if not new_outputs:
         return node_outputs
@@ -154,20 +153,20 @@ def update_node_outputs(
 
 class WorkflowTeamState(TypedDict):
     all_messages: Annotated[list[AnyMessage], add_messages]
-    messages: Annotated[list[AnyMessage], add_or_replace_messages]
     history: Annotated[list[AnyMessage], add_messages]
+    messages: Annotated[list[AnyMessage], add_or_replace_messages]
     team: GraphTeam
     next: str
     main_task: list[AnyMessage]
     task: list[AnyMessage]
-    node_outputs: Annotated[dict[str, Any], update_node_outputs]  # 修改这一行
+    node_outputs: Annotated[dict[str, Any], update_node_outputs]  # Modify this line
 
 
 # When returning teamstate, is it possible to exclude fields that you don't want to update
 class ReturnWorkflowTeamState(TypedDict):
     all_messages: NotRequired[list[AnyMessage]]
-    messages: NotRequired[list[AnyMessage]]
     history: NotRequired[list[AnyMessage]]
+    messages: NotRequired[list[AnyMessage]]
     team: NotRequired[GraphTeam]
     next: NotRequired[str | None]  # Returning None is valid for sequential graphs only
     task: NotRequired[list[AnyMessage]]
@@ -182,17 +181,17 @@ def parse_variables(text: str, node_outputs: dict, is_code: bool = False) -> str
             if key in value:
                 value = value[key]
             else:
-                return match.group(0)  # 如果找不到变量，保持原样
+                return match.group(0)  # If variable not found, keep it as is
 
-        # 转换全角字符为半角字符
+        # Convert fullwidth characters to halfwidth characters
         def convert_fullwidth_to_halfwidth(s: str) -> str:
-            # 全角字符范围是 0xFF01 到 0xFF5E
-            # 半角字符范围是 0x0021 到 0x007E
+            # Fullwidth character range is 0xFF01 to 0xFF5E
+            # Halfwidth character range is 0x0021 to 0x007E
             result = []
             for char in str(s):
                 code = ord(char)
                 if 0xFF01 <= code <= 0xFF5E:
-                    # 转换全角字符到半角字符
+                    # Convert fullwidth characters to halfwidth characters
                     result.append(chr(code - 0xFEE0))
                 else:
                     result.append(char)
@@ -200,12 +199,82 @@ def parse_variables(text: str, node_outputs: dict, is_code: bool = False) -> str
 
         str_value = str(value)
         if is_code:
-            # 对于代码中的字符串，需要转换全角字符并正确转义
+            # For strings in code, convert fullwidth characters and properly escape
             converted_value = convert_fullwidth_to_halfwidth(str_value)
-            # 转义引号和反斜杠
+            # Escape quotes and backslashes
             escaped_value = converted_value.replace('"', '\\"').replace("\\", "\\\\")
             return f'"{escaped_value}"'
         else:
             return str_value
 
     return re.sub(r"\{([^}]+)\}", replace_variable, text)
+
+
+class ToolInvokeMessage(BaseModel):
+    class MessageType(Enum):
+        TEXT = "text"
+        IMAGE = "image"
+        LINK = "link"
+        BLOB = "blob"
+        JSON = "json"
+        IMAGE_LINK = "image_link"
+
+    type: MessageType = MessageType.TEXT
+    """
+        plain text, image url or link url
+    """
+    message: str | bytes | dict | None = None
+    meta: dict[str, Any] | None = None
+    save_as: str = ""
+
+
+def create_image_message(image: str, save_as: str = "") -> ToolInvokeMessage:
+    """
+    create an image message
+
+    :param image: the url of the image
+    :return: the image message
+    """
+    return ToolInvokeMessage(type=ToolInvokeMessage.MessageType.IMAGE, message=image, save_as=save_as)
+
+
+def create_link_message(link: str, save_as: str = "") -> ToolInvokeMessage:
+    """
+    create a link message
+
+    :param link: the url of the link
+    :return: the link message
+    """
+    return ToolInvokeMessage(type=ToolInvokeMessage.MessageType.LINK, message=link, save_as=save_as)
+
+
+def create_text_message(text: str, save_as: str = "") -> ToolInvokeMessage:
+    """
+    create a text message
+
+    :param text: the text
+    :return: the text message
+    """
+    return ToolInvokeMessage(type=ToolInvokeMessage.MessageType.TEXT, message=text, save_as=save_as)
+
+
+def create_blob_message(blob: bytes, meta: dict | None = None, save_as: str = "") -> ToolInvokeMessage:
+    """
+    create a blob message
+
+    :param blob: the blob
+    :return: the blob message
+    """
+    return ToolInvokeMessage(
+        type=ToolInvokeMessage.MessageType.BLOB,
+        message=blob,
+        meta=meta,
+        save_as=save_as,
+    )
+
+
+def create_json_message(object: dict) -> ToolInvokeMessage:
+    """
+    create a json message
+    """
+    return ToolInvokeMessage(type=ToolInvokeMessage.MessageType.JSON, message=object)

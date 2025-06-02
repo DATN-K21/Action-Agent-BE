@@ -6,21 +6,20 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
 from app.core.settings import env_settings
 from app.core.workflow.utils.db_utils import db_operation
-from app.db_models import ModelProvider, Model
+from app.db_models import Model, ModelProvider
 
 logger = logging.getLogger(__name__)
 
 
 def get_api_key(provider_name: str) -> str:
-    def _get_api_key(session):
-        provider = session.exec(
-            select(ModelProvider).where(ModelProvider.provider_name == provider_name)
-        ).first()
+    def _get_api_key(session: Session):
+        provider = session.execute(select(ModelProvider).where(ModelProvider.provider_name == provider_name)).first()
         if not provider:
             raise ValueError(f"Provider {provider_name} not found")
         return provider.decrypted_api_key
@@ -29,19 +28,15 @@ def get_api_key(provider_name: str) -> str:
 
 
 def get_embedding_dimension(provider_name: str, model_name: str) -> int:
-    def _get_dimension(session):
-        provider = session.exec(
-            select(ModelProvider).where(ModelProvider.provider_name == provider_name)
-        ).first()
+    def _get_dimension(session: Session):
+        provider = session.execute(select(ModelProvider).where(ModelProvider.provider_name == provider_name)).first()
         if not provider:
             raise ValueError(f"Provider {provider_name} not found")
 
-        model = session.exec(
-            select(Model).where(Model.ai_model_name == model_name)
-        ).first()
+        model = session.execute(select(Model).where(Model.ai_model_name == model_name)).first()
 
         if not model:
-            # 如果数据库中没有,从配置中获取
+            # If not found in the database, get from configuration
             provider_models = model_provider_manager.get_supported_models(provider_name)
             model_info = next(
                 (m for m in provider_models if m["name"] == model_name), None
@@ -52,7 +47,7 @@ def get_embedding_dimension(provider_name: str, model_name: str) -> int:
                 )
             dimension = model_info["dimension"]
         else:
-            dimension = model.meta_.get("dimension")
+            dimension = model.metadata_.get("dimension")
             if dimension is None:
                 raise ValueError(
                     f"No dimension information found in database for model {model_name}"

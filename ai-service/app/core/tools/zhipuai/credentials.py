@@ -1,14 +1,13 @@
-from typing import Any
+# from typing import Any
 
-ZHIPUAI_CREDENTIALS = {
-    "ZHIPUAI_API_KEY": {
-        "type": "string",
-        "description": "API key for zhipuai",
-        "value": "",
-    }
-}
+# ZHIPUAI_CREDENTIALS = {
+#     "ZHIPUAI_API_KEY": {
+#         "type": "string",
+#         "description": "API key for zhipuai",
+#         "value": "",
+#     }
+# }
 
 
-def get_credentials() -> dict[str, Any]:
-
-    return ZHIPUAI_CREDENTIALS
+# def get_credentials() -> dict[str, Any]:
+#     return ZHIPUAI_CREDENTIALS

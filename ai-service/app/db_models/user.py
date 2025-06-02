@@ -12,16 +12,16 @@ class User(BaseEntity):
     """
     __tablename__ = "users"
 
-    username: str = Column(String, unique=True, nullable=False, index=True)
-    email: str = Column(String, unique=True, nullable=False, index=True)
-    first_name: str | None = Column(String, nullable=True)
-    last_name: str | None = Column(String, nullable=True)
-    language: str = Column(String, default="en-US")
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    language = Column(String, default="en-US")
 
-    default_api_key_id: str | None = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
-    remain_trial_tokens: str = Column(Integer, nullable=False, default=0)
+    default_api_key_id = Column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
+    remain_trial_tokens = Column(Integer, nullable=False, default=0)
 
-    teams = relationship("Team", back_populates="user")
+    assistants = relationship("Assistant", back_populates="user")
     skills = relationship("Skill", back_populates="user")
     uploads = relationship("Upload", back_populates="user")
     graphs = relationship("Graph", back_populates="user")

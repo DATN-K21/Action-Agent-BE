@@ -9,18 +9,16 @@ class MathInput(BaseModel):
     expression: str = Field(description="Math Expression")
 
 
-def math_cal(expression: str) -> str:
+def math_calc(expression: str) -> str:
     try:
         result = ne.evaluate(expression)
-        result_str = str(result)
-        return f"{result_str}"
+        return str(result)
     except Exception:
-
         return f"Error evaluating expression: {expression}"
 
 
 math = StructuredTool.from_function(
-    func=math_cal,
+    func=math_calc,
     name="Math Calculator",
     description=" A tool for evaluating an math expression, calculated locally with NumExpr.",
     args_schema=MathInput,

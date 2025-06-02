@@ -3,7 +3,7 @@ import os
 import re
 import threading
 from collections import OrderedDict
-from typing import Any, Dict, OrderedDict as OrderedDictType
+from typing import Any, Dict
 
 from langchain.tools import BaseTool
 from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
@@ -50,17 +50,16 @@ def _standardize_name_part(text_part: str) -> str:
     return processed_text
 
 
-def create_unique_personal_tool_name(skill_id: str, skill_name: str) -> str:
+def create_unique_personal_skill_name(skill_id: str, skill_name: str) -> str:
     """
-    Creates a unique and standardized personal tool name.
+    Creates a unique and standardized personal skill name.
     It joins a standardized skill_id and a standardized, lowercase skill_name.
     """
-    if not skill_id:  # skill_id is mandatory
+    if not skill_id:
         raise ValueError("skill_id cannot be empty.")
 
     standardized_id = _standardize_name_part(skill_id)
-    standardized_name = _standardize_name_part(
-        skill_name)  # skill_name part is already lowercased by _standardize_name_part
+    standardized_name = _standardize_name_part(skill_name)  # skill_name part is already lowercased by _standardize_name_part
 
     if not standardized_id and not standardized_name:
         # This could happen if both inputs consist only of characters that are removed
@@ -78,16 +77,16 @@ def create_unique_personal_tool_name(skill_id: str, skill_name: str) -> str:
 class ToolManager:
     def __init__(self, tools_package_path: str = DEFAULT_TOOLS_PACKAGE_PATH):
         self.global_tools: Dict[str, ToolInfo] = {}
-        self.personal_tool_cache: OrderedDictType[str, OrderedDictType[str, ToolInfo]] = OrderedDict()
+        self.personal_tool_cache: OrderedDict[str, OrderedDict[str, ToolInfo]] = OrderedDict()
         self.tools_package_path = tools_package_path
 
         # Initialize the lock
         self.cache_lock = threading.Lock()  # For asyncio, this would be asyncio.Lock()
 
         if MAX_CACHED_USERS <= 0:
-            print("Warning: MAX_CACHED_USERS non-positive. Personal user caching disabled.")
+            logger.warning("Warning: MAX_CACHED_USERS non-positive. Personal user caching disabled.")
         if MAX_PERSONAL_TOOLS_PER_USER <= 0:
-            print("Warning: MAX_PERSONAL_TOOLS_PER_USER non-positive. Per-user tool caching disabled.")
+            logger.warning("Warning: MAX_PERSONAL_TOOLS_PER_USER non-positive. Per-user tool caching disabled.")
 
         self._load_initial_global_tools()  # Assumed to be called before concurrent access begins
 
@@ -118,11 +117,11 @@ class ToolManager:
         try:
             package_module = importlib.import_module(self.tools_package_path)
             if not hasattr(package_module, '__path__'):
-                print(f"Warning: '{self.tools_package_path}' not a package. Skipping local tool loading.")
+                logger.warning(f"Warning: '{self.tools_package_path}' not a package. Skipping local tool loading.")
                 return
             tools_root_dir = package_module.__path__[0]
         except ImportError:
-            print(f"Warning: Tools package '{self.tools_package_path}' not found. Skipping local tools.")
+            logger.error(f"Warning: Tools package '{self.tools_package_path}' not found. Skipping local tools.")
             return
 
         for item in os.listdir(tools_root_dir):
@@ -159,29 +158,31 @@ class ToolManager:
                                     credentials=credentials,
                                 )
                 except Exception as e:
-                    print(f"Failed to load tools from '{item}': {str(e)}")  # Simplified
+                    logger.error(f"Failed to load tools from '{item}': {str(e)}")  # Simplified
 
     def _load_hardcoded_external_tools_to_global(self):
         # (Implementation as before)
         external_tools = {
             "duckduckgo-search": ToolInfo(
                 description="Searches web via DuckDuckGo.",
-                tool=DuckDuckGoSearchRun(), display_name="DuckDuckGo Search",
+                tool=DuckDuckGoSearchRun(),
+                display_name="DuckDuckGo Search",
                 input_parameters={"query": {"type": "string", "required": True, "description": "Search query."}},
             ),
             "wikipedia": ToolInfo(
                 description="Searches Wikipedia.",
-                tool=WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper()), display_name="Wikipedia Search",
+                tool=WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper(wiki_client=None)),
+                display_name="Wikipedia Search",
                 input_parameters={"query": {"type": "string", "required": True, "description": "Search query."}},
             ),
         }
         self.global_tools.update(external_tools)
 
     def _load_initial_global_tools(self):
-        print("Loading global tools...")
+        logger.info("Loading global tools...")
         self._load_local_tools_to_global()
         self._load_hardcoded_external_tools_to_global()
-        print(f"Loaded {len(self.global_tools)} global tools.")
+        logger.info(f"Loaded {len(self.global_tools)} global tools.")
 
     def add_personal_tool(self, user_id: str, tool_name: str, tool_info: ToolInfo):
         # For asyncio: async def add_personal_tool(self, ...):
@@ -190,14 +191,14 @@ class ToolManager:
             if MAX_CACHED_USERS <= 0:
                 return
 
-            user_specific_cache: OrderedDictType[str, ToolInfo]
+            user_specific_cache: OrderedDict[str, ToolInfo]
             if user_id in self.personal_tool_cache:
                 user_specific_cache = self.personal_tool_cache[user_id]
                 self.personal_tool_cache.move_to_end(user_id)
             else:
                 if len(self.personal_tool_cache) >= MAX_CACHED_USERS:
                     lru_user_id, _ = self.personal_tool_cache.popitem(last=False)
-                    print(f"User cache limit ({MAX_CACHED_USERS}) hit. Evicted: '{lru_user_id}'.")
+                    logger.warning(f"User cache limit ({MAX_CACHED_USERS}) hit. Evicted: '{lru_user_id}'.")
                 user_specific_cache = OrderedDict()
                 self.personal_tool_cache[user_id] = user_specific_cache
 
@@ -210,26 +211,21 @@ class ToolManager:
 
             while len(user_specific_cache) > MAX_PERSONAL_TOOLS_PER_USER:
                 dropped_tool_name, _ = user_specific_cache.popitem(last=False)
-                print(
-                    f"Tool limit ({MAX_PERSONAL_TOOLS_PER_USER}) for '{user_id}' hit. Evicted: '{dropped_tool_name}'.")
+                logger.warning(f"Tool limit ({MAX_PERSONAL_TOOLS_PER_USER}) for '{user_id}' hit. Evicted: '{dropped_tool_name}'.")
         # Lock is released automatically when exiting 'with' block
 
-    def get_personal_tool(self, user_id: str, tool_name: str) -> ToolInfo | None:
+    def get_personal_tool(self, user_id: str, tool_name: str) -> ToolInfo:
         # For asyncio: async def get_personal_tool(self, ...):
         # For asyncio:     async with self.cache_lock:
         with self.cache_lock:  # Acquire lock
-            if MAX_CACHED_USERS <= 0: return None
-
             if user_id in self.personal_tool_cache:
                 self.personal_tool_cache.move_to_end(user_id)
                 user_specific_cache = self.personal_tool_cache[user_id]
 
-                if MAX_PERSONAL_TOOLS_PER_USER <= 0: return None
-
                 if tool_name in user_specific_cache:
                     user_specific_cache.move_to_end(tool_name)
                     return user_specific_cache[tool_name]
-            return None
+            raise KeyError(f"Personal tool '{tool_name}' for user '{user_id}' not found in cache.")
         # Lock is released
 
     def get_tools_for_user(self, user_id: str) -> Dict[str, ToolInfo]:
@@ -257,17 +253,17 @@ class ToolManager:
         # Reading global_tools is safe as it's populated at init and then read-only.
         return self.global_tools.copy()
 
-    def clear_personal_tool_cache(self, user_id: str = None):
+    def clear_personal_tool_cache(self, user_id: str | None = None):
         # For asyncio: async def clear_personal_tool_cache(self, ...):
         # For asyncio:     async with self.cache_lock:
         with self.cache_lock:  # Acquire lock
             if user_id:
                 if user_id in self.personal_tool_cache:
                     del self.personal_tool_cache[user_id]
-                    print(f"Cleared personal tool cache for user '{user_id}'.")
+                    logger.info(f"Cleared personal tool cache for user '{user_id}'.")
             else:
                 self.personal_tool_cache.clear()
-                print("Cleared all personal tool caches.")
+                logger.info("Cleared all personal tool caches.")
         # Lock is released
 
 

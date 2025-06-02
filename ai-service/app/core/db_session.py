@@ -1,29 +1,47 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Generator
 
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core import logging
 from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
 
-# Create async engine (Lazy connection pooling)
-DATABASE_URL = f"postgresql+asyncpg://{env_settings.POSTGRES_URL_PATH}"
-engine = create_async_engine(DATABASE_URL, echo=env_settings.DEBUG_SQLALCHEMY)
+ASYNC_URL = f"postgresql+asyncpg://{env_settings.POSTGRES_URL_PATH}"
+SYNC_URL = f"postgresql+psycopg2://{env_settings.POSTGRES_URL_PATH}"
 
-# Create session factory
-AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=True)
+async_engine = create_async_engine(ASYNC_URL, pool_pre_ping=True, echo=env_settings.DEBUG_SQLALCHEMY)
+sync_engine = create_async_engine(SYNC_URL, pool_pre_ping=True, echo=env_settings.DEBUG_SQLALCHEMY).sync_engine
+
+AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=True, autoflush=False)
+SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False, autoflush=False, autocommit=False)
+
+# --- FastAPI dependencies ---------------------------------------------------
 
 
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as db:
         try:
-            async with engine.begin() as conn:
-                await conn.run_sync(lambda connection: None)  # Test connection
-            yield session
-        except (IntegrityError, OperationalError, SQLAlchemyError) as e:
-            await session.rollback()
-            raise e
-        finally:
-            await session.close()
+            await db.execute(text("SELECT 1"))
+            yield db
+        except SQLAlchemyError:
+            logger.exception("Async DB error")
+            await db.rollback()
+            raise
+
+
+def get_sync_session() -> Generator[Session, None, None]:
+    db: Session = SyncSessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        yield db
+        db.commit()
+    except SQLAlchemyError:
+        logger.exception("Sync DB error")
+        db.rollback()
+        raise
+    finally:
+        db.close()

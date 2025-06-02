@@ -28,10 +28,9 @@ def load_and_split_document(
     if file_path.startswith("http://") or file_path.startswith("https://"):
         loader = WebBaseLoader(web_path=file_path)
     else:
-        # 根据文件类型选择合适的加载器
+        # Select the appropriate loader based on the file type
         if file_path.endswith(".pdf"):
             loader = PyMuPDFLoader(file_path)
-
         elif file_path.endswith(".docx"):
             loader = UnstructuredWordDocumentLoader(file_path)
         elif file_path.endswith(".pptx"):
@@ -50,11 +49,11 @@ def load_and_split_document(
     documents = loader.load()
     logger.debug(f"Loaded {len(documents)} documents")
 
-    # 更新文档元数据
+    # Update document metadata
     for doc in documents:
         doc.metadata.update({"user_id": user_id, "upload_id": upload_id})
 
-    # 文本分割
+    # Text splitting
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,

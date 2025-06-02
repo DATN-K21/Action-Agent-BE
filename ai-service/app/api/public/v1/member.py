@@ -1,15 +1,14 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
 from app.core.settings import env_settings
-from app.db_models import Member, Team, Skill, Upload
-from app.schemas.base import MessageResponse
-from app.schemas.base import ResponseWrapper
-from app.schemas.member import CreateMemberRequest, UpdateMemberRequest, MembersResponse, MemberResponse
+from app.db_models import Assistant, Member, Skill, Upload
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.member import CreateMemberRequest, MemberResponse, MembersResponse, UpdateMemberRequest
 
 router = APIRouter()
 
@@ -82,22 +81,14 @@ def read_members(
             count_statement = (
                 select(func.count())
                 .select_from(Member)
-                .join(Team)
-                .where(
-                    Team.user_id == x_user_id,
-                    Member.team_id == team_id,
-                    Member.is_deleted.is_(False)
-                )
+                .join(Assistant)
+                .where(Assistant.user_id == x_user_id, Member.team_id == team_id, Member.is_deleted.is_(False))
             )
             count = session.exec(count_statement).one()
             statement = (
                 select(Member)
-                .join(Team)
-                .where(
-                    Team.user_id == x_user_id,
-                    Member.team_id == team_id,
-                    Member.is_deleted.is_(False)
-                )
+                .join(Assistant)
+                .where(Assistant.user_id == x_user_id, Member.team_id == team_id, Member.is_deleted.is_(False))
                 .offset(skip)
                 .limit(limit)
             )
@@ -124,22 +115,13 @@ def read_member(
     """
     try:
         if x_user_role.lower() == "admin":
-            statement = (
-                select(Member)
-                .join(Team)
-                .where(Member.id == member_id, Member.team_id == team_id)
-            )
+            statement = select(Member).join(Assistant).where(Member.id == member_id, Member.team_id == team_id)
             member = session.exec(statement).first()
         else:
             statement = (
                 select(Member)
-                .join(Team)
-                .where(
-                    Member.id == member_id,
-                    Member.team_id == team_id,
-                    Team.user_id == x_user_id,
-                    Member.is_deleted.is_(False)
-                )
+                .join(Assistant)
+                .where(Member.id == member_id, Member.team_id == team_id, Assistant.user_id == x_user_id, Member.is_deleted.is_(False))
             )
             member = session.exec(statement).first()
 
@@ -167,7 +149,7 @@ def create_member(
     Create new member.
     """
     try:
-        team = session.get(Team, team_id)
+        team = session.get(Assistant, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
 
@@ -205,26 +187,13 @@ def update_member(
     """
     try:
         if x_user_role.lower() == "admin":
-            statement = (
-                select(Member)
-                .join(Team)
-                .where(
-                    Member.id == member_id,
-                    Member.team_id == team_id,
-                    Member.is_deleted.is_(False)
-                )
-            )
+            statement = select(Member).join(Assistant).where(Member.id == member_id, Member.team_id == team_id, Member.is_deleted.is_(False))
             member = session.exec(statement).first()
         else:
             statement = (
                 select(Member)
-                .join(Team)
-                .where(
-                    Member.id == member_id,
-                    Member.team_id == team_id,
-                    Team.user_id == x_user_id,
-                    Member.is_deleted.is_(False)
-                )
+                .join(Assistant)
+                .where(Member.id == member_id, Member.team_id == team_id, Assistant.user_id == x_user_id, Member.is_deleted.is_(False))
             )
             member = session.exec(statement).first()
 
@@ -286,20 +255,16 @@ def delete_member(
     """
     try:
         if x_user_role.lower() == "admin":
-            statement = (
-                select(Member)
-                .join(Team)
-                .where(Member.id == member_id, Member.team_id == team_id)
-            )
+            statement = select(Member).join(Assistant).where(Member.id == member_id, Member.team_id == team_id)
             member = session.exec(statement).first()
         else:
             statement = (
                 select(Member)
-                .join(Team)
+                .join(Assistant)
                 .where(
                     Member.id == member_id,
                     Member.team_id == team_id,
-                    Team.user_id == x_user_id,
+                    Assistant.user_id == x_user_id,
                 )
             )
             member = session.exec(statement).first()

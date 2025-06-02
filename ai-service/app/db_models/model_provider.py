@@ -9,19 +9,19 @@ class ModelProvider(BaseEntity):
     __tablename__ = "model_providers"
 
     # Provider name with a max length of 64 characters, cannot be null
-    provider_name: str = Column(String(64), nullable=False)
+    provider_name = Column(String(64), nullable=False)
 
     # Optional base URL string column
-    base_url: str | None = Column(String, nullable=True)
+    base_url = Column(String, nullable=True)
 
     # Optional API key stored as a string (encrypted)
-    api_key: str | None = Column(String, nullable=True)
+    api_key = Column(String, nullable=True)
 
     # Optional icon URL or identifier
-    icon: str | None = Column(String, nullable=True)
+    icon = Column(String, nullable=True)
 
     # Optional description with max length of 256 characters
-    description: str | None = Column(String(256), nullable=True)
+    description = Column(String(256), nullable=True)
 
     # Relationship to Models table, cascade deletes models when provider is deleted
     models = relationship(
@@ -33,15 +33,15 @@ class ModelProvider(BaseEntity):
     @property
     def encrypted_api_key(self) -> str | None:
         """Return the encrypted API key for API responses."""
-        if self.api_key:
-            return self.api_key  # Already encrypted
+        if str(self.api_key):
+            return str(self.api_key)  # Already encrypted
         return None
 
     @property
     def decrypted_api_key(self) -> str | None:
         """Return the decrypted API key for internal business logic."""
-        if self.api_key:
-            return security_manager.decrypt_api_key(self.api_key)
+        if str(self.api_key):
+            return security_manager.decrypt_api_key(str(self.api_key))
         return None
 
     def set_api_key(self, value: str | None) -> None:

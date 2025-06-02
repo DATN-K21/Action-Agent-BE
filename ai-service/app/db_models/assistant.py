@@ -7,21 +7,16 @@ from app.db_models.base_entity import BaseEntity
 class Assistant(BaseEntity):
     __tablename__ = "assistants"
 
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String, nullable=False)
+    name = Column(String(64), unique=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+
     description = Column(String, nullable=True)
-    type = Column(String, nullable=False)
+    icon = Column(String, nullable=True)  # Add an icon field for the team
 
-    extension_assistants = relationship(
-        "ExtensionAssistant",
-        back_populates="assistant",
-        cascade="all, delete-orphan",
-        passive_deletes=True
-    )
-
-    mcp_assistants = relationship(
-        "McpAssistant",
-        back_populates="assistant",
-        cascade="all, delete-orphan",
-        passive_deletes=True
-    )
+    # Relationships
+    user = relationship("User", back_populates="teams")
+    members = relationship("Member", back_populates="belongs", cascade="all, delete-orphan")
+    threads = relationship("Thread", back_populates="team", cascade="all, delete-orphan")
+    graphs = relationship("Graph", back_populates="team", cascade="all, delete-orphan")
+    subgraphs = relationship("Subgraph", back_populates="team", cascade="all, delete-orphan")
+    apikeys = relationship("ApiKey", back_populates="team", cascade="all, delete-orphan")

@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.core.settings import env_settings
 from app.db_models.base_entity import Base
 
+# Import all models so they're registered with SQLAlchemy's metadata
+
 # Alembic config
 config = context.config
 

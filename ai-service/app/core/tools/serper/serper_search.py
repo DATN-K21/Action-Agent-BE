@@ -4,7 +4,7 @@ import requests
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 
 class SerperDevToolSchema(BaseModel):
@@ -13,11 +13,11 @@ class SerperDevToolSchema(BaseModel):
     search_query: str = Field(..., description="Search query to search the internet")
 
 
-def serper_search(search_query: str) -> str:
+async def serper_search(search_query: str) -> str:
     """
     Search the internet using Serper API
     """
-    api_key = get_credential_value("Serper Search", "SERPER_API_KEY")
+    api_key = await aget_credential_value("Serper Search", "SERPER_API_KEY")
 
     if not api_key:
         return "Error: Serper API Key is not set."

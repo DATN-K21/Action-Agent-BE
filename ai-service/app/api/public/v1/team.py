@@ -1,15 +1,15 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
 from app.api.deps import SessionDep
 from app.core import logging
 from app.core.graph.build import generator
-from app.db_models import Team, Member, Thread
-from app.schemas.base import ResponseWrapper, MessageResponse
-from app.schemas.team import CreateTeamRequest, UpdateTeamRequest, TeamsResponse, TeamResponse, ChatTeamRequest
+from app.db_models import Assistant, Member, Thread
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.team import ChatTeamRequest, CreateTeamRequest, TeamResponse, TeamsResponse, UpdateTeamRequest
 
 router = APIRouter()
 
@@ -18,10 +18,7 @@ logger = logging.get_logger(__name__)
 
 async def validate_name_on_create(session: SessionDep, team_in: CreateTeamRequest) -> None:
     """Validate that team name is unique"""
-    statement = select(Team).where(
-        Team.name == team_in.name,
-        Team.is_deleted.is_(False)
-    )
+    statement = select(Assistant).where(Assistant.name == team_in.name, Assistant.is_deleted.is_(False))
     team = session.exec(statement).first()
     if team:
         raise HTTPException(status_code=400, detail="Team name already exists")
@@ -31,11 +28,7 @@ async def validate_name_on_update(
         session: SessionDep, team_in: UpdateTeamRequest, id_team: int
 ) -> None:
     """Validate that team name is unique"""
-    statement = select(Team).where(
-        Team.name == team_in.name,
-        Team.id != id_team,
-        Team.is_deleted.is_(False)
-    )
+    statement = select(Assistant).where(Assistant.name == team_in.name, Assistant.id != id_team, Assistant.is_deleted.is_(False))
     team = session.exec(statement).first()
     if team:
         raise HTTPException(status_code=400, detail="Team name already exists")
@@ -55,30 +48,19 @@ def read_teams(
 
     try:
         if x_user_role == "admin":
-            count_statement = select(func.count()).select_from(Team).where(Team.is_deleted.is_(False))
+            count_statement = select(func.count()).select_from(Assistant).where(Assistant.is_deleted.is_(False))
             count = session.exec(count_statement).one()
-            statement = select(Team).where(Team.is_deleted.is_(False)).offset(skip).limit(limit).order_by(
-                Team.id.desc())
+            statement = select(Assistant).where(Assistant.is_deleted.is_(False)).offset(skip).limit(limit).order_by(Assistant.id.desc())
             teams = session.exec(statement).all()
         else:
-            count_statement = (
-                select(func.count())
-                .select_from(Team)
-                .where(
-                    Team.user_id == x_user_id,
-                    Team.is_deleted.is_(False)
-                )
-            )
+            count_statement = select(func.count()).select_from(Assistant).where(Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
             count = session.exec(count_statement).one()
             statement = (
-                select(Team)
-                .where(
-                    Team.user_id == x_user_id,
-                    Team.is_deleted.is_(False)
-                )
+                select(Assistant)
+                .where(Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
                 .offset(skip)
                 .limit(limit)
-                .order_by(Team.id.desc())
+                .order_by(Assistant.id.desc())
             )
             teams = session.exec(statement).all()
 
@@ -103,7 +85,7 @@ def read_team(
     Get team by ID.
     """
     try:
-        team = session.get(Team, team_id)
+        team = session.get(Assistant, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
         if not x_user_role and (team.user_id != x_user_id):
@@ -144,7 +126,7 @@ def create_team(
                 message="Invalid workflow type. Supported types: hierarchical, sequential, chatbot, ragbot, workflow."
             ).to_response()
 
-        team = Team(**team_dict)
+        team = Assistant(**team_dict)
         session.add(team)
         session.commit()
 
@@ -228,7 +210,7 @@ def update_team(
     Update a team.
     """
     try:
-        team = session.get(Team, team_id)
+        team = session.get(Assistant, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
         if x_user_role != "admin" and (team.owner_id != x_user_id):
@@ -260,7 +242,7 @@ def delete_team(
     Delete a team.
     """
     try:
-        team = session.get(Team, team_id)
+        team = session.get(Assistant, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
         if x_user_role != "admin" and (team.user_id != x_user_id):
@@ -291,7 +273,7 @@ async def stream(
     """
     try:
         # Get team and join members and skills
-        team = session.get(Team, team_id)
+        team = session.get(Assistant, team_id)
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
         if x_user_role != "admin" and (team.user_id != x_user_id):

@@ -5,7 +5,7 @@ import requests
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 
 class WebSearchInput(BaseModel):
@@ -14,11 +14,11 @@ class WebSearchInput(BaseModel):
     query: str = Field(description="search query")
 
 
-def web_search_query(query: str) -> str:
+async def web_search_query(query: str) -> str:
     """
     Invoke Web Search API
     """
-    api_key = get_credential_value("Web Search Pro", "ZHIPUAI_API_KEY")
+    api_key = await aget_credential_value("Web Search Pro", "ZHIPUAI_API_KEY")
 
     if not api_key:
         return "Error: Web Search API Key is not set."

@@ -1,16 +1,29 @@
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from sqlmodel import Session
+from sqlalchemy.orm import Session
+
+from app.core.db_session import get_db_session_sync
 
 T = TypeVar("T")
 
 
 def db_operation(operation: Callable[[Session], T]) -> T:
-    # with get_db_session() as session:
-    #     return operation(session)
+    """
+    Execute a database operation synchronously.
 
-    raise NotImplementedError
+    Args:
+        operation: A callable that takes a Session and returns a result.
+
+    Returns:
+        The result of the operation.
+    """
+    with get_db_session_sync() as session:
+        try:
+            return operation(session)
+        except Exception as e:
+            session.rollback()
+            raise e
 
 
 # Example Usage

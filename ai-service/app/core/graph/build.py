@@ -31,7 +31,7 @@ from app.core.models import ChatMessage, Interrupt
 from app.core.settings import env_settings
 from app.core.state import GraphSkill, GraphUpload
 from app.core.workflow.build_workflow import initialize_graph
-from app.db_models import Member, Team
+from app.db_models import Assistant, Member
 from app.memory.checkpoint import get_checkpointer
 
 
@@ -620,11 +620,11 @@ def convert_messages_and_tasks_to_dict(data: Any) -> Any:
 
 
 async def generator(
-        team: Team,
-        members: list[Member],
-        messages: list[ChatMessage],
-        thread_id: str,
-        interrupt: Interrupt | None = None,
+    team: Assistant,
+    members: list[Member],
+    messages: list[ChatMessage],
+    thread_id: str,
+    interrupt: Interrupt | None = None,
 ) -> AsyncGenerator[Any, Any]:
     """Create the graph and stream responses as JSON."""
 

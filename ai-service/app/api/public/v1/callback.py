@@ -12,9 +12,9 @@ router = APIRouter(prefix="/callback", tags=["Callback"], include_in_schema=Fals
 
 @router.get("/extension/{user_id}", summary="Handle connection success.")
 async def connection_success(
-        user_id: str,
-        request: Request,
-        connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
+    user_id: str,
+    request: Request,
+    connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
 ):
     url = env_settings.FRONTEND_REDIRECT_URL
 

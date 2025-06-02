@@ -1,7 +1,5 @@
-from datetime import datetime
-from typing import Any
 
-from sqlalchemy import Column, ForeignKey, DateTime, func, String
+from sqlalchemy import Column, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -11,13 +9,13 @@ from app.db_models.base_entity import BaseEntity  # Adjust if needed
 class Graph(BaseEntity):
     __tablename__ = "graphs"
 
-    user_id: str = Column(String, ForeignKey("users.id"), nullable=False)
-    team_id: str = Column(String, ForeignKey("teams.id"), nullable=False)
-    name = Column(String(64), nullable=False, unique=True)
-    description: str | None = Column(String, nullable=True)
-    config: dict[Any, Any] = Column(JSONB, nullable=False, server_default="{}")
-    metadata_: dict[Any, Any] = Column(JSONB, nullable=False, server_default="{}")
-    created_at: datetime = Column(
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(String, nullable=True)
+    config = Column(JSONB, nullable=False, server_default="{}")
+    metadata_ = Column(JSONB, nullable=False, server_default="{}")
+    created_at = Column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
@@ -25,7 +23,7 @@ class Graph(BaseEntity):
     )
 
     # Timestamp for last update time, automatically updated on change
-    updated_at: datetime = Column(
+    updated_at = Column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
@@ -35,4 +33,4 @@ class Graph(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="graphs")
-    team = relationship("Team", back_populates="graphs")
+    assistant = relationship("Assistant", back_populates="graphs")

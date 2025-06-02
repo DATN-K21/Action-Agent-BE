@@ -1,4 +1,3 @@
-# 导入自定义响应模型
 import uuid
 
 from langchain_core.messages import AIMessage
@@ -16,7 +15,7 @@ class ToolMessages(BaseModel):
 
 class ToolInvokeResponse(BaseModel):
     messages: list[ToolMessages]
-    error: str | None = None  # 可选的错误信息
+    error: str | None = None  # Optional error message
 
 
 def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
@@ -39,8 +38,8 @@ def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
     )
 
     try:
-
-        tool_node = ToolNode(tools=[get_tool(tool_name)])  # 确保 get_tool 函数可用
+        # Create a ToolNode with the specified tool
+        tool_node = ToolNode(tools=[get_tool(tool_name)])
         result = tool_node.invoke({"messages": [message_with_tool_call]})
 
         messages = [
@@ -51,7 +50,7 @@ def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
             )
             for msg in result["messages"]
         ]
-        return ToolInvokeResponse(messages=messages)  # 返回自定义响应模型
+        return ToolInvokeResponse(messages=messages)  # Return custom response model
     except Exception as e:
-        # 返回易于识别的错误信息
+        # Return easy-to-identify error information
         return ToolInvokeResponse(messages=[], error=str(e))

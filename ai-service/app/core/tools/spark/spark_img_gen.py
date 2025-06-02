@@ -11,8 +11,7 @@ import requests
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from app.core.tools.utils import get_credential_value
-from app.core.workflow.utils.db_utils import db_operation
+from app.core.tools.utils import aget_credential_value
 
 
 class Text2ImageInput(BaseModel):
@@ -103,17 +102,11 @@ def spark_response(text, appid, apisecret, apikey):
         return json.dumps(f"There is a error occured . {e}")
 
 
-def img_generation(prompt: str):
+async def img_generation(prompt: str):
     creds = {
-        "appid": db_operation(
-            get_credential_value("Spark Image Generation", "SPARK_APPID")
-        ),
-        "apisecret": db_operation(
-            get_credential_value("Spark Image Generation", "SPARK_APISECRET")
-        ),
-        "apikey": db_operation(
-            get_credential_value("Spark Image Generation", "SPARK_APIKEY")
-        ),
+        "appid": await aget_credential_value("Spark Image Generation", "SPARK_APPID"),
+        "apisecret": await aget_credential_value("Spark Image Generation", "SPARK_APISECRET"),
+        "apikey": await aget_credential_value("Spark Image Generation", "SPARK_APIKEY"),
     }
 
     if not all(creds.values()):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint, Numeric, Boolean
+from sqlalchemy import Boolean, Column, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import BaseEntity
@@ -6,25 +6,25 @@ from app.db_models.base_entity import BaseEntity
 
 class Member(BaseEntity):
     __tablename__ = "members"
-    __table_args__ = (
-        UniqueConstraint("name", "team_id", name="unique_team_and_name"),
-    )
+    __table_args__ = UniqueConstraint("name", "assistant_id", name="unique_assistant_and_name")
 
-    name: str = Column(String(64), unique=True, nullable=False)
-    team_id: str = Column(String, ForeignKey("teams.id"), nullable=False)
+    name = Column(String(64), unique=True, nullable=False)
+    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
 
-    backstory: str | None = Column(String, nullable=True)
-    role: str | None = Column(String, nullable=True)
-    type: str | None = Column(String, nullable=True)  # one of: leader, worker, freelancer
-    position_x: float | None = Column(Numeric, nullable=True)
-    position_y: float | None = Column(Numeric, nullable=True)
-    source: str | None = Column(String, nullable=True)
-    provider: str | None = Column(String, nullable=True)
-    model: str | None = Column(String, nullable=True)
-    temperature: float | None = Column(Numeric, default=0.1, nullable=True)
-    interrupt: bool | None = Column(Boolean, default=False, nullable=True)
+    backstory = Column(String, nullable=True)
+    role = Column(String, nullable=True)
+    type = Column(String, nullable=True)  # one of: leader, worker, freelancer
+    source = Column(String, nullable=True)
+    provider = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    temperature = Column(Numeric, default=0.1, nullable=True)
+    interrupt = Column(Boolean, default=False, nullable=True)
 
-    team = relationship("Team", back_populates="members")
+    # For drag-and-drop positioning in the UI
+    position_x = Column(Numeric, nullable=True)
+    position_y = Column(Numeric, nullable=True)
+
+    assistant = relationship("Assistant", back_populates="members")
 
     skills = relationship(
         "Skill",

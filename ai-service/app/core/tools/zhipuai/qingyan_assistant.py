@@ -5,7 +5,7 @@ from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 from zhipuai import ZhipuAI
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 ASSISTANT_IDS = {
     "data_analysis": "65a265419d72d299a9230616",
@@ -99,11 +99,11 @@ def process_outputs(outputs):
     return processed_outputs
 
 
-def qingyan_assistant_query(query: str, assistant_type: str = "ai_search") -> str:
+async def qingyan_assistant_query(query: str, assistant_type: str = "ai_search") -> str:
     """
     Invoke Qingyan Assistant API
     """
-    api_key = get_credential_value("Qingyan Assistant", "ZHIPUAI_API_KEY")
+    api_key = await aget_credential_value("Qingyan Assistant", "ZHIPUAI_API_KEY")
 
     if not api_key:
         return "Error: Qingyan Assistant API Key is not set."

@@ -1,12 +1,19 @@
 from fastapi import APIRouter, Depends
 
-from app.api.auth import ensure_user_id
 from app.core import logging
-from app.schemas.assistant import CreateAssistantRequest, \
-    UpdateAssistantRequest, GetFullInfoAssistantResponse, McpData, \
-    ExtensionData, GetFullInfoAssistantsResponse, CreateFullInfoAssistantRequest, CreateFullInfoAssistantResponse, \
-    UpdateFullInfoAssistantRequest, UpdateFullInfoAssistantResponse
-from app.schemas.base import ResponseWrapper, PagingRequest
+from app.schemas.assistant import (
+    CreateAssistantRequest,
+    CreateFullInfoAssistantRequest,
+    CreateFullInfoAssistantResponse,
+    ExtensionData,
+    GetFullInfoAssistantResponse,
+    GetFullInfoAssistantsResponse,
+    McpData,
+    UpdateAssistantRequest,
+    UpdateFullInfoAssistantRequest,
+    UpdateFullInfoAssistantResponse,
+)
+from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.extension_assistant import CreateExtensionAssistantRequest
 from app.schemas.mcp_assistant import CreateMcpAssistantRequest
 from app.schemas.thread import (
@@ -23,8 +30,7 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/assistant", tags=["API-V2 | Assistant"])
 
 
-@router.get("/{user_id}/get-all", summary="Get assistants of a user.",
-            response_model=ResponseWrapper[GetFullInfoAssistantsResponse])
+@router.get("/{user_id}/get-all", summary="Get assistants of a user.", response_model=ResponseWrapper[GetFullInfoAssistantsResponse])
 async def list_full_info_assistants(
         user_id: str,
         paging: PagingRequest = Depends(),

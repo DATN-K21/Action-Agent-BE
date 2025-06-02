@@ -17,9 +17,9 @@ class ConnectedExtension(BaseEntity):
     auth_value = Column(String, nullable=True)
     auth_scheme = Column(String, nullable=True)
 
-    extension_assistants = relationship(
-        "ExtensionAssistant",
+    extension_assistant_links = relationship(
+        "ExtensionAssistantLink",
         back_populates="extension",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )

@@ -4,7 +4,7 @@ import requests
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 
 class Text2ImageInput(BaseModel):
@@ -13,13 +13,13 @@ class Text2ImageInput(BaseModel):
     prompt: str = Field(description="the prompt for generating image ")
 
 
-def text2img(
+async def text2img(
     prompt: str,
 ):
     """
     invoke tools
     """
-    api_key = get_credential_value("Image Generation", "SILICONFLOW_API_KEY")
+    api_key = await aget_credential_value("Image Generation", "SILICONFLOW_API_KEY")
 
     if not api_key:
         return "Error: Siliconflow API Key is not set."

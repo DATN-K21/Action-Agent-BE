@@ -1,12 +1,12 @@
 from sqlalchemy import (
     Column,
-    String,
     DateTime,
-    PrimaryKeyConstraint,
     ForeignKey,
+    PrimaryKeyConstraint,
+    String,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import Base
@@ -14,13 +14,11 @@ from app.db_models.base_entity import Base
 
 class Checkpoint(Base):
     __tablename__ = "checkpoints"
-    __table_args__ = (
-        PrimaryKeyConstraint("thread_id", "checkpoint_id", "checkpoint_ns"),
-    )
+    __table_args__ = PrimaryKeyConstraint("thread_id", "checkpoint_id", "checkpoint_ns")
 
+    checkpoint_id = Column(UUID(as_uuid=True), primary_key=True)
     thread_id = Column(String, ForeignKey("threads.id"), primary_key=True)
     checkpoint_ns = Column(String, nullable=False, server_default="", primary_key=True)
-    checkpoint_id = Column(UUID(as_uuid=True), primary_key=True)
 
     parent_checkpoint_id = Column(UUID(as_uuid=True), nullable=True)
     type = Column(String, nullable=True)

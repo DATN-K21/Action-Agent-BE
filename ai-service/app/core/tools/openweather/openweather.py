@@ -1,10 +1,10 @@
 import json
 
-import requests
+import aiohttp
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from app.core.tools.utils import get_credential_value
+from app.core.tools.utils import aget_credential_value
 
 
 class WeatherSearchInput(BaseModel):
@@ -15,11 +15,11 @@ class WeatherSearchInput(BaseModel):
     )
 
 
-def open_weather_qry(city: str) -> str:
+async def open_weather_qry(city: str) -> str:
     """
     invoke tools
     """
-    appid = get_credential_value("Open Weather", "OPEN_WEATHER_API_KEY")
+    appid = await aget_credential_value("Open Weather", "OPEN_WEATHER_API_KEY")
 
     if not appid:
         return "Error: OpenWeather API Key is not set."
@@ -30,19 +30,20 @@ def open_weather_qry(city: str) -> str:
             "q": city,
             "appid": appid,
             "units": "metric",
-            "lang": "zh_cn",
+            "lang": "en",
         }
-        response = requests.get(url, params=params)
 
-        if response.status_code == 200:
-            data = response.json()
-            return data
-        else:
-            error_message = {
-                "error": f"failed:{response.status_code}",
-                "data": response.text,
-            }
-            return json.dumps(error_message)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data
+                else:
+                    error_message = {
+                        "error": f"failed:{response.status}",
+                        "data": await response.text(),
+                    }
+                    return json.dumps(error_message)
 
     except Exception as e:
         return json.dumps(f"OpenWeather API request failed. {e}")

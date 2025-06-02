@@ -1,9 +1,9 @@
-from typing import Optional, Any, Dict
+from typing import Any, Dict
 
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field, model_validator
+from langchain.tools.base import BaseTool
+from pydantic import BaseModel, model_validator
 
-from app.core.enums import ChatMessageType, InterruptType, InterruptDecision
+from app.core.enums import ChatMessageType, InterruptDecision, InterruptType
 
 
 class ToolInfo(BaseModel):
@@ -26,12 +26,12 @@ class Interrupt(BaseModel):
     tool_message: str | None = None
 
 
-class TeamChat(BaseModel):
+class AssistantChat(BaseModel):
     messages: list[ChatMessage]
     interrupt: Interrupt | None = None
 
 
-class TeamChatPublic(BaseModel):
+class AssistantChatPublic(BaseModel):
     message: ChatMessage | None = None
     interrupt: Interrupt | None = None
 
@@ -42,23 +42,3 @@ class TeamChatPublic(BaseModel):
             raise ValueError('Either "message" or "interrupt" must be provided.')
         return values
 
-
-class MemberBase(BaseModel):
-    name: str = Field(..., pattern=r"^[a-zA-Z0-9_-]{1,64}$")
-    backstory: Optional[str] = None
-    role: str
-    type: str  # one of: leader, worker, freelancer
-    owner_of: Optional[int] = None
-    position_x: float
-    position_y: float
-    source: Optional[int] = None
-    provider: str = ""
-    model: str = ""
-    temperature: float = 0.1
-    interrupt: bool = False
-
-
-class TeamBase(BaseModel):
-    name: str = Field(..., pattern=r"^[a-zA-Z0-9_-]{1,64}$")
-    description: Optional[str] = None
-    icon: Optional[str] = None  # Add an icon field for the team
