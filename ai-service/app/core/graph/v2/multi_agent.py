@@ -1,22 +1,20 @@
 import functools
 import inspect
-from typing import Optional, TypedDict, Annotated, Sequence, Union, Callable, Any, TypeVar, Type, cast, Literal
+from typing import Annotated, Any, Callable, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union, cast
 
-from langchain_core.language_models import LanguageModelLike, LanguageModelInput, BaseChatModel
-from langchain_core.messages import BaseMessage, SystemMessage, AIMessage, ToolMessage, HumanMessage
-from langchain_core.runnables import RunnableConfig, Runnable, RunnableBinding
+from langchain_core.language_models import BaseChatModel, LanguageModelInput, LanguageModelLike
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import Runnable, RunnableBinding, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.errors import create_error_message, ErrorCode
-from langgraph.graph import START, END, add_messages, StateGraph
+from langgraph.errors import ErrorCode, create_error_message
+from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.graph.graph import CompiledGraph
 from langgraph.managed import IsLastStep, RemainingSteps
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import Checkpointer
 from langgraph.utils.runnable import RunnableCallable
 from openai import BaseModel
-from pydantic import Field
-from pydantic import create_model
 
 from app.core import logging
 from app.core.settings import env_settings
@@ -26,6 +24,7 @@ from app.services.database.extension_assistant_service import ExtensionAssistant
 from app.services.database.mcp_assistant_service import McpAssistantService
 from app.services.extensions.extension_service_manager import ExtensionServiceManager
 from app.services.llm_service import get_llm_chat_model
+from app.services.mcps.mcp_service import McpService
 
 logger = logging.get_logger(__name__)
 
@@ -114,10 +113,27 @@ def _convert_messages_modifier_to_prompt(
         return messages_modifier
     elif callable(messages_modifier):
 
-        def prompt(state: MultiAgentState) -> Sequence[BaseMessage]:
-            return messages_modifier(state["messages"])
+        def messages_prompt(state: MultiAgentState) -> Sequence[BaseMessage]:
+            result = messages_modifier(state["messages"])
+            if isinstance(result, list) and all(isinstance(msg, BaseMessage) for msg in result):
+                # Ensure all items are BaseMessage instances
+                if isinstance(result, list) and all(isinstance(msg, BaseMessage) for msg in result):
+                    # Convert any string to HumanMessage, filter out non-BaseMessage
+                    return [
+                        msg if isinstance(msg, BaseMessage) else HumanMessage(content=msg) for msg in result if isinstance(msg, (BaseMessage, str))
+                    ]
+                elif isinstance(result, BaseMessage):
+                    return [result]
+                elif isinstance(result, str):
+                    return [HumanMessage(content=result)]
+                else:
+                    raise TypeError("messages_modifier must return a BaseMessage, a list of BaseMessage objects, or a string.")
+            elif isinstance(result, BaseMessage):
+                return [result]
+            else:
+                raise TypeError("messages_modifier must return a BaseMessage or a list of BaseMessage objects.")
 
-        return prompt
+        return messages_prompt
     elif isinstance(messages_modifier, Runnable):
         prompt = (lambda state: state["messages"]) | messages_modifier
         return prompt
@@ -256,25 +272,6 @@ def _convert_models_to_str(models: list[BaseModel]) -> str:
     return str([model.model_dump_json() for model in models])
 
 
-def _get_dynamic_router(name: str, fields: any, descriptions):
-    """
-       Dynamically create a Pydantic model with descriptions for each field.
-
-       Args:
-           name: The name of the model.
-           fields: A dict mapping field names to their types.
-           descriptions: A dict mapping field names to their descriptions.
-
-       Returns:
-           A dynamically created Pydantic model.
-       """
-    annotated_fields = {
-        name: (type_, Field(..., description=descriptions.get(name, "")))
-        for name, type_ in fields.items()
-    }
-    return create_model(name, **annotated_fields)
-
-
 def _get_planner_system_prompt(workers: list[Worker]):
     members = [worker.name for worker in workers]
     metadata = "\n".join(
@@ -360,6 +357,10 @@ class MultiAgentGraphBuilder:
     async def _aplan(self, state: MultiAgentState, config: RunnableConfig):
         logger.info("[NODE] PLAN")
 
+        if isinstance(self.model, str):
+            raise TypeError(
+                "self.model must be a LanguageModelLike, not a str. Please initialize MultiAgentGraphBuilder with a valid model instance."
+            )
         model = _get_model(self.model)
 
         options = ["FINISH"] + [worker.name for worker in self.workers]
@@ -378,7 +379,7 @@ class MultiAgentGraphBuilder:
             - task: The action to perform with the selected tool.
             """
             # noinspection PyTypeHints
-            next: Literal[*options]
+            next: Literal[*options]  # type: ignore
             task: str
 
         class StepList(TypedDict):
@@ -392,7 +393,7 @@ class MultiAgentGraphBuilder:
 
         logger.info(f"[Plan:] {response}")
 
-        return {"actions": response.get("steps"), "current_action_index": 0, "next": "supervisor", "question": question}
+        return {"actions": response.get("steps", []), "current_action_index": 0, "next": "supervisor", "question": question}  # type: ignore
 
     async def _acall_model(self, state: MultiAgentState, config: RunnableConfig):
         logger.info("[NODE] CALL MODEL")
@@ -415,6 +416,11 @@ class MultiAgentGraphBuilder:
         if isinstance(self.response_format, tuple):
             system_prompt, structured_response_schema = self.response_format
             messages = [SystemMessage(content=system_prompt)] + list(messages)
+
+        if isinstance(self.model, str):
+            raise TypeError(
+                "self.model must be a LanguageModelLike, not a str. Please initialize MultiAgentGraphBuilder with a valid model instance."
+            )
 
         model_with_structured_output = _get_model(self.model).with_structured_output(
             cast(StructuredResponseSchema, structured_response_schema)
@@ -442,8 +448,11 @@ class MultiAgentGraphBuilder:
             next_ = "agent"
 
         logger.info(f"[NODE] {next_} ")
-        return {"next": next_, "current_action_index": current_action_index,
-                "messages": [HumanMessage(content=action.get("task"))]}
+
+        task_content = ""
+        if action is not None:
+            task_content = action.get("task") or ""
+        return {"next": next_, "current_action_index": current_action_index, "messages": [HumanMessage(content=task_content)]}
 
     def build_graph(self) -> CompiledGraph:
         """
@@ -483,12 +492,42 @@ async def acreate_multi_agent(
     result = await assistant_service.get_assistant_by_id(user_id=user_id, assistant_id=assistant_id)
     assistant = result.data
 
+    if assistant is None:
+        raise ValueError("Assistant not found")
+
     if assistant.type == "mcp":
         result = await mcp_assistant_service.list_mcps_of_assistant(assistant_id=assistant_id)
-        return None
+        if not result.data or not hasattr(result.data, "mcps"):
+            raise ValueError("No MCP connections found for the assistant")
+        mcp_connections = result.data.mcps
+
+        builder = MultiAgentGraphBuilder(
+            model=get_llm_chat_model(),
+            checkpointer=checkpointer,
+            name=assistant.name,
+        )
+
+        for mcp in mcp_connections:
+            connections = {}
+            connections[f"{mcp.mcp_name}"] = {"url": mcp.url, "transport": mcp.connection_type}
+            tools = await McpService.aget_tools(connections=connections)
+
+            subgraph = create_react_agent(
+                name=mcp.mcp_name,
+                tools=tools,
+                model=get_llm_chat_model(),
+                checkpointer=checkpointer,
+                debug=env_settings.DEBUG_AGENT,
+            )
+
+            builder.add_subgraph(subgraph, node_name=mcp.mcp_name)
+
+        return builder.build_graph()
 
     if assistant.type == "extension":
         result = await extension_assistant_service.list_extensions_of_assistant(assistant_id=assistant_id)
+        if not result.data or not hasattr(result.data, "extensions"):
+            raise ValueError("No extensions found for the assistant")
         extensions = result.data.extensions
 
         # Build multi-agent graph
@@ -500,12 +539,17 @@ async def acreate_multi_agent(
 
         for extension in extensions:
             extension_service = extension_service_manager.get_extension_service(extension.extension_name)
+            if extension_service is None:
+                logger.warning(f"Extension service for '{extension.extension_name}' not found, skipping.")
+                continue
             tools = extension_service.get_authed_tools(user_id=user_id)
+            # Filter tools to only include BaseTool instances
+            filtered_tools = [tool for tool in tools if isinstance(tool, BaseTool)]
             subgraph = create_react_agent(
-                tools=tools,
+                name=extension.extension_name,
+                tools=filtered_tools,
                 model=get_llm_chat_model(),
                 checkpointer=checkpointer,
-                name=extension.extension_name,
                 debug=env_settings.DEBUG_AGENT,
             )
 
