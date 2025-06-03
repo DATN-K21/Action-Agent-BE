@@ -127,9 +127,9 @@ class GraphBuilder:
             model = get_llm_chat_model(temperature=0)
             prompt = get_openai_function_prompt_template()
             if self.tool_choice is not None:
-                model = model.bind_tools(tools=self.tools, tool_choice=self.tool_choice)
+                model = model.bind_tools(tools=self.tools, tool_choice=self.tool_choice)  # type: ignore
             else:
-                model = model.bind_tools(self.tools)
+                model = model.bind_tools(self.tools)  # type: ignore
             chain = prompt | trimmer | model
             response = await chain.ainvoke({
                 "input": question,
@@ -163,7 +163,7 @@ class GraphBuilder:
         chain = prompt | model.with_structured_output(BinaryScore)
         response = await chain.ainvoke({"tool_calls": str_tool_calls})
 
-        if response["score"] == "yes":
+        if response["score"] == "yes":  # type: ignore
             return {"next": "human_editing_node", "interrupted": True}
         else:
             return {"next": "tool_node", "interrupted": False}
@@ -174,7 +174,7 @@ class GraphBuilder:
         # Make a stream by using LLM (for socketio stream)
         str_tool_message = str(state.get("tool_calls"))
         model = get_llm_chat_model(temperature=0)
-        model = model.bind_tools(self.tools)
+        model = model.bind_tools(self.tools)  # type: ignore
         prompt = get_regenerate_tool_calls_prompt_template()
         chain = prompt | model
 

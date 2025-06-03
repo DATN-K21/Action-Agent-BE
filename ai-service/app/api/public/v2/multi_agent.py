@@ -63,6 +63,10 @@ async def chat(
             extension_service_manager=extension_service_manager,
         )
 
+        if multi_agent is None:
+            logger.error("Failed to create multi_agent instance.")
+            return ResponseWrapper.wrap(status=500, message="Failed to initialize multi-agent.").to_response()
+
         config = create_invocation_config(
             thread_id=thread_id,
             recursion_limit=request.recursion_limit,

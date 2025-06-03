@@ -3,7 +3,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, Optional
 
-from app.services.mcps.mcp_service import McpClient
+from app.services.mcps.mcp_service import McpService
 
 
 class McpAgentCache:
@@ -17,7 +17,7 @@ class McpAgentCache:
         self.ttl = ttl
         self.max_size = max_size
 
-    async def aset(self, user_id: str, agent: Any, mcp_client: McpClient):
+    async def aset(self, user_id: str, agent: Any, mcp_client: McpService):
         """
         Store an agent in the cache with LRU eviction if necessary.
         :param user_id: Unique identifier for the user.

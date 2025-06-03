@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.schemas.base import BaseResponse, PagingResponse, BaseRequest
+from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
 ##################################################
@@ -13,13 +13,13 @@ class CreateConnectedMcpRequest(BaseRequest):
     id: Optional[str] = Field(None, min_length=3, max_length=50, examples=["id"])
     mcp_name: str = Field(..., min_length=3, max_length=50, examples=["mcpname"])
     url: str = Field(..., min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["sse"])
+    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
 
 
 class UpdateConnectedMcpRequest(BaseRequest):
     mcp_name: Optional[str] = Field(None, min_length=3, max_length=50, examples=["mcpname"])
     url: Optional[str] = Field(None, min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["sse"])
+    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
 
 
 ##################################################
