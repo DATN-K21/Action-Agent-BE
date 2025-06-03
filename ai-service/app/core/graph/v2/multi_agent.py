@@ -19,6 +19,7 @@ from openai import BaseModel
 from app.core import logging
 from app.core.settings import env_settings
 from app.core.utils.messages import trimmer
+from app.core.utils.standard_sring import standardize_string
 from app.services.database.assistant_service import AssistantService
 from app.services.database.extension_assistant_service import ExtensionAssistantService
 from app.services.database.mcp_assistant_service import McpAssistantService
@@ -509,18 +510,20 @@ async def acreate_multi_agent(
 
         for mcp in mcp_connections:
             connections = {}
-            connections[f"{mcp.mcp_name}"] = {"url": mcp.url, "transport": mcp.connection_type}
+            connections[mcp.mcp_name] = {"url": mcp.url, "transport": mcp.connection_type}
             tools = await McpService.aget_tools(connections=connections)
 
+            mcp_name = standardize_string(mcp.mcp_name)
+
             subgraph = create_react_agent(
-                name=mcp.mcp_name,
+                name=mcp_name,
                 tools=tools,
                 model=get_llm_chat_model(),
                 checkpointer=checkpointer,
                 debug=env_settings.DEBUG_AGENT,
             )
 
-            builder.add_subgraph(subgraph, node_name=mcp.mcp_name)
+            builder.add_subgraph(subgraph, node_name=mcp_name)
 
         return builder.build_graph()
 
@@ -543,17 +546,20 @@ async def acreate_multi_agent(
                 logger.warning(f"Extension service for '{extension.extension_name}' not found, skipping.")
                 continue
             tools = extension_service.get_authed_tools(user_id=user_id)
-            # Filter tools to only include BaseTool instances
+
+            # Filter tools to only include BaseTool instances and standardize the extension name
             filtered_tools = [tool for tool in tools if isinstance(tool, BaseTool)]
+            extension_name = standardize_string(extension.extension_name)
+
             subgraph = create_react_agent(
-                name=extension.extension_name,
+                name=extension_name,
                 tools=filtered_tools,
                 model=get_llm_chat_model(),
                 checkpointer=checkpointer,
                 debug=env_settings.DEBUG_AGENT,
             )
 
-            builder.add_subgraph(subgraph, node_name=extension.extension_name)
+            builder.add_subgraph(subgraph, node_name=extension_name)
 
         return builder.build_graph()
 
