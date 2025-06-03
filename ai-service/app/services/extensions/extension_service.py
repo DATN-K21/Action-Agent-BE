@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Sequence, Union, Callable
+from typing import Callable, Sequence, Union
 from uuid import uuid4
 
 from composio import App

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import select, update, func, Delete
+from sqlalchemy import Delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import or_
@@ -9,10 +9,19 @@ from sqlalchemy.sql.elements import or_
 from app.core import logging
 from app.core.session import get_db_session
 from app.models.mcp_assistant import McpAssistant
-from app.schemas.base import ResponseWrapper, PagingRequest
-from app.schemas.mcp_assistant import CreateMcpAssistantRequest, CreateMcpAssistantResponse, GetMcpAssistantResponse, \
-    GetMcpAssistantsResponse, UpdateMcpAssistantRequest, UpdateMcpAssistantResponse, DeleteMcpAssistantResponse, \
-    GetMcpsOfAssistantResponse, GetMcpOfAssistantResponse, DeleteAllMcpsOfAssistantResponse
+from app.schemas.base import PagingRequest, ResponseWrapper
+from app.schemas.mcp_assistant import (
+    CreateMcpAssistantRequest,
+    CreateMcpAssistantResponse,
+    DeleteAllMcpsOfAssistantResponse,
+    DeleteMcpAssistantResponse,
+    GetMcpAssistantResponse,
+    GetMcpAssistantsResponse,
+    GetMcpOfAssistantResponse,
+    GetMcpsOfAssistantResponse,
+    UpdateMcpAssistantRequest,
+    UpdateMcpAssistantResponse,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -88,8 +97,8 @@ class McpAssistantService:
 
             # COUNT total connected apps
             count_stmt = select(func.count(McpAssistant.id)).where(
-                or_(assistant_id is None, McpAssistant.assistant_id == assistant_id),
-                or_(mcp_id is None, McpAssistant.mcp_id == mcp_id),
+                or_(assistant_id is None, McpAssistant.assistant_id == assistant_id),  # type: ignore
+                or_(mcp_id is None, McpAssistant.mcp_id == mcp_id),  # type: ignore
                 McpAssistant.is_deleted.is_(False),
             )
             count_result = await self.db.execute(count_stmt)
@@ -111,8 +120,8 @@ class McpAssistantService:
             query = (
                 select(McpAssistant)
                 .where(
-                    or_(assistant_id is None, McpAssistant.assistant_id == assistant_id),
-                    or_(mcp_id is None, McpAssistant.mcp_id == mcp_id),
+                    or_(assistant_id is None, McpAssistant.assistant_id == assistant_id),  # type: ignore
+                    or_(mcp_id is None, McpAssistant.mcp_id == mcp_id),  # type: ignore
                     McpAssistant.is_deleted.is_(False),
                 )
                 .offset((page_number - 1) * max_per_page)
@@ -259,19 +268,19 @@ class McpAssistantService:
 
             result = await self.db.execute(query)
             mcp_assistants = result.scalars().all()
-            wrapped_mcps = [GetMcpOfAssistantResponse(
-                id=mcp_assistant.id,
-                user_id=mcp_assistant.mcp.user_id,
-                assistant_id=mcp_assistant.assistant_id,
-                mcp_id=mcp_assistant.mcp_id,
-                mcp_name=mcp_assistant.mcp.mcp_name,
-                url=mcp_assistant.mcp.url,
-                connection_type=mcp_assistant.mcp.connection_type,
-                created_at=mcp_assistant.created_at,
-            ) for
-                mcp_assistant
-                in
-                mcp_assistants]
+            wrapped_mcps = [
+                GetMcpOfAssistantResponse(
+                    id=mcp_assistant.id,  # type: ignore
+                    user_id=mcp_assistant.mcp.user_id,
+                    assistant_id=mcp_assistant.assistant_id,  # type: ignore
+                    mcp_id=mcp_assistant.mcp_id,  # type: ignore
+                    mcp_name=mcp_assistant.mcp.mcp_name,
+                    url=mcp_assistant.mcp.url,
+                    connection_type=mcp_assistant.mcp.connection_type,
+                    created_at=mcp_assistant.created_at,  # type: ignore
+                )
+                for mcp_assistant in mcp_assistants
+            ]
             return ResponseWrapper.wrap(status=200, data=
             GetMcpsOfAssistantResponse(
                 mcps=wrapped_mcps,
