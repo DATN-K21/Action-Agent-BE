@@ -1,7 +1,6 @@
-from email.header import Header
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import ValidationError
 from sqlalchemy import func, or_, select, update
 
@@ -11,9 +10,8 @@ from app.core.enums import StorageStrategy
 from app.core.tools.api_tool import ToolDefinition
 from app.core.tools.tool_invoker import ToolInvokeResponse, invoke_tool
 from app.db_models import Skill
-from app.schemas.base import ResponseWrapper, MessageResponse
-from app.schemas.skill import SkillsResponse, SkillResponse, CreateSkillRequest, SkillUpdateRequest, \
-    ValidateToolDefinitionRequest
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.skill import CreateSkillRequest, SkillResponse, SkillsResponse, SkillUpdateRequest, ValidateToolDefinitionRequest
 
 logger = logging.get_logger(__name__)
 
@@ -37,55 +35,43 @@ def validate_tool_definition(tool_definition: dict[str, Any]) -> ToolDefinition 
 
 
 @router.get("/", response_model=ResponseWrapper[SkillsResponse])
-def read_skills(
-        session: SessionDep,
-        skip: int = 0,
-        limit: int = 100,
-        x_user_id: str = Header(None),
-        x_user_role: str = Header(None),
+async def aread_skills(
+    session: SessionDep,
+    skip: int = 0,
+    limit: int = 100,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """
     Retrieve skills
     """
     try:
-        if x_user_role == "superuser":
-            count_statement = select(func.count()).select_from(Skill).where(Skill.is_deleted.is_(False))
-            count = session.exec(count_statement).one()
-            statement = (
-                select(Skill)
-                .where(Skill.is_deleted.is_(False))
-                .order_by(Skill.id.desc())
-                .offset(skip)
-                .limit(limit)
-            )
+        if x_user_role in ["admin", "super_admin"]:
+            count_statement = select(func.count()).select_from(Skill.__table__).where(Skill.is_deleted.is_(False))
+            result = await session.execute(count_statement)
+            count = result.scalar_one()
+            statement = select(Skill).where(Skill.is_deleted.is_(False)).order_by(Skill.id.desc()).offset(skip).limit(limit)
         else:
             count_statement = (
                 select(func.count())
-                .select_from(Skill)
-                .where(
-                    or_(Skill.strategy == StorageStrategy.GLOBAL_TOOLS, Skill.user_id == x_user_id),
-                    Skill.is_deleted.is_(False)
-                )
+                .select_from(Skill.__table__)
+                .where(or_(Skill.strategy == StorageStrategy.GLOBAL_TOOLS, Skill.user_id == x_user_id), Skill.is_deleted.is_(False))
             )
-            count = session.exec(count_statement).one()
+            result = await session.execute(count_statement)
+            count = result.scalar_one()
 
             statement = (
                 select(Skill)
-                .where(
-                    or_(Skill.strategy == StorageStrategy.GLOBAL_TOOLS, Skill.user_id == x_user_id),
-                    Skill.is_deleted.is_(False)
-                )
+                .where(or_(Skill.strategy == StorageStrategy.GLOBAL_TOOLS, Skill.user_id == x_user_id), Skill.is_deleted.is_(False))
                 .order_by(Skill.id.desc())
                 .offset(skip)
                 .limit(limit)
             )
 
-        skills = session.exec(statement).all()
+        result = await session.execute(statement)
+        skills = result.scalars().all()
         converted_skills = [SkillResponse.model_validate(skill) for skill in skills]
-        data = SkillsResponse(
-            skills=converted_skills,
-            count=count
-        )
+        data = SkillsResponse(skills=converted_skills, count=count)
         return ResponseWrapper(status=200, data=data).to_response()
 
     except Exception as e:
@@ -94,37 +80,36 @@ def read_skills(
 
 
 @router.get("/{id}", response_model=ResponseWrapper[SkillResponse])
-def read_skill(
-        session: SessionDep,
-        skill_id: str,
-        x_user_id: str = Header(None)
-) -> Any:
+async def aread_skill(session: SessionDep, skill_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)) -> Any:
     """
     Get skill by ID.
     """
     try:
         statement = select(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False))
-        skill = session.exec(statement).one_or_none()
+        result = await session.execute(statement)
+        skill = result.scalar_one_or_none()
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found")
-        if skill.strategy != StorageStrategy.GLOBAL_TOOLS and (skill.user_id != x_user_id):
+        if (
+            x_user_id not in ["admin", "super admin"]
+            and str(skill.strategy) != str(StorageStrategy.GLOBAL_TOOLS)
+            and (str(skill.user_id) != x_user_id)
+        ):
             return ResponseWrapper(status=403, message="Not enough permissions")
 
         data = SkillResponse.model_validate(skill)
         return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error retrieving skill with ID {skill_id}: {str(e)}")
-        raise ResponseWrapper(status=500, message="Internal Server Error").to_response()
+        return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
 @router.post("/", response_model=ResponseWrapper[SkillResponse])
-def create_skill(
-        *,
-        session: SessionDep,
-        skill_in: CreateSkillRequest,
-        x_user_id: str = Header(None),
-        x_user_role: str = Header(None),
+async def acreate_skill(
+    session: SessionDep,
+    skill_in: CreateSkillRequest,
+    x_user_id: str = Header(None),
 ) -> Any:
     """
     Create new skill.
@@ -136,8 +121,8 @@ def create_skill(
         skill_data["user_id"] = x_user_id
         skill = Skill(**skill_data)
         session.add(skill)
-        session.commit()
-        session.refresh(skill)
+        await session.commit()
+        await session.refresh(skill)
 
         data = SkillResponse.model_validate(skill)
         return ResponseWrapper(status=200, data=data).to_response()
@@ -146,23 +131,27 @@ def create_skill(
         return ResponseWrapper(status=500, message="Internal Server Error")
 
 
-@router.put("/{id}", response_model=ResponseWrapper[SkillResponse])
-def update_skill(
-        *,
-        session: SessionDep,
-        skill_id: str,
-        skill_in: SkillUpdateRequest,
-        x_user_id: str = Header(None),
-        x_user_role: str = Header(None),
+@router.patch("/{id}", response_model=ResponseWrapper[SkillResponse])
+async def aupdate_skill(
+    *,
+    session: SessionDep,
+    skill_id: str,
+    skill_in: SkillUpdateRequest,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """
     Update a skill.
     """
     try:
-        skill = session.get(Skill, skill_id)
+        statement = select(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False))
+
+        result = await session.execute(statement)
+        skill = result.scalar_one_or_none()
+
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if x_user_role != "admin" and (skill.user_id != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         if skill_in.tool_definition:
@@ -170,58 +159,46 @@ def update_skill(
 
         update_dict = skill_in.model_dump(exclude_unset=True)
 
-        statement = (
-            update(Skill)
-            .where(
-                Skill.id == skill_id,
-                Skill.is_deleted.is_(False)
-            )
-            .values(
-                **update_dict
-            )
-        )
-        session.exec(statement)
-        session.commit()
-        session.refresh(skill)
+        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(**update_dict)
+        await session.execute(statement)
+        await session.commit()
+        await session.refresh(skill)
 
         data = SkillResponse.model_validate(skill)
         return ResponseWrapper(status=200, data=data).to_response()
+
     except Exception as e:
         logger.error(f"Error updating skill with ID {skill_id}: {str(e)}")
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
 @router.delete("/{id}", response_model=ResponseWrapper[MessageResponse])
-def delete_skill(
-        session: SessionDep,
-        skill_id: str,
-        x_user_id: str = Header(None),
-        x_user_role: str = Header(None),
+async def adelete_skill(
+    session: SessionDep,
+    skill_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """
     Delete a skill.
     """
     try:
-        skill = session.get(Skill, skill_id)
+        statement = select(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False))
+
+        result = await session.execute(statement)
+        skill = result.scalar_one_or_none()
+
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if x_user_role != "admin" and (skill.user_id != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
-        if skill.Strategy == StorageStrategy.GLOBAL_TOOLS:
+        if str(skill.strategy) == str(StorageStrategy.GLOBAL_TOOLS):
             return ResponseWrapper(status=400, message="Cannot delete global tools").to_response()
 
-        statement = (
-            update(Skill)
-            .where(
-                Skill.id == skill_id,
-                Skill.is_deleted.is_(False)
-            )
-            .values(
-                is_deleted=True
-            )
-        )
-        session.exec(statement)
-        session.commit()
+        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True)
+
+        await session.execute(statement)
+        await session.commit()
 
         data = MessageResponse(message="Skill deleted successfully")
         return ResponseWrapper(status=200, data=data).to_response()
@@ -236,9 +213,7 @@ def validate_skill(tool_definition_in: ValidateToolDefinitionRequest) -> Any:
     Validate skill's tool definition.
     """
     try:
-        validated_tool_definition = validate_tool_definition(
-            tool_definition_in.tool_definition
-        )
+        validated_tool_definition = validate_tool_definition(tool_definition_in.tool_definition)
         return validated_tool_definition
     except Exception as e:
         logger.error(f"Error validating tool definition: {str(e)}")
@@ -255,40 +230,37 @@ def invoke_tools(tool_name: str, args: dict) -> ToolInvokeResponse:
 
 
 @router.post("/update-credentials/{id}", response_model=ResponseWrapper[SkillResponse])
-def update_skill_credentials(
-        *,
-        session: SessionDep,
-        skill_id: str,
-        credentials: dict[str, dict[str, Any]],
-        x_user_id: str = Header(None),
-        x_user_role: str = Header(None),
+async def aupdate_skill_credentials(
+    *,
+    session: SessionDep,
+    skill_id: str,
+    credentials: dict[str, dict[str, Any]],
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """
     Update a skill's credentials.
     """
     try:
-        skill = session.get(Skill, skill_id)
+        statement = select(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False))
+
+        result = await session.execute(statement)
+        skill = result.scalar_one_or_none()
+
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if not x_user_role != "admin" and (skill.user_id != x_user_id):
+        if not x_user_role != "admin" and (str(skill.user_id) != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
-        statement = (
-            update(Skill)
-            .where(
-                Skill.id == skill_id,
-                Skill.is_deleted.is_(False)
-            )
-            .values(
-                credentials=credentials
-            )
-        )
+        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(credentials=credentials)
 
-        session.exec(statement)
-        session.commit()
-        session.refresh(skill)
+        await session.execute(statement)
+        await session.commit()
+        await session.refresh(skill)
 
-        return ResponseWrapper(status=200, data=skill).to_response()
+        response_data = SkillResponse.model_validate(skill)
+        return ResponseWrapper(status=200, data=response_data).to_response()
+
     except Exception as e:
         logger.error(f"Error updating skill credentials with ID {skill_id}: {str(e)}")
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
