@@ -174,7 +174,7 @@ async def aupdate_skill(
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
-@router.delete("/{id}", response_model=ResponseWrapper[MessageResponse])
+@router.delete("/{skill_id}", response_model=ResponseWrapper[MessageResponse])
 async def adelete_skill(
     session: SessionDep,
     skill_id: str,
@@ -232,7 +232,7 @@ def invoke_tools(tool_name: str, args: dict) -> ToolInvokeResponse:
     return result
 
 
-@router.post("/update-credentials/{id}", response_model=ResponseWrapper[SkillResponse])
+@router.post("/update-credentials/{skill_id}", response_model=ResponseWrapper[SkillResponse])
 async def aupdate_skill_credentials(
     *,
     session: SessionDep,

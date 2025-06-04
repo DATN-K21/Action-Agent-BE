@@ -76,7 +76,7 @@ async def aread_teams(
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.get("/{id}", response_model=ResponseWrapper[TeamResponse])
+@router.get("/{team_id}", response_model=ResponseWrapper[TeamResponse])
 async def aread_team(session: SessionDep, team_id: str, x_user_id=Header(None), x_user_role=Header(None)) -> Any:
     """
     Get team by ID.
@@ -196,7 +196,7 @@ async def acreate_team(
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.put("/{id}", response_model=ResponseWrapper[TeamResponse])
+@router.put("/{team_id}", response_model=ResponseWrapper[TeamResponse])
 async def aupdate_team(
     *,
     session: SessionDep,
@@ -235,7 +235,7 @@ async def aupdate_team(
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.delete("/{id}")
+@router.delete("/{team_id}")
 async def adelete_team(
     session: SessionDep,
     team_id: str,
