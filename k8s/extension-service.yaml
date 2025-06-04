@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-service-config
+data:
+  NODE_ENV: "dev"
+  PORT: "15300"
+  COMPOSIO_API_BASE_URL: "https://backend.composio.dev/api"
+  DATABASE_URL: "mongodb://localhost:27017/datn-extension-database"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: extension-service-secrets
+stringData:
+  COMPOSIO_API_KEY: "d04n821zcnqtop53g98fx"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extension-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: extension-service
+  template:
+    metadata:
+      labels:
+        app: extension-service
+    spec:
+      containers:
+        - name: extension-service
+          image: actionagent.azurecr.io/extension-service:stg
+          ports:
+            - containerPort: 15300
+          envFrom:
+            - configMapRef:
+                name: extension-service-config
+            - secretRef:
+                name: extension-service-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: extension-service
+spec:
+  selector:
+    app: extension-service
+  ports:
+    - port: 15300
+      targetPort: 15300
