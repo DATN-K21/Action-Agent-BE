@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Header
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -116,7 +116,7 @@ async def disconnect(
                     )
                     .values(
                         is_deleted=True,
-                        deleted_at=func.now(),
+                        deleted_at=datetime.now(),
                     )
                 )
 

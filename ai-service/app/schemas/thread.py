@@ -12,18 +12,11 @@ from app.schemas.base import BaseRequest, BaseResponse, CursorPagingResponse
 class CreateThreadRequest(BaseRequest):
     id: Optional[str] = None
     title: str = Field(..., min_length=3, max_length=50)
-    thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
-    assistant_id: Optional[str] = Field(None, min_length=3, max_length=50)
-
-
-class FilterThreadRequest(BaseRequest):
-    thread_type: Optional[str] = Field(None, description="Filter by thread type")
-    assistant_id: Optional[str] = Field(None, min_length=3, max_length=50)
+    assistant_id: str = Field(..., min_length=3, max_length=50)
 
 
 class UpdateThreadRequest(BaseRequest):
     title: Optional[str] = Field(None, min_length=3, max_length=50)
-    thread_type: Optional[str] = Field(None, min_length=3, max_length=50)
     assistant_id: Optional[str] = Field(None, min_length=3, max_length=50)
 
 
@@ -34,13 +27,12 @@ class CreateThreadResponse(BaseResponse):
     id: str
     user_id: str
     title: str
-    thread_type: Optional[str]
     assistant_id: Optional[str]
     created_at: datetime
 
 
 class GetThreadResponse(CreateThreadResponse):
-    pass
+    assistant: Optional[dict] = Field(None, description="Details of the assistant associated with the thread")
 
 
 class GetThreadsResponse(CursorPagingResponse):
@@ -49,9 +41,3 @@ class GetThreadsResponse(CursorPagingResponse):
 
 class UpdateThreadResponse(CreateThreadResponse):
     pass
-
-
-class DeleteThreadResponse(BaseResponse):
-    id: str
-    user_id: str
-    assistant_id: str

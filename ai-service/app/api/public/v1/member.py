@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -271,7 +272,7 @@ async def async_delete_member(
         statement = (
             update(Member)
             .where(Member.id == member_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
-            .values(is_deleted=True, deleted_at=func.now())
+            .values(is_deleted=True, deleted_at=datetime.now())
         )
         await session.execute(statement)
         await session.commit()

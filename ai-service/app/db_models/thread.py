@@ -15,7 +15,6 @@ class Thread(BaseEntity):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=True)
     assistant_id = Column(String, ForeignKey("assistants.id"), nullable=True)
-    query = Column(String, nullable=True)
 
     # Relationships
     assistant = relationship("Assistant", back_populates="threads")

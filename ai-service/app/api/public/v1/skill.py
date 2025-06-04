@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
@@ -197,7 +198,7 @@ async def adelete_skill(
         if str(skill.strategy) == str(StorageStrategy.GLOBAL_TOOLS):
             return ResponseWrapper(status=400, message="Cannot delete global tools").to_response()
 
-        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True, deleted_at=func.now())
+        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
 
         await session.execute(statement)
         await session.commit()
