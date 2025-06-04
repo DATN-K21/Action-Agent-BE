@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-service-config
+data:
+  DEBUG_AGENT: "False"
+  DEBUG_SERVER: "False"
+  DEBUG_SQLALCHEMY: "False"
+  LOGGING_LOG_LEVEL: "INFO"
+  LLM_DEFAULT_PROVIDER: "openai"
+  LLM_DEFAULT_MODEL: "gpt-4o-mini"
+  POSTGRES_HOST: "ai-database"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "ai-database"
+  COMPOSIO_LOGGING_LEVEL: "debug"
+  COMPOSIO_REDIRECT_URL: "https://localhost:15000/ai/api/v1/callback/extension"
+  FRONTEND_REDIRECT_URL: "http://localhost:3000/callback/extension"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-service-secrets
+stringData:
+  LLM_DEFAULT_API_KEY: "<YOUR_OPENAI_API_KEY>"
+  POSTGRES_PASSWORD: "123456"
+  TOOL_TAVILY_API_KEY: "<YOUR_TAVILY_API_KEY>"
+  COMPOSIO_API_KEY: "<YOUR_COMPOSIO_API_KEY>"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: actionagent.azurecr.io/ai-service:stg
+          ports:
+            - containerPort: 15200
+          envFrom:
+            - configMapRef:
+                name: ai-service-config
+            - secretRef:
+                name: ai-service-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+spec:
+  selector:
+    app: ai-service
+  ports:
+    - port: 15200
+      targetPort: 15200
