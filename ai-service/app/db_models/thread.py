@@ -1,8 +1,6 @@
 from sqlalchemy import Column, ForeignKey, String
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
-from app.core.enums import ThreadType
 from app.db_models.base_entity import BaseEntity
 
 
@@ -16,12 +14,11 @@ class Thread(BaseEntity):
 
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=True)
-    thread_type = Column(SQLEnum(ThreadType), nullable=True)
     assistant_id = Column(String, ForeignKey("assistants.id"), nullable=True)
     query = Column(String, nullable=True)
 
     # Relationships
-    team = relationship("Team", back_populates="threads")
+    assistant = relationship("Assistant", back_populates="threads")
     checkpoints = relationship(
         "Checkpoint",
         back_populates="thread",

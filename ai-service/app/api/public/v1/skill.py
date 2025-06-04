@@ -79,7 +79,7 @@ async def aread_skills(
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
-@router.get("/{id}", response_model=ResponseWrapper[SkillResponse])
+@router.get("/{skill_id}", response_model=ResponseWrapper[SkillResponse])
 async def aread_skill(session: SessionDep, skill_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)) -> Any:
     """
     Get skill by ID.
@@ -128,10 +128,11 @@ async def acreate_skill(
         return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error creating new skill: {str(e)}")
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal Server Error")
 
 
-@router.patch("/{id}", response_model=ResponseWrapper[SkillResponse])
+@router.patch("/{skill_id}", response_model=ResponseWrapper[SkillResponse])
 async def aupdate_skill(
     *,
     session: SessionDep,
@@ -169,6 +170,7 @@ async def aupdate_skill(
 
     except Exception as e:
         logger.error(f"Error updating skill with ID {skill_id}: {str(e)}")
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
@@ -195,7 +197,7 @@ async def adelete_skill(
         if str(skill.strategy) == str(StorageStrategy.GLOBAL_TOOLS):
             return ResponseWrapper(status=400, message="Cannot delete global tools").to_response()
 
-        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True)
+        statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True, deleted_at=func.now())
 
         await session.execute(statement)
         await session.commit()
@@ -204,6 +206,7 @@ async def adelete_skill(
         return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error deleting skill with ID {skill_id}: {str(e)}")
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 
@@ -249,7 +252,7 @@ async def aupdate_skill_credentials(
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if not x_user_role != "admin" and (str(skill.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(credentials=credentials)
@@ -263,6 +266,7 @@ async def aupdate_skill_credentials(
 
     except Exception as e:
         logger.error(f"Error updating skill credentials with ID {skill_id}: {str(e)}")
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal Server Error").to_response()
 
 

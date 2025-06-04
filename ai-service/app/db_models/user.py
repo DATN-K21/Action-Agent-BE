@@ -22,6 +22,7 @@ class User(BaseEntity):
     remain_trial_tokens = Column(Integer, nullable=False, default=0)
 
     assistants = relationship("Assistant", back_populates="user")
+    teams = relationship("Team", back_populates="user")
     skills = relationship("Skill", back_populates="user")
     uploads = relationship("Upload", back_populates="user")
     graphs = relationship("Graph", back_populates="user")

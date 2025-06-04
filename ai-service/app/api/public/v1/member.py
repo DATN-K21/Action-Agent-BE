@@ -6,7 +6,7 @@ from sqlalchemy import func, select, update
 from app.api.deps import SessionDep
 from app.core import logging
 from app.core.settings import env_settings
-from app.db_models import Assistant, Member, Skill, Upload
+from app.db_models import Member, Skill, Team, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.member import CreateMemberRequest, MemberResponse, MembersResponse, UpdateMemberRequest
 
@@ -21,7 +21,7 @@ async def async_validate_name_on_create(session: SessionDep, assistant_id: str, 
         raise HTTPException(
             status_code=400, detail="Name is a protected name. Choose another name."
         )
-    statement = select(Member).where(Member.name == member_in.name, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
+    statement = select(Member).where(Member.name == member_in.name, Member.team_id == assistant_id, Member.is_deleted.is_(False))
     member_unique = await session.execute(statement)
     member_unique = member_unique.scalar_one_or_none()
     if member_unique:
@@ -37,7 +37,7 @@ async def async_validate_names_on_update(session: SessionDep, assistant_id: str,
             status_code=400, detail="Name is a protected name. Choose another name."
         )
     statement = select(Member).where(
-        Member.name == member_in.name, Member.assistant_id == assistant_id, Member.id != member_id, Member.is_deleted.is_(False)
+        Member.name == member_in.name, Member.team_id == assistant_id, Member.id != member_id, Member.is_deleted.is_(False)
     )
     member_unique = await session.execute(statement)
     member_unique = member_unique.scalar_one_or_none()
@@ -65,22 +65,22 @@ async def aread_members(
             count_statement = select(func.count()).select_from(Member).where(Member.is_deleted.is_(False))
             count_result = await session.execute(count_statement)
             count = count_result.scalar_one()
-            statement = select(Member).where(Member.assistant_id == assistant_id, Member.is_deleted.is_(False)).offset(skip).limit(limit)
+            statement = select(Member).where(Member.team_id == assistant_id, Member.is_deleted.is_(False)).offset(skip).limit(limit)
             result = await session.execute(statement)
             members = result.scalars().all()
         else:
             count_statement = (
                 select(func.count())
                 .select_from(Member)
-                .join(Assistant)
-                .where(Assistant.user_id == x_user_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
+                .join(Team)
+                .where(Team.user_id == x_user_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
             )
             count_result = await session.execute(count_statement)
             count = count_result.scalar_one()
             statement = (
                 select(Member)
-                .join(Assistant)
-                .where(Assistant.user_id == x_user_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
+                .join(Team)
+                .where(Team.user_id == x_user_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
                 .offset(skip)
                 .limit(limit)
             )
@@ -108,16 +108,14 @@ async def aread_member(
     """
     try:
         if x_user_role.lower() == "admin" or x_user_role.lower() == "super admin":
-            statement = (
-                select(Member).join(Assistant).where(Member.id == member_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
-            )
+            statement = select(Member).join(Team).where(Member.id == member_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
         else:
             statement = (
                 select(Member)
-                .join(Assistant)
-                .where(Member.id == member_id, Member.assistant_id == assistant_id, Assistant.user_id == x_user_id, Member.is_deleted.is_(False))
+                .join(Team)
+                .where(Member.id == member_id, Member.team_id == assistant_id, Team.user_id == x_user_id, Member.is_deleted.is_(False))
             )
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
@@ -145,7 +143,7 @@ async def acreate_member(
     Create new member.
     """
     try:
-        statement = select(Assistant).where(Assistant.id == assistant_id, Assistant.is_deleted.is_(False))
+        statement = select(Team).where(Team.id == assistant_id, Team.is_deleted.is_(False))
         result = await session.execute(statement)
         assistant = result.scalar_one_or_none()
         if not assistant:
@@ -166,10 +164,11 @@ async def acreate_member(
         return ResponseWrapper(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error creating new member: {e}", exc_info=True)
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.put("/{id}", response_model=ResponseWrapper[MemberResponse])
+@router.put("/{member_id}", response_model=ResponseWrapper[MemberResponse])
 async def async_update_member(
     *,
     session: SessionDep,
@@ -185,16 +184,14 @@ async def async_update_member(
     """
     try:
         if x_user_role.lower() == "admin" or x_user_role.lower() == "super admin":
-            statement = (
-                select(Member).join(Assistant).where(Member.id == member_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
-            )
+            statement = select(Member).join(Team).where(Member.id == member_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
         else:
             statement = (
                 select(Member)
-                .join(Assistant)
-                .where(Member.id == member_id, Member.assistant_id == assistant_id, Assistant.user_id == x_user_id, Member.is_deleted.is_(False))
+                .join(Team)
+                .where(Member.id == member_id, Member.team_id == assistant_id, Team.user_id == x_user_id, Member.is_deleted.is_(False))
             )
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
@@ -239,10 +236,11 @@ async def async_update_member(
         return ResponseWrapper.wrap(status=200, data=data).to_response()
     except Exception as e:
         logger.error(f"Error updating member: {e}", exc_info=True)
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
-@router.delete("/{id}", response_model=ResponseWrapper[MessageResponse])
+@router.delete("/{member_id}", response_model=ResponseWrapper[MessageResponse])
 async def async_delete_member(
     session: SessionDep,
     assistant_id: str,
@@ -255,16 +253,14 @@ async def async_delete_member(
     """
     try:
         if x_user_role.lower() == "admin" or x_user_role.lower() == "super admin":
-            statement = (
-                select(Member).join(Assistant).where(Member.id == member_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
-            )
+            statement = select(Member).join(Team).where(Member.id == member_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
         else:
             statement = (
                 select(Member)
-                .join(Assistant)
-                .where(Member.id == member_id, Member.assistant_id == assistant_id, Assistant.user_id == x_user_id, Member.is_deleted.is_(False))
+                .join(Team)
+                .where(Member.id == member_id, Member.team_id == assistant_id, Team.user_id == x_user_id, Member.is_deleted.is_(False))
             )
             result = await session.execute(statement)
             member = result.scalar_one_or_none()
@@ -274,7 +270,7 @@ async def async_delete_member(
 
         statement = (
             update(Member)
-            .where(Member.id == member_id, Member.assistant_id == assistant_id, Member.is_deleted.is_(False))
+            .where(Member.id == member_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
             .values(is_deleted=True, deleted_at=func.now())
         )
         await session.execute(statement)
@@ -285,4 +281,5 @@ async def async_delete_member(
 
     except Exception as e:
         logger.error(f"Error deleting member: {e}", exc_info=True)
+        await session.rollback()
         return ResponseWrapper(status=500, message="Internal server error").to_response()

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.core.enums import WorkflowType
 from app.core.models import ChatMessage, Interrupt
 from app.schemas.base import BaseRequest, BaseResponse
 
@@ -9,7 +10,7 @@ class TeamBase(BaseModel):
                       description="Name of the team, must be 1-64 characters long and can only contain alphanumeric characters, underscores, and hyphens.")
     description: str | None = Field(None, description="Description of the team.")
     icon: str | None = Field(None, description="Icon of the team.")
-    workflow: str = Field(..., description="Workflow associated with the team.")
+    workflow_type: WorkflowType = Field(WorkflowType.HIERARCHICAL, description="Workflow type associated with the team, default is 'HIERARCHICAL'.")
 
 
 ##################################################
@@ -25,7 +26,7 @@ class UpdateTeamRequest(TeamBase, BaseRequest):
                              description="Name of the team, must be 1-64 characters long and can only contain alphanumeric characters, underscores, and hyphens.")
     description: str | None = Field(None, description="Description of the team.")
     icon: str | None = Field(None, description="Icon of the team.")
-    workflow: str | None = Field(None, description="Workflow associated with the team.")
+    workflow_type: str | None = Field(None, description="Workflow associated with the team.")
 
 
 class ChatTeamRequest(BaseModel):
@@ -49,3 +50,4 @@ class TeamResponse(TeamBase, BaseResponse):
 
 class TeamsResponse(BaseResponse):
     teams: list[TeamResponse] = Field(..., description="List of teams.")
+    count: int = Field(..., description="Total count of teams.")

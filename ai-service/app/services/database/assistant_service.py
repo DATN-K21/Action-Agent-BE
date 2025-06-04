@@ -2,15 +2,21 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import select, update, func
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.db_session import get_db_session
-from app.db_models.assistant import Assistant
-from app.schemas.assistant import CreateAssistantRequest, CreateAssistantResponse, GetAssistantResponse, \
-    GetAssistantsResponse, UpdateAssistantRequest, DeleteAssistantResponse
-from app.schemas.base import ResponseWrapper, PagingRequest
+from app.db_models.team import Team
+from app.schemas.assistant import (
+    CreateAssistantRequest,
+    CreateAssistantResponse,
+    DeleteAssistantResponse,
+    GetAssistantResponse,
+    GetAssistantsResponse,
+    UpdateAssistantRequest,
+)
+from app.schemas.base import PagingRequest, ResponseWrapper
 
 logger = logging.get_logger(__name__)
 
@@ -25,7 +31,7 @@ class AssistantService:
         CreateAssistantResponse]:
         """Create a new thread in the database."""
         try:
-            db_assistant = Assistant(
+            db_assistant = Team(
                 **request.model_dump(),
                 user_id=user_id,
                 created_by=user_id,
@@ -48,17 +54,17 @@ class AssistantService:
         try:
             stmt = (
                 select(
-                    Assistant.id.label("id"),
-                    Assistant.user_id.label("user_id"),
-                    Assistant.name.label("name"),
-                    Assistant.description.label("description"),
-                    Assistant.type.label("type"),
-                    Assistant.created_at.label("created_at"),
+                    Team.id.label("id"),
+                    Team.user_id.label("user_id"),
+                    Team.name.label("name"),
+                    Team.description.label("description"),
+                    Team.type.label("type"),
+                    Team.created_at.label("created_at"),
                 )
                 .where(
-                    Assistant.user_id == user_id,
-                    Assistant.id == assistant_id,
-                    Assistant.is_deleted.is_(False),
+                    Team.user_id == user_id,
+                    Team.id == assistant_id,
+                    Team.is_deleted.is_(False),
                 )
                 .limit(1)
             )
@@ -85,9 +91,9 @@ class AssistantService:
         """Get all assistants of a user."""
         try:
             # COUNT total connected apps
-            count_stmt = select(func.count(Assistant.id)).where(
-                Assistant.user_id == user_id,
-                Assistant.is_deleted.is_(False),
+            count_stmt = select(func.count(Team.id)).where(
+                Team.user_id == user_id,
+                Team.is_deleted.is_(False),
             )
             count_result = await self.db.execute(count_stmt)
             total_assistants = count_result.scalar_one()
@@ -116,14 +122,14 @@ class AssistantService:
 
             # GET connected apps
             query = (
-                select(Assistant)
+                select(Team)
                 .where(
-                    Assistant.user_id == user_id,
-                    Assistant.is_deleted.is_(False),
+                    Team.user_id == user_id,
+                    Team.is_deleted.is_(False),
                 )
                 .offset((page_number - 1) * max_per_page)
                 .limit(max_per_page)
-                .order_by(Assistant.created_at.desc())
+                .order_by(Team.created_at.desc())
             )
 
             result = await self.db.execute(query)
@@ -158,14 +164,14 @@ class AssistantService:
             }
 
             stmt = (
-                update(Assistant)
+                update(Team)
                 .where(
-                    Assistant.user_id == user_id,
-                    Assistant.id == assistant_id,
-                    Assistant.is_deleted.is_(False),
+                    Team.user_id == user_id,
+                    Team.id == assistant_id,
+                    Team.is_deleted.is_(False),
                 )
                 .values(**update_values)
-                .returning(Assistant)
+                .returning(Team)
             )
 
             result = await self.db.execute(stmt)
@@ -193,17 +199,17 @@ class AssistantService:
         """Delete an assistant."""
         try:
             stmt = (
-                update(Assistant)
+                update(Team)
                 .where(
-                    Assistant.user_id == user_id,
-                    Assistant.id == assistant_id,
-                    Assistant.is_deleted.is_(False),
+                    Team.user_id == user_id,
+                    Team.id == assistant_id,
+                    Team.is_deleted.is_(False),
                 )
                 .values(
                     is_deleted=True,
                     deleted_at=datetime.now(),
                 )
-                .returning(Assistant.id.label("id"), Assistant.user_id.label("user_id"))
+                .returning(Team.id.label("id"), Team.user_id.label("user_id"))
             )
 
             result = await self.db.execute(stmt)

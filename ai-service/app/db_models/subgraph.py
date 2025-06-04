@@ -10,7 +10,7 @@ class Subgraph(BaseEntity):
     __tablename__ = "subgraphs"
 
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
     name = Column(String, nullable=True)
     description = Column(String, nullable=True)
     config = Column(JSONB, nullable=False, default=dict)
@@ -32,4 +32,4 @@ class Subgraph(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="subgraphs")
-    assistant = relationship("Assistant", back_populates="subgraphs")
+    team = relationship("Team", back_populates="subgraphs")

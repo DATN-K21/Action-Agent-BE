@@ -7,12 +7,18 @@ class UploadStatus(str, Enum):
     FAILED = "Failed"
 
 
-class ThreadType(str, Enum):
-    MCPS_ASSISTANT = "Mcp Assistant"
-    EXTENSIONS_ASSISTANT = "Extensions Assistant"
-    MCP_AGENT = "Mcp Agent"
-    EXTENSION_AGENT = "Extension Agent"
-    DEFAULT = "Default"
+class AssistantType(str, Enum):
+    GENERAL_ASSISTANT = "general_assistant"
+    ADVANCED_ASSISTANT = "advanced_assistant"
+
+
+class WorkflowType(str, Enum):
+    CHATBOT = "chatbot"
+    RAGBOT = "ragbot"
+    SEARCHBOT = "searchbot"
+    SEQUENTIAL = "sequential"
+    HIERARCHICAL = "hierarchical"
+    WORKFLOW = "workflow"
 
 
 class ChatMessageType(str, Enum):

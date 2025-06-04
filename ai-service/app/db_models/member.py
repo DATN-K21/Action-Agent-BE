@@ -9,7 +9,7 @@ class Member(BaseEntity):
     __table_args__ = UniqueConstraint("name", "assistant_id", name="unique_assistant_and_name")
 
     name = Column(String(64), unique=True, nullable=False)
-    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
 
     backstory = Column(String, nullable=True)
     role = Column(String, nullable=True)
@@ -24,7 +24,7 @@ class Member(BaseEntity):
     position_x = Column(Numeric, nullable=True)
     position_y = Column(Numeric, nullable=True)
 
-    assistant = relationship("Assistant", back_populates="members")
+    team = relationship("Team", back_populates="members")
 
     skills = relationship(
         "Skill",

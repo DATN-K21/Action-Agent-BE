@@ -10,7 +10,7 @@ class Graph(BaseEntity):
     __tablename__ = "graphs"
 
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
     name = Column(String, nullable=False, unique=True)
     description = Column(String, nullable=True)
     config = Column(JSONB, nullable=False, server_default="{}")
@@ -33,4 +33,4 @@ class Graph(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="graphs")
-    assistant = relationship("Assistant", back_populates="graphs")
+    team = relationship("Team", back_populates="graphs")

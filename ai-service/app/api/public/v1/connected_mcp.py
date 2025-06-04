@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy import func, select, update
@@ -241,7 +240,7 @@ async def adelete(
                 )
                 .values(
                     is_deleted=True,
-                    deleted_at=datetime.now(),
+                    deleted_at=func.now(),
                 )
             )
         else:
@@ -254,7 +253,7 @@ async def adelete(
                 )
                 .values(
                     is_deleted=True,
-                    deleted_at=datetime.now(),
+                    deleted_at=func.now(),
                 )
             )
 
