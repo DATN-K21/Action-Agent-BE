@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.16.1",
     "asyncpg>=0.30.0",
     "beautifulsoup4>=4.13.3",
+    "celery>=5.5.3",
     "composio>=0.1.1",
     "composio-langchain>=0.7.4",
     "composio-langgraph>=0.7.4",

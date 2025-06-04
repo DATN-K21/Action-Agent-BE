@@ -7,23 +7,18 @@ from tempfile import NamedTemporaryFile
 from typing import IO, Annotated, Any
 
 import aiofiles
-from app.api.deps import CurrentUser, SessionDep
-from app.core.config import settings
-from app.models import (
-    Message,
-    Upload,
-    UploadCreate,
-    UploadOut,
-    UploadsOut,
-    UploadStatus,
-    UploadUpdate,
-)
-from app.tasks.tasks import add_upload, edit_upload, perform_search, remove_upload
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
-from sqlalchemy import ColumnElement
-from sqlmodel import and_, func, select
+from sqlalchemy import and_, func, select
 from starlette import status
+
+from app.api.deps import SessionDep
+from app.core.enums import UploadStatus
+from app.core.settings import env_settings
+from app.db_models.upload import Upload
+from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.upload import CreateUploadRequest, UploadResponse, UploadsResponse
 
 router = APIRouter()
 
@@ -31,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 async def valid_content_length(
-        content_length: int = Header(..., le=settings.MAX_UPLOAD_SIZE),
+    content_length: int = Header(..., le=env_settings.MAX_UPLOAD_SIZE),
 ) -> int:
     return content_length
 
@@ -80,19 +75,20 @@ def move_upload_to_shared_folder(filename: str, temp_file_dir: str) -> str:
         str: The new file path in the shared folder.
     """
     file_name = f"{uuid.uuid4()}-{filename}"
-    file_path = f"./app/{file_name}"
+    file_path = f"./app/shared_folder/{file_name}"
     shutil.move(temp_file_dir, file_path)
     os.chmod(file_path, 0o775)
     return file_path
 
 
-@router.get("/", response_model=UploadsOut)
-def read_uploads(
-        session: SessionDep,
-        current_user: CurrentUser,
-        status: UploadStatus | None = None,
-        skip: int = 0,
-        limit: int = 100,
+@router.get("/", response_model=ResponseWrapper[UploadsResponse])
+async def aread_uploads(
+    session: SessionDep,
+    status: UploadStatus | None = None,
+    skip: int = 0,
+    limit: int = 100,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """
     Retrieve uploads.
@@ -100,18 +96,34 @@ def read_uploads(
     filters = []
     if status:
         filters.append(Upload.status == status)
-    if not current_user.is_superuser:
-        filters.append(Upload.owner_id == current_user.id)
+    if x_user_role not in ["admin", "super_admin"]:
+        filters.append(Upload.user_id == x_user_id)
+    filters.append(Upload.is_deleted.is_(False))
 
-    filter_conditions: ColumnElement[bool] | bool = and_(*filters) if filters else True
+    # Only apply where clause if there are filters, otherwise return all rows
+    if filters:
+        filter_conditions = and_(*filters)
+        count_statement = select(func.count()).select_from(Upload).where(filter_conditions)
+        statement = select(Upload).where(filter_conditions).offset(skip).limit(limit)
+    else:
+        count_statement = select(func.count()).select_from(Upload).where(Upload.is_deleted.is_(False))
+        statement = select(Upload).where(Upload.is_deleted.is_(False)).offset(skip).limit(limit)
 
-    count_statement = select(func.count()).select_from(Upload).where(filter_conditions)
-    statement = select(Upload).where(filter_conditions).offset(skip).limit(limit)
+    result = await session.execute(count_statement)
+    count = result.scalar_one()
 
-    count = session.exec(count_statement).one()
-    uploads = session.exec(statement).all()
+    result = await session.execute(statement)
+    uploads = result.scalars().all()
 
-    return UploadsOut(data=uploads, count=count)
+    response_data = [UploadResponse.model_validate(upload) for upload in uploads]
+
+    return ResponseWrapper.wrap(
+        status=200,
+        data=UploadsResponse(
+            uploads=response_data,
+            count=count,
+        ),
+    ).to_response()
 
 
 def get_file_type(filename: str) -> str:
@@ -128,96 +140,99 @@ def get_file_type(filename: str) -> str:
     return file_types.get(extension, "unknown")
 
 
-@router.post("/", response_model=UploadOut)
-async def create_upload(
-        session: SessionDep,
-        current_user: CurrentUser,
-        name: Annotated[str, Form()],
-        description: Annotated[str, Form()],
-        file_type: Annotated[str, Form()],
-        chunk_size: Annotated[int, Form()],
-        chunk_overlap: Annotated[int, Form()],
-        web_url: Annotated[str | None, Form()] = None,
-        file: UploadFile | None = None,
+@router.post("/", response_model=ResponseWrapper[UploadResponse])
+async def acreate_upload(
+    session: SessionDep,
+    name: Annotated[str, Form()],
+    description: Annotated[str, Form()],
+    file_type: Annotated[str, Form()],
+    chunk_size: Annotated[int, Form()],
+    chunk_overlap: Annotated[int, Form()],
+    web_url: Annotated[str | None, Form()] = None,
+    file: UploadFile | None = None,
+    x_user_id: str = Header(None),
 ) -> Any:
     """Create upload"""
     logger.info(f"Received upload request: file_type={file_type}, name={name}")
 
     try:
         if file_type not in ["file", "web"]:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid file type: {file_type}"
-            )
+            return ResponseWrapper.wrap(status=400, message=f"Invalid file type: {file_type}").to_response()
 
         if file_type == "web" and not web_url:
-            raise HTTPException(
-                status_code=400, detail="Web URL is required for web uploads"
-            )
+            return ResponseWrapper.wrap(status=400, message="Web URL is required for web uploads").to_response()
 
         if file_type == "file" and not file:
-            raise HTTPException(
-                status_code=400, detail="File is required for file uploads"
-            )
+            return ResponseWrapper.wrap(status=400, message="File is required for file uploads").to_response()
 
         try:
             chunk_size = int(chunk_size)
             chunk_overlap = int(chunk_overlap)
             if chunk_size <= 0 or chunk_overlap < 0:
-                raise ValueError()
+                return ResponseWrapper.wrap(
+                    status=400,
+                    message="Chunk size must be greater than 0 and chunk overlap must be non-negative",
+                ).to_response()
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid chunk size or overlap")
+            return ResponseWrapper.wrap(status=400, message="Invalid chunk size or overlap").to_response()
 
         if file_type == "file":
-            actual_file_type = get_file_type(file.filename)
-            if actual_file_type == "unknown":
-                raise HTTPException(status_code=400, detail="Unsupported file type")
+            if file and file.filename:
+                actual_file_type = get_file_type(file.filename)
+                if actual_file_type == "unknown":
+                    return ResponseWrapper.wrap(status=400, message="Unsupported file type").to_response()
+            else:
+                return ResponseWrapper.wrap(status=400, message="File name is required for file uploads").to_response()
         else:
             actual_file_type = "web"
 
-        upload = Upload.model_validate(
-            UploadCreate(
-                name=name,
-                description=description,
-                file_type=actual_file_type,
-                web_url=web_url,
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
-            ),
-            update={"owner_id": current_user.id, "status": UploadStatus.IN_PROGRESS},
+        upload_request = CreateUploadRequest(
+            name=name,
+            description=description,
+            file_type=actual_file_type,
+            web_url=web_url if web_url else "",
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
         )
-        session.add(upload)
-        session.commit()
 
-        if current_user.id is None or upload.id is None:
-            raise HTTPException(
-                status_code=500, detail="Failed to retrieve user and upload ID"
-            )
+        upload = Upload(
+            name=upload_request.name,
+            description=upload_request.description,
+            file_type=upload_request.file_type,
+            web_url=upload_request.web_url,
+            chunk_size=upload_request.chunk_size,
+            chunk_overlap=upload_request.chunk_overlap,
+            user_id=x_user_id,
+            status=UploadStatus.IN_PROGRESS,
+        )
+
+        session.add(upload)
+        await session.commit()
+        await session.refresh(upload)
+
+        if upload.id is None:
+            raise HTTPException(status_code=500, detail="Failed to retrieve upload ID")
 
         if file_type == "web":
-            # 处理网页上传
-            add_upload.delay(
-                web_url, upload.id, current_user.id, chunk_size, chunk_overlap
-            )
+            # Handle web upload
+            add_upload.delay(web_url, upload.id, x_user_id, chunk_size, chunk_overlap)
         else:
-            # 处理文件上传
+            # Handle file upload
             if not file or not file.filename:
                 raise HTTPException(status_code=400, detail="File is required")
 
             file_path = await save_upload_file(file)
-            add_upload.delay(
-                file_path, upload.id, current_user.id, chunk_size, chunk_overlap
-            )
+            add_upload.delay(file_path, upload.id, x_user_id, chunk_size, chunk_overlap)
 
         logger.info(f"Upload created successfully: id={upload.id}")
         return upload
     except Exception as e:
-        logger.error(f"Error processing upload: {str(e)}")
+        logger.error(f"Error processing upload: {str(e)}", exc_info=True)
         if "upload" in locals():
-            session.delete(upload)
-            session.commit()
-        raise HTTPException(
-            status_code=500, detail=f"Failed to process upload: {str(e)}"
-        )
+            await session.delete(upload)
+            await session.commit()
+
+        return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
 
 
 async def save_upload_file(file: UploadFile) -> str:
@@ -232,26 +247,31 @@ async def save_upload_file(file: UploadFile) -> str:
     return file_path
 
 
-@router.put("/{id}", response_model=UploadOut)
-def update_upload(
-        session: SessionDep,
-        current_user: CurrentUser,
-        id: int,
-        name: str | None = Form(None),
-        description: str | None = Form(None),
-        file_type: str | None = Form(None),
-        chunk_size: Annotated[int, Form(ge=0)] | None = Form(None),
-        chunk_overlap: Annotated[int, Form(ge=0)] | None = Form(None),
-        web_url: str | None = Form(None),
-        file: UploadFile | None = File(None),
-        file_size: int = Depends(valid_content_length),
+@router.put("/{upload_id}", response_model=ResponseWrapper[UploadResponse])
+async def aupdate_upload(
+    session: SessionDep,
+    upload_id: str,
+    name: str | None = Form(None),
+    description: str | None = Form(None),
+    file_type: str | None = Form(None),
+    chunk_size: Annotated[int, Form(ge=0)] | None = Form(None),
+    chunk_overlap: Annotated[int, Form(ge=0)] | None = Form(None),
+    web_url: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    file_size: int = Depends(valid_content_length),
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ) -> Any:
     """Update upload"""
-    upload = session.get(Upload, id)
+    statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
+
+    result = await session.execute(statement)
+    upload = result.scalar_one_or_none()
+
     if not upload:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    if not current_user.is_superuser and upload.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+    if x_user_role not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
     update_data: dict[str, Any] = {}
     if name is not None:
@@ -269,24 +289,25 @@ def update_upload(
 
     if update_data:
         update_data["last_modified"] = datetime.now()
-        update_dict = UploadUpdate(**update_data).model_dump(exclude_unset=True)
-        upload.sqlmodel_update(update_dict)
+        for key, value in update_data.items():
+            setattr(upload, key, value)
         session.add(upload)
+        await session.commit()
 
     if file_type == "web" and web_url:
-        # 处理网页更新
-        upload.status = UploadStatus.IN_PROGRESS
+        # Handle web update
+        setattr(upload, "status", UploadStatus.IN_PROGRESS)
         session.add(upload)
-        session.commit()
+        await session.commit()
         edit_upload.delay(
             web_url,
             id,
-            upload.owner_id,
+            upload.user_id,
             chunk_size or upload.chunk_size,
             chunk_overlap or upload.chunk_overlap,
         )
     elif file:
-        # 处理文件更新
+        # Handle file update
         if file.content_type not in [
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -296,15 +317,15 @@ def update_upload(
             "text/html",
             "text/markdown",
         ]:
-            raise HTTPException(status_code=400, detail="Invalid file type")
+            return ResponseWrapper.wrap(status=400, message="Invalid file type. Supported types: pdf, docx, pptx, xlsx, txt, html, md").to_response()
 
         temp_file = save_file_if_within_size_limit(file, file_size)
-        if upload.owner_id is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
+        if upload.user_id is None:
+            return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
 
-        upload.status = UploadStatus.IN_PROGRESS
+        setattr(upload, "status", UploadStatus.IN_PROGRESS)
         session.add(upload)
-        session.commit()
+        await session.commit()
 
         if not file.filename or not isinstance(temp_file.name, str):
             raise HTTPException(status_code=500, detail="Failed to upload file")
@@ -313,62 +334,81 @@ def update_upload(
         edit_upload.delay(
             file_path,
             id,
-            upload.owner_id,
+            upload.user_id,
             chunk_size or upload.chunk_size,
             chunk_overlap or upload.chunk_overlap,
         )
 
-    session.commit()
-    session.refresh(upload)
-    return upload
+    await session.commit()
+    await session.refresh(upload)
+
+    response_data = UploadResponse.model_validate(upload)
+    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
-@router.delete("/{id}")
-def delete_upload(session: SessionDep, current_user: CurrentUser, id: int) -> Message:
-    upload = session.get(Upload, id)
+@router.delete("/{upload_id}", response_model=ResponseWrapper[MessageResponse])
+async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+    statement = select(Upload).where(
+        Upload.id == upload_id,
+        Upload.is_deleted.is_(False),
+    )
+
+    result = await session.execute(statement)
+    upload = result.scalar_one_or_none()
+
     if not upload:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    if not current_user.is_superuser and upload.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+    if x_user_role not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
     try:
         # Set upload status to in progress
-        upload.status = UploadStatus.IN_PROGRESS
+        setattr(upload, "status", UploadStatus.IN_PROGRESS)
         session.add(upload)
-        session.commit()
+        await session.commit()
 
-        if upload.owner_id is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
+        if upload.user_id is None:
+            return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
 
-        remove_upload.delay(id, upload.owner_id)
+        remove_upload.delay(id, upload.user_id)
     except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=500, detail="Failed to delete upload") from e
+        logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message=f"Failed to delete upload: {str(e)}").to_response()
 
-    return Message(message="Upload deleted successfully")
+    response_data = MessageResponse(message="Upload deletion initiated successfully")
+    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
 @router.post("/{upload_id}/search")
 async def search_upload(
-        upload_id: int,
-        current_user: CurrentUser,
-        search_params: dict[str, Any],
-        session: SessionDep,
+    session: SessionDep,
+    upload_id: str,
+    search_params: dict[str, Any],
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
 ):
     """
     Initiate an asynchronous search within a specific upload.
     """
-    upload = session.get(Upload, upload_id)
+    statement = select(Upload).where(
+        Upload.id == upload_id,
+        Upload.is_deleted.is_(False),
+    )
+
+    result = await session.execute(statement)
+    upload = result.scalar_one_or_none()
+
     if not upload:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    if not current_user.is_superuser and upload.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+    if x_user_id not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
     search_type = search_params.get("search_type", "vector")
     if search_type not in ["vector", "fulltext", "hybrid"]:
-        raise HTTPException(status_code=400, detail="Invalid search type")
+        return ResponseWrapper.wrap(status=400, message="Invalid search type. Supported types: vector, fulltext, hybrid").to_response()
 
     task = perform_search.delay(
-        current_user.id,
+        x_user_id,
         upload_id,
         search_params["query"],
         search_type,

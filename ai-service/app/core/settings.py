@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     MAX_CACHED_MCP_USERS: int = 100
     MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
 
+    # Upload settings
+    MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
+
+    # Sets the number of processors
+    MAX_WORKERS = 1
+
+    # Celery settings
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
+
+    # Protected names
     PROTECTED_NAMES = ["user", "ignore", "error"]
 
     @property
