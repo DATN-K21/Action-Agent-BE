@@ -14,9 +14,9 @@ class SkillBase(BaseModel):
     strategy: StorageStrategy | None = Field(None,
                                              description="The storage strategy for the skill, e.g., 'definition', 'file'")
     display_name: str | None = Field(None, description="The display name of the skill")
-    tool_definition: dict[str, Any] = Field(dict, description="The tool definition of the skill")
-    input_parameters: dict[str, Any] = Field(dict, description="The input parameters of the skill")
-    credentials: dict[str, Any] = Field(dict, description="The credentials of the skill")
+    tool_definition: dict[str, Any] = Field(default_factory=dict, description="The tool definition of the skill")
+    input_parameters: dict[str, Any] = Field(default_factory=dict, description="The input parameters of the skill")
+    credentials: dict[str, Any] = Field(default_factory=dict, description="The credentials of the skill")
 
 
 ##################################################
@@ -32,9 +32,9 @@ class SkillUpdateRequest(SkillBase, BaseRequest):
     description: str | None = Field(None, description="A brief description of the skill")
     managed: bool | None = Field(None, description="The managed status of the skill")
     display_name: str | None = Field(None, description="The display name of the skill")
-    tool_definition: dict[str, Any] | None = Field(None, description="The tool definition of the skill")
+    tool_definition: dict[str, Any] | None = Field(default_factory=dict, description="The tool definition of the skill")
     input_schema: dict[str, Any] | None = Field(None, description="The input schema of the skill")
-    credentials: dict[str, Any] | None = Field(None, description="The credentials of the skill")
+    credentials: dict[str, Any] | None = Field(default_factory=dict, description="The credentials of the skill")
 
 
 class ValidateToolDefinitionRequest(BaseRequest):

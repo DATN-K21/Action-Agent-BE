@@ -1,425 +1,194 @@
-# from fastapi import APIRouter, Depends
-# from sqlalchemy import select
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from sse_starlette import EventSourceResponse
-# from starlette.responses import StreamingResponse
-#
-# from app.api.auth import ensure_authenticated, ensure_user_id
-# from app.core import logging
-# from app.core.cache.cached_agents import AgentCache, get_agent_cache
-# from app.core.graph.deps import get_extension, get_extension_builder_manager
-# from app.core.graph.extension_builder_manager import ExtensionBuilderManager
-# from app.core.session import get_db_session
-# from app.core.utils.streaming import format_extension_interrupt_sse, format_extension_stream_sse
-# from app.db_models import Thread
-# from app.schemas.base import ResponseWrapper
-# from app.schemas.extension import (
-#     ActiveAccountResponse,
-#     CheckConnectionResponse,
-#     ExtensionResponse,
-#     GetActionsResponse,
-#     GetExtensionsResponse,
-#     GetSocketioInfoResponse,
-#     HTTPExtensionCallbackRequest,
-#     HTTPExtensionRequest,
-# )
-# from app.services.database.connected_extension_service import get_connected_extension_service, ConnectedExtensionService
-# from app.services.extensions.deps import get_extension_service_manager
-# from app.services.extensions.extension_service_manager import ExtensionServiceManager
-#
-# logger = logging.get_logger(__name__)
-#
-# router = APIRouter(prefix="/extension", tags=["Extension"])
-#
-#
-# @router.get(path="/get-all", summary="Get the list of extensions available.",
-#             response_model=ResponseWrapper[GetExtensionsResponse])
-# async def get_extensions(
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         _: bool = Depends(ensure_authenticated),
-# ):
-#     try:
-#         extensions = extension_service_manager.get_all_extension_service_names()
-#         response_data = GetExtensionsResponse(extensions=extensions)
-#         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.get(path="/{extension_name}/get-actions", summary="Get actions available for extension.",
-#             response_model=ResponseWrapper[GetActionsResponse])
-# async def get_actions(
-#         extension_name: str,
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         _: bool = Depends(ensure_authenticated),
-# ):
-#     try:
-#         # Get the extension service
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         if extension_service is None:
-#             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
-#
-#         # Get the actions from the extension service
-#         extension_service.get_actions()
-#         actions = extension_service.get_action_names()
-#         response_data = GetActionsResponse(actions=list(actions))
-#         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.post(path="/active", summary="Initialize the connection.",
-#              response_model=ResponseWrapper[ActiveAccountResponse])
-# async def active(
-#         user_id: str,
-#         extension_name: str,
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Get the extension service
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         if extension_service is None:
-#             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
-#
-#         # Initialize the connection
-#         connection_request = extension_service.initialize_connection(str(user_id))
-#         if connection_request is None:
-#             response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
-#             return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#
-#         response_data = ActiveAccountResponse(is_existed=False, redirect_url=connection_request.redirectUrl)
-#         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper)
-# async def disconnect(
-#         user_id: str,
-#         extension_name: str,
-#         connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Get the extension service
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         if extension_service is None:
-#             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
-#
-#         # Get the account id
-#         account_id = await connected_extension_service.get_account_id(user_id, extension_name)
-#         if account_id is None:
-#             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
-#
-#         # Disconnect the account
-#         response_data = extension_service.disconnect(account_id)
-#
-#         # Delete the account from the database
-#         if response_data.status == "success":
-#             result = await connected_extension_service.delete_connected_extension(user_id, extension_name)
-#             if not result:
-#                 return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.get(path="/check-active", summary="Check the connection.",
-#             response_model=ResponseWrapper[CheckConnectionResponse])
-# async def check_active(
-#         user_id: str,
-#         extension_name: str,
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Get the extension service
-#         extension_service = extension_service_manager.get_extension_service(extension_name)
-#         if extension_service is None:
-#             return ResponseWrapper.wrap(status=404, message="Extension not found").to_response()
-#
-#         # Check the connection
-#         result = extension_service.check_connection(str(user_id))
-#
-#         response_data = CheckConnectionResponse(is_connected=result)
-#         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.get("/socketio-info")
-# async def get_info():
-#     response_data = GetSocketioInfoResponse(
-#         output="""
-# 1. General Information
-#     - URL: http://hostdomain/
-#     - Namespace: /extension
-#     - Some client listeners: error, connect, disconnect
-#     - Some server listeners: connect, disconnect, message, set_timezone
-#
-# 2. Chat Endpoint:
-#     - Event name: chat, chat_interrupt
-#     - Client listens to: chat_response, handle_chat_interrupt
-#     - Description: This Socket.io endpoint enables agent communication through message-based chatting.
-#
-# 3. Stream Endpoint:
-#     - Event name: stream, stream_interrupt
-#     - Client listens to: stream_response, handle_stream_interrupt
-#     - Description: This Socket.io endpoint facilitates agent communication through message streaming.
-# """
-#     )
-#     return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-#
-#
-# @router.post("/chat/{user_id}/{thread_id}/{extension_name}", summary="Chat with the extension.",
-#              response_model=ResponseWrapper[ExtensionResponse])
-# async def chat(
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         request: HTTPExtensionRequest,
-#         agent_cache: AgentCache = Depends(get_agent_cache),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         db: AsyncSession = Depends(get_db_session),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Check the thread
-#         stmt = (
-#             select(Thread.id)
-#             .where(
-#                 Thread.user_id == user_id,
-#                 Thread.id == thread_id,
-#                 Thread.is_deleted.is_(False),
-#             )
-#             .limit(1)
-#         )
-#         db_thread = (await db.execute(stmt)).scalar_one_or_none()
-#         if db_thread is None:
-#             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
-#
-#         agent = get_extension(
-#             extension_name=extension_name,
-#             user_id=user_id,
-#             agent_cache=agent_cache,
-#             extension_service_manager=extension_service_manager,
-#             builder_manager=builder_manager,
-#             logger=logger,
-#         )
-#
-#         response = await agent.async_chat(
-#             question=request.input,
-#             thread_id=thread_id,
-#             timezone='Asia/Ho_Chi_Minh',
-#             recursion_limit=request.recursion_limit,
-#         )
-#
-#         return ResponseWrapper.wrap(
-#             status=200,
-#             data=ExtensionResponse(
-#                 user_id=user_id,
-#                 thread_id=thread_id,
-#                 extension_name=extension_name,
-#                 interrupted=response.interrupted,
-#                 output=response.output,
-#                 streaming=None,
-#             ),
-#         ).to_response()
-#
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.post(
-#     "/chat-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the chat.",
-#     response_model=ResponseWrapper[ExtensionResponse]
-# )
-# async def chat_interrupt(
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         request: HTTPExtensionCallbackRequest,
-#         agent_cache: AgentCache = Depends(get_agent_cache),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         db: AsyncSession = Depends(get_db_session),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Check the thread
-#         stmt = (
-#             select(Thread.id)
-#             .where(
-#                 Thread.user_id == user_id,
-#                 Thread.id == thread_id,
-#                 Thread.is_deleted.is_(False),
-#             )
-#             .limit(1)
-#         )
-#         db_thread = (await db.execute(stmt)).scalar_one_or_none()
-#         if db_thread is None:
-#             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
-#
-#         agent = get_extension(
-#             extension_name=extension_name,
-#             user_id=user_id,
-#             agent_cache=agent_cache,
-#             extension_service_manager=extension_service_manager,
-#             builder_manager=builder_manager,
-#             logger=logger,
-#         )
-#
-#         execute = request.execute
-#         tool_calls = request.tool_calls
-#         result = await agent.async_handle_chat_interrupt(
-#             execute=execute,
-#             tool_calls=tool_calls,
-#             thread_id=thread_id,
-#             timezone='Asia/Ho_Chi_Minh',
-#             recursion_limit=request.recursion_limit,
-#         )
-#
-#         if execute:
-#             return ResponseWrapper.wrap(
-#                 status=200,
-#                 data=ExtensionResponse(
-#                     user_id=user_id,
-#                     thread_id=thread_id,
-#                     extension_name=extension_name,
-#                     interrupted=False,
-#                     output=result.output,
-#                     streaming=None,
-#                 ),
-#             ).to_response()
-#         else:
-#             return ResponseWrapper.wrap(
-#                 status=200,
-#                 data=ExtensionResponse(
-#                     user_id=user_id,
-#                     thread_id=thread_id,
-#                     extension_name=extension_name,
-#                     interrupted=False,
-#                     output="",
-#                     streaming=None,
-#                 ),
-#             ).to_response()
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.post("/stream/{user_id}/{thread_id}/{extension_name}", summary="Stream with the extension.",
-#              response_class=StreamingResponse)
-# async def stream(
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         request: HTTPExtensionRequest,
-#         agent_cache: AgentCache = Depends(get_agent_cache),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         db: AsyncSession = Depends(get_db_session),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Check the thread
-#         stmt = (
-#             select(Thread.id)
-#             .where(
-#                 Thread.user_id == user_id,
-#                 Thread.id == thread_id,
-#                 Thread.is_deleted.is_(False),
-#             )
-#             .limit(1)
-#         )
-#         db_thread = (await db.execute(stmt)).scalar_one_or_none()
-#         if db_thread is None:
-#             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
-#
-#         agent = get_extension(
-#             extension_name=extension_name,
-#             user_id=user_id,
-#             agent_cache=agent_cache,
-#             extension_service_manager=extension_service_manager,
-#             builder_manager=builder_manager,
-#             logger=logger,
-#         )
-#
-#         response = await agent.async_stream(
-#             question=request.input,
-#             thread_id=thread_id,
-#             timezone='Asia/Ho_Chi_Minh',
-#             recursion_limit=request.recursion_limit,
-#         )
-#
-#         return EventSourceResponse(format_extension_stream_sse(response))
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-#
-#
-# @router.post("/stream-interrupt/{user_id}/{thread_id}/{extension_name}", summary="Interrupt the stream.",
-#              response_class=StreamingResponse)
-# async def stream_interrupt(
-#         user_id: str,
-#         thread_id: str,
-#         extension_name: str,
-#         request: HTTPExtensionCallbackRequest,
-#         agent_cache: AgentCache = Depends(get_agent_cache),
-#         extension_service_manager: ExtensionServiceManager = Depends(get_extension_service_manager),
-#         builder_manager: ExtensionBuilderManager = Depends(get_extension_builder_manager),
-#         db: AsyncSession = Depends(get_db_session),
-#         _: bool = Depends(ensure_user_id),
-# ):
-#     try:
-#         # Check the thread
-#         stmt = (
-#             select(Thread.id)
-#             .where(
-#                 Thread.user_id == user_id,
-#                 Thread.id == thread_id,
-#                 Thread.is_deleted.is_(False),
-#             )
-#             .limit(1)
-#         )
-#         db_thread = (await db.execute(stmt)).scalar_one_or_none()
-#         if db_thread is None:
-#             return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
-#
-#         agent = get_extension(
-#             extension_name=extension_name,
-#             user_id=user_id,
-#             agent_cache=agent_cache,
-#             extension_service_manager=extension_service_manager,
-#             builder_manager=builder_manager,
-#             logger=logger,
-#         )
-#
-#         execute = request.execute
-#         tool_calls = request.tool_calls
-#         result = await agent.async_handle_stream_interrupt(
-#             execute=execute,
-#             tool_calls=tool_calls,
-#             thread_id=thread_id,
-#             timezone='Asia/Ho_Chi_Minh',
-#             recursion_limit=request.recursion_limit,
-#         )
-#
-#         return EventSourceResponse(format_extension_interrupt_sse(result))
-#
-#     except Exception as e:
-#         logger.exception("Has error: %s", str(e))
-#         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+from datetime import datetime
+
+from fastapi import APIRouter, Header
+from sqlalchemy import select, update
+
+from app.api.deps import SessionDep
+from app.core import logging
+from app.core.enums import ConnectionStatus
+from app.db_models.connected_extension import ConnectedExtension
+from app.schemas.base import ResponseWrapper
+from app.schemas.extension import ActiveAccountResponse, CheckConnectionResponse, DeleteConnectionResponse
+from app.services.extensions import extension_service_manager
+
+logger = logging.get_logger(__name__)
+
+router = APIRouter(prefix="/extension", tags=["Extension"])
+
+
+@router.post(path="/active", summary="Initialize the connection.", response_model=ResponseWrapper[ActiveAccountResponse])
+async def active(
+    session: SessionDep,
+    extension_enum: str,
+    x_user_id: str = Header(None),
+):
+    try:
+        # Get the extension service
+        extension_service_info = extension_service_manager.get_service(extension_enum)
+        if extension_service_info is None or extension_service_info.service_object is None:
+            return ResponseWrapper.wrap(status=404, message="Extension Info or Extension Service not found").to_response()
+
+        # Get the service object
+        extension_service = extension_service_info.service_object
+
+        # Create connected extension
+        connected_extension = ConnectedExtension(
+            user_id=x_user_id,
+            extension_enum=extension_service.get_app_enum(),
+            extension_name=extension_service.get_name(),
+            connection_status=ConnectionStatus.PENDING,
+        )
+
+        session.add(connected_extension)
+        await session.commit()
+        await session.refresh(connected_extension)
+
+        # Initialize the connection
+        connection_request = extension_service.initialize_connection(user_id=x_user_id, connected_extension_id=str(connected_extension.id))
+
+        if connection_request is None:
+            response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
+            return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+        response_data = ActiveAccountResponse(is_existed=False, redirect_url=connection_request.redirectUrl)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.exception("Error activating the extension: %s", str(e), exc_info=True)
+        # Rollback the session in case of an error
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper[DeleteConnectionResponse])
+async def disconnect(
+    session: SessionDep,
+    connected_extension_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
+    try:
+        # Get connected extension
+
+        if x_user_role in ["admin", "super admin"]:
+            statement = (
+                select(ConnectedExtension).where(ConnectedExtension.id == connected_extension_id, ConnectedExtension.is_deleted.is_(False)).limit(1)
+            )
+        else:
+            statement = (
+                select(ConnectedExtension)
+                .where(
+                    ConnectedExtension.id == connected_extension_id, ConnectedExtension.user_id == x_user_id, ConnectedExtension.is_deleted.is_(False)
+                )
+                .limit(1)
+            )
+
+        result = await session.execute(statement)
+        connected_extension = result.scalar_one_or_none()
+
+        if connected_extension is None:
+            return ResponseWrapper.wrap(status=404, message="Connected Extension not found").to_response()
+
+        # Get the extension service
+        extension_service_info = extension_service_manager.get_service(str(connected_extension.extension_enum))
+        if extension_service_info is None or extension_service_info.service_object is None:
+            return ResponseWrapper.wrap(status=404, message="Extension Info or Extension Service not found").to_response()
+
+        extension_service = extension_service_info.service_object
+
+        # Get the account id
+        if connected_extension.connected_account_id is None:
+            return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
+
+        account_id = str(connected_extension.connected_account_id)
+
+        # Disconnect the account
+        result = extension_service.disconnect(account_id)
+
+        # Delete the account from the database
+        if result.status == "success":
+            if x_user_role in ["admin", "super admin"]:
+                statement = (
+                    update(ConnectedExtension)
+                    .where(
+                        ConnectedExtension.id == connected_extension.connected_account_id,
+                        ConnectedExtension.is_deleted.is_(False),
+                    )
+                    .values(
+                        is_deleted=True,
+                        deleted_at=datetime.now(),
+                    )
+                )
+
+            else:
+                statement = (
+                    update(ConnectedExtension)
+                    .where(
+                        ConnectedExtension.id == connected_extension.connected_account_id,
+                        ConnectedExtension.user_id == connected_extension.user_id,
+                        ConnectedExtension.is_deleted.is_(False),
+                    )
+                    .values(
+                        is_deleted=True,
+                        deleted_at=datetime.now(),
+                    )
+                )
+
+            await session.execute(statement)
+            await session.commit()
+
+        response_data = DeleteConnectionResponse.model_validate(result)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+    except Exception as e:
+        logger.exception("Disconnect failed: %s", str(e), exc_info=True)
+        # Rollback the session in case of an error
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get(path="/check-active", summary="Check the connection.", response_model=ResponseWrapper[CheckConnectionResponse])
+async def check_active(
+    session: SessionDep,
+    connected_extension_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
+    try:
+        # Get the connected extension
+        if x_user_role in ["admin", "super admin"]:
+            statement = (
+                select(ConnectedExtension).where(ConnectedExtension.id == connected_extension_id, ConnectedExtension.is_deleted.is_(False)).limit(1)
+            )
+        else:
+            statement = (
+                select(ConnectedExtension)
+                .where(
+                    ConnectedExtension.id == connected_extension_id,
+                    ConnectedExtension.user_id == x_user_id,
+                    ConnectedExtension.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+
+        result = await session.execute(statement)
+        connected_extension = result.scalar_one_or_none()
+        if connected_extension is None:
+            return ResponseWrapper.wrap(status=404, message="Connected Extension not found").to_response()
+
+        # Get the extension service
+        extension_service_info = extension_service_manager.get_service(service_enum=str(connected_extension.extension_enum))
+        if extension_service_info is None or extension_service_info.service_object is None:
+            logger.warning("Extension service not found for enum: %s", connected_extension.extension_enum)
+            return ResponseWrapper.wrap(status=404, message="Extension Info or Extension Service not found").to_response()
+
+        extension_service = extension_service_info.service_object
+
+        # Check the connection
+        result = extension_service.check_connection(user_id=x_user_id)
+
+        response_data = CheckConnectionResponse(is_connected=result)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.exception("Check connection failed: %s", str(e))
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

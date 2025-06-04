@@ -67,3 +67,15 @@ class StorageStrategy(str, Enum):
     PERSONAL_TOOL_CACHE = "personal_tool_cache"
     GLOBAL_TOOLS = "global_tools"
     DEFINITION = "definition"
+
+
+class ConnectedServiceType(str, Enum):
+    MCP = "mcp"
+    EXTENSION = "extension"
+    NONE = "None"
+
+
+class ConnectionStatus(str, Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"

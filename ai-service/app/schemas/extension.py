@@ -1,5 +1,6 @@
 from typing import Literal, Optional
 
+from openai import BaseModel
 from pydantic import Field
 
 from app.schemas.base import BaseResponse
@@ -25,39 +26,21 @@ from app.schemas.base import BaseResponse
 # ##################################################
 # ########### RESPONSE SCHEMAS #####################
 # ##################################################
-# class ActiveAccountResponse(BaseResponse):
-#     is_existed: bool = Field(..., title="Is existed", examples=[False])
-#     redirect_url: Optional[str] = Field(None, title="Redirect URL", examples=["https://example.com"])
-#
-#
-# class GetActionsResponse(BaseResponse):
-#     actions: list[str] = Field(..., title="List of actions", examples=[["action1", "action2"]])
-#
-#
-# class GetExtensionsResponse(BaseResponse):
-#     extensions: list[str] = Field(..., title="List of extensions", examples=[["extension1", "extension2"]])
-#
-#
-class DeleteConnectionResponse(BaseResponse):
+class ActiveAccountResponse(BaseResponse):
+    is_existed: bool = Field(..., title="Is existed", examples=[False])
+    redirect_url: Optional[str] = Field(None, title="Redirect URL", examples=["https://example.com"])
+
+
+class DeleteConnection(BaseModel):
     status: Literal["success", "failed"] = Field(..., title="Status of the delete operation", examples=["success"])
     count: Optional[int] = Field(None, title="Number of records deleted", examples=[1])
     message: Optional[str] = Field(None, title="Message", examples=["Connection deleted successfully"])
     error_code: Optional[int] = Field(None, title="Error code", examples=[400])
-#
-#
-# class CheckConnectionResponse(BaseResponse):
-#     is_connected: bool = Field(..., title="Is connected", examples=[True])
-#
-#
-# class GetSocketioInfoResponse(BaseResponse):
-#     output: str = Field(..., title="Output", examples=["Hello!"])
-#
-#
-# class ExtensionResponse(BaseResponse):
-#     user_id: Optional[str] = Field(None, min_length=1, max_length=100, title="User ID", examples=["userid"])
-#     thread_id: Optional[str] = Field(None, min_length=1, max_length=100, title="Thread ID", examples=["threadid"])
-#     extension_name: Optional[str] = Field(None, min_length=1, max_length=100, title="Extension Name",
-#                                           examples=["extension1"])
-#     interrupted: Optional[bool] = Field(None, title="Interrupted", examples=[False])
-#     streaming: Optional[bool] = Field(None, title="Streaming", examples=[False])
-#     output: Optional[str | dict | list[Any]] = Field(None, title="Output", examples=["Hello"])
+
+
+class DeleteConnectionResponse(DeleteConnection, BaseResponse):
+    pass
+
+
+class CheckConnectionResponse(BaseResponse):
+    is_connected: bool = Field(..., title="Is connected", examples=[True])

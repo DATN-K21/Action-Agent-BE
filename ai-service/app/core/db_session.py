@@ -1,6 +1,5 @@
 from typing import AsyncGenerator, Generator
 
-from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -25,8 +24,8 @@ SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False, autofl
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as db:
         try:
-            await db.execute(text("SELECT 1"))
             yield db
+            await db.commit()
         except SQLAlchemyError:
             logger.exception("Async DB error")
             await db.rollback()
@@ -36,7 +35,6 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 def get_sync_session() -> Generator[Session, None, None]:
     db: Session = SyncSessionLocal()
     try:
-        db.execute(text("SELECT 1"))
         yield db
         db.commit()
     except SQLAlchemyError:

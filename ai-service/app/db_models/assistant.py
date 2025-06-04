@@ -7,7 +7,7 @@ from app.db_models.base_entity import BaseEntity
 class Assistant(BaseEntity):
     __tablename__ = "assistants"
 
-    name = Column(String(64), unique=True, nullable=False)
+    name = Column(String, unique=True, nullable=False)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
 
     description = Column(String, nullable=True)

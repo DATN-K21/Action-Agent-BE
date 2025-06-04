@@ -1,8 +1,8 @@
-from typing import Any
 
 from pydantic import BaseModel, Field
 
 from app.core import logging
+from app.services.extensions.extension_service import ExtensionService
 
 logger = logging.get_logger(__name__)
 
@@ -17,12 +17,11 @@ class ExtensionServiceInfo(BaseModel):
     description: str | None = Field(None, description="A brief description of what the service does.")
     # The actual service object or client. This could be an instantiated class,
     # a function, or any other relevant Python object.
-    service_object: Any = Field(None,
-                                description="The actual service instance or a callable to interact with the service.")
+    service_object: ExtensionService | None = Field(None, description="The actual service instance or a callable to interact with the service.")
     version: str = "1.0"
 
 
-class ExtensionService:
+class ExtensionClient:
     """
     Connect to the Extension Service (Extension service container)
     and get information about the available services.

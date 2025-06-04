@@ -27,17 +27,13 @@ from app.services.database.mcp_assistant_service import McpAssistantService, get
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/assistant", tags=["API-V2 | Assistant"])
+router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
 
-@router.get("/{user_id}/get-all", summary="Get assistants of a user.", response_model=ResponseWrapper[GetFullInfoAssistantsResponse])
+@router.get("/get-all", summary="Get assistants of a user.", response_model=ResponseWrapper[GetFullInfoAssistantsResponse])
 async def list_full_info_assistants(
-        user_id: str,
-        paging: PagingRequest = Depends(),
-        assistant_service: AssistantService = Depends(get_assistant_service),
-        extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
-        mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
-        _: bool = Depends(ensure_user_id),
+    paging: PagingRequest = Depends(),
+    _: bool = Depends(ensure_user_id),
 ):
     assistants_result = await assistant_service.list_assistants(user_id, paging)
 

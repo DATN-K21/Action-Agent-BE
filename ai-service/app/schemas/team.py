@@ -47,5 +47,5 @@ class TeamResponse(TeamBase, BaseResponse):
     user_id: int | None = Field(None, description="ID of the user who owns the team.")
 
 
-class TeamsResponse(BaseModel, BaseResponse):
+class TeamsResponse(BaseResponse):
     teams: list[TeamResponse] = Field(..., description="List of teams.")

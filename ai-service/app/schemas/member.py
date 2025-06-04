@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from openai import BaseModel
 from pydantic import Field
@@ -10,7 +10,7 @@ from app.schemas.base import BaseRequest, BaseResponse
 class MemberBase(BaseModel):
     name: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     backstory: Optional[str] = Field(None, max_length=1000, description="A brief backstory of the member")
-    role: str = Field(None, max_length=100, description="The role of the member")
+    role: Optional[str] = Field(None, max_length=100, description="The role of the member")
     type: Literal['leader', 'worker', 'freelancer']  # Enforces specific values
     position_x: float = Field(..., description="X coordinate of the member's position")
     position_y: float = Field(..., description="Y coordinate of the member's position")

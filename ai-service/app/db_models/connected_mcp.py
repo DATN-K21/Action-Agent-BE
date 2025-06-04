@@ -12,9 +12,5 @@ class ConnectedMcp(BaseEntity):
     url = Column(String, nullable=False)
     connection_type = Column(String, nullable=False, default="sse")
 
-    mcp_assistants = relationship(
-        "McpAssistant",
-        back_populates="mcp",
-        cascade="all, delete-orphan",
-        passive_deletes=True
-    )
+    # Relationships
+    skills = relationship("Skill", back_populates="mcp", cascade="all, delete-orphan", passive_deletes=True)
