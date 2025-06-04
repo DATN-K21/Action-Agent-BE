@@ -20,14 +20,14 @@ celery_app = Celery(
     # broker="redis://localhost:6379/0",
     backend=env_settings.CELERY_RESULT_BACKEND,
     # backend="redis://localhost:6379/0",
-    include=["app.tasks.tasks"],
+    include=["app.jobs.tasks"],
 )
 
 celery_app.conf.update(
     result_expires=3600,
 )
 
-celery_app.conf.task_routes = {"app.worker.celery_worker.*": "main-queue"}
+celery_app.conf.task_routes = {"app.jobs.tasks.*": "main-queue"}
 celery_app.conf.update(task_track_started=True)
 
 # Configure Celery logging
