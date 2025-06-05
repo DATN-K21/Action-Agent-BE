@@ -5,14 +5,15 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from pydantic import SecretStr
 
 
 async def main():
     model = ChatOpenAI(
         model="glm-4-flash",
         temperature=0.01,
-        openai_api_key="your_api_key",
-        openai_api_base="https://open.bigmodel.cn/api/paas/v4/",
+        api_key=SecretStr("your_api_key"),
+        base_url="https://open.bigmodel.cn/api/paas/v4/",
     )
 
     server_params = StdioServerParameters(

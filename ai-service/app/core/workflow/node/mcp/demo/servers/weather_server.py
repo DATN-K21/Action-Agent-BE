@@ -6,7 +6,7 @@ mcp = FastMCP("Weather", port=8123)
 
 
 @mcp.tool()
-async def get_weather(location: str) -> int:
+async def get_weather(location: str) -> str:
     """Get weather for location."""
     return "It's always sunny in New York"
 

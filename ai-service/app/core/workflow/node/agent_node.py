@@ -20,15 +20,15 @@ class AgentNode:
     """Agent Node that combines LLM with tools and knowledge bases"""
 
     def __init__(
-            self,
-            node_id: str,
-            model_name: str,
-            temperature: float,
-            system_message: str = None,
-            user_message: str = None,
-            tools: List[str] = None,
-            retrieval_tools: List[Dict[str, Any]] = None,
-            agent_name: str = None,
+        self,
+        node_id: str,
+        model_name: str,
+        temperature: float,
+        system_message: str | None = None,
+        user_message: str | None = None,
+        tools: List[str] | None = None,
+        retrieval_tools: List[Dict[str, Any]] | None = None,
+        agent_name: str | None = None,
     ):
         self.node_id = node_id
         self.system_message = system_message
@@ -170,7 +170,7 @@ class AgentNode:
         self.agent = create_react_agent(
             model=self.llm,
             tools=self.tools_list,
-            messages_modifier=prompt,
+            prompt=prompt,
         )
 
         # Invoke the Agent

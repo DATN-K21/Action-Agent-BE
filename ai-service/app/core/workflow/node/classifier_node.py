@@ -4,14 +4,18 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 
+from app.core import logging
 from app.core.model_providers.model_provider_manager import model_provider_manager
 from app.core.workflow.utils.db_utils import get_model_info
+
 from ...state import (
     ReturnWorkflowTeamState,
     WorkflowTeamState,
     parse_variables,
     update_node_outputs,
 )
+
+logger = logging.get_logger(__name__)
 
 CLASSIFIER_SYSTEM_PROMPT = """
 ### Job Description
@@ -110,19 +114,19 @@ class ClassifierNode:
                 elif isinstance(result, str):
                     return result
                 else:
-                    print(f"Unexpected result format: {result}")
-                    # 使用 others 分类作为默认
+                    logger.info(f"Unexpected result format: {result}")
+                    # Use "others" classification as default
                     return "Others Intent"
             except Exception as e:
-                print(f"Error normalizing result: {e}")
-                # 出错时使用 others 分类
+                logger.info(f"Error normalizing result: {e}")
+                # Use 'others' classification in case of error
                 return "Others Intent"
 
         result = await chain.ainvoke(input_json)
 
         # Ensure categories is not empty and has valid format
         if not self.categories or not isinstance(self.categories, list):
-            print("Invalid categories format")
+            logger.info("Invalid categories format")
             return {"node_outputs": state.get("node_outputs", {})}
 
         # Get normalized category name
@@ -135,25 +139,21 @@ class ClassifierNode:
                     cat
                     for cat in self.categories
                     if isinstance(cat, dict)
-                       and "category_name" in cat
-                       and "category_id" in cat
-                       and cat["category_name"].lower() == category_name.lower()
+                    and "category_name" in cat
+                    and "category_id" in cat
+                    and cat["category_name"].lower() == category_name.lower()
                 ),
-                next(  # 如果没找到匹配的类别，使用 others 类别
-                    (
-                        cat
-                        for cat in self.categories
-                        if cat["category_id"] == "others_category"
-                    ),
+                next(  # If no matching category is found, use the 'others' category
+                    (cat for cat in self.categories if cat["category_id"] == "others_category"),
                     {
                         "category_id": "others_category",
                         "category_name": "Others Intent",
-                    },  # 最后的 fallback
+                    },  # Final fallback
                 ),
             )
         except Exception as e:
-            print(f"Error matching category: {e}")
-            # 确保使用 others 类别作为 fallback
+            logger.info(f"Error matching category: {e}")
+            # Ensure using 'others' category as fallback
             matched_category = next(
                 (
                     cat
@@ -162,7 +162,7 @@ class ClassifierNode:
                 ),
                 {"category_id": "others_category", "category_name": "Others Intent"},
             )
-        print("matched_category:", matched_category)
+        logger.info("matched_category:", matched_category)
         # Update node outputs with both category_id and category_name
         new_output = {
             self.node_id: {

@@ -16,11 +16,11 @@ from app.core.workflow.utils.db_utils import get_model_info
 
 
 class MCPConfigValidator:
-    """MCP配置验证器"""
+    """MCP Configuration Validator"""
 
     @staticmethod
     def validate_stdio_config(config: Dict[str, Any]) -> Optional[str]:
-        """验证stdio类型配置"""
+        """Validate stdio type configuration"""
         if not isinstance(config, dict):
             return "Config must be a dictionary"
 
@@ -35,7 +35,7 @@ class MCPConfigValidator:
         if not isinstance(config["args"], list):
             return "Args must be a list"
 
-        # 验证Python文件路径是否存在
+        # Validate if Python file path exists
         if config["command"] == "python":
             script_path = config["args"][0]
             if not Path(script_path).is_file():
@@ -45,7 +45,7 @@ class MCPConfigValidator:
 
     @staticmethod
     def validate_sse_config(config: Dict[str, Any]) -> Optional[str]:
-        """验证sse类型配置"""
+        """Validate sse type configuration"""
         if not isinstance(config, dict):
             return "Config must be a dictionary"
 
@@ -67,7 +67,7 @@ class MCPConfigValidator:
 
     @classmethod
     def validate_mcp_config(cls, config: Dict[str, Dict[str, Any]]) -> None:
-        """验证整个MCP配置"""
+        """Validate the entire MCP configuration"""
         if not isinstance(config, dict):
             raise ValueError("MCP config must be a dictionary")
 
@@ -105,7 +105,7 @@ class MCPBaseNode:
     ):
         self.node_id = node_id
         self.input = input
-        # 验证MCP配置
+        # Validate MCP configuration
         try:
             MCPConfigValidator.validate_mcp_config(mcp_config)
             self.mcp_config = mcp_config
@@ -118,7 +118,7 @@ class MCPBaseNode:
             self.model = model_provider_manager.init_model(
                 provider_name=self.model_info["provider_name"],
                 model=self.model_info["ai_model_name"],
-                temperature=0.01,  # MCP工具调用需要低温度
+                temperature=0.01,  # MCP tool calls require low temperature
                 api_key=self.model_info["api_key"],
                 base_url=self.model_info["base_url"],
             )
@@ -142,26 +142,26 @@ class MCPNode(MCPBaseNode):
         input_text = (
             parse_variables(self.input, state["node_outputs"]) if self.input else None
         )
-        # 使用MultiServerMCPClient处理多个MCP服务
-        async with MultiServerMCPClient(self.mcp_config) as client:
-            # 创建agent并获取工具
-            agent = create_react_agent(self.model, client.get_tools())
 
-            # 处理用户输入
+        # Use MultiServerMCPClient to handle multiple MCP services
+        client = MultiServerMCPClient(self.mcp_config)
+        tools = await client.get_tools()
 
-            result = await agent.ainvoke({"messages": input_text})
+        # Create agent and get tools
+        agent = create_react_agent(self.model, tools)
 
-            # 更新node_outputs
-            new_output = {self.node_id: {"response": result["messages"][-1].content}}
-            state["node_outputs"] = update_node_outputs(
-                state["node_outputs"], new_output
-            )
+        # Handle user input
+        result = await agent.ainvoke({"messages": input_text})
 
-            return_state: ReturnWorkflowTeamState = {
-                "history": history + result["messages"],
-                "messages": result["messages"],
-                "all_messages": messages + result["messages"],
-                "node_outputs": state["node_outputs"],
-            }
+        # Update node_outputs
+        new_output = {self.node_id: {"response": result["messages"][-1].content}}
+        state["node_outputs"] = update_node_outputs(state["node_outputs"], new_output)
 
-            return return_state
+        return_state: ReturnWorkflowTeamState = {
+            "history": history + result["messages"],
+            "messages": result["messages"],
+            "all_messages": messages + result["messages"],
+            "node_outputs": state["node_outputs"],
+        }
+
+        return return_state

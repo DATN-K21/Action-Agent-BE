@@ -5,8 +5,9 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
-from app.core.tools.tool_manager import managed_tools
+from app.core.tools.tool_manager import global_tools
 from app.core.workflow.utils.db_utils import get_model_info
+
 from ...state import (
     ReturnWorkflowTeamState,
     WorkflowTeamState,
@@ -21,14 +22,14 @@ You are also known for your ability to delegate work to the right people, and to
 Even though you don't perform tasks by yourself, you have a lot of experience in the field, which allows you to properly evaluate the work of your team members."""
 
     def __init__(
-            self,
-            node_id: str,
-            model_name: str,
-            agents_config: list[dict[str, Any]],
-            tasks_config: list[dict[str, Any]],
-            process_type: str = "sequential",
-            manager_config: dict[str, Any] = dict,
-            config: dict[str, Any] = dict,
+        self,
+        node_id: str,
+        model_name: str,
+        agents_config: list[dict[str, Any]],
+        tasks_config: list[dict[str, Any]],
+        process_type: str = "sequential",
+        manager_config: dict[str, Any] = {},
+        config: dict[str, Any] = {},
     ):
         self.node_id = node_id
         self.agents_config = agents_config
@@ -83,7 +84,7 @@ Even though you don't perform tasks by yourself, you have a lot of experience in
 
     def _get_tool_instance(self, tool_name: str):
         """Get tool instance by name"""
-        for tool_id, tool_info in managed_tools.items():
+        for tool_id, tool_info in global_tools.items():
             if tool_info.display_name == tool_name:
                 return tool_info.tool
         return None
@@ -124,7 +125,7 @@ Even though you don't perform tasks by yourself, you have a lot of experience in
         # Parse variables in task configuration
         description = parse_variables(task_config["description"], state["node_outputs"])
 
-        # 确保 expected_output 始终是字符串
+        # Ensure expected_output is always a string
         expected_output = ""
         if task_config.get("expected_output"):
             expected_output = parse_variables(
@@ -139,12 +140,13 @@ Even though you don't perform tasks by yourself, you have a lot of experience in
                 for ctx in task_config["context"]
             ]
 
+        # TODO: I dont understand, the context type don't mach expected type
         return Task(
             description=description,
             agent=agents[task_config["agent_id"]],
             expected_output=expected_output,  # It must be a string here now
             output_json=task_config.get("output_json"),
-            context=context if context else None
+            context=context if context else None,  # type: ignore
         )
 
     async def work(

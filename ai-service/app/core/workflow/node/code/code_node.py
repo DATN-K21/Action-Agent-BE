@@ -1,6 +1,5 @@
 import base64
 import json
-import logging
 import queue
 import threading
 import time
@@ -8,10 +7,12 @@ import uuid
 from textwrap import dedent
 
 import docker
-from docker.errors import NotFound
+from docker.errors import ImageNotFound, NotFound
 from docker.models.containers import Container
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
+
+from app.core import logging
 
 from ....state import (
     ReturnWorkflowTeamState,
@@ -20,25 +21,24 @@ from ....state import (
     update_node_outputs,
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class ContainerPool:
-    """管理Docker容器池"""
+    """Manages a pool of Docker containers"""
 
     def __init__(self, image_tag: str, pool_size: int = 3, memory_limit: str = "256m"):
         self.image_tag = image_tag
         self.pool_size = pool_size
         self.memory_limit = memory_limit
         self.available_containers = queue.Queue()
-        self.active_containers = {}  # 改用字典来跟踪容器
+        self.active_containers = {}  # Use dictionary to track containers
         self.client = docker.from_env()
         self.lock = threading.Lock()
         self._initialize_pool()
 
     def _initialize_pool(self):
-        """初始化容器池"""
+        """Initialize container pool"""
         container = self._create_container()
         self.available_containers.put(container)
 
@@ -52,7 +52,7 @@ class ContainerPool:
                 old_container = self.client.containers.get(container_name)
                 old_container.remove(force=True)
                 logger.info(f"Removed old container: {container_name}")
-            except docker.errors.NotFound:
+            except NotFound:
                 pass
 
             # Create a new container
@@ -89,44 +89,44 @@ class ContainerPool:
             raise
 
     def get_container(self):
-        """获取一个可用的容器"""
+        """Get an available container"""
         with self.lock:
             try:
                 container = self.available_containers.get_nowait()
-                # 检查容器是否还在运行
+                # Check if container is still running
                 try:
                     container.reload()
                     return container
-                except:
-                    # 使用 pop 而不是 discard，因为是字典
+                except Exception:
+                    # Use pop instead of discard because it's a dictionary
                     self.active_containers.pop(container.id, None)
                     return self._create_container()
             except queue.Empty:
                 if len(self.active_containers) < self.pool_size:
                     return self._create_container()
                 else:
-                    # 等待可用容器
+                    # Wait for an available container
                     return self.available_containers.get(timeout=5)
 
     def return_container(self, container):
-        """归还容器到池中"""
+        """Return container to the pool"""
         with self.lock:
             try:
-                container.reload()  # 检查容器状态
-                container.exec_run("rm -rf /workspace/*")  # 清理工作目录
+                container.reload()  # Check container status
+                container.exec_run("rm -rf /workspace/*")  # Clean the workspace directory
                 self.available_containers.put(container)
-            except:
-                # 使用 pop 而不是 discard
+            except Exception:
+                # Use pop instead of discard since it's a dictionary
                 self.active_containers.pop(container.id, None)
                 try:
                     container.remove(force=True)
-                except:
+                except Exception:
                     pass
 
     def cleanup(self):
-        """清理所有容器"""
+        """Clean up all containers"""
         with self.lock:
-            # 清理活动容器
+            # Clean up active containers
             for container_id, container in list(self.active_containers.items()):
                 try:
                     logger.info(f"Removing container: {container.name}")
@@ -136,7 +136,7 @@ class ContainerPool:
                 finally:
                     self.active_containers.pop(container_id, None)
 
-            # 清理所有 code-interpreter-worker 容器
+            # Clean up all code-interpreter-worker containers
             try:
                 containers = self.client.containers.list(
                     all=True, filters={"name": "code-interpreter-worker"}
@@ -151,22 +151,22 @@ class ContainerPool:
                 logger.error(f"Error listing containers: {e}")
 
     def __del__(self):
-        """确保在对象被销毁时清理所有容器"""
+        """Ensure all containers are cleaned up when the object is destroyed"""
         self.cleanup()
 
 
 class CodeTemplate:
-    """代码模板管理类"""
+    """Code Template Management Class"""
 
     _code_placeholder = "{code}"
     _inputs_placeholder = "{inputs}"
 
     @classmethod
     def get_runner_script(cls) -> str:
-        """创建标准化的执行脚本模板"""
+        """Create standardized execution script template"""
         runner_script = dedent(
             f"""
-            # 用户定义的函数
+            # User defined function
             {cls._code_placeholder}
 
             import json, ast
@@ -178,31 +178,31 @@ class CodeTemplate:
                         return node.name
                 return None
 
-            # 分析代码获取函数名
+            # Analyze code to get function name
             code = '''{cls._code_placeholder}'''
             function_name = find_function_name(code)
 
             if not function_name:
                 raise Exception("No function found in the code")
 
-            # 执行代码
+            # Execute code
             exec(code)
 
-            # 执行函数并获取结果
+            # Execute function and get result
             result = eval(f"{{function_name}}()")
 
-            # 转换结果为JSON并打印
+            # Convert result to JSON and logger.info
             output_json = json.dumps(result, indent=4)
-            print(f'<<RESULT>>{{output_json}}<<RESULT>>')
+            logger.info(f'<<RESULT>>{{output_json}}<<RESULT>>')
             """
         )
         return runner_script
 
     @classmethod
-    def create_execution_script(cls, code: str, inputs: dict = None) -> str:
-        """创建完整的执行脚本"""
+    def create_execution_script(cls, code: str, inputs: dict | None = None) -> str:
+        """Create complete execution script"""
         runner_script = cls.get_runner_script()
-        # 替换占位符
+        # Replace placeholders
         script = runner_script.replace(cls._code_placeholder, code)
         if inputs:
             inputs_json = json.dumps(inputs)
@@ -216,7 +216,7 @@ class CodeExecutor:
     _instance = None
     _pool = None
 
-    # Python 内置库，不需要安装
+    # Python built-in libraries, no installation needed
     BUILTIN_LIBRARIES = {
         "os",
         "sys",
@@ -264,24 +264,26 @@ class CodeExecutor:
             self.memory_limit = memory_limit
             self.image_tag = image_tag
             self.client = docker.from_env()
-            # self._verify_docker_image()
+            self._verify_docker_image()
             self._pool = ContainerPool(
                 image_tag=image_tag, pool_size=pool_size, memory_limit=memory_limit
             )
             self.initialized = True
 
+        # Ensure pool is always initialized
+        elif self._pool is None:
+            self._pool = ContainerPool(image_tag=self.image_tag, pool_size=pool_size, memory_limit=self.memory_limit)
+
     def _verify_docker_image(self) -> None:
         """Verify if Docker image exists, build if not"""
         try:
             self.client.images.get(self.image_tag)
-        except docker.errors.ImageNotFound:
-            # 更新Dockerfile路径
+        except ImageNotFound:
+            # Update Dockerfile path
             dockerfile_path = "./docker/code-interpreter"
             self.client.images.build(path=dockerfile_path, tag=self.image_tag, rm=True)
 
-    def _install_libraries(
-            self, container: docker.models.containers.Container, libraries: list[str]
-    ) -> None:
+    def _install_libraries(self, container: Container, libraries: list[str]) -> None:
         """Install required libraries in container"""
         # Filter out built-in libraries and pre-installed libraries
         libraries_to_install = [
@@ -292,25 +294,29 @@ class CodeExecutor:
         ]
 
         if libraries_to_install:
-            print(f"Installing libraries: {', '.join(libraries_to_install)}")
+            logger.info(f"Installing libraries: {', '.join(libraries_to_install)}")
             for library in libraries_to_install:
                 container.exec_run(f"pip install --user {library}")
         else:
-            print("All required libraries are pre-installed or built-in")
+            logger.info("All required libraries are pre-installed or built-in")
 
     def execute(self, code: str, libraries: list[str]) -> str:
         """Execute code in Docker container with safety measures"""
-        print(f"\nStarting code execution with {len(libraries)} libraries")
+        logger.info(f"\nStarting code execution with {len(libraries)} libraries")
         if libraries:
-            print(f"Required libraries: {', '.join(libraries)}")
+            logger.info(f"Required libraries: {', '.join(libraries)}")
+
+        if self._pool is None:
+            error_msg = "Container pool is not initialized"
+            return error_msg
 
         container = self._pool.get_container()
-        print(f"Using container: {container.name}")
+        logger.info(f"Using container: {container.name}")
 
         try:
             # Install required libraries
             self._install_libraries(container, libraries)
-            print("Libraries installed successfully")
+            logger.info("Libraries installed successfully")
 
             # Create execution script using a template
             runner_script = CodeTemplate.create_execution_script(code)
@@ -330,7 +336,7 @@ class CodeExecutor:
                 error_msg = (
                     f"Error executing code: {exec_result.output.decode('utf-8')}"
                 )
-                print(f"\nError: {error_msg}")
+                logger.info(f"\nError: {error_msg}")
                 return error_msg
 
             result = exec_result.output.decode("utf-8")
@@ -345,20 +351,20 @@ class CodeExecutor:
                     result = json.loads(result_json.strip())
                     return result
                 except json.JSONDecodeError as e:
-                    print(f"JSON decode error: {e}")
+                    logger.info(f"JSON decode error: {e}")
                     return result_json.strip()
 
-            print("\nCode execution result:")
-            print(result)
+            logger.info("\nCode execution result:")
+            logger.info(result)
             return result
 
         except Exception as e:
             error_msg = f"Execution error: {str(e)}"
-            print(f"\nError: {error_msg}")
+            logger.info(f"\nError: {error_msg}")
             return error_msg
 
         finally:
-            print("Returning container to pool")
+            logger.info("Returning container to pool")
             self._pool.return_container(container)
 
     def cleanup(self):
