@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import BaseEntity
@@ -17,7 +17,7 @@ class Member(BaseEntity):
     source = Column(String, nullable=True)
     provider = Column(String, nullable=True)
     model = Column(String, nullable=True)
-    temperature = Column(Numeric, default=0.1, nullable=True)
+    temperature = Column(Float, default=0.1, nullable=True)
     interrupt = Column(Boolean, default=False, nullable=True)
 
     # For drag-and-drop positioning in the UI

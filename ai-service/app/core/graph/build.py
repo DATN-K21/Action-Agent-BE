@@ -15,7 +15,7 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 
-from app.core.enums import InterruptDecision
+from app.core.enums import InterruptDecision, WorkflowType
 from app.core.graph.members import (
     GraphLeader,
     GraphMember,
@@ -61,7 +61,7 @@ def convert_hierarchical_team_to_dict(members: list[Member]
     for member in members:
         assert member.id is not None, "member.id is unexpectedly None"
         member_id = str(member.id)
-        if member.source:
+        if member.source is not None:
             source_id = str(member.source)
             in_counts[member_id] += 1
             out_counts[source_id].append(member_id)
@@ -78,28 +78,29 @@ def convert_hierarchical_team_to_dict(members: list[Member]
     while queue:
         member_id = queue.popleft()
         member = members_lookup[member_id]
-        if member.type == "root" or member.type == "leader":
-            leader_name = member.name
+        if str(member.type) == "root" or str(member.type) == "leader":
+            leader_name = str(member.name)
             # Create the team definitions
             teams[leader_name] = GraphTeam(
                 name=leader_name,
-                model=member.model,
-                role=member.role,
-                backstory=member.backstory or "",
+                model=str(member.model),
+                role=str(member.role),
+                backstory=str(member.backstory) or "",
                 members={},
-                provider=member.provider,
-                temperature=member.temperature,
+                provider=str(member.provider),
+                temperature=float(member.temperature),  # type: ignore
             )
         # If member is not root team leader, add as a member
-        if member.type != "root" and member.source:
-            member_name = member.name
+        if str(member.type) != "root" and member.source is not None:
+            member_name = str(member.name)
             source_id = str(member.source)
             leader = members_lookup[source_id]
-            leader_name = leader.name
-            if member.type == "worker":
+            leader_name = str(leader.name)
+            if str(member.type) == "worker":
                 tools: list[GraphSkill | GraphUpload]
                 tools = [
                     GraphSkill(
+                        user_id=member.team.user_id,
                         name=skill.name,
                         strategy=skill.strategy,
                         definition=skill.tool_definition,
@@ -118,22 +119,22 @@ def convert_hierarchical_team_to_dict(members: list[Member]
                 ]
                 teams[leader_name].members[member_name] = GraphMember(
                     name=member_name,
-                    backstory=member.backstory or "",
-                    role=member.role,
+                    backstory=str(member.backstory) or "",
+                    role=str(member.role),
                     tools=tools,
-                    provider=member.provider,
-                    model=member.model,
-                    temperature=member.temperature,
-                    interrupt=member.interrupt,
+                    provider=str(member.provider),
+                    model=str(member.model),
+                    temperature=float(member.temperature),  # type: ignore
+                    interrupt=bool(member.interrupt),
                 )
-            elif member.type == "leader":
+            elif str(member.type) == "leader":
                 teams[leader_name].members[member_name] = GraphLeader(
                     name=member_name,
-                    backstory=member.backstory or "",
-                    role=member.role,
-                    provider=member.provider,
-                    model=member.model,
-                    temperature=member.temperature,
+                    backstory=str(member.backstory) or "",
+                    role=str(member.role),
+                    provider=str(member.provider),
+                    model=str(member.model),
+                    temperature=float(member.temperature),  # type: ignore
                 )
         for nei_id in out_counts[member_id]:
             in_counts[nei_id] -= 1
@@ -152,7 +153,7 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     for member in members:
         assert member.id is not None, "member.id is unexpectedly None"
         member_id = str(member.id)
-        if member.source:
+        if member.source is not None:
             source_id = str(member.source)
             in_counts[member_id] += 1
             out_counts[source_id].append(member_id)
@@ -172,6 +173,7 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
         tools: list[GraphSkill | GraphUpload]
         tools = [
             GraphSkill(
+                user_id=member.team.user_id,
                 name=skill.name,
                 strategy=skill.strategy,
                 definition=skill.tool_definition,
@@ -189,14 +191,14 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
             if upload.user_id is not None
         ]
         graph_member = GraphMember(
-            name=member.name,
-            backstory=member.backstory or "",
-            role=member.role,
+            name=str(member.name),
+            backstory=str(member.backstory) or "",
+            role=str(member.role),
             tools=tools,
-            provider=member.provider,
-            model=member.model,
-            temperature=member.temperature,
-            interrupt=member.interrupt,
+            provider=str(member.provider),
+            model=str(member.model),
+            temperature=float(member.temperature),  # type: ignore
+            interrupt=bool(member.interrupt),
         )
         team_dict[graph_member.name] = graph_member
         for nei_id in out_counts[member_id]:
@@ -230,34 +232,35 @@ def convert_chatbot_chatrag_team_to_dict(
         ]
     elif workflow_type == "chatbot":
         tools = [
-                    GraphUpload(
-                        name=upload.name,
-                        description=upload.description,
-                        user_id=upload.user_id,
-                        upload_id=str(upload.id),
-                    )
-                    for upload in member.uploads
-                    if upload.user_id is not None
-                ] + [
-                    GraphSkill(
-                        name=skill.name,
-                        strategy=skill.strategy,
-                        definition=skill.tool_definition,
-                    )
-                    for skill in member.skills
-                ]
+            GraphUpload(
+                name=upload.name,
+                description=upload.description,
+                user_id=upload.user_id,
+                upload_id=str(upload.id),
+            )
+            for upload in member.uploads
+            if upload.user_id is not None
+        ] + [
+            GraphSkill(
+                user_id=member.team.user_id,
+                name=skill.name,
+                strategy=skill.strategy,
+                definition=skill.tool_definition,
+            )
+            for skill in member.skills
+        ]
     else:
         raise ValueError("Invalid workflow_type. Expected 'ragbot' or 'chatbot'.")
 
     graph_member = GraphMember(
-        name=member.name,
-        backstory=member.backstory or "",
-        role=member.role,
+        name=str(member.name),
+        backstory=str(member.backstory) or "",
+        role=str(member.role),
         tools=tools,
-        provider=member.provider,
-        model=member.model,
-        temperature=member.temperature,
-        interrupt=member.interrupt,
+        provider=str(member.provider),
+        model=str(member.model),
+        temperature=float(member.temperature),  # type: ignore
+        interrupt=bool(member.interrupt),
     )
     team_dict[graph_member.name] = graph_member
 
@@ -653,7 +656,7 @@ async def generator(
         graph_config: dict[str, Any] = {}
         response: Any = None
         interrupt_name = None
-        if team.workflow == "hierarchical":
+        if str(team.workflow_type) == WorkflowType.HIERARCHICAL:
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
             root = create_hierarchical_graph(
@@ -667,7 +670,7 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
-        elif team.workflow == "sequential":
+        elif str(team.workflow_type) == WorkflowType.SEQUENTIAL:
             member_dict = convert_sequential_team_to_dict(members)
             root = create_sequential_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
@@ -687,10 +690,8 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
-        elif team.workflow in ["ragbot"]:
-            member_dict = convert_chatbot_chatrag_team_to_dict(
-                members, workflow_type=team.workflow
-            )
+        elif str(team.workflow_type) == WorkflowType.RAGBOT:
+            member_dict = convert_chatbot_chatrag_team_to_dict(members, workflow_type=str(team.workflow_type))
             root = create_chatbot_ragbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
@@ -708,10 +709,8 @@ async def generator(
                 "next": first_member.name,
                 "all_messages": formatted_messages,
             }
-        elif team.workflow in ["chatbot"]:
-            member_dict = convert_chatbot_chatrag_team_to_dict(
-                members, workflow_type=team.workflow
-            )
+        elif str(team.workflow_type) == WorkflowType.CHATBOT:
+            member_dict = convert_chatbot_chatrag_team_to_dict(members, workflow_type=str(team.workflow_type))
 
             root = create_chatbot_ragbot_graph(member_dict, checkpointer)
 
@@ -731,7 +730,7 @@ async def generator(
                 "next": first_member.name,
                 "all_messages": formatted_messages,
             }
-        elif team.workflow in ["workflow"]:
+        elif str(team.workflow_type) == WorkflowType.WORKFLOW:
 
             graph_config = team.graphs[0].config
 
@@ -860,11 +859,7 @@ async def generator(
                 )
         async for event in root.astream_events(state, version="v2", config=config):
             # If workflow type and graph_config exists, pass nodes parameter
-            nodes = (
-                graph_config["nodes"]
-                if team.workflow == "workflow" and hasattr(graph_config, "nodes")
-                else None
-            )
+            nodes = graph_config["nodes"] if str(team.workflow_type) == WorkflowType.WORKFLOW and hasattr(graph_config, "nodes") else None
             response = event_to_response(event, nodes=nodes)
             if response:
                 formatted_output = f"data: {response.model_dump_json()}\n\n"
@@ -879,7 +874,7 @@ async def generator(
 
             # Handle non-workflow type
             # Determine if it should return default or ask-human interrupt based on whether AskHuman tool was called.
-            if team.workflow != "workflow":
+            if str(team.workflow_type) != WorkflowType.WORKFLOW:
                 if not isinstance(message, AIMessage):
                     return
                 for tool_call in message.tool_calls:

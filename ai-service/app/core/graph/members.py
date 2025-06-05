@@ -90,10 +90,10 @@ class BaseNode:
         return ",".join(list(team_members))
 
     async def _handle_messages(
-            self,
-            state: dict[str, Any],
-            config: RunnableConfig,
-            chain: RunnableSerializable[Any, Any],
+        self,
+        state: dict[str, Any] | GraphTeamState,
+        config: RunnableConfig,
+        chain: RunnableSerializable[Any, Any],
     ) -> AIMessage:
         """Handle both regular messages and image messages in a unified way"""
         all_messages = state.get("all_messages", [])
@@ -333,11 +333,13 @@ class LeaderNode(BaseNode):
         team_members_info = self.get_team_members_info(team.members)
         options = list(team.members) + ["FINISH"]
         tools = [self.get_tool_definition(options)]
+
         # Disable default parallel tool calls from ChatOpenAI
         if isinstance(self.model, ChatOpenAI):
             bind_tool = self.model.bind_tools(tools=tools, parallel_tool_calls=False)
         else:
             bind_tool = self.model.bind_tools(tools=tools)
+
         delegate_chain: RunnableSerializable[Any, Any] = (
                 self.leader_prompt.partial(
                     team_name=team.name,
@@ -352,7 +354,7 @@ class LeaderNode(BaseNode):
                 | JsonOutputKeyToolsParser(key_name="route", first_tool_only=True)
         )
 
-        result: AIMessage = await self._handle_messages(state, config, delegate_chain)
+        result: dict[str, Any] = await delegate_chain.ainvoke(state, config)
 
         if not result or result.get("next") is None or result["next"] == "FINISH":
             return {
@@ -362,11 +364,7 @@ class LeaderNode(BaseNode):
         else:
             task_content: str = str(result.get("task", state["main_task"][0].content))
             tasks = [AIMessage(content=task_content, name=team.name)]
-            return {
-                "next": result["next"],
-                "task": tasks,
-                "all_messages": tasks
-            }
+            return {"next": result["next"], "task": tasks, "all_messages": tasks}  # type: ignore
 
     async def work(
             self, state: GraphTeamState, config: RunnableConfig

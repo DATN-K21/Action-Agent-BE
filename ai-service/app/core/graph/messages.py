@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from langchain_core.documents import Document
 from langchain_core.messages import (
@@ -58,9 +58,15 @@ def event_to_response(
     id = event["run_id"]
 
     if kind == "on_chat_model_stream":
-        node_id = event["metadata"]["langgraph_node"]
+        metadata = event.get("metadata", {})
+        node_id = metadata.get("langgraph_node", "unknown")
         name = get_node_label(node_id, nodes) if nodes else node_id
-        message_chunk: AIMessageChunk = event["data"]["chunk"]
+        if "chunk" not in event.get("data", {}):
+            return None
+        data = event.get("data", {})
+        message_chunk: Optional[AIMessageChunk] = data.get("chunk") if isinstance(data, dict) else None
+        if message_chunk is None:
+            return None
         type = get_message_type(message_chunk)
         content: str = ""
         if isinstance(message_chunk.content, list):
@@ -78,8 +84,14 @@ def event_to_response(
                 type=type, id=id, name=name, content=content, tool_calls=tool_calls
             )
     elif kind == "on_chat_model_end":
-        message: AIMessage = event["data"]["output"]
-        node_id = event["metadata"]["langgraph_node"]
+        if "output" not in event.get("data", {}):
+            return None
+        message = event.get("data", {}).get("output")
+        if not isinstance(message, AIMessage):
+            return None
+        metadata = event.get("metadata", {})
+        node_id = metadata.get("langgraph_node", "unknown")
+        name = get_node_label(node_id, nodes) if nodes else node_id
         name = get_node_label(node_id, nodes) if nodes else node_id
         tool_calls = message.tool_calls
         if tool_calls:
@@ -113,7 +125,9 @@ def event_to_response(
             )
 
     elif kind == "on_chain_end":
-        output = event["data"]["output"]
+        output = event.get("data", {}).get("output")
+        if output is None:
+            return None
         node_id = event.get("name", "")
         name = get_node_label(node_id, nodes) if nodes else node_id
 
@@ -123,11 +137,21 @@ def event_to_response(
                 if "messages" in output and output["messages"]:
                     last_message = output["messages"][-1]
                     if isinstance(last_message, AIMessage):
+                        content = ""
+                        if isinstance(last_message.content, list):
+                            for c in last_message.content:
+                                if isinstance(c, str):
+                                    content += c
+                                elif isinstance(c, dict):
+                                    if c.get("type") == "text":
+                                        content += c.get("text", "")
+                        else:
+                            content = last_message.content
                         return ChatResponse(
                             type="ai",
                             id=id,
                             name=name,
-                            content=last_message.content,
+                            content=content,
                         )
             elif isinstance(output, AIMessage):
                 return ChatResponse(

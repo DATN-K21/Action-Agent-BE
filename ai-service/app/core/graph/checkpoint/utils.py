@@ -46,8 +46,8 @@ def convert_checkpoint_tuple_to_messages(
             formatted_messages.append(
                 ChatResponse(
                     type="human",
-                    id=message.id,
-                    name=message.name,
+                    id=message.id if message.id is not None else str(uuid4()),
+                    name=message.name or "",
                     content=content,
                     imgdata=imgdata,
                 )
@@ -61,8 +61,8 @@ def convert_checkpoint_tuple_to_messages(
             formatted_messages.append(
                 ChatResponse(
                     type="ai",
-                    id=message.id,
-                    name=message.name,
+                    id=message.id if message.id is not None else str(uuid4()),
+                    name=message.name or "",
                     tool_calls=message.tool_calls,
                     content=message.content,
                 )
