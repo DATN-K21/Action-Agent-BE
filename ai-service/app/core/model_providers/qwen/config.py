@@ -1,5 +1,6 @@
 from crewai import LLM
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from app.core.enums import ModelCapability, ModelCategory
 
@@ -54,7 +55,7 @@ def init_model(model: str, temperature: float, api_key: str, base_url: str, **kw
         return ChatOpenAI(
             model=model,
             temperature=temperature,
-            api_key=api_key,
+            api_key=SecretStr(api_key),
             base_url=base_url,
             **kwargs,
         )
