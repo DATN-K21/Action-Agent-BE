@@ -1,15 +1,15 @@
-import logging
 import os
 
 from sqlalchemy import select
 
+from app.core import logging
 from app.core.celery_app import celery_app
 from app.core.db_session import SyncSessionLocal
 from app.core.enums import UploadStatus
 from app.core.rag.pgvector import PGVectorWrapper
 from app.db_models.upload import Upload
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 @celery_app.task
