@@ -154,14 +154,26 @@ def event_to_response(
                             content=content,
                         )
             elif isinstance(output, AIMessage):
+                content = ""
+                if isinstance(output.content, list):
+                    for c in output.content:
+                        if isinstance(c, str):
+                            content += c
+                        elif isinstance(c, dict):
+                            if c.get("type") == "text":
+                                content += c.get("text", "")
+                else:
+                    content = output.content
                 return ChatResponse(
                     type="ai",
                     id=id,
                     name=name,
-                    content=output.content,
+                    content=content,
                 )
     elif kind == "on_chain_stream":
-        output = event["data"]["chunk"]
+        output = event.get("data", {}).get("chunk")
+        if output is None:
+            return None
         node_id = event.get("name", "")
         name = get_node_label(node_id, nodes) if nodes else node_id
 
@@ -179,29 +191,59 @@ def event_to_response(
                             ),
                         )
             elif isinstance(output, AIMessage):
+                content = ""
+                if isinstance(output.content, list):
+                    for c in output.content:
+                        if isinstance(c, str):
+                            content += c
+                        elif isinstance(c, dict):
+                            if c.get("type") == "text":
+                                content += c.get("text", "")
+                else:
+                    content = output.content
                 return ChatResponse(
                     type="tool",
                     id=id,
                     name=name,
-                    content=output.content,
+                    content=content,
                 )
         elif node_id and node_id.startswith("crewai"):
             if isinstance(output, dict):
                 if "messages" in output and output["messages"]:
                     last_message = output["messages"][-1]
                     if isinstance(last_message, AIMessage):
+                        content = ""
+                        if isinstance(last_message.content, list):
+                            for c in last_message.content:
+                                if isinstance(c, str):
+                                    content += c
+                                elif isinstance(c, dict):
+                                    if c.get("type") == "text":
+                                        content += c.get("text", "")
+                        else:
+                            content = last_message.content
                         return ChatResponse(
                             type="ai",
                             id=id,
                             name=name,
-                            content=last_message.content,
+                            content=content,
                         )
             elif isinstance(output, AIMessage):
+                content = ""
+                if isinstance(output.content, list):
+                    for c in output.content:
+                        if isinstance(c, str):
+                            content += c
+                        elif isinstance(c, dict):
+                            if c.get("type") == "text":
+                                content += c.get("text", "")
+                else:
+                    content = output.content
                 return ChatResponse(
                     type="ai",
                     id=id,
                     name=name,
-                    content=output.content,
+                    content=content,
                 )
         elif (
                 node_id
@@ -232,11 +274,21 @@ def event_to_response(
                             ),
                         )
             elif isinstance(output, AIMessage):
+                content = ""
+                if isinstance(output.content, list):
+                    for c in output.content:
+                        if isinstance(c, str):
+                            content += c
+                        elif isinstance(c, dict):
+                            if c.get("type") == "text":
+                                content += c.get("text", "")
+                else:
+                    content = output.content
                 return ChatResponse(
                     type="tool",
                     id=id,
                     name=name,
-                    content=output.content,
+                    content=content,
                 )
 
     return None
