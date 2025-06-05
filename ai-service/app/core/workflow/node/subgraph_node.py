@@ -23,18 +23,18 @@ class SubgraphNode:
     ):
         self.node_id = node_id
         self.input = input
-        # 初始化时编译子图
-        self.subgraph_config, self.subgraph_name = get_subgraph_by_id(subgraph_id)
+        # Initialize and compile subgraph
+        self.subgraph_name, self.subgraph_config = get_subgraph_by_id(subgraph_id)
         self.subgraph = self._build_subgraph()
 
     def _build_subgraph(self):
         """Build and compile subgraph"""
         from app.core.workflow.build_workflow import initialize_graph
 
-        # 使用主图的初始化函数来构建子图
+        # Use the main graph's initialization function to build the subgraph
         return initialize_graph(
             self.subgraph_config,
-            checkpointer=None,  # 子图不需要checkpointer
+            checkpointer=None,  # Subgraph doesn't need a checkpointer
             save_graph_img=False,
         )
 

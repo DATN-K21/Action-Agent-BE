@@ -3,7 +3,7 @@ from typing import Any, TypeVar
 
 from sqlalchemy.orm import Session
 
-from app.core.db_session import get_db_session_sync
+from app.core.db_session import SyncSessionLocal
 
 T = TypeVar("T")
 
@@ -18,7 +18,7 @@ def db_operation(operation: Callable[[Session], T]) -> T:
     Returns:
         The result of the operation.
     """
-    with get_db_session_sync() as session:
+    with SyncSessionLocal() as session:
         try:
             return operation(session)
         except Exception as e:
@@ -65,7 +65,7 @@ def get_model_info(model_name: str) -> dict[str, str]:
     raise NotImplementedError
 
 
-def get_subgraph_by_id(subgraph_id: int) -> dict[str, Any]:
+def get_subgraph_by_id(subgraph_id: int) -> tuple[str, dict[str, Any]]:
     """
     Get subgraph config by ID.
     """
@@ -73,6 +73,6 @@ def get_subgraph_by_id(subgraph_id: int) -> dict[str, Any]:
     #     subgraph = session.get(Subgraph, subgraph_id)
     #     if not subgraph:
     #         raise ValueError(f"Subgraph {subgraph_id} not found")
-    #     return subgraph.config, subgraph.name
+    #     return subgraph.name, subgraph.config
 
     raise NotImplementedError

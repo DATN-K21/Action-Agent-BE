@@ -38,7 +38,8 @@ class PluginNode:
             state["node_outputs"] = {}
 
         if self.args:
-            parsed_tool_args = parse_variables(self.args, state["node_outputs"])
+            args_str = json.dumps(self.args)
+            parsed_tool_args = parse_variables(args_str, state["node_outputs"])
             parsed_tool_args_dict = convert_str_to_dict(parsed_tool_args)
             tool_result = invoke_tool(self.tool_name, parsed_tool_args_dict)
         else:

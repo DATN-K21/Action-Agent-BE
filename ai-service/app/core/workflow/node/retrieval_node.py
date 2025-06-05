@@ -1,25 +1,23 @@
-import logging
 import uuid
-
-from app.core.rag.pgvector import PGVectorWrapper
-from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
+from app.core import logging
+from app.core.rag.pgvector import PGVectorWrapper
 from app.core.state import (
     ReturnWorkflowTeamState,
     WorkflowTeamState,
     parse_variables,
     update_node_outputs,
 )
+from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
+
+logger = logging.get_logger(__name__)
 
 
 class RetrievalNode:
-    def __init__(self, node_id: str, query: str, user_id: int, kb_id: int):
+    def __init__(self, node_id: str, query: str, user_id: str, kb_id: str):
         self.node_id = node_id
         self.query = query
         self.pgvector_store = PGVectorWrapper()

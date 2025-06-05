@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any
 
-from langchain_core.messages import AIMessage, AnyMessage
+from langchain_core.messages import AnyMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig, RunnableSerializable
 from langchain_core.tools import BaseTool
@@ -112,7 +112,7 @@ class LLMNode(LLMBaseNode):
         prompt = llm_node_prompts.partial(history_string=format_messages(history))
         chain: RunnableSerializable[dict[str, Any], AnyMessage] = prompt | self.model
 
-        # 检查消息是否包含图片
+        # Check if message contains images
         if (
             all_messages
             and isinstance(all_messages[-1].content, list)
@@ -126,13 +126,14 @@ class LLMNode(LLMBaseNode):
 
             from langchain_core.messages import HumanMessage
 
-            # 创建新的临时状态用于处理图片消息
+            # Create new temporary state for handling image messages
             temp_state = [HumanMessage(content=all_messages[-1].content, name="user")]
 
-            result: AIMessage = await self.model.ainvoke(temp_state, config)
+            result: AnyMessage = await self.model.ainvoke(temp_state, config)
         else:
-            # 普通消息保持原有处理方式
-            result: AIMessage = await chain.ainvoke(state, config)
+            # Normal messages maintain the original processing method
+            # Convert WorkflowTeamState to dict before passing to ainvoke
+            result: AnyMessage = await chain.ainvoke({"messages": state.get("messages", [])}, config)
 
         # 更新 node_outputs
         new_output = {self.node_id: {"response": result.content}}
@@ -140,7 +141,7 @@ class LLMNode(LLMBaseNode):
 
         return_state: ReturnWorkflowTeamState = {
             "history": history + [result],
-            "messages": [result] if result.tool_calls else [],
+            "messages": [result] if hasattr(result, "tool_calls") else [],
             "all_messages": messages + [result],
             "node_outputs": state["node_outputs"],
         }

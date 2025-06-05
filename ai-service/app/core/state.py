@@ -170,7 +170,7 @@ class ReturnWorkflowTeamState(TypedDict):
     team: NotRequired[GraphTeam]
     next: NotRequired[str | None]  # Returning None is valid for sequential graphs only
     task: NotRequired[list[AnyMessage]]
-    node_outputs: Annotated[dict[str, Any], update_node_outputs]
+    node_outputs: Annotated[NotRequired[dict[str, Any]], update_node_outputs]
 
 
 def parse_variables(text: str, node_outputs: dict, is_code: bool = False) -> str:

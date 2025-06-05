@@ -1,8 +1,8 @@
 import json
-from typing import Any
+from typing import Any, List
 from uuid import uuid4
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command, interrupt
 
@@ -46,11 +46,17 @@ class HumanNode:
         }
 
         if self.interaction_type == InterruptType.TOOL_REVIEW:
-            if (
-                    not hasattr(self.last_message, "tool_calls")
-                    or not self.last_message.tool_calls
-            ):
-                return state
+            if not isinstance(self.last_message, AIMessage) or not hasattr(self.last_message, "tool_calls") or not self.last_message.tool_calls:
+                return {
+                    "all_messages": state["all_messages"],
+                    "history": state["history"],
+                    "messages": state["messages"],
+                    "team": state["team"],
+                    "next": state["next"],
+                    "task": state["task"],
+                    "node_outputs": state["node_outputs"],
+                }
+
             tool_call = self.last_message.tool_calls
             interrupt_data.update(
                 {
@@ -90,6 +96,10 @@ class HumanNode:
             raise ValueError(f"Unknown interaction type: {self.interaction_type}")
 
     def _handle_tool_review(self, action: str, review_data: Any) -> Command[str]:
+        # Use safety checks to ensure last_message is an AIMessage with tool_calls
+        if not isinstance(self.last_message, AIMessage) or not hasattr(self.last_message, "tool_calls") or not self.last_message.tool_calls:
+            raise ValueError("Last message does not contain valid tool calls for review")
+
         tool_call = self.last_message.tool_calls[-1]
         match action:
             case InterruptDecision.APPROVED:
@@ -99,7 +109,7 @@ class HumanNode:
 
             case InterruptDecision.REJECTED:
                 # Reject tool call, add rejection message
-                result = [
+                result: List[AnyMessage] = [
                     ToolMessage(
                         tool_call_id=tool_call["id"],
                         content="Rejected by user. Continue assisting.",
@@ -114,10 +124,11 @@ class HumanNode:
                 )
 
                 return_state: ReturnWorkflowTeamState = {
-                    "history": self.history + result,
+                    "history": (self.history or []) + result,
                     "messages": result,
-                    "all_messages": self.all_messages + result,
+                    "all_messages": (self.all_messages or []) + result,
                 }
+
                 next_node = self.routes.get("rejected", "call_llm")
                 return Command(goto=next_node, update=return_state)
 
@@ -143,9 +154,9 @@ class HumanNode:
                 )
 
                 return_state: ReturnWorkflowTeamState = {
-                    "history": self.history + [updated_message],
+                    "history": (self.history or []) + [updated_message],
                     "messages": [updated_message],
-                    "all_messages": self.all_messages + [updated_message],
+                    "all_messages": (self.all_messages or []) + [updated_message],
                 }
                 next_node = self.routes.get("update", "run_tool")
                 return Command(goto=next_node, update=return_state)
@@ -163,9 +174,9 @@ class HumanNode:
                 result = HumanMessage(content=review_data, name="user", id=str(uuid4()))
                 next_node = self.routes.get("review", "call_llm")
                 return_state: ReturnWorkflowTeamState = {
-                    "history": self.history + [result],
+                    "history": (self.history or []) + [result],
                     "messages": [result],
-                    "all_messages": self.all_messages + [result],
+                    "all_messages": (self.all_messages or []) + [result],
                 }
                 return Command(goto=next_node, update=return_state)
 
@@ -177,9 +188,9 @@ class HumanNode:
             result = HumanMessage(content=review_data, name="user", id=str(uuid4()))
             next_node = self.routes.get("continue", "call_llm")
             return_state: ReturnWorkflowTeamState = {
-                "history": self.history + [result],
+                "history": (self.history or []) + [result],
                 "messages": [result],
-                "all_messages": self.all_messages + [result],
+                "all_messages": (self.all_messages or []) + [result],
             }
             return Command(goto=next_node, update=return_state)
         else:

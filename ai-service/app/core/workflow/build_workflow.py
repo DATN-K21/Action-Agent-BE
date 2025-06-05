@@ -12,6 +12,8 @@ from app.core.enums import InterruptType
 from app.core.workflow.node.parameter_extractor_node import ParameterExtractorNode
 from app.core.workflow.node.plugin_node import PluginNode
 from app.core.workflow.utils.tools_utils import get_retrieval_tool, get_tool
+
+from ..state import WorkflowTeamState
 from .node.agent_node import AgentNode
 from .node.answer_node import AnswerNode
 from .node.classifier_node import ClassifierNode
@@ -24,7 +26,6 @@ from .node.llm_node import LLMNode
 from .node.mcp.mcp_node import MCPNode
 from .node.retrieval_node import RetrievalNode
 from .node.subgraph_node import SubgraphNode
-from ..state import WorkflowTeamState
 
 
 def validate_config(config: dict[str, Any]) -> bool:
@@ -163,9 +164,9 @@ def _add_ifelse_conditional_edges(
 
 
 def initialize_graph(
-        build_config: dict[str, Any],
-        checkpointer: BaseCheckpointSaver,
-        save_graph_img=False,
+    build_config: dict[str, Any],
+    checkpointer: BaseCheckpointSaver | None,
+    save_graph_img=False,
 ) -> CompiledGraph:
     global tool_name_to_node_id
 
