@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def test_delete_operation(user_id: int, upload_id: int):
+def test_delete_operation(user_id: str, upload_id: str):
     """Test delete operation for PGVectorWrapper"""
     pgvector_store = PGVectorWrapper()
 
@@ -34,9 +34,7 @@ def test_delete_operation(user_id: int, upload_id: int):
         logger.error("Unexpected result: document count increased after deletion")
 
 
-def check_document_count(
-        pgvector_store: PGVectorWrapper, user_id: int, upload_id: int
-) -> int:
+def check_document_count(pgvector_store: PGVectorWrapper, user_id: str, upload_id: str) -> int:
     """Check document count using PGVectorWrapper's internal method"""
     count = pgvector_store._count_documents(user_id, upload_id)
     logger.info(
@@ -45,7 +43,7 @@ def check_document_count(
     return count
 
 
-def inspect_documents(pgvector_store: PGVectorWrapper, user_id: int, upload_id: int):
+def inspect_documents(pgvector_store: PGVectorWrapper, user_id: str, upload_id: str):
     """Inspect documents by performing a search to see what exists"""
     logger.info(f"Inspecting documents for user_id: {user_id}, upload_id: {upload_id}")
 
@@ -81,8 +79,8 @@ def inspect_documents(pgvector_store: PGVectorWrapper, user_id: int, upload_id: 
 
 
 if __name__ == "__main__":
-    user_id = 1  # Replace with actual user ID
-    upload_id = 20  # Replace with actual upload ID
+    user_id = "1"  # Replace with actual user ID
+    upload_id = "20"  # Replace with actual upload ID
 
     pgvector_store = PGVectorWrapper()
 

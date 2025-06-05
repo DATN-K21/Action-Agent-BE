@@ -49,13 +49,13 @@ class PGVectorWrapper:
             raise
 
     def add(
-            self,
-            file_path_or_url: str,
-            upload_id: int,
-            user_id: int,
-            chunk_size: int = 500,
-            chunk_overlap: int = 50,
-            callback: Callable[[], None] | None = None,
+        self,
+        file_path_or_url: str,
+        upload_id: str,
+        user_id: str,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
+        callback: Callable[[], None] | None = None,
     ) -> None:
         try:
             docs = load_and_split_document(
@@ -87,7 +87,7 @@ class PGVectorWrapper:
             raise
 
     # noinspection SqlNoDataSourceInspection
-    def delete(self, upload_id: int, user_id: int) -> bool:
+    def delete(self, upload_id: str, user_id: str) -> bool:
         try:
             logger.debug(
                 f"Attempting to delete documents for upload_id: {upload_id}, user_id: {user_id}"
@@ -106,7 +106,7 @@ class PGVectorWrapper:
 
             with self.sync_engine.connect() as conn:
                 result = conn.execute(
-                    text(f"""
+                    text("""
                         DELETE FROM langchain_pg_embedding 
                         WHERE collection_id = (
                             SELECT uuid FROM langchain_pg_collection 
@@ -115,14 +115,10 @@ class PGVectorWrapper:
                         AND cmetadata->>'user_id' = :user_id 
                         AND cmetadata->>'upload_id' = :upload_id
                     """),
-                    {
-                        "collection_name": self.collection_name,
-                        "user_id": str(user_id),
-                        "upload_id": str(upload_id)
-                    }
+                    {"collection_name": self.collection_name, "user_id": str(user_id), "upload_id": str(upload_id)},
                 )
                 conn.commit()
-                deleted_count = result.rowcount()
+                deleted_count = result.rowcount
 
             logger.info(
                 f"Successfully deleted {deleted_count} documents for upload_id: {upload_id}, user_id: {user_id}"
@@ -134,13 +130,13 @@ class PGVectorWrapper:
             return False
 
     def update(
-            self,
-            file_path_or_url: str,
-            upload_id: int,
-            user_id: int,
-            chunk_size: int = 500,
-            chunk_overlap: int = 50,
-            callback: Callable[[], None] | None = None,
+        self,
+        file_path_or_url: str,
+        upload_id: str,
+        user_id: str,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
+        callback: Callable[[], None] | None = None,
     ) -> None:
         deletion_successful = self.delete(upload_id, user_id)
         if not deletion_successful:
@@ -151,7 +147,7 @@ class PGVectorWrapper:
         if callback:
             callback()
 
-    def search(self, user_id: int, upload_ids: list[int], query: str) -> list[Document]:
+    def search(self, user_id: str, upload_ids: list[str], query: str) -> list[Document]:
         try:
             # Create filter for metadata
             filter_dict = {
@@ -194,7 +190,7 @@ class PGVectorWrapper:
         logger.debug(f"Retriever created: {retriever}")
         return retriever
 
-    def debug_retriever(self, user_id: int, upload_id: int, query: str):
+    def debug_retriever(self, user_id: str, upload_id: str, query: str):
         logger.debug(
             f"Debug retriever for user_id: {user_id}, upload_id: {upload_id}, query: '{query}'"
         )
@@ -374,12 +370,12 @@ class PGVectorWrapper:
         return combined_results[:top_k]
 
     # noinspection SqlNoDataSourceInspection
-    def _count_documents(self, user_id: int, upload_id: int) -> int:
+    def _count_documents(self, user_id: str, upload_id: str) -> int:
         """Helper method to count documents for a specific user and upload"""
         try:
             with self.sync_engine.connect() as conn:
                 result = conn.execute(
-                    text(f"""
+                    text("""
                         SELECT COUNT(*) 
                         FROM langchain_pg_embedding 
                         WHERE collection_id = (
@@ -389,11 +385,7 @@ class PGVectorWrapper:
                         AND cmetadata->>'user_id' = :user_id 
                         AND cmetadata->>'upload_id' = :upload_id
                     """),
-                    {
-                        "collection_name": self.collection_name,
-                        "user_id": str(user_id),
-                        "upload_id": str(upload_id)
-                    }
+                    {"collection_name": self.collection_name, "user_id": str(user_id), "upload_id": str(upload_id)},
                 )
                 count = result.scalar()
                 return count or 0

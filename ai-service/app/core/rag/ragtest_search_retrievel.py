@@ -7,8 +7,8 @@ from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-user_id = 1
-upload_id = 5
+user_id = "1"
+upload_id = "5"
 query = "When was Thomson established?"  # Converted to English
 
 # Create PGVectorWrapper instance
@@ -42,7 +42,7 @@ for doc in search_results:
     logger.info("---")
 
 # Create and use retriever tool
-retriever = pgvector_store.retriever(user_id, upload_id)
+retriever = pgvector_store.retriever(str(user_id), str(upload_id))
 logger.info(f"Created retriever: {retriever}")
 retriever_tool = create_retriever_tool_custom_modified(retriever)
 logger.info(f"Created retriever tool: {retriever_tool}")

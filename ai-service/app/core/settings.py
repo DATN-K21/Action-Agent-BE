@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND: str = ""
 
+    # Embedding model. See the list of supported models: https://qdrant.github.io/fastembed/examples/Supported_Models/
+    DENSE_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    SPARSE_EMBEDDING_MODEL: str = "prithivida/Splade_PP_en_v1"
+    FASTEMBED_CACHE_PATH = "./fastembed_cache"
+
     # Protected names
     PROTECTED_NAMES = ["user", "ignore", "error"]
 

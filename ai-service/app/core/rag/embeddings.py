@@ -5,7 +5,7 @@ import requests
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -132,10 +132,11 @@ def get_embedding_model(model__provider_name: str) -> Embeddings:
     try:
         if model__provider_name == "openai":
             api_key = get_api_key("openai")
-            embedding_model = OpenAIEmbeddings(openai_api_key=api_key)
-            embedding_model.dimension = get_embedding_dimension(
-                "openai", "text-embedding-ada-002"
-            )
+            embedding_model = OpenAIEmbeddings(api_key=SecretStr(api_key))
+            # Store dimension as a separate attribute since OpenAIEmbeddings doesn't have a dimension attribute
+            dimension = get_embedding_dimension("openai", "text-embedding-ada-002")
+            # Add dimension as a separate attribute to the embedding_model
+            setattr(embedding_model, "dimension", dimension)
         elif model__provider_name == "zhipuai":
             api_key = get_api_key("zhipuai")
             embedding_model = ZhipuAIEmbeddings(api_key=api_key)
@@ -147,16 +148,20 @@ def get_embedding_model(model__provider_name: str) -> Embeddings:
                 model_name=env_settings.DENSE_EMBEDDING_MODEL,
                 model_kwargs={"device": "cpu"},
             )
-            # 对于local模型，我们可以通过实际嵌入一个样本文本来获取维度
+            # For local models, we can get the dimension by actually embedding a sample text
             sample_embedding = embedding_model.embed_query("Sample text for dimension")
-            embedding_model.dimension = len(sample_embedding)
+            setattr(embedding_model, "dimension", len(sample_embedding))
         else:
             raise ValueError(
                 f"Unsupported embedding model provider: {model__provider_name}"
             )
 
         logger.info(f"Embedding model created: {type(embedding_model)}")
-        logger.info(f"Embedding model dimension: {embedding_model.dimension}")
+
+        # Check if the embedding model has a dimension attribute before logging it
+        dimension = getattr(embedding_model, "dimension", None)
+        if dimension is not None:
+            logger.info(f"Embedding model dimension: {dimension}")
 
         return embedding_model
     except Exception as e:

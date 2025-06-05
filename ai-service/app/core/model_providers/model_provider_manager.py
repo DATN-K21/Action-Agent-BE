@@ -7,7 +7,7 @@ from typing import Any
 class ModelProviderManager:
     def __init__(self):
         self.providers: dict[str, dict[str, Any]] = {}
-        self.models: dict[str, list[str]] = {}
+        self.models: dict[str, list[dict[str, Any]]] = {}
         self.init_functions: dict[str, Callable] = {}
         self.init_crewai_functions: dict[str, Callable] = {}
         self.load_providers()
@@ -29,7 +29,7 @@ class ModelProviderManager:
 
                     if provider_config and init_function:
                         self.providers[item] = provider_config
-                        self.models[item] = supported_models
+                        self.models[item] = supported_models  # type: ignore
                         self.init_functions[item] = init_function
                         if init_crewai_function:
                             self.init_crewai_functions[item] = init_crewai_function
@@ -39,13 +39,13 @@ class ModelProviderManager:
     def get_provider_config(self, provider_name: str) -> dict[str, Any]:
         return self.providers.get(provider_name, {})
 
-    def get_supported_models(self, provider_name: str) -> list[str]:
+    def get_supported_models(self, provider_name: str) -> list[dict[str, Any]]:
         return self.models.get(provider_name, [])
 
     def get_all_providers(self) -> dict[str, dict[str, Any]]:
         return self.providers
 
-    def get_all_models(self) -> dict[str, list[str]]:
+    def get_all_models(self) -> dict[str, list[dict[str, Any]]]:
         return self.models
 
     def init_model(

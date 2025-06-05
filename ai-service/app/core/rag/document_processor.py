@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 def load_and_split_document(
     file_path: str,
-    user_id: int,
-    upload_id: int,
+    user_id: str,
+    upload_id: str,
     chunk_size: int = 500,
     chunk_overlap: int = 50,
 ) -> list[Document]:
