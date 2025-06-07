@@ -1,12 +1,13 @@
 import socket
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
+from alembic import command
+from alembic.config import Config
 
 from app.core import logging
-from app.core.db_session import async_engine
-from app.db_models.base_entity import Base
 from app.memory.checkpoint import AsyncPostgresPool
 
 logger = logging.get_logger(__name__)
@@ -21,12 +22,9 @@ async def lifespan(app: FastAPI):
         # Manually set up the PostgreSQL connection pool
         await AsyncPostgresPool.asetup()
 
-        # Setup PostgreSQL migrations
-        # TODO: Use Alembic for migrations instead of this
-        async with async_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            logger.info(f"SQLAlchemy tables: {Base.metadata.tables.keys()}")
-            logger.info("SQLAlchemy tables created")
+        # Setup PostgreSQL migrations using Alembic
+        alembic_cfg = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+        command.upgrade(alembic_cfg, "head")
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()

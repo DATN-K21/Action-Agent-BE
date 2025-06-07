@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -60,33 +61,22 @@ async def aread_members(
     """
     Retrieve members from assistant.
     """
-    # TODO: Use new way of getting members from assistants. Get assistant first then use assistant.members
     try:
-        if x_user_role.lower() == "admin" or x_user_role.lower() == "super admin":
-            count_statement = select(func.count()).select_from(Member).where(Member.is_deleted.is_(False))
-            count_result = await session.execute(count_statement)
-            count = count_result.scalar_one()
-            statement = select(Member).where(Member.team_id == assistant_id, Member.is_deleted.is_(False)).offset(skip).limit(limit)
-            result = await session.execute(statement)
-            members = result.scalars().all()
-        else:
-            count_statement = (
-                select(func.count())
-                .select_from(Member)
-                .join(Team)
-                .where(Team.user_id == x_user_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
-            )
-            count_result = await session.execute(count_statement)
-            count = count_result.scalar_one()
-            statement = (
-                select(Member)
-                .join(Team)
-                .where(Team.user_id == x_user_id, Member.team_id == assistant_id, Member.is_deleted.is_(False))
-                .offset(skip)
-                .limit(limit)
-            )
-            result = await session.execute(statement)
-            members = result.scalars().all()
+        stmt = select(Team).options(selectinload(Team.members)).where(
+            Team.id == assistant_id,
+            Team.is_deleted.is_(False),
+        )
+        result = await session.execute(stmt)
+        assistant = result.scalar_one_or_none()
+        if not assistant:
+            return ResponseWrapper(status=404, message="assistant not found").to_response()
+
+        if x_user_role.lower() not in ["admin", "super admin"] and assistant.user_id != x_user_id:
+            return ResponseWrapper(status=403, message="Not enough permissions").to_response()
+
+        all_members = [m for m in assistant.members if not m.is_deleted]
+        count = len(all_members)
+        members = all_members[skip : skip + limit]
 
         converted_members = [MemberResponse.model_validate(member) for member in members]
         data = MembersResponse(members=converted_members, count=count)

@@ -297,12 +297,11 @@ def should_continue(state: GraphTeamState) -> str:
     """Determine if graph should go to tool node or not. For tool calling agents."""
     messages: list[AnyMessage] = state["messages"]
     if messages and isinstance(messages[-1], AIMessage) and messages[-1].tool_calls:
-        # TODO: what if multiple tool_calls?
-        for tool_call in messages[-1].tool_calls:
-            if tool_call["name"] == "ask-human":
-                return "call_human"
-        else:
-            return "call_tools"
+        # Prioritise asking a human if any tool call requests it
+        if any(tc.get("name") == "ask-human" for tc in messages[-1].tool_calls):
+            return "call_human"
+        # Otherwise proceed with the tool calls
+        return "call_tools"
     else:
         return "continue"
 

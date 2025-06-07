@@ -302,8 +302,9 @@ async def astream(
         if not thread:
             return ResponseWrapper(status=404, message="Thread not found").to_response()
 
-        # TODO: Check if the thread and the team belongs to the assistan
-        # ...
+        # Ensure the thread is associated with the requested assistant
+        if thread.assistant_id != team_id:
+            return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
         # Populate the skills and accessible uploads for each member
         members = team.members
