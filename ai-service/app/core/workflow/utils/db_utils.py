@@ -22,10 +22,12 @@ def db_operation(operation: Callable[[Session], T]) -> T:
     """
     with SyncSessionLocal() as session:
         try:
-            return operation(session)
-        except Exception as e:
+            result = operation(session)
+            session.commit()
+            return result
+        except Exception:
             session.rollback()
-            raise e
+            raise
 
 
 # Example Usage
@@ -60,14 +62,11 @@ def get_all_models_helper():
     return db_operation(_get_all_models)
 
 
-def get_models_by_provider_helper(provider_id: int):
+def get_models_by_provider_helper(provider_id: str):
     # from app.curd.models import get_models_by_provider
     # return db_operation(lambda session: get_models_by_provider(session, provider_id))
     def _get_models(session: Session):
-        stmt = (
-            select(Model)
-            .where(Model.provider_id == str(provider_id), Model.is_deleted.is_(False))
-        )
+        stmt = select(Model).where(Model.provider_id == provider_id, Model.is_deleted.is_(False))
         result = session.execute(stmt)
         return result.scalars().all()
 
@@ -120,7 +119,7 @@ def get_model_info(model_name: str) -> dict[str, str]:
     return db_operation(_get_info)
 
 
-def get_subgraph_by_id(subgraph_id: int) -> tuple[str, dict[str, Any]]:
+def get_subgraph_by_id(subgraph_id: str) -> tuple[str, dict[str, Any]]:
     """
     Get subgraph config by ID.
     """
