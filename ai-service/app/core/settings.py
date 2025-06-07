@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
 
     # Sets the number of processors
-    MAX_WORKERS = 1
+    MAX_WORKERS: int = 1
 
     # Celery settings
     CELERY_BROKER_URL: str = ""
@@ -75,10 +75,10 @@ class Settings(BaseSettings):
     # Embedding model. See the list of supported models: https://qdrant.github.io/fastembed/examples/Supported_Models/
     DENSE_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     SPARSE_EMBEDDING_MODEL: str = "prithivida/Splade_PP_en_v1"
-    FASTEMBED_CACHE_PATH = "./fastembed_cache"
+    FASTEMBED_CACHE_PATH: str = "./fastembed_cache"
 
     # Protected names
-    PROTECTED_NAMES = ["user", "ignore", "error"]
+    PROTECTED_NAMES: list[str] = ["user", "ignore", "error"]
 
     @property
     def POSTGRES_URL_PATH(self) -> str:
