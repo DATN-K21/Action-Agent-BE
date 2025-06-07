@@ -1,4 +1,5 @@
 from app.db_models.apikey import ApiKey
+from app.db_models.assistant import Assistant
 from app.db_models.base_entity import Base, BaseEntity
 from app.db_models.checkpoint import Checkpoint
 from app.db_models.checkpoint_blobs import CheckpointBlobs
@@ -20,6 +21,7 @@ from app.db_models.user_api_key import UserApiKey
 from app.db_models.write import Write
 
 __all__ = [
+    "Assistant",
     "Base",
     "BaseEntity",
     "ConnectedExtension",

@@ -21,7 +21,7 @@ class Skill(BaseEntity):
     credentials = Column(JSON, default=dict, nullable=True)
 
     reference_type = Column(Enum(ConnectedServiceType), nullable=False, default=ConnectedServiceType.NONE)
-    extension_id = Column(String, ForeignKey("extensions.id"), nullable=True)
+    extension_id = Column(String, ForeignKey("connected_extensions.id"), nullable=True)
     mcp_id = Column(String, ForeignKey("connected_mcps.id"), nullable=True)
 
     # Relationships
@@ -31,5 +31,5 @@ class Skill(BaseEntity):
         secondary="member_skills_link",
         back_populates="skills"
     )
-    extension = relationship("Extension", back_populates="skills")
+    extension = relationship("ConnectedExtension", back_populates="skills")
     mcp = relationship("ConnectedMcp", back_populates="skills")
