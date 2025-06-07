@@ -6,6 +6,7 @@ import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 from alembic import command
 from alembic.config import Config
+import asyncio
 
 from app.core import logging
 from app.memory.checkpoint import AsyncPostgresPool
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
 
         # Setup PostgreSQL migrations using Alembic
         alembic_cfg = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
-        command.upgrade(alembic_cfg, "head")
+        await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()
