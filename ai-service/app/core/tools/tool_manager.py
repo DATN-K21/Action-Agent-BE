@@ -50,7 +50,7 @@ def _standardize_name_part(text_part: str) -> str:
     return processed_text
 
 
-def create_unique_personal_skill_name(skill_id: str, skill_name: str) -> str:
+def create_unique_key(skill_id: str, skill_name: str) -> str:
     """
     Creates a unique and standardized personal skill name.
     It joins a standardized skill_id and a standardized, lowercase skill_name.
@@ -76,7 +76,9 @@ def create_unique_personal_skill_name(skill_id: str, skill_name: str) -> str:
 
 class ToolManager:
     def __init__(self, tools_package_path: str = DEFAULT_TOOLS_PACKAGE_PATH):
+        # tool_key -> ToolInfo
         self.global_tools: Dict[str, ToolInfo] = {}
+        # user_id -> tool_key -> ToolInfo
         self.personal_tool_cache: OrderedDict[str, OrderedDict[str, ToolInfo]] = OrderedDict()
         self.tools_package_path = tools_package_path
 
@@ -90,9 +92,9 @@ class ToolManager:
 
         self._load_initial_global_tools()  # Assumed to be called before concurrent access begins
 
-    # Static methods format_tool_name and convert_to_input_parameters remain unchanged
+    # Static methods format_tool_key and convert_to_input_parameters remain unchanged
     @staticmethod
-    def format_tool_name(name: str) -> str:
+    def format_tool_key(name: str) -> str:
         return name.replace("_", "-")
 
     @staticmethod
@@ -130,10 +132,10 @@ class ToolManager:
                 try:
                     module = importlib.import_module(f".{item}", package=self.tools_package_path)
                     if hasattr(module, "__all__"):
-                        for tool_name_in_module in module.__all__:
-                            tool_instance = getattr(module, tool_name_in_module, None)
+                        for tool_key_in_module in module.__all__:
+                            tool_instance = getattr(module, tool_key_in_module, None)
                             if isinstance(tool_instance, BaseTool):
-                                formatted_name = self.format_tool_name(tool_name_in_module)
+                                formatted_name = self.format_tool_key(tool_key_in_module)
                                 inputs_dict = tool_instance.args
                                 input_params = self.convert_to_input_parameters(inputs_dict)
                                 credentials = {}
@@ -184,7 +186,7 @@ class ToolManager:
         self._load_hardcoded_external_tools_to_global()
         logger.info(f"Loaded {len(self.global_tools)} global tools.")
 
-    def add_personal_tool(self, user_id: str, tool_name: str, tool_info: ToolInfo):
+    def add_personal_tool(self, user_id: str, tool_key: str, tool_info: ToolInfo):
         # For asyncio: async def add_personal_tool(self, ...):
         # For asyncio:     async with self.cache_lock:
         with self.cache_lock:  # Acquire lock
@@ -205,16 +207,16 @@ class ToolManager:
             if MAX_PERSONAL_TOOLS_PER_USER <= 0:
                 return
 
-            if tool_name in user_specific_cache:
-                user_specific_cache.move_to_end(tool_name)
-            user_specific_cache[tool_name] = tool_info
+            if tool_key in user_specific_cache:
+                user_specific_cache.move_to_end(tool_key)
+            user_specific_cache[tool_key] = tool_info
 
             while len(user_specific_cache) > MAX_PERSONAL_TOOLS_PER_USER:
-                dropped_tool_name, _ = user_specific_cache.popitem(last=False)
-                logger.warning(f"Tool limit ({MAX_PERSONAL_TOOLS_PER_USER}) for '{user_id}' hit. Evicted: '{dropped_tool_name}'.")
+                dropped_tool_key, _ = user_specific_cache.popitem(last=False)
+                logger.warning(f"Tool limit ({MAX_PERSONAL_TOOLS_PER_USER}) for '{user_id}' hit. Evicted: '{dropped_tool_key}'.")
         # Lock is released automatically when exiting 'with' block
 
-    def get_personal_tool(self, user_id: str, tool_name: str) -> ToolInfo:
+    def get_personal_tool(self, user_id: str, tool_key: str) -> ToolInfo:
         # For asyncio: async def get_personal_tool(self, ...):
         # For asyncio:     async with self.cache_lock:
         with self.cache_lock:  # Acquire lock
@@ -222,10 +224,10 @@ class ToolManager:
                 self.personal_tool_cache.move_to_end(user_id)
                 user_specific_cache = self.personal_tool_cache[user_id]
 
-                if tool_name in user_specific_cache:
-                    user_specific_cache.move_to_end(tool_name)
-                    return user_specific_cache[tool_name]
-            raise KeyError(f"Personal tool '{tool_name}' for user '{user_id}' not found in cache.")
+                if tool_key in user_specific_cache:
+                    user_specific_cache.move_to_end(tool_key)
+                    return user_specific_cache[tool_key]
+            raise KeyError(f"Personal tool '{tool_key}' for user '{user_id}' not found in cache.")
         # Lock is released
 
     def get_tools_for_user(self, user_id: str) -> Dict[str, ToolInfo]:

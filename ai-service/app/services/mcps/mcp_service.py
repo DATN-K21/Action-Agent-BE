@@ -10,7 +10,7 @@ logger = logging.get_logger(__name__)
 
 class McpService:
     @classmethod
-    async def aget_mcp_tool_info(cls, user_id: str, connections: dict[str, Connection]) -> list[ToolInfo]:
+    async def aget_mcp_tool_info(cls, connections: dict[str, Connection]) -> list[ToolInfo]:
         """
         Retrieve information about a specific MCP tool for a user.
 

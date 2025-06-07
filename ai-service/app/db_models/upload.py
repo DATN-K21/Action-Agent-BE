@@ -2,10 +2,13 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column,
-    Integer,
-    ForeignKey,
     DateTime,
-    Enum as SQLEnum, String,
+    ForeignKey,
+    Integer,
+    String,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import relationship
 
@@ -29,9 +32,10 @@ class Upload(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="uploads")
-    members = relationship(
-        "Member",
-        secondary="member_uploads_link",  # tên bảng liên kết
+    members = relationship("Member", secondary="member_uploads_link", back_populates="uploads", cascade="all, delete")
+    thread = relationship(
+        "Thread",
+        secondary="upload_thread_links",
         back_populates="uploads",
-        cascade="all, delete"
+        cascade="all, delete",
     )

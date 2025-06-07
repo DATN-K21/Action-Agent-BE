@@ -57,7 +57,7 @@ class ExtensionServiceManager:
     def reload_all_defined_services(self):
         self._load_all_defined_services()
 
-    def get_service(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
+    def get_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
         """
         Retrieves an extension service.
         If the service is in the active_service_cache, it's returned and marked as recently used.

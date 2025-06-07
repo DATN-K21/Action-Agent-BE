@@ -33,3 +33,4 @@ class Thread(BaseEntity):
         back_populates="thread",
         cascade="all, delete-orphan"
     )
+    uploads = relationship("Upload", secondary="upload_thread_links", back_populates="thread", cascade="all, delete")

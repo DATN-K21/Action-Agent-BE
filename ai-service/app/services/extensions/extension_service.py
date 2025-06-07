@@ -5,6 +5,7 @@ from composio_langgraph import Action
 from langchain_core.tools import BaseTool
 
 from app.core import logging
+from app.core.models import ToolInfo
 from app.core.settings import env_settings
 from app.schemas.extension import DeleteConnection
 from app.services.extensions.composio_client import ComposioClient
@@ -56,11 +57,22 @@ class ExtensionService:
         tool_names = [str(action) for action in self._supported_actions]
         return tool_names
 
-    def get_tools(self) -> Sequence[BaseTool]:
+    def get_tools(self) -> Sequence[ToolInfo]:
         """Get the tools"""
         toolset = ComposioClient.get_toolset()
         tools = toolset.get_tools(actions=self._supported_actions)
-        return tools
+
+        tool_infos = [
+            ToolInfo(
+                description=tool.description,
+                tool=tool,
+                display_name=tool.name,
+                input_parameters=tool.get_input_jsonschema(),
+            )
+            for tool in tools
+        ]
+
+        return tool_infos
 
     def get_authed_tools(self, user_id: str) -> Sequence[BaseTool]:
         """Get the tools for a specific user"""

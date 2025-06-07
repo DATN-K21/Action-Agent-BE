@@ -10,7 +10,8 @@ class ConnectedMcp(BaseEntity):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     mcp_name = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    connection_type = Column(String, nullable=False, default="sse")
+    transport = Column(String, nullable=False, default="sse")
+    description = Column(String, nullable=True)
 
     # Relationships
     skills = relationship("Skill", back_populates="mcp", cascade="all, delete-orphan", passive_deletes=True)

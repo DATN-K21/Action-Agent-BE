@@ -15,7 +15,6 @@ class Skill(BaseEntity):
     icon = Column(String, nullable=True)
     display_name = Column(String, nullable=True)
     strategy = Column(Enum(StorageStrategy), nullable=True, default=StorageStrategy.DEFINITION)
-    skill_type = Column(Enum(StorageStrategy), nullable=True, default=StorageStrategy.DEFINITION)
     tool_definition = Column(JSON, default=dict, nullable=True)
     input_parameters = Column(JSON, default=dict, nullable=True)
     credentials = Column(JSON, default=dict, nullable=True)
