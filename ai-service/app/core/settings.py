@@ -11,6 +11,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
         env_file_encoding="utf-8",
         env_ignore_empty=True,
+        extra="ignore",
     )
 
     # Debug mode
