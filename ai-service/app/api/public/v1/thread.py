@@ -7,6 +7,10 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
+from app.core.graph.checkpoint.utils import (
+    convert_checkpoint_tuple_to_messages,
+    get_checkpoint_tuples,
+)
 from app.db_models.thread import Thread
 from app.schemas.base import CursorPagingRequest, MessageResponse, ResponseWrapper
 from app.schemas.thread import (
@@ -188,11 +192,13 @@ async def generate_title(
         if thread is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found")
 
-        # Get the thread messages
-        # TODO: get messages from the thread
-        # This is a placeholder for the actual message retrieval logic.
-        # ...
-        messages = []
+        # Get the thread messages from the latest checkpoint
+        checkpoint_tuple = await get_checkpoint_tuples(thread_id)
+        messages = (
+            convert_checkpoint_tuple_to_messages(checkpoint_tuple)
+            if checkpoint_tuple
+            else []
+        )
         if not messages:
             return ResponseWrapper.wrap(status=404, message="Thread not found")
 

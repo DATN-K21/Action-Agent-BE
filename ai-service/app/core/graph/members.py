@@ -396,8 +396,9 @@ class SummariserNode(BaseNode):
     ) -> dict[str, list[AnyMessage]]:
         team = state["team"]
         team_members_name = self.get_team_members_name(team.members)
-        # TODO: optimise looking for task
-        team_task = state["main_task"][0].content
+        # Retrieve the current task if available otherwise fall back to the main task
+        tasks = state.get("task") or state.get("main_task", [])
+        team_task = tasks[0].content if tasks else ""
 
         summarise_chain: RunnableSerializable[Any, Any] = (
                 self.summariser_prompt.partial(

@@ -1,8 +1,7 @@
-import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 
 from app.core.settings import env_settings
 from app.db_models.base_entity import Base
@@ -27,7 +26,7 @@ def get_url():
     host = env_settings.POSTGRES_HOST
     port = env_settings.POSTGRES_PORT
     db = env_settings.POSTGRES_DB
-    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
 
 
 # Offline migrations
@@ -44,26 +43,22 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-# Async online migrations
-async def run_migrations_online():
+# Online migrations
+def run_migrations_online():
     url = get_url()
-    connectable = create_async_engine(url)
+    connectable = create_engine(url)
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
 
-    await connectable.dispose()
+        with context.begin_transaction():
+            context.run_migrations()
 
-
-def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
+    connectable.dispose()
 
 
 # Entry point
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

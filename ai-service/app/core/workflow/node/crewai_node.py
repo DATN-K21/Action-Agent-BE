@@ -140,7 +140,7 @@ Even though you don't perform tasks by yourself, you have a lot of experience in
                 for ctx in task_config["context"]
             ]
 
-        # TODO: I dont understand, the context type don't mach expected type
+        # Create the task with the parsed context
         return Task(
             description=description,
             agent=agents[task_config["agent_id"]],
