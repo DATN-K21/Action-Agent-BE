@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public.v1 import assistant, callback, connected_extension, connected_mcp, test, user
+from app.api.public.v1 import callback, connected_extension, connected_mcp, test, user
 
 
 class ValidationErrorResponse(BaseModel):
@@ -43,7 +43,7 @@ router.include_router(connected_mcp.router, prefix=prefix)
 prefix = "/api/v2"
 # router.include_router(agent_v2.router, prefix=prefix)
 # router.include_router(mcp_agent.router, prefix=prefix)
-router.include_router(assistant.router, prefix=prefix)
+# router.include_router(assistant.router, prefix=prefix)
 # router.include_router(multi_agent.router, prefix=prefix)
 router.include_router(connected_extension.router, prefix=prefix)
 # router.include_router(composio.router, prefix=prefix)
