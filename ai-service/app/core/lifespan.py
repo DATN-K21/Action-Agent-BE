@@ -5,7 +5,7 @@ import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 
 from app.core import logging
-from app.core.db_session import engine
+from app.core.db_session import async_engine
 from app.db_models.base_entity import Base
 from app.memory.checkpoint import AsyncPostgresPool
 
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
         # Setup PostgreSQL migrations
         # TODO: Use Alembic for migrations instead of this
-        async with engine.begin() as conn:
+        async with async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             logger.info(f"SQLAlchemy tables: {Base.metadata.tables.keys()}")
             logger.info("SQLAlchemy tables created")

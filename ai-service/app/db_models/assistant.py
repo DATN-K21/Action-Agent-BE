@@ -17,3 +17,4 @@ class Assistant(BaseEntity):
 
     # Relationships
     threads = relationship("Thread", back_populates="assistant", cascade="all, delete-orphan")
+    apiKeys = relationship("ApiKey", back_populates="assistant", cascade="all, delete-orphan")

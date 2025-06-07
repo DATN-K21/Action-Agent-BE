@@ -18,7 +18,7 @@ class ApiKey(BaseEntity):
     description = Column(String, nullable=False)
 
     # Foreign key referencing assistant.id; the assistant owning this API key
-    assistant_id = Column(String, ForeignKey("assistant.id"), nullable=False)
+    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=False)
 
     # Relationship to Team model
     assistant = relationship("Assistant", back_populates="apikeys")

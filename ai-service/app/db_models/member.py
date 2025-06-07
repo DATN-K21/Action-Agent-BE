@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Numeric, String
 from sqlalchemy.orm import relationship
 
 from app.db_models.base_entity import BaseEntity
@@ -6,7 +6,6 @@ from app.db_models.base_entity import BaseEntity
 
 class Member(BaseEntity):
     __tablename__ = "members"
-    __table_args__ = UniqueConstraint("name", "assistant_id", name="unique_assistant_and_name")
 
     name = Column(String(64), unique=True, nullable=False)
     team_id = Column(String, ForeignKey("teams.id"), nullable=False)
