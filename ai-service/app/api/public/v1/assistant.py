@@ -1,17 +1,34 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Header
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
-from app.core.enums import AssistantType, WorkflowType
+from app.core.enums import AssistantType, ConnectedServiceType, StorageStrategy, WorkflowType
+from app.core.tools.tool_manager import create_unique_key, tool_manager, global_tools
+from app.core.utils.convert_type import convert_base_tool_to_tool_info
 from app.db_models.assistant import Assistant
+from app.db_models.connected_extension import ConnectedExtension
 from app.db_models.connected_mcp import ConnectedMcp
 from app.db_models.member import Member
+from app.db_models.member_skill_link import MemberSkillLink
+from app.db_models.skill import Skill
 from app.db_models.team import Team
 from app.db_models.team_assistant_link import TeamAssistantLink
-from app.schemas.assistant import CreateAdvancedAssistantRequest, CreateAdvancedAssistantResponse, GetAssistantResponse, GetAssistantsResponse
+from app.schemas.assistant import (
+    CreateAdvancedAssistantRequest,
+    CreateAdvancedAssistantResponse,
+    GetAdvancedAssistantResponse,
+    GetAssistantResponse,
+    GetAssistantsResponse,
+    UpdateAdvancedAssistantRequest,
+    UpdateAdvancedAssistantResponse,
+)
 from app.schemas.base import PagingRequest, ResponseWrapper
+from app.services.extensions import extension_service_manager
+from app.services.mcps.mcp_service import McpService
 
 logger = logging.get_logger(__name__)
 
@@ -57,7 +74,7 @@ async def aget_assistants(
                 statement = (
                     select(Assistant)
                     .options(selectinload(Assistant.teams))
-                    .where(Assistant.is_deleted == False)
+                    .where(Assistant.is_deleted.is_(False))
                     .offset((paging_number - 1) * max_per_page)
                     .limit(max_per_page)
                     .order_by(Assistant.created_at.desc())
@@ -132,10 +149,54 @@ async def aget_assistants(
                 system_prompt=str(assistant.system_prompt),
                 provider="",  # TODO: Not support for custom provider, let's update it later
                 model_name="",  # TODO: Not support for custom model, let's update it later
+                # TODO: Not support for custom temperature, let's update it later
+                main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
+                support_units=extract_support_units(assistant),
+                teams=[
+                    {
+                        "id": team.id,
+                        "name": team.name,
+                        "description": team.description,
+                        "workflow_type": team.workflow_type,
+                        "members": [
+                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                            for member in team.members
+                            if hasattr(team, "members") and team.members
+                        ],
+                    }
+                    for team in assistant.teams
+                ],
+                created_at=assistant.created_at,  # type: ignore
+            )
+            if str(assistant.assistant_type) == AssistantType.GENERAL_ASSISTANT
+            else GetAdvancedAssistantResponse(
+                id=str(assistant.id),
+                user_id=str(assistant.user_id),
+                name=str(assistant.name),
+                assistant_type=assistant.assistant_type,  # type: ignore
+                description=str(assistant.description),
+                system_prompt=str(assistant.system_prompt),
+                provider="",  # TODO: Not support for custom provider, let's update it later
+                model_name="",  # TODO: Not support for custom model, let's update it later
                 temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
                 main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
                 support_units=extract_support_units(assistant),
-                teams=[{"id": team.id, "name": team.name} for team in assistant.teams],
+                mcp_ids=None,  # TODO: Not support for MCPs yet
+                # TODO: Not support for extensions yet
+                teams=[
+                    {
+                        "id": team.id,
+                        "name": team.name,
+                        "description": team.description,
+                        "workflow_type": team.workflow_type,
+                        "members": [
+                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                            for member in team.members
+                            if hasattr(team, "members") and team.members
+                        ],
+                    }
+                    for team in assistant.teams
+                ],
                 created_at=assistant.created_at,  # type: ignore
             )
             for assistant in assistants
@@ -159,19 +220,18 @@ async def create_advanced_assistant(
     try:
         # Create a new assistant instance
         new_assistant = Assistant(
+            id=str(uuid.uuid4()),
             user_id=x_user_id,
             name=request.name,
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,  # Default type
         )
-
         session.add(new_assistant)
-        await session.commit()
-        await session.refresh(new_assistant)
 
         # Create main unit (main team)
         main_team = Team(
+            id=str(uuid.uuid4()),
             name="Hierarchical Unit",
             description="Main unit for advanced assistant, which integrates with mcps and extensions.",
             workflow_type=WorkflowType.HIERARCHICAL,
@@ -179,15 +239,17 @@ async def create_advanced_assistant(
         )
 
         session.add(main_team)
-        await session.commit()
-        await session.refresh(main_team)
 
         # Link the assistant with the main team
-        new_assistant.teams.append(main_team)
-        await session.commit()
+        team_assistant_link = TeamAssistantLink(
+            team_id=main_team.id,
+            assistant_id=new_assistant.id,
+        )
+        session.add(team_assistant_link)
 
         # Create root member for the main team
         root_member = Member(
+            id=str(uuid.uuid4()),
             name=f"{request.name} Leader",
             team_id=main_team.id,
             backstory="Leader of the main team for advanced assistant.",
@@ -202,13 +264,11 @@ async def create_advanced_assistant(
             position_y=0.0,
         )
         session.add(root_member)
-        await session.commit()
-        await session.refresh(root_member)
 
         # Load members of the main team
         if request.mcp_ids:
             for mcp_id in request.mcp_ids:
-                # Load mcp
+                # Load connected_mcp
                 statement = (
                     select(ConnectedMcp)
                     .select_from(ConnectedMcp)
@@ -219,6 +279,7 @@ async def create_advanced_assistant(
                 if connected_mcp:
                     # Create a member for the main team
                     member = Member(
+                        id=str(uuid.uuid4()),
                         name=str(connected_mcp.mcp_name),
                         team_id=main_team.id,
                         backstory=str(connected_mcp.description) if connected_mcp.description is not None else None,
@@ -233,28 +294,66 @@ async def create_advanced_assistant(
                         position_x=0.0,  # Placeholder for UI positioning
                         position_y=0.0,  # Placeholder for UI positioning
                     )
-
                     session.add(member)
-                    await session.commit()
-                    await session.refresh(member)
+
+                    # Load skills
+                    connections = {}
+                    connections[connected_mcp.mcp_name] = {
+                        "url": connected_mcp.url,
+                        "transport": connected_mcp.transport,
+                    }
+
+                    tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+
+                    # Create skills
+                    for tool_info in tool_infos:
+                        # Create skill
+                        skill = Skill(
+                            id=str(uuid.uuid4()),
+                            user_id=str(connected_mcp.user_id),
+                            name=tool_info.display_name,
+                            description=tool_info.description,
+                            icon="",
+                            display_name=tool_info.display_name,
+                            strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                            input_parameters=tool_info.input_parameters,
+                            reference_type=ConnectedServiceType.MCP,
+                            mcp_id=connected_mcp.id,
+                        )
+                        session.add(skill)
+
+                        # Add link to member
+                        member_skill_link = MemberSkillLink(
+                            member_id=member.id,
+                            skill_id=skill.id,
+                        )
+                        session.add(member_skill_link)
+
+                        # Add tool to cache
+                        tool_manager.add_personal_tool(
+                            user_id=str(connected_mcp.user_id),
+                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                            tool_info=tool_info,
+                        )
 
         # Load extensions of the main team
         if request.extension_ids:
             for extension_id in request.extension_ids:
-                # Load extension
+                # Load connected_extension
                 statement = (
-                    select(ConnectedMcp)
-                    .select_from(ConnectedMcp)
-                    .where(ConnectedMcp.id == extension_id, ConnectedMcp.user_id == x_user_id, ConnectedMcp.is_deleted.is_(False))
+                    select(ConnectedExtension)
+                    .select_from(ConnectedExtension)
+                    .where(ConnectedExtension.id == extension_id, ConnectedExtension.user_id == x_user_id, ConnectedExtension.is_deleted.is_(False))
                 )
                 result = await session.execute(statement)
                 connected_extension = result.scalar_one_or_none()
                 if connected_extension:
                     # Create a member for the main team
                     member = Member(
-                        name=str(connected_extension.mcp_name),
+                        id=str(uuid.uuid4()),
+                        name=str(connected_extension.extension_name),
                         team_id=main_team.id,
-                        backstory=str(connected_extension.description) if connected_extension.description is not None else None,
+                        backstory="", # TODO: Let's get description of the extension later
                         user_id=x_user_id,
                         role="Execute actions based on provided tasks using binding tools and return the results",
                         type="worker",
@@ -266,16 +365,55 @@ async def create_advanced_assistant(
                         position_x=0.0,  # Placeholder for UI positioning
                         position_y=0.0,  # Placeholder for UI positioning
                     )
-
                     session.add(member)
-                    await session.commit()
-                    await session.refresh(member)
+
+                    # Load skills
+                    extension_service_info = extension_service_manager.get_service_info(service_enum=str(connected_extension.extension_enum))
+
+                    if not extension_service_info or not extension_service_info.service_object:
+                        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
+                    extension_service = extension_service_info.service_object
+                    tools = extension_service.get_authed_tools(user_id=str(connected_extension.user_id))
+
+                    tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
+
+                    for tool_info in tool_infos:
+                        # Create skill
+                        skill = Skill(
+                            id=str(uuid.uuid4()),
+                            user_id=str(connected_extension.user_id),
+                            name=tool_info.display_name,
+                            description=tool_info.description,
+                            icon="",
+                            display_name=tool_info.display_name,
+                            strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                            input_parameters=tool_info.input_parameters,
+                            reference_type=ConnectedServiceType.EXTENSION,
+                            extension_id=connected_extension.id,
+                        )
+                        session.add(skill)
+
+                        # Add link to member
+                        member_skill_link = MemberSkillLink(
+                            member_id=member.id,
+                            skill_id=skill.id,
+                        )
+                        session.add(member_skill_link)
+
+                        # Add tool to cache
+                        tool_manager.add_personal_tool(
+                            user_id=str(connected_extension.user_id),
+                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                            tool_info=tool_info,
+                        )
 
         # For loop to create support units
         if request.support_units:
             for unit in request.support_units:
                 # Create a support team for each unit
                 support_team = Team(
+                    id=str(uuid.uuid4()),
                     name=f"Support Unit - {unit}",
                     description=f"Support unit for {unit} in advanced assistant.",
                     workflow_type=unit,
@@ -283,15 +421,17 @@ async def create_advanced_assistant(
                 )
 
                 session.add(support_team)
-                await session.commit()
-                await session.refresh(support_team)
 
                 # Link the support team with the assistant
-                new_assistant.teams.append(support_team)
-                await session.commit()
+                support_team_assistant_link = TeamAssistantLink(
+                    team_id=support_team.id,
+                    assistant_id=new_assistant.id,
+                )
+                session.add(support_team_assistant_link)
 
                 # Create freelancer head for the support team
                 support_root_member = Member(
+                    id=str(uuid.uuid4()),
                     name=f"{unit}",
                     team_id=support_team.id,
                     backstory=f"Unit for advanced assistant: {unit}.",
@@ -307,9 +447,83 @@ async def create_advanced_assistant(
                 )
 
                 session.add(support_root_member)
-                await session.commit()
-                await session.refresh(support_root_member)
+                
+                # Load skill for RAGBOT unit
+                if unit == WorkflowType.RAGBOT:
+                    rag_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(member.team.user_id),
+                        name="KnowledgeBase",
+                        description="Query documents for answers.",
+                        icon="",
+                        display_name="Knowledge Base",
+                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                        input_parameters={},
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(rag_skill)
 
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=member.id,
+                        skill_id=rag_skill.id,
+                    )
+                    session.add(member_skill_link)
+                
+                if unit == WorkflowType.SEARCHBOT:
+                     # DDG tool
+                    ddg_tool_info = global_tools.get("duckduckgo-search")
+                    if not ddg_tool_info:
+                        raise ValueError("DuckDuckGo search tool not found in global tools.")
+
+                    ddg_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(member.team.user_id),
+                        name=ddg_tool_info.display_name,
+                        description=ddg_tool_info.description,
+                        icon="",
+                        display_name=ddg_tool_info.display_name,
+                        strategy=StorageStrategy.GLOBAL_TOOLS,
+                        input_parameters=ddg_tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(ddg_skill)
+
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=member.id,
+                        skill_id=ddg_skill.id,
+                    )
+                    session.add(member_skill_link)
+
+                    # Wikipedia tool
+                    wikipedia_tool_info = global_tools.get("wikipedia")
+                    if not wikipedia_tool_info:
+                        raise ValueError("Wikipedia tool not found in global tools.")
+                    wikipedia_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(member.team.user_id),
+                        name=wikipedia_tool_info.display_name,
+                        description=wikipedia_tool_info.description,
+                        icon="",
+                        display_name=wikipedia_tool_info.display_name,
+                        strategy=StorageStrategy.GLOBAL_TOOLS,
+                        input_parameters=wikipedia_tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(wikipedia_skill)
+
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=member.id,
+                        skill_id=wikipedia_skill.id,
+                    )
+                    session.add(member_skill_link)
+
+        # Commit the session to save all changes
+        await session.commit()
+
+        # Get all teams associated with the new assistant
         statement = (
             select(Team)
             .select_from(Team)
@@ -358,36 +572,592 @@ async def create_advanced_assistant(
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
-@router.get("/{user_id}/{assistant_id}/get-detail", summary="Get assistant details.", response_model=ResponseWrapper[GetFullInfoAssistantResponse])
-async def get_full_info_assistant_by_id(
-    user_id: str,
-    assistant_id: str,
-    assistant_service: AssistantService = Depends(get_assistant_service),
-    extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
-    mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
-    _: bool = Depends(ensure_user_id),
-):
-    pass
-
-
-@router.patch(
-    "/{user_id}/{assistant_id}/update", summary="Update assistant information.", response_model=ResponseWrapper[UpdateFullInfoAssistantResponse]
+@router.get(
+    "/{assistant_id}/get-detail",
+    summary="Get assistant details.",
+    response_model=ResponseWrapper[GetAssistantResponse | GetAdvancedAssistantResponse],
 )
+async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+    """
+    Get details of an assistant by its ID.
+    """
+    try:
+        # Fetch the assistant by ID
+        if x_user_role in ["admin", "superuser"]:
+            statement = (
+                select(Assistant)
+                .select_from(Assistant)
+                .options(selectinload(Assistant.teams))
+                .where(Assistant.id == assistant_id, Assistant.is_deleted.is_(False))
+            )
+        else:
+            statement = (
+                select(Assistant)
+                .select_from(Assistant)
+                .options(selectinload(Assistant.teams))
+                .where(Assistant.user_id == x_user_id, Assistant.id == assistant_id, Assistant.is_deleted.is_(False))
+            )
+
+        result = await session.execute(statement)
+        assistant = result.scalar_one_or_none()
+
+        if not assistant:
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
+
+        # Prepare the response
+        if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT:
+            response = GetAdvancedAssistantResponse(
+                id=str(assistant.id),
+                user_id=str(assistant.user_id),
+                name=str(assistant.name),
+                assistant_type=assistant.assistant_type,  # type: ignore
+                description=str(assistant.description),
+                system_prompt=str(assistant.system_prompt),
+                provider="",  # TODO: Not support for custom provider, let's update it later
+                model_name="",  # TODO: Not support for custom model, let's update it later
+                temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
+                main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
+                support_units=extract_support_units(assistant),
+                mcp_ids=None,  # TODO: Not support for MCPs yet
+                # TODO: Not support for extensions yet
+                teams=[
+                    {
+                        "id": team.id,
+                        "name": team.name,
+                        "description": team.description,
+                        "workflow_type": team.workflow_type,
+                        "members": [
+                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                            for member in team.members
+                            if hasattr(team, "members") and team.members
+                        ],
+                    }
+                    for team in assistant.teams
+                ],
+                created_at=assistant.created_at,  # type: ignore
+            )
+
+            return ResponseWrapper.wrap(status=200, data=response).to_response()
+        else:
+            response = GetAssistantResponse(
+                id=str(assistant.id),
+                user_id=str(assistant.user_id),
+                name=str(assistant.name),
+                assistant_type=assistant.assistant_type,  # type: ignore
+                description=str(assistant.description),
+                system_prompt=str(assistant.system_prompt),
+                provider="",  # TODO: Not support for custom provider, let's update it later
+                model_name="",  # TODO: Not support for custom model, let's update it later
+                temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
+                main_unit=WorkflowType.CHATBOT,
+                support_units=[],
+                teams=[
+                    {
+                        "id": team.id,
+                        "name": team.name,
+                        "description": team.description,
+                        "workflow_type": team.workflow_type,
+                        "members": [
+                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                            for member in team.members
+                            if hasattr(team, "members") and team.members
+                        ],
+                    }
+                    for team in assistant.teams
+                ],
+                created_at=assistant.created_at,  # type: ignore
+            )
+            return ResponseWrapper.wrap(status=200, data=response).to_response()
+
+    except Exception as e:
+        logger.error(f"Error fetching assistant details: {e}")
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
+
+
+@router.patch("{assistant_id}/update", summary="Update assistant information.", response_model=ResponseWrapper[UpdateAdvancedAssistantResponse])
 async def update_assistant(
-    user_id: str,
+    session: SessionDep,
     assistant_id: str,
-    request: UpdateFullInfoAssistantRequest,
-    assistant_service: AssistantService = Depends(get_assistant_service),
-    extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
-    mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
-    connected_mcp_service: ConnectedMcpService = Depends(get_connected_mcp_service),
-    connected_extension_service: ConnectedExtensionService = Depends(get_connected_extension_service),
-    _: bool = Depends(ensure_user_id),
+    request: UpdateAdvancedAssistantRequest,
+    x_user_id: str = Header(None),
 ):
-    pass
+    """
+    Update an assistant's information.
+    """
+    try:
+        # Fetch the assistant by ID
+        statement = (
+            select(Assistant)
+            .select_from(Assistant)
+            .where(Assistant.id == assistant_id, Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
+        )
+        result = await session.execute(statement)
+        assistant = result.scalar_one_or_none()
 
+        if not assistant:
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
 
-@router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[DeleteThreadResponse])
+        # Update the assistant table
+        if request.name:
+            setattr(assistant, "name", request.name)
+        if request.description:
+            setattr(assistant, "description", request.description)
+        if request.system_prompt:
+            setattr(assistant, "system_prompt", request.system_prompt)
+
+        # Get main team (main unit)
+        # Get main team (hierarchical unit)
+        statement = (
+            select(Team)
+            .select_from(Team)
+            .options(selectinload(Team.members))
+            .join(TeamAssistantLink, Team.id == TeamAssistantLink.team_id)
+            .where(
+                Team.user_id == x_user_id,
+                TeamAssistantLink.assistant_id == assistant.id,
+                Team.workflow_type == WorkflowType.HIERARCHICAL
+            )
+        )
+        
+        result = await session.execute(statement)
+        main_team = result.scalar_one_or_none()
+
+        if not main_team:
+            return ResponseWrapper.wrap(status=404, message="Main team not found").to_response()
+
+        # Update mcp members of the main team (main unit)
+        if request.mcp_ids and len(request.mcp_ids) > 0:
+            # Delete all members that have at least on mcp skill
+            # Find all members in the main team that have MCP skills
+            mcp_member_ids = []
+
+            for member in main_team.members:
+                if member.type == "worker":  # Workers are the ones that have MCP/extension skills
+                    # Check if this member has any MCP skills
+                    statement = (
+                        select(Skill)
+                        .select_from(Skill)
+                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                        .where(
+                            MemberSkillLink.member_id == member.id,
+                            Skill.reference_type == ConnectedServiceType.MCP
+                        )
+                    )
+                    
+                    skill_result = await session.execute(statement)
+                    mcp_skills = skill_result.scalars().all()
+                    
+                    if mcp_skills:
+                        mcp_member_ids.append(member.id)
+
+            # Delete the member skills first
+            if mcp_member_ids:
+                await session.execute(
+                    delete(MemberSkillLink)
+                    .where(MemberSkillLink.member_id.in_(mcp_member_ids))
+                )
+                
+                # Then delete the members
+                await session.execute(
+                    delete(Member)
+                    .where(Member.id.in_(mcp_member_ids))
+                )
+                
+            
+            # Now, add new members based on the provided MCP IDs
+            for mcp_id in request.mcp_ids:
+                # Load connected_mcp
+                statement = (
+                    select(ConnectedMcp)
+                    .select_from(ConnectedMcp)
+                    .where(ConnectedMcp.id == mcp_id, ConnectedMcp.user_id == x_user_id, ConnectedMcp.is_deleted.is_(False))
+                )
+                result = await session.execute(statement)
+                connected_mcp = result.scalar_one_or_none()
+                if connected_mcp:
+                    # Create a member for the main team
+                    member = Member(
+                        id=str(uuid.uuid4()),
+                        name=str(connected_mcp.mcp_name),
+                        team_id=main_team.id,
+                        backstory=str(connected_mcp.description) if connected_mcp.description is not None else None,
+                        user_id=x_user_id,
+                        role="Execute actions based on provided tasks using binding tools and return the results",
+                        type="worker",
+                        source=None,  # No root member for MCPs
+                        provider=request.provider,
+                        model=request.model_name,
+                        temperature=request.temperature,
+                        interrupt=True,
+                        position_x=0.0,  # Placeholder for UI positioning
+                        position_y=0.0,  # Placeholder for UI positioning
+                    )
+                    session.add(member)
+
+                    # Load skills
+                    connections = {}
+                    connections[connected_mcp.mcp_name] = {
+                        "url": connected_mcp.url,
+                        "transport": connected_mcp.transport,
+                    }
+
+                    tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+
+                    # Create skills
+                    for tool_info in tool_infos:
+                        # Create skill
+                        skill = Skill(
+                            id=str(uuid.uuid4()),
+                            user_id=str(connected_mcp.user_id),
+                            name=tool_info.display_name,
+                            description=tool_info.description,
+                            icon="",
+                            display_name=tool_info.display_name,
+                            strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                            input_parameters=tool_info.input_parameters,
+                            reference_type=ConnectedServiceType.MCP,
+                            mcp_id=connected_mcp.id,
+                        )
+                        session.add(skill)
+
+                        # Add link to member
+                        member_skill_link = MemberSkillLink(
+                            member_id=member.id,
+                            skill_id=skill.id,
+                        )
+                        session.add(member_skill_link)
+
+                        # Add tool to cache
+                        tool_manager.add_personal_tool(
+                            user_id=str(connected_mcp.user_id),
+                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                            tool_info=tool_info,
+                        )
+                        
+        # Update extension members of the main team (main unit)
+        if request.extension_ids and len(request.extension_ids) > 0:
+            # Delete all members that have at least one extension skill
+            # Find all members in the main team that have extension skills
+            extension_member_ids = []
+
+            for member in main_team.members:
+                if member.type == "worker":  # Workers are the ones that have MCP/extension skills
+                    # Check if this member has any extension skills
+                    statement = (
+                        select(Skill)
+                        .select_from(Skill)
+                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                        .where(
+                            MemberSkillLink.member_id == member.id,
+                            Skill.reference_type == ConnectedServiceType.EXTENSION,
+                            Skill.is_deleted.is_(False)
+                        )
+                    )
+                    
+                    skill_result = await session.execute(statement)
+                    extension_skills = skill_result.scalars().all()
+                    
+                    if extension_skills:
+                        extension_member_ids.append(member.id)
+
+            # Delete the member skills first
+            if extension_member_ids:
+                await session.execute(
+                    delete(MemberSkillLink)
+                    .where(MemberSkillLink.member_id.in_(extension_member_ids))
+                )
+                
+                # Then delete the members
+                await session.execute(
+                    delete(Member)
+                    .where(Member.id.in_(extension_member_ids))
+                )
+                
+            # Now, add new members based on the provided extension IDs
+            for extension_id in request.extension_ids:
+                # Load connected_extension
+                statement = (
+                    select(ConnectedExtension)
+                    .select_from(ConnectedMcp)
+                    .where(ConnectedMcp.id == extension_id, ConnectedMcp.user_id == x_user_id, ConnectedMcp.is_deleted.is_(False))
+                )
+                result = await session.execute(statement)
+                connected_extension = result.scalar_one_or_none()
+                if connected_extension:
+                    # Create a member for the main team
+                    member = Member(
+                        id=str(uuid.uuid4()),
+                        name=str(connected_extension.extension_name),
+                        team_id=main_team.id,
+                        backstory="", # TODO: Let's get description of the extension later
+                        user_id=x_user_id,
+                        role="Execute actions based on provided tasks using binding tools and return the results",
+                        type="worker",
+                        source=None,  # No root member for extensions
+                        provider=request.provider,
+                        model=request.model_name,
+                        temperature=request.temperature,
+                        interrupt=True,
+                        position_x=0.0,  # Placeholder for UI positioning
+                        position_y=0.0,  # Placeholder for UI positioning
+                    )
+                    session.add(member)
+
+                    # Load skills
+                    extension_service_info = extension_service_manager.get_service_info(service_enum=str(connected_extension.extension_enum))
+
+                    if not extension_service_info or not extension_service_info.service_object:
+                        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
+                    extension_service = extension_service_info.service_object
+                    tools = extension_service.get_authed_tools(user_id=str(connected_extension.user_id))
+
+                    tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
+
+                    for tool_info in tool_infos:
+                        # Create skill
+                        skill = Skill(
+                            id=str(uuid.uuid4()),
+                            user_id=str(connected_extension.user_id),
+                            name=tool_info.display_name,
+                            description=tool_info.description,
+                            icon="",
+                            display_name=tool_info.display_name,
+                            strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                            input_parameters=tool_info.input_parameters,
+                            reference_type=ConnectedServiceType.EXTENSION,
+                            extension_id=connected_extension.id,
+                        )
+                        session.add(skill)
+
+                        # Add link to member
+                        member_skill_link = MemberSkillLink(
+                            member_id=member.id,
+                            skill_id=skill.id,
+                        )
+                        session.add(member_skill_link)
+
+                        # Add tool to cache
+                        tool_manager.add_personal_tool(
+                            user_id=str(connected_extension.user_id),
+                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                            tool_info=tool_info,
+                        )
+        
+        # Update support units
+        if request.support_units and len(request.support_units) > 0:
+            # Delete all support teams that are not in the request
+            # Find all teams associated with this assistant
+            all_teams_statement = (
+                select(Team)
+                .select_from(Team)
+                .join(TeamAssistantLink, Team.id == TeamAssistantLink.team_id)
+                .where(TeamAssistantLink.assistant_id == assistant.id)
+            )
+            all_teams_result = await session.execute(all_teams_statement)
+            all_teams = all_teams_result.scalars().all()
+
+            # Find teams to delete (all except the hierarchical/main team)
+            teams_to_delete = [team.id for team in all_teams if str(team.workflow_type) != WorkflowType.HIERARCHICAL]
+
+            if teams_to_delete:
+                # Delete all member skill links for members in these teams
+                member_statement = select(Member.id).where(Member.team_id.in_(teams_to_delete))
+                member_result = await session.execute(member_statement)
+                member_ids = member_result.scalars().all()
+                
+                if member_ids:
+                    await session.execute(
+                        delete(MemberSkillLink)
+                        .where(MemberSkillLink.member_id.in_(member_ids))
+                    )
+                
+                # Delete all members in these teams
+                await session.execute(
+                    delete(Member)
+                    .where(Member.team_id.in_(teams_to_delete))
+                )
+                
+                # Delete team assistant links
+                await session.execute(
+                    delete(TeamAssistantLink)
+                    .where(TeamAssistantLink.team_id.in_(teams_to_delete))
+                )
+                
+                # Delete the teams themselves
+                await session.execute(
+                    delete(Team)
+                    .where(Team.id.in_(teams_to_delete))
+                )
+
+            # Now create new support teams based on the request
+            for unit in request.support_units:
+                # Create a support team for each unit
+                support_team = Team(
+                    id=str(uuid.uuid4()),
+                    name=f"Support Unit - {unit}",
+                    description=f"Support unit for {unit} in advanced assistant.",
+                    workflow_type=unit,
+                    user_id=x_user_id,
+                )
+                
+                session.add(support_team)
+                
+                # Link the support team with the assistant
+                support_team_assistant_link = TeamAssistantLink(
+                    team_id=support_team.id,
+                    assistant_id=assistant.id,
+                )
+                session.add(support_team_assistant_link)
+                
+                # Create root member for the support team
+                support_root_member = Member(
+                    id=str(uuid.uuid4()),
+                    name=f"{unit}",
+                    team_id=support_team.id,
+                    backstory=f"Unit for advanced assistant: {unit}.",
+                    user_id=x_user_id,
+                    role="Answer the user's question.",
+                    type=f"{unit}",
+                    provider=request.provider,
+                    model=request.model_name,
+                    temperature=request.temperature,
+                    interrupt=False,
+                    position_x=0.0,
+                    position_y=0.0,
+                )
+                session.add(support_root_member)
+                
+                # Load skill for RAGBOT unit
+                if unit == WorkflowType.RAGBOT:
+                    rag_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(x_user_id),
+                        name="KnowledgeBase",
+                        description="Query documents for answers.",
+                        icon="",
+                        display_name="Knowledge Base",
+                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                        input_parameters={},
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(rag_skill)
+
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=support_root_member.id,
+                        skill_id=rag_skill.id,
+                    )
+                    session.add(member_skill_link)
+                
+                # Load skill for SEARCHBOT unit
+                if unit == WorkflowType.SEARCHBOT:
+                    # DDG tool
+                    ddg_tool_info = global_tools.get("duckduckgo-search")
+                    if not ddg_tool_info:
+                        raise ValueError("DuckDuckGo search tool not found in global tools.")
+
+                    ddg_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(x_user_id),
+                        name=ddg_tool_info.display_name,
+                        description=ddg_tool_info.description,
+                        icon="",
+                        display_name=ddg_tool_info.display_name,
+                        strategy=StorageStrategy.GLOBAL_TOOLS,
+                        input_parameters=ddg_tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(ddg_skill)
+
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=support_root_member.id,
+                        skill_id=ddg_skill.id,
+                    )
+                    session.add(member_skill_link)
+
+                    # Wikipedia tool
+                    wikipedia_tool_info = global_tools.get("wikipedia")
+                    if not wikipedia_tool_info:
+                        raise ValueError("Wikipedia tool not found in global tools.")
+                    wikipedia_skill = Skill(
+                        id=str(uuid.uuid4()),
+                        user_id=str(x_user_id),
+                        name=wikipedia_tool_info.display_name,
+                        description=wikipedia_tool_info.description,
+                        icon="",
+                        display_name=wikipedia_tool_info.display_name,
+                        strategy=StorageStrategy.GLOBAL_TOOLS,
+                        input_parameters=wikipedia_tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.NONE,
+                    )
+                    session.add(wikipedia_skill)
+
+                    # Add link to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=support_root_member.id,
+                        skill_id=wikipedia_skill.id,
+                    )
+                    session.add(member_skill_link)
+        
+        # Save all changes
+        await session.commit()
+        
+        # Return value
+        # Fetch the updated assistant with all teams
+        statement = (
+            select(Assistant)
+            .select_from(Assistant)
+            .options(selectinload(Assistant.teams).selectinload(Team.members))
+            .where(Assistant.id == assistant_id)
+        )
+
+        result = await session.execute(statement)
+        updated_assistant = result.scalar_one()
+
+        # Format the response data
+        teams_data = []
+        for team in updated_assistant.teams:
+            team_dict = {
+                "id": team.id,
+                "name": team.name,
+                "description": team.description,
+                "workflow_type": team.workflow_type,
+                "members": [
+                    {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                    for member in team.members
+                ],
+            }
+            teams_data.append(team_dict)
+
+        response = UpdateAdvancedAssistantResponse(
+            id=str(updated_assistant.id),
+            user_id=str(updated_assistant.user_id),
+            name=str(updated_assistant.name),
+            assistant_type=updated_assistant.assistant_type,  # type: ignore
+            description=str(updated_assistant.description),
+            system_prompt=str(updated_assistant.system_prompt),
+            provider=request.provider,
+            model_name=request.model_name,
+            temperature=request.temperature,
+            main_unit=WorkflowType.HIERARCHICAL,
+            support_units=request.support_units or extract_support_units(updated_assistant),
+            mcp_ids=request.mcp_ids,
+            extension_ids=request.extension_ids,
+            teams=teams_data,
+            created_at=updated_assistant.created_at,  # type: ignore
+        )
+
+        return ResponseWrapper.wrap(status=200, data=response).to_response()
+    except Exception as e:
+        
+        
+        
+        
+            
+
+@router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[UpdateAdvancedAssistantResponse])
 async def delete_assistant(
     user_id: str,
     assistant_id: str,

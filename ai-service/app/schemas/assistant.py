@@ -93,8 +93,8 @@ class GetAdvancedAssistantResponse(CreateAdvancedAssistantResponse):
 
 
 class GetAssistantsResponse(PagingResponse):
-    assistants: list[GetAssistantResponse]
+    assistants: list[GetAssistantResponse | GetAdvancedAssistantResponse]
 
 
-class UpdateAssistantResponse(CreateAdvancedAssistantResponse):
+class UpdateAdvancedAssistantResponse(CreateAdvancedAssistantResponse):
     pass
