@@ -239,6 +239,7 @@ async def create_advanced_assistant(
         )
 
         session.add(main_team)
+        await session.flush()  # Flush to get the ID of the main team
 
         # Link the assistant with the main team
         team_assistant_link = TeamAssistantLink(
@@ -253,7 +254,6 @@ async def create_advanced_assistant(
             name=f"{request.name} Leader",
             team_id=main_team.id,
             backstory="Leader of the main team for advanced assistant.",
-            user_id=x_user_id,
             role="Gather inputs from your team and answer the question.",
             type="root",
             provider=request.provider,
@@ -283,7 +283,6 @@ async def create_advanced_assistant(
                         name=str(connected_mcp.mcp_name),
                         team_id=main_team.id,
                         backstory=str(connected_mcp.description) if connected_mcp.description is not None else None,
-                        user_id=x_user_id,
                         role="Execute actions based on provided tasks using binding tools and return the results",
                         type="worker",
                         source=root_member.id,
@@ -291,8 +290,8 @@ async def create_advanced_assistant(
                         model=request.model_name,
                         temperature=request.temperature,
                         interrupt=True,
-                        position_x=0.0,  # Placeholder for UI positioning
-                        position_y=0.0,  # Placeholder for UI positioning
+                        position_x=0.0,
+                        position_y=0.0,
                     )
                     session.add(member)
 
@@ -304,6 +303,7 @@ async def create_advanced_assistant(
                     }
 
                     tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+                    skills_to_cache = []  # Store info for later caching
 
                     # Create skills
                     for tool_info in tool_infos:
@@ -321,6 +321,7 @@ async def create_advanced_assistant(
                             mcp_id=connected_mcp.id,
                         )
                         session.add(skill)
+                        await session.flush()
 
                         # Add link to member
                         member_skill_link = MemberSkillLink(
@@ -329,6 +330,13 @@ async def create_advanced_assistant(
                         )
                         session.add(member_skill_link)
 
+                        # Store info for later caching
+                        skills_to_cache.append((skill, tool_info))
+
+                    await session.flush()
+
+                    # Now add tools to cache
+                    for skill, tool_info in skills_to_cache:
                         # Add tool to cache
                         tool_manager.add_personal_tool(
                             user_id=str(connected_mcp.user_id),
@@ -353,8 +361,7 @@ async def create_advanced_assistant(
                         id=str(uuid.uuid4()),
                         name=str(connected_extension.extension_name),
                         team_id=main_team.id,
-                        backstory="", # TODO: Let's get description of the extension later
-                        user_id=x_user_id,
+                        backstory="",  # TODO: Let's get description of the extension later
                         role="Execute actions based on provided tasks using binding tools and return the results",
                         type="worker",
                         source=root_member.id,
@@ -362,8 +369,8 @@ async def create_advanced_assistant(
                         model=request.model_name,
                         temperature=request.temperature,
                         interrupt=True,
-                        position_x=0.0,  # Placeholder for UI positioning
-                        position_y=0.0,  # Placeholder for UI positioning
+                        position_x=0.0,
+                        position_y=0.0,
                     )
                     session.add(member)
 
@@ -377,6 +384,7 @@ async def create_advanced_assistant(
                     tools = extension_service.get_authed_tools(user_id=str(connected_extension.user_id))
 
                     tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
+                    skills_to_cache = []  # Store info for later caching
 
                     for tool_info in tool_infos:
                         # Create skill
@@ -393,6 +401,7 @@ async def create_advanced_assistant(
                             extension_id=connected_extension.id,
                         )
                         session.add(skill)
+                        await session.flush()
 
                         # Add link to member
                         member_skill_link = MemberSkillLink(
@@ -401,13 +410,19 @@ async def create_advanced_assistant(
                         )
                         session.add(member_skill_link)
 
+                        # Store info for later caching
+                        skills_to_cache.append((skill, tool_info))
+
+                    await session.flush()
+
+                    # Now add tools to cache
+                    for skill, tool_info in skills_to_cache:
                         # Add tool to cache
                         tool_manager.add_personal_tool(
                             user_id=str(connected_extension.user_id),
                             tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
                             tool_info=tool_info,
                         )
-
         # For loop to create support units
         if request.support_units:
             for unit in request.support_units:
@@ -419,8 +434,8 @@ async def create_advanced_assistant(
                     workflow_type=unit,
                     user_id=x_user_id,
                 )
-
                 session.add(support_team)
+                await session.flush()
 
                 # Link the support team with the assistant
                 support_team_assistant_link = TeamAssistantLink(
@@ -435,7 +450,6 @@ async def create_advanced_assistant(
                     name=f"{unit}",
                     team_id=support_team.id,
                     backstory=f"Unit for advanced assistant: {unit}.",
-                    user_id=x_user_id,
                     role="Answer the user's question.",
                     type=f"{unit}",
                     provider=request.provider,
@@ -445,14 +459,14 @@ async def create_advanced_assistant(
                     position_x=0.0,
                     position_y=0.0,
                 )
-
                 session.add(support_root_member)
-                
+                await session.flush()
+
                 # Load skill for RAGBOT unit
                 if unit == WorkflowType.RAGBOT:
                     rag_skill = Skill(
                         id=str(uuid.uuid4()),
-                        user_id=str(member.team.user_id),
+                        user_id=x_user_id,  # This user_id is correct as it's for Skill model
                         name="KnowledgeBase",
                         description="Query documents for answers.",
                         icon="",
@@ -462,23 +476,25 @@ async def create_advanced_assistant(
                         reference_type=ConnectedServiceType.NONE,
                     )
                     session.add(rag_skill)
+                    await session.flush()
 
                     # Add link to member
                     member_skill_link = MemberSkillLink(
-                        member_id=member.id,
+                        member_id=support_root_member.id,
                         skill_id=rag_skill.id,
                     )
                     session.add(member_skill_link)
-                
+
+                # Load skill for SEARCHBOT unit
                 if unit == WorkflowType.SEARCHBOT:
-                     # DDG tool
+                    # DDG tool
                     ddg_tool_info = global_tools.get("duckduckgo-search")
                     if not ddg_tool_info:
                         raise ValueError("DuckDuckGo search tool not found in global tools.")
 
                     ddg_skill = Skill(
                         id=str(uuid.uuid4()),
-                        user_id=str(member.team.user_id),
+                        user_id=x_user_id,  # This user_id is correct as it's for Skill model
                         name=ddg_tool_info.display_name,
                         description=ddg_tool_info.description,
                         icon="",
@@ -488,10 +504,11 @@ async def create_advanced_assistant(
                         reference_type=ConnectedServiceType.NONE,
                     )
                     session.add(ddg_skill)
+                    await session.flush()
 
                     # Add link to member
                     member_skill_link = MemberSkillLink(
-                        member_id=member.id,
+                        member_id=support_root_member.id,
                         skill_id=ddg_skill.id,
                     )
                     session.add(member_skill_link)
@@ -502,7 +519,7 @@ async def create_advanced_assistant(
                         raise ValueError("Wikipedia tool not found in global tools.")
                     wikipedia_skill = Skill(
                         id=str(uuid.uuid4()),
-                        user_id=str(member.team.user_id),
+                        user_id=x_user_id,  # This user_id is correct as it's for Skill model
                         name=wikipedia_tool_info.display_name,
                         description=wikipedia_tool_info.description,
                         icon="",
@@ -512,10 +529,11 @@ async def create_advanced_assistant(
                         reference_type=ConnectedServiceType.NONE,
                     )
                     session.add(wikipedia_skill)
+                    await session.flush()
 
                     # Add link to member
                     member_skill_link = MemberSkillLink(
-                        member_id=member.id,
+                        member_id=support_root_member.id,
                         skill_id=wikipedia_skill.id,
                     )
                     session.add(member_skill_link)
@@ -781,7 +799,6 @@ async def update_assistant(
                         name=str(connected_mcp.mcp_name),
                         team_id=main_team.id,
                         backstory=str(connected_mcp.description) if connected_mcp.description is not None else None,
-                        user_id=x_user_id,
                         role="Execute actions based on provided tasks using binding tools and return the results",
                         type="worker",
                         source=None,  # No root member for MCPs
@@ -793,6 +810,10 @@ async def update_assistant(
                         position_y=0.0,  # Placeholder for UI positioning
                     )
                     session.add(member)
+
+                    # Commit to ensure member exists before creating skill links
+                    await session.commit()
+                    await session.refresh(member)
 
                     # Load skills
                     connections = {}
@@ -819,6 +840,8 @@ async def update_assistant(
                             mcp_id=connected_mcp.id,
                         )
                         session.add(skill)
+                        await session.commit()  # Commit after creating skill
+                        await session.refresh(skill)
 
                         # Add link to member
                         member_skill_link = MemberSkillLink(
@@ -826,14 +849,8 @@ async def update_assistant(
                             skill_id=skill.id,
                         )
                         session.add(member_skill_link)
+                        await session.commit()  # Commit after creating link
 
-                        # Add tool to cache
-                        tool_manager.add_personal_tool(
-                            user_id=str(connected_mcp.user_id),
-                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
-                            tool_info=tool_info,
-                        )
-                        
         # Update extension members of the main team (main unit)
         if request.extension_ids and len(request.extension_ids) > 0:
             # Delete all members that have at least one extension skill
@@ -889,8 +906,7 @@ async def update_assistant(
                         id=str(uuid.uuid4()),
                         name=str(connected_extension.extension_name),
                         team_id=main_team.id,
-                        backstory="", # TODO: Let's get description of the extension later
-                        user_id=x_user_id,
+                        backstory="",  # TODO: Let's get description of the extension later
                         role="Execute actions based on provided tasks using binding tools and return the results",
                         type="worker",
                         source=None,  # No root member for extensions
@@ -902,6 +918,10 @@ async def update_assistant(
                         position_y=0.0,  # Placeholder for UI positioning
                     )
                     session.add(member)
+
+                    # Commit to ensure member exists before creating skill links
+                    await session.commit()
+                    await session.refresh(member)
 
                     # Load skills
                     extension_service_info = extension_service_manager.get_service_info(service_enum=str(connected_extension.extension_enum))
@@ -937,13 +957,6 @@ async def update_assistant(
                         )
                         session.add(member_skill_link)
 
-                        # Add tool to cache
-                        tool_manager.add_personal_tool(
-                            user_id=str(connected_extension.user_id),
-                            tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
-                            tool_info=tool_info,
-                        )
-        
         # Update support units
         if request.support_units and len(request.support_units) > 0:
             # Delete all support teams that are not in the request
@@ -965,30 +978,18 @@ async def update_assistant(
                 member_statement = select(Member.id).where(Member.team_id.in_(teams_to_delete))
                 member_result = await session.execute(member_statement)
                 member_ids = member_result.scalars().all()
-                
+
                 if member_ids:
-                    await session.execute(
-                        delete(MemberSkillLink)
-                        .where(MemberSkillLink.member_id.in_(member_ids))
-                    )
-                
+                    await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+
                 # Delete all members in these teams
-                await session.execute(
-                    delete(Member)
-                    .where(Member.team_id.in_(teams_to_delete))
-                )
-                
+                await session.execute(delete(Member).where(Member.team_id.in_(teams_to_delete)))
+
                 # Delete team assistant links
-                await session.execute(
-                    delete(TeamAssistantLink)
-                    .where(TeamAssistantLink.team_id.in_(teams_to_delete))
-                )
-                
+                await session.execute(delete(TeamAssistantLink).where(TeamAssistantLink.team_id.in_(teams_to_delete)))
+
                 # Delete the teams themselves
-                await session.execute(
-                    delete(Team)
-                    .where(Team.id.in_(teams_to_delete))
-                )
+                await session.execute(delete(Team).where(Team.id.in_(teams_to_delete)))
 
             # Now create new support teams based on the request
             for unit in request.support_units:
@@ -1000,23 +1001,22 @@ async def update_assistant(
                     workflow_type=unit,
                     user_id=x_user_id,
                 )
-                
+
                 session.add(support_team)
-                
+
                 # Link the support team with the assistant
                 support_team_assistant_link = TeamAssistantLink(
                     team_id=support_team.id,
                     assistant_id=assistant.id,
                 )
                 session.add(support_team_assistant_link)
-                
+
                 # Create root member for the support team
                 support_root_member = Member(
                     id=str(uuid.uuid4()),
                     name=f"{unit}",
                     team_id=support_team.id,
                     backstory=f"Unit for advanced assistant: {unit}.",
-                    user_id=x_user_id,
                     role="Answer the user's question.",
                     type=f"{unit}",
                     provider=request.provider,
@@ -1027,7 +1027,7 @@ async def update_assistant(
                     position_y=0.0,
                 )
                 session.add(support_root_member)
-                
+
                 # Load skill for RAGBOT unit
                 if unit == WorkflowType.RAGBOT:
                     rag_skill = Skill(
@@ -1049,7 +1049,7 @@ async def update_assistant(
                         skill_id=rag_skill.id,
                     )
                     session.add(member_skill_link)
-                
+
                 # Load skill for SEARCHBOT unit
                 if unit == WorkflowType.SEARCHBOT:
                     # DDG tool
