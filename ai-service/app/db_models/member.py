@@ -25,14 +25,6 @@ class Member(BaseEntity):
 
     team = relationship("Team", back_populates="members")
 
-    skills = relationship(
-        "Skill",
-        secondary="member_skills_link",
-        back_populates="members"
-    )
+    skills = relationship("Skill", secondary="member_skill_links", back_populates="members")
 
-    uploads = relationship(
-        "Upload",
-        secondary="member_uploads_link",
-        back_populates="members"
-    )
+    uploads = relationship("Upload", secondary="member_upload_links", back_populates="members")

@@ -4,9 +4,10 @@ from alembic import context
 from sqlalchemy import create_engine
 
 from app.core.settings import env_settings
-from app.db_models.base_entity import Base
 
 # Import all models so they're registered with SQLAlchemy's metadata
+from app.db_models import *  # noqa: F403, F401
+from app.db_models.base_entity import Base
 
 # Alembic config
 config = context.config

@@ -25,10 +25,6 @@ class Skill(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="skills")
-    members = relationship(
-        "Member",
-        secondary="member_skills_link",
-        back_populates="skills"
-    )
+    members = relationship("Member", secondary="member_skill_links", back_populates="skills")
     extension = relationship("ConnectedExtension", back_populates="skills")
     mcp = relationship("ConnectedMcp", back_populates="skills")

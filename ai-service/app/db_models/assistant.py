@@ -17,6 +17,6 @@ class Assistant(BaseEntity):
     assistant_type = Column(Enum(AssistantType), nullable=False, default=AssistantType.ADVANCED_ASSISTANT)
 
     # Relationships
+    user = relationship("User", back_populates="assistants")
     threads = relationship("Thread", back_populates="assistant", cascade="all, delete-orphan")
-    apiKeys = relationship("ApiKey", back_populates="assistant", cascade="all, delete-orphan")
-    teams = relationship("Team", secondary="team_assistant_links", back_populates="assistant", cascade="all, delete-orphan")
+    teams = relationship("Team", secondary="team_assistant_links", back_populates="assistant")

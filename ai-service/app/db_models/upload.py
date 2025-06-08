@@ -14,6 +14,7 @@ from sqlalchemy.orm import relationship
 
 from app.core.enums import UploadStatus
 from app.db_models.base_entity import BaseEntity
+from app.db_models.upload_thread_link import UploadThreadLink
 
 
 class Upload(BaseEntity):
@@ -32,10 +33,9 @@ class Upload(BaseEntity):
 
     # Relationships
     user = relationship("User", back_populates="uploads")
-    members = relationship("Member", secondary="member_uploads_link", back_populates="uploads", cascade="all, delete")
-    thread = relationship(
+    threads = relationship(
         "Thread",
-        secondary="upload_thread_links",
+        secondary=UploadThreadLink.__tablename__,
         back_populates="uploads",
-        cascade="all, delete",
     )
+    members = relationship("Member", secondary="member_upload_links", back_populates="uploads")
