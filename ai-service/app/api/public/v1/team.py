@@ -271,12 +271,12 @@ async def adelete_team(
 @router.post("/{team_id}/stream/{thread_id}")
 async def astream(
     session: SessionDep,
-    team_id: int,
+    team_id: str,
     thread_id: str,
     team_chat: ChatTeamRequest,
     x_user_id=Header(None),
     x_user_role=Header(None),
-) -> StreamingResponse | Any:
+) -> Any:
     """
     Stream a response to a user's input.
     """
@@ -303,7 +303,7 @@ async def astream(
             return ResponseWrapper(status=404, message="Thread not found").to_response()
 
         # Ensure the thread is associated with the requested assistant
-        if thread.assistant_id != team_id:
+        if str(thread.assistant_id) != team_id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
         # Populate the skills and accessible uploads for each member
