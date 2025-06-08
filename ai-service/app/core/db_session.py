@@ -24,7 +24,7 @@ sync_engine = create_engine(
     echo=env_settings.DEBUG_SQLALCHEMY,
 )
 
-AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=True, autoflush=False)
+AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, autoflush=False, autocommit=False)
 SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False, autoflush=False, autocommit=False)
 
 # --- FastAPI dependencies ---------------------------------------------------

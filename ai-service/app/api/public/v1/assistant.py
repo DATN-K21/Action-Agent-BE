@@ -140,66 +140,66 @@ async def aget_assistants(
         assistants = result.scalars().all()
 
         wrapped_assistants = [
-            GetAssistantResponse(
-                id=str(assistant.id),
-                user_id=str(assistant.user_id),
-                name=str(assistant.name),
-                assistant_type=assistant.assistant_type,  # type: ignore
-                description=str(assistant.description),
-                system_prompt=str(assistant.system_prompt),
-                provider="",  # TODO: Not support for custom provider, let's update it later
-                model_name="",  # TODO: Not support for custom model, let's update it later
-                # TODO: Not support for custom temperature, let's update it later
-                main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
-                support_units=extract_support_units(assistant),
-                teams=[
-                    {
-                        "id": team.id,
-                        "name": team.name,
-                        "description": team.description,
-                        "workflow_type": team.workflow_type,
-                        "members": [
-                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
-                            for member in team.members
-                            if hasattr(team, "members") and team.members
-                        ],
-                    }
-                    for team in assistant.teams
-                ],
-                created_at=assistant.created_at,  # type: ignore
-            )
-            if str(assistant.assistant_type) == AssistantType.GENERAL_ASSISTANT
-            else GetAdvancedAssistantResponse(
-                id=str(assistant.id),
-                user_id=str(assistant.user_id),
-                name=str(assistant.name),
-                assistant_type=assistant.assistant_type,  # type: ignore
-                description=str(assistant.description),
-                system_prompt=str(assistant.system_prompt),
-                provider="",  # TODO: Not support for custom provider, let's update it later
-                model_name="",  # TODO: Not support for custom model, let's update it later
-                temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
-                main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
-                support_units=extract_support_units(assistant),
-                mcp_ids=None,  # TODO: Not support for MCPs yet
-                # TODO: Not support for extensions yet
-                teams=[
-                    {
-                        "id": team.id,
-                        "name": team.name,
-                        "description": team.description,
-                        "workflow_type": team.workflow_type,
-                        "members": [
-                            {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
-                            for member in team.members
-                            if hasattr(team, "members") and team.members
-                        ],
-                    }
-                    for team in assistant.teams
-                ],
-                created_at=assistant.created_at,  # type: ignore
-            )
-            for assistant in assistants
+            # GetAssistantResponse(
+            #     id=str(assistant.id),
+            #     user_id=str(assistant.user_id),
+            #     name=str(assistant.name),
+            #     assistant_type=assistant.assistant_type,  # type: ignore
+            #     description=str(assistant.description),
+            #     system_prompt=str(assistant.system_prompt),
+            #     provider="",  # TODO: Not support for custom provider, let's update it later
+            #     model_name="",  # TODO: Not support for custom model, let's update it later
+            #     # TODO: Not support for custom temperature, let's update it later
+            #     main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
+            #     support_units=extract_support_units(assistant),
+            #     teams=[
+            #         {
+            #             "id": team.id,
+            #             "name": team.name,
+            #             "description": team.description,
+            #             "workflow_type": team.workflow_type,
+            #             "members": [
+            #                 {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+            #                 for member in team.members
+            #                 if hasattr(team, "members") and team.members
+            #             ],
+            #         }
+            #         for team in assistant.teams
+            #     ],
+            #     created_at=assistant.created_at,  # type: ignore
+            # )
+            # if str(assistant.assistant_type) == AssistantType.GENERAL_ASSISTANT
+            # else GetAdvancedAssistantResponse(
+            #     id=str(assistant.id),
+            #     user_id=str(assistant.user_id),
+            #     name=str(assistant.name),
+            #     assistant_type=assistant.assistant_type,  # type: ignore
+            #     description=str(assistant.description),
+            #     system_prompt=str(assistant.system_prompt),
+            #     provider="",  # TODO: Not support for custom provider, let's update it later
+            #     model_name="",  # TODO: Not support for custom model, let's update it later
+            #     temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
+            #     main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
+            #     support_units=extract_support_units(assistant),
+            #     mcp_ids=None,  # TODO: Not support for MCPs yet
+            #     # TODO: Not support for extensions yet
+            #     teams=[
+            #         {
+            #             "id": team.id,
+            #             "name": team.name,
+            #             "description": team.description,
+            #             "workflow_type": team.workflow_type,
+            #             "members": [
+            #                 {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+            #                 for member in team.members
+            #                 if hasattr(team, "members") and team.members
+            #             ],
+            #         }
+            #         for team in assistant.teams
+            #     ],
+            #     created_at=assistant.created_at,  # type: ignore
+            # )
+            # for assistant in assistants
         ]
 
         return ResponseWrapper.wrap(
@@ -207,7 +207,7 @@ async def aget_assistants(
             data=GetAssistantsResponse(assistants=wrapped_assistants, page_number=paging_number, max_per_page=max_per_page, total_page=total_pages),
         ).to_response()
     except Exception as e:
-        logger.error(f"Error fetching assistants: {e}")
+        logger.exception(f"Error fetching assistants: {e}")
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
