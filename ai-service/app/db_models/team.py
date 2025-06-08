@@ -20,7 +20,7 @@ class Team(BaseEntity):
     # Relationships
     user = relationship("User", back_populates="teams")
     members = relationship("Member", back_populates="team", cascade="all, delete-orphan")
-    threads = relationship("Thread", back_populates="team", cascade="all, delete-orphan")
     graphs = relationship("Graph", back_populates="team", cascade="all, delete-orphan")
     subgraphs = relationship("Subgraph", back_populates="team", cascade="all, delete-orphan")
     apikeys = relationship("ApiKey", back_populates="team", cascade="all, delete-orphan")
+    assistant = relationship("Assistant", secondary="team_assistant_links", back_populates="teams", cascade="all, delete-orphan")

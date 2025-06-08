@@ -1,105 +1,100 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
+from app.core.enums import AssistantType, WorkflowType
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
+
+
+class AssistantBase(BaseModel):
+    name: str = Field(..., min_length=3, max_length=50)
+    description: Optional[str] = Field(None, min_length=3, max_length=500)
+    system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
 
 
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
-class CreateAssistantRequest(BaseRequest):
-    id: Optional[str] = None
-    name: str = Field(..., min_length=3, max_length=50)
-    description: Optional[str] = Field(None, min_length=3, max_length=500)
-    type: str = Field(..., min_length=3, max_length=50)
+class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
+    provider: str = Field(..., min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
+    model_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Name of the model to use with the assistant")
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Controls randomness of the output. Higher values mean more randomness")
+    support_units: Optional[list[WorkflowType]] = Field(
+        None, description="List of units (teams) to be used by the assistant. If not provided, the assistant will not use any units."
+    )
+    mcp_ids: Optional[list[str]] = Field(
+        None, description="List of MCP IDs to be used by the assistant. If not provided, the assistant will not use any MCPs."
+    )  # This is used for hierarchical unit
+    extension_ids: Optional[list[str]] = Field(
+        None, description="List of extension IDs to be used by the assistant. If not provided, the assistant will not use any extensions."
+    )  # This is used for hierarchical unit
 
 
-class UpdateAssistantRequest(BaseRequest):
+class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = Field(None, min_length=3, max_length=500)
-    type: Optional[str] = Field(None, min_length=3, max_length=50)
-
-
-class CreateFullInfoAssistantRequest(BaseRequest):
-    id: Optional[str] = None
-    name: str = Field(..., min_length=3, max_length=50)
-    description: Optional[str] = Field(None, min_length=3, max_length=500)
-    type: str = Field(..., min_length=3, max_length=50)
-    worker_ids: list[str]
-
-
-class UpdateFullInfoAssistantRequest(BaseRequest):
-    name: Optional[str] = Field(None, min_length=3, max_length=50)
-    description: Optional[str] = Field(None, min_length=3, max_length=500)
-    type: Optional[str] = Field(None, min_length=3, max_length=50)
-    worker_ids: Optional[list[str]] = None
-
+    system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
+    provider: str = Field(..., min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
+    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    support_units: Optional[list[WorkflowType]] = None
+    mcp_ids: Optional[list[str]] = None
+    extension_ids: Optional[list[str]] = None
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 
-class CreateAssistantResponse(BaseResponse):
-    id: str
-    user_id: str
-    name: str
-    description: Optional[str]
-    type: str
-    created_at: datetime
-
-
 class GetAssistantResponse(BaseResponse):
     id: str
     user_id: str
     name: str
+    assistant_type: AssistantType
     description: Optional[str]
-    type: str
-    created_at: datetime
+    system_prompt: Optional[str]
+    provider: str  # e.g., 'openai', 'anthropic'
+    model_name: Optional[str]
+    temperature: Optional[float]
+    main_unit: WorkflowType
+    support_units: Optional[list[WorkflowType]]  # unit alias team in this case
+    teams: Optional[list[dict[str, Any]]] = Field(
+        None, description="List of teams (units) associated with the assistant. Each team is represented as a dictionary."
+    )
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp of the assistant")
 
 
-class GetAssistantsResponse(PagingResponse):
-    assistants: list[GetAssistantResponse]
+class CreateAdvancedAssistantResponse(AssistantBase, BaseResponse):
+    id: str
+    user_id: str
+    name: str
+    assistant_type: AssistantType
+    description: Optional[str]
+    system_prompt: Optional[str]
+    provider: str  # e.g., 'openai', 'anthropic'
+    model_name: Optional[str]
+    temperature: Optional[float]
+    main_unit: WorkflowType
+    support_units: Optional[list[WorkflowType]]  # unit alias team in this case
+    mcp_ids: Optional[list[str]] = Field(
+        None, description="List of MCP IDs used by the assistant. If not provided, the assistant will not use any MCPs."
+    )
+    extension_ids: Optional[list[str]] = Field(
+        None, description="List of extension IDs used by the assistant. If not provided, the assistant will not use any extensions."
+    )
+    teams: Optional[list[dict[str, Any]]] = Field(
+        None, description="List of teams (units) associated with the assistant. Each team is represented as a dictionary."
+    )
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp of the assistant")
 
 
-class UpdateAssistantResponse(CreateAssistantResponse):
+class GetAdvancedAssistantResponse(CreateAdvancedAssistantResponse):
     pass
 
 
-class DeleteAssistantResponse(BaseResponse):
-    id: str
-    user_id: str
+class GetAssistantsResponse(PagingResponse):
+    assistants: list[GetAssistantResponse | GetAdvancedAssistantResponse]
 
 
-class ExtensionData(BaseResponse):
-    id: str
-    extension_name: str
-    connected_account_id: str = Field(..., title="Connected Account ID", examples=["connectedaccountid"])
-    auth_scheme: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
-    auth_value: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
-    created_at: Optional[datetime]
-
-
-class McpData(BaseResponse):
-    id: str
-    mcp_name: str
-    url: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
-    connection_type: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
-    created_at: Optional[datetime]
-
-
-class GetFullInfoAssistantResponse(GetAssistantResponse):
-    workers: Optional[list[ExtensionData | McpData]]
-
-
-class GetFullInfoAssistantsResponse(PagingResponse):
-    full_info_assistants: list[GetFullInfoAssistantResponse]
-
-
-class CreateFullInfoAssistantResponse(CreateAssistantResponse):
-    workers: Optional[list[ExtensionData | McpData]] = Field(..., title="List of workers")
-
-
-class UpdateFullInfoAssistantResponse(CreateFullInfoAssistantResponse):
+class UpdateAdvancedAssistantResponse(CreateAdvancedAssistantResponse):
     pass

@@ -16,6 +16,7 @@ from app.api.deps import SessionDep
 from app.core.enums import UploadStatus
 from app.core.settings import env_settings
 from app.db_models.upload import Upload
+from app.db_models.upload_thread_link import UploadThreadLink
 from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.upload import CreateUploadRequest, UploadResponse, UploadsResponse
@@ -149,6 +150,7 @@ async def acreate_upload(
     chunk_size: Annotated[int, Form()],
     chunk_overlap: Annotated[int, Form()],
     web_url: Annotated[str | None, Form()] = None,
+    thread_id: str | None = Form(None),
     file: UploadFile | None = None,
     x_user_id: str = Header(None),
 ) -> Any:
@@ -191,6 +193,7 @@ async def acreate_upload(
             description=description,
             file_type=actual_file_type,
             web_url=web_url if web_url else "",
+            thread_id=thread_id,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
@@ -200,6 +203,7 @@ async def acreate_upload(
             description=upload_request.description,
             file_type=upload_request.file_type,
             web_url=upload_request.web_url,
+            thread_id=upload_request.thread_id,
             chunk_size=upload_request.chunk_size,
             chunk_overlap=upload_request.chunk_overlap,
             user_id=x_user_id,
@@ -211,7 +215,25 @@ async def acreate_upload(
         await session.refresh(upload)
 
         if upload.id is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve upload ID")
+            raise HTTPException(status_code=500, detail="Failed to create upload")
+        elif thread_id is not None:
+            # Associate upload with thread if thread_id is provided
+            from app.db_models.thread import Thread
+
+            # Check if thread exists
+            thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+
+            thread_result = await session.execute(thread_statement)
+            thread = thread_result.scalar_one_or_none()
+
+            if not thread:
+                raise HTTPException(status_code=404, detail="Thread not found")
+
+            # Create link between upload and thread
+            link = UploadThreadLink(upload_id=upload.id, thread_id=thread_id)
+            session.add(link)
+            await session.commit()
+            await session.refresh(link)
 
         if file_type == "web":
             # Handle web upload
@@ -226,12 +248,12 @@ async def acreate_upload(
 
         logger.info(f"Upload created successfully: id={upload.id}")
         return upload
+
     except Exception as e:
         logger.error(f"Error processing upload: {str(e)}", exc_info=True)
         if "upload" in locals():
             await session.delete(upload)
             await session.commit()
-
         return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
 
 
@@ -367,7 +389,7 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
         await session.commit()
 
         if upload.user_id is None:
-            return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
+            raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
 
         remove_upload.delay(id, upload.user_id)
     except Exception as e:
@@ -385,7 +407,6 @@ async def search_upload(
     upload_id: str,
     search_params: dict[str, Any],
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     """
     Initiate an asynchronous search within a specific upload.
