@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core import logging
 from app.services.extensions.extension_service import ExtensionService
@@ -19,6 +19,8 @@ class ExtensionServiceInfo(BaseModel):
     # a function, or any other relevant Python object.
     service_object: ExtensionService | None = Field(None, description="The actual service instance or a callable to interact with the service.")
     version: str = "1.0"
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ExtensionClient:
