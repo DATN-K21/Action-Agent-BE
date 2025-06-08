@@ -73,7 +73,7 @@ async def aget_assistants(
                 count_statement = select(func.count(Assistant.id)).select_from(Assistant).where(Assistant.is_deleted.is_(False))
                 statement = (
                     select(Assistant)
-                    .options(selectinload(Assistant.teams))
+                    .options(selectinload(Assistant.teams).selectinload(Team.members))
                     .where(Assistant.is_deleted.is_(False))
                     .offset((paging_number - 1) * max_per_page)
                     .limit(max_per_page)
@@ -87,7 +87,7 @@ async def aget_assistants(
                 )
                 statement = (
                     select(Assistant)
-                    .options(selectinload(Assistant.teams))
+                    .options(selectinload(Assistant.teams).selectinload(Team.members))
                     .where(Assistant.assistant_type == assistant_type, Assistant.is_deleted.is_(False))
                     .offset((paging_number - 1) * max_per_page)
                     .limit(max_per_page)
@@ -101,7 +101,7 @@ async def aget_assistants(
                 )
                 statement = (
                     select(Assistant)
-                    .options(selectinload(Assistant.teams))
+                    .options(selectinload(Assistant.teams).selectinload(Team.members))
                     .where(Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
                     .offset((paging_number - 1) * max_per_page)
                     .limit(max_per_page)
@@ -115,7 +115,7 @@ async def aget_assistants(
                 )
                 statement = (
                     select(Assistant)
-                    .options(selectinload(Assistant.teams))
+                    .options(selectinload(Assistant.teams).selectinload(Team.members))
                     .where(
                         Assistant.user_id == x_user_id,
                         Assistant.assistant_type == assistant_type,
@@ -139,68 +139,59 @@ async def aget_assistants(
         result = await session.execute(statement)
         assistants = result.scalars().all()
 
-        wrapped_assistants = [
-            # GetAssistantResponse(
-            #     id=str(assistant.id),
-            #     user_id=str(assistant.user_id),
-            #     name=str(assistant.name),
-            #     assistant_type=assistant.assistant_type,  # type: ignore
-            #     description=str(assistant.description),
-            #     system_prompt=str(assistant.system_prompt),
-            #     provider="",  # TODO: Not support for custom provider, let's update it later
-            #     model_name="",  # TODO: Not support for custom model, let's update it later
-            #     # TODO: Not support for custom temperature, let's update it later
-            #     main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
-            #     support_units=extract_support_units(assistant),
-            #     teams=[
-            #         {
-            #             "id": team.id,
-            #             "name": team.name,
-            #             "description": team.description,
-            #             "workflow_type": team.workflow_type,
-            #             "members": [
-            #                 {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
-            #                 for member in team.members
-            #                 if hasattr(team, "members") and team.members
-            #             ],
-            #         }
-            #         for team in assistant.teams
-            #     ],
-            #     created_at=assistant.created_at,  # type: ignore
-            # )
-            # if str(assistant.assistant_type) == AssistantType.GENERAL_ASSISTANT
-            # else GetAdvancedAssistantResponse(
-            #     id=str(assistant.id),
-            #     user_id=str(assistant.user_id),
-            #     name=str(assistant.name),
-            #     assistant_type=assistant.assistant_type,  # type: ignore
-            #     description=str(assistant.description),
-            #     system_prompt=str(assistant.system_prompt),
-            #     provider="",  # TODO: Not support for custom provider, let's update it later
-            #     model_name="",  # TODO: Not support for custom model, let's update it later
-            #     temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
-            #     main_unit=WorkflowType.HIERARCHICAL if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT,
-            #     support_units=extract_support_units(assistant),
-            #     mcp_ids=None,  # TODO: Not support for MCPs yet
-            #     # TODO: Not support for extensions yet
-            #     teams=[
-            #         {
-            #             "id": team.id,
-            #             "name": team.name,
-            #             "description": team.description,
-            #             "workflow_type": team.workflow_type,
-            #             "members": [
-            #                 {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
-            #                 for member in team.members
-            #                 if hasattr(team, "members") and team.members
-            #             ],
-            #         }
-            #         for team in assistant.teams
-            #     ],
-            #     created_at=assistant.created_at,  # type: ignore
-            # )
-            # for assistant in assistants
-        ]
+        wrapped_assistants: list[GetAssistantResponse | GetAdvancedAssistantResponse] = []
+        for assistant in assistants:
+            teams_data = [
+                {
+                    "id": team.id,
+                    "name": team.name,
+                    "description": team.description,
+                    "workflow_type": team.workflow_type,
+                    "members": [
+                        {"id": member.id, "name": member.name, "type": member.type, "role": member.role}
+                        for member in team.members
+                    ],
+                }
+                for team in assistant.teams
+            ]
+
+            if str(assistant.assistant_type) == AssistantType.GENERAL_ASSISTANT:
+                wrapped_assistants.append(
+                    GetAssistantResponse(
+                        id=str(assistant.id),
+                        user_id=str(assistant.user_id),
+                        name=str(assistant.name),
+                        assistant_type=assistant.assistant_type,  # type: ignore
+                        description=str(assistant.description),
+                        system_prompt=str(assistant.system_prompt),
+                        provider="",  # TODO: Not support for custom provider, let's update it later
+                        model_name="",  # TODO: Not support for custom model, let's update it later
+                        temperature=None,  # TODO: Not support for custom temperature, let's update it later
+                        main_unit=WorkflowType.CHATBOT,
+                        support_units=extract_support_units(assistant),
+                        teams=teams_data,
+                        created_at=assistant.created_at,  # type: ignore
+                    )
+                )
+            else:
+                wrapped_assistants.append(
+                    GetAdvancedAssistantResponse(
+                        id=str(assistant.id),
+                        user_id=str(assistant.user_id),
+                        name=str(assistant.name),
+                        assistant_type=assistant.assistant_type,  # type: ignore
+                        description=str(assistant.description),
+                        system_prompt=str(assistant.system_prompt),
+                        provider="",  # TODO: Not support for custom provider, let's update it later
+                        model_name="",  # TODO: Not support for custom model, let's update it later
+                        temperature=0.0,  # TODO: Not support for custom temperature, let's update it later
+                        main_unit=WorkflowType.HIERARCHICAL,
+                        support_units=extract_support_units(assistant),
+                        mcp_ids=None,  # TODO: Not support for MCPs yet
+                        teams=teams_data,
+                        created_at=assistant.created_at,  # type: ignore
+                    )
+                )
 
         return ResponseWrapper.wrap(
             status=200,
