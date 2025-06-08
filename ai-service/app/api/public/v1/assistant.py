@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import AssistantType, ConnectedServiceType, StorageStrategy, WorkflowType
-from app.core.tools.tool_manager import create_unique_key, tool_manager, global_tools
+from app.core.tools.tool_manager import create_unique_key, global_tools, tool_manager
 from app.core.utils.convert_type import convert_base_tool_to_tool_info
 from app.db_models.assistant import Assistant
 from app.db_models.connected_extension import ConnectedExtension
@@ -26,7 +26,7 @@ from app.schemas.assistant import (
     UpdateAdvancedAssistantRequest,
     UpdateAdvancedAssistantResponse,
 )
-from app.schemas.base import PagingRequest, ResponseWrapper
+from app.schemas.base import MessageResponse, PagingRequest, ResponseWrapper
 from app.services.extensions import extension_service_manager
 from app.services.mcps.mcp_service import McpService
 
@@ -1151,19 +1151,81 @@ async def update_assistant(
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:
-        
-        
-        
-        
-            
+        logger.error(f"Error updating assistant: {e}", exc_info=True)
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
-@router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[UpdateAdvancedAssistantResponse])
-async def delete_assistant(
-    user_id: str,
-    assistant_id: str,
-    assistant_service: AssistantService = Depends(get_assistant_service),
-    extension_assistant_service: ExtensionAssistantService = Depends(get_extension_assistant_service),
-    mcp_assistant_service: McpAssistantService = Depends(get_mcp_assistant_service),
-    _: bool = Depends(ensure_user_id),
-):
-    pass
+
+@router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[MessageResponse])
+async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: str):
+    """
+    Delete an assistant by setting its is_deleted flag to True.
+    """
+    try:
+        # Fetch the assistant by ID
+        statement = (
+            select(Assistant)
+            .select_from(Assistant)
+            .where(Assistant.id == assistant_id, Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
+        )
+        result = await session.execute(statement)
+        assistant = result.scalar_one_or_none()
+
+        if not assistant:
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
+
+        # Remove assistant, its teams, teams's members, members's skills.
+        # First, get all teams associated with the assistant
+        teams_statement = (
+            select(Team.id)
+            .select_from(Team)
+            .join(TeamAssistantLink, Team.id == TeamAssistantLink.team_id)
+            .where(TeamAssistantLink.assistant_id == assistant_id)
+        )
+        teams_result = await session.execute(teams_statement)
+        team_ids = teams_result.scalars().all()
+
+        if team_ids:
+            # Get all member IDs from these teams
+            members_statement = select(Member.id).where(Member.team_id.in_(team_ids))
+            members_result = await session.execute(members_statement)
+            member_ids = members_result.scalars().all()
+
+            if member_ids:
+                # Delete member skill links
+                await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+
+                # Delete skills associated with these members
+                await session.execute(
+                    delete(Skill).where(
+                        Skill.id.in_(
+                            select(Skill.id)
+                            .select_from(Skill)
+                            .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                            .where(MemberSkillLink.member_id.in_(member_ids))
+                        )
+                    )
+                )
+
+                # Delete members
+                await session.execute(delete(Member).where(Member.id.in_(member_ids)))
+
+            # Delete team assistant links
+            await session.execute(delete(TeamAssistantLink).where(TeamAssistantLink.assistant_id == assistant_id))
+
+            # Delete teams
+            await session.execute(delete(Team).where(Team.id.in_(team_ids)))
+
+        # Finally, delete the assistant
+        await session.execute(delete(Assistant).where(Assistant.id == assistant_id))
+
+        await session.commit()
+
+        message = MessageResponse(message="Assistant deleted successfully")
+
+        return ResponseWrapper.wrap(status=200, data=message).to_response()
+
+    except Exception as e:
+        logger.error(f"Error deleting assistant: {e}")
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
