@@ -1,5 +1,5 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Numeric, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Float, ForeignKey, Numeric, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db_models.base_entity import BaseEntity
 
@@ -7,21 +7,21 @@ from app.db_models.base_entity import BaseEntity
 class Member(BaseEntity):
     __tablename__ = "members"
 
-    name = Column(String(64), unique=True, nullable=False)
-    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    team_id: Mapped[str] = mapped_column(String, ForeignKey("teams.id"), nullable=False)
 
-    backstory = Column(String, nullable=True)
-    role = Column(String, nullable=True)
-    type = Column(String, nullable=True)  # one of: leader, worker, freelancer
-    source = Column(String, nullable=True)
-    provider = Column(String, nullable=True)
-    model = Column(String, nullable=True)
-    temperature = Column(Float, default=0.1, nullable=True)
-    interrupt = Column(Boolean, default=False, nullable=True)
+    backstory: Mapped[str | None] = mapped_column(String, nullable=True)
+    role: Mapped[str | None] = mapped_column(String, nullable=True)
+    type: Mapped[str | None] = mapped_column(String, nullable=True)  # one of: leader, worker, freelancer
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    temperature: Mapped[float | None] = mapped_column(Float, default=0.1, nullable=True)
+    interrupt: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
 
     # For drag-and-drop positioning in the UI
-    position_x = Column(Numeric, nullable=True)
-    position_y = Column(Numeric, nullable=True)
+    position_x: Mapped[Numeric | None] = mapped_column(Numeric, nullable=True)
+    position_y: Mapped[Numeric | None] = mapped_column(Numeric, nullable=True)
 
     team = relationship("Team", back_populates="members")
 

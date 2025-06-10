@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, String
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -16,11 +17,11 @@ class BaseEntity(Base):
     """
     __abstract__ = True  # This ensures SQLAlchemy does not treat this as a table
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
-    created_by = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(), nullable=False)
-    is_deleted = Column(Boolean, default=False, nullable=False)
-    deleted_at = Column(DateTime, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(), nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} id={self.id}>"

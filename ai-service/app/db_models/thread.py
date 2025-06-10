@@ -1,5 +1,7 @@
-from sqlalchemy import Column, ForeignKey, String
-from sqlalchemy.orm import relationship
+from typing import Optional
+
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db_models.base_entity import BaseEntity
 from app.db_models.upload_thread_link import UploadThreadLink
@@ -13,9 +15,9 @@ class Thread(BaseEntity):
     """
     __tablename__ = "threads"
 
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String, nullable=True)
-    assistant_id = Column(String, ForeignKey("assistants.id"), nullable=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    assistant_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("assistants.id"), nullable=True)
 
     # Relationships
     assistant = relationship("Assistant", back_populates="threads")

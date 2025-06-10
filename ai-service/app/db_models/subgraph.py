@@ -1,7 +1,6 @@
-
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db_models.base_entity import BaseEntity  # Adjust according to your project structure
 
@@ -9,20 +8,20 @@ from app.db_models.base_entity import BaseEntity  # Adjust according to your pro
 class Subgraph(BaseEntity):
     __tablename__ = "subgraphs"
 
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
-    name = Column(String, nullable=True)
-    description = Column(String, nullable=True)
-    config = Column(JSONB, nullable=False, default=dict)
-    metadata_ = Column("metadata", JSONB, nullable=False, default=dict)
-    is_public = Column(Boolean, nullable=False, default=False)
-    created_at = Column(
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    team_id: Mapped[str] = mapped_column(String, ForeignKey("teams.id"), nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         server_default=func.now(),
     )
-    updated_at = Column(
+    updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),

@@ -14,7 +14,6 @@ from app.db_models.model_provider import ModelProvider
 from app.db_models.skill import Skill
 from app.db_models.subgraph import Subgraph
 from app.db_models.team import Team
-from app.db_models.team_assistant_link import TeamAssistantLink
 from app.db_models.thread import Thread
 from app.db_models.upload import Upload
 from app.db_models.user import User
@@ -31,7 +30,6 @@ __all__ = [
     "User",
     "UserApiKey",
     "Team",
-    "TeamAssistantLink",
     "ApiKey",
     "Checkpoint",
     "CheckpointBlobs",
