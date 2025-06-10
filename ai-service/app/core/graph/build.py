@@ -208,9 +208,7 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     return team_dict
 
 
-def convert_chatbot_chatrag_team_to_dict(
-        members: list[Member], workflow_type: str
-) -> Mapping[str, GraphMember]:
+def convert_chatbot_ragbot_searchbot_team_to_dict(members: list[Member], workflow_type: str) -> Mapping[str, GraphMember]:
     team_dict: dict[str, GraphMember] = {}
 
     if len(members) != 1:
@@ -219,7 +217,7 @@ def convert_chatbot_chatrag_team_to_dict(
     member = members[0]
     assert member.id is not None, "member.id is unexpectedly None"
     tools: list[GraphSkill | GraphUpload]
-    if workflow_type == "ragbot":
+    if workflow_type == str(WorkflowType.RAGBOT):
         tools = [
             GraphUpload(
                 name=upload.name,
@@ -230,7 +228,7 @@ def convert_chatbot_chatrag_team_to_dict(
             for upload in member.uploads
             if upload.user_id is not None
         ]
-    elif workflow_type == "chatbot":
+    elif workflow_type == str(WorkflowType.CHATBOT):
         tools = [
             GraphUpload(
                 name=upload.name,
@@ -249,8 +247,19 @@ def convert_chatbot_chatrag_team_to_dict(
             )
             for skill in member.skills
         ]
+    elif workflow_type == str(WorkflowType.SEARCHBOT):
+        tools = [
+            GraphSkill(
+                user_id=member.team.user_id,
+                name=skill.name,
+                strategy=skill.strategy,
+                definition=skill.tool_definition,
+            )
+            for skill in member.skills
+        ]
+
     else:
-        raise ValueError("Invalid workflow_type. Expected 'ragbot' or 'chatbot'.")
+        raise ValueError("Invalid workflow_type. Expected 'ragbot', 'searchbot' or 'chatbot'.")
 
     graph_member = GraphMember(
         name=str(member.name),
@@ -538,9 +547,7 @@ def create_sequential_graph(
     return graph
 
 
-def create_chatbot_ragbot_graph(
-        team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver
-) -> CompiledGraph:
+def create_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
     """
     Creates a simple chatbot graph for a single team member.
     Args:
@@ -655,7 +662,7 @@ async def generator(
         graph_config: dict[str, Any] = {}
         response: Any = None
         interrupt_name = None
-        if str(team.workflow_type) == WorkflowType.HIERARCHICAL:
+        if str(team.workflow_type) == str(WorkflowType.HIERARCHICAL):
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
             root = create_hierarchical_graph(
@@ -669,7 +676,7 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
-        elif str(team.workflow_type) == WorkflowType.SEQUENTIAL:
+        elif str(team.workflow_type) == str(WorkflowType.SEQUENTIAL):
             member_dict = convert_sequential_team_to_dict(members)
             root = create_sequential_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
@@ -689,9 +696,9 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
-        elif str(team.workflow_type) == WorkflowType.RAGBOT:
-            member_dict = convert_chatbot_chatrag_team_to_dict(members, workflow_type=str(team.workflow_type))
-            root = create_chatbot_ragbot_graph(member_dict, checkpointer)
+        elif str(team.workflow_type) == str(WorkflowType.RAGBOT):
+            member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=str(team.workflow_type))
+            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -708,11 +715,9 @@ async def generator(
                 "next": first_member.name,
                 "all_messages": formatted_messages,
             }
-        elif str(team.workflow_type) == WorkflowType.CHATBOT:
-            member_dict = convert_chatbot_chatrag_team_to_dict(members, workflow_type=str(team.workflow_type))
-
-            root = create_chatbot_ragbot_graph(member_dict, checkpointer)
-
+        elif str(team.workflow_type) == str(WorkflowType.CHATBOT):
+            member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=str(team.workflow_type))
+            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -729,7 +734,26 @@ async def generator(
                 "next": first_member.name,
                 "all_messages": formatted_messages,
             }
-        elif str(team.workflow_type) == WorkflowType.WORKFLOW:
+        elif str(team.workflow_type) == str(WorkflowType.SEARCHBOT):
+            member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=str(team.workflow_type))
+            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
+            first_member = list(member_dict.values())[0]
+            state = {
+                "history": formatted_messages,
+                "team": GraphTeam(
+                    name=first_member.name,
+                    role=first_member.role,
+                    backstory=first_member.backstory,
+                    members=member_dict,  # type: ignore[arg-type]
+                    provider=first_member.provider,
+                    model=first_member.model,
+                    temperature=first_member.temperature,
+                ),
+                "messages": [],
+                "next": first_member.name,
+                "all_messages": formatted_messages,
+            }
+        elif str(team.workflow_type) == str(WorkflowType.WORKFLOW):
 
             graph_config = team.graphs[0].config
 
@@ -856,9 +880,8 @@ async def generator(
                 raise ValueError(
                     f"Unsupported interrupt type: {interrupt.interaction_type}"
                 )
-        async for event in root.astream_events(state, version="v2", config=config):
-            # If workflow type and graph_config exists, pass nodes parameter
-            nodes = graph_config["nodes"] if str(team.workflow_type) == WorkflowType.WORKFLOW and hasattr(graph_config, "nodes") else None
+        async for event in root.astream_events(state, version="v2", config=config):  # If workflow type and graph_config exists, pass nodes parameter
+            nodes = graph_config["nodes"] if str(team.workflow_type) == str(WorkflowType.WORKFLOW) and hasattr(graph_config, "nodes") else None
             response = event_to_response(event, nodes=nodes)
             if response:
                 formatted_output = f"data: {response.model_dump_json()}\n\n"
@@ -869,11 +892,9 @@ async def generator(
             try:
                 message = snapshot.values["messages"][-1]
             except Exception:
-                message = snapshot.values["all_messages"][-1]
-
-            # Handle non-workflow type
+                message = snapshot.values["all_messages"][-1]  # Handle non-workflow type
             # Determine if it should return default or ask-human interrupt based on whether AskHuman tool was called.
-            if str(team.workflow_type) != WorkflowType.WORKFLOW:
+            if str(team.workflow_type) != str(WorkflowType.WORKFLOW):
                 if not isinstance(message, AIMessage):
                     return
                 for tool_call in message.tool_calls:

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db_session import SyncSessionLocal
+from app.core.settings import env_settings
 from app.db_models import Model, ModelProvider, Subgraph
 
 T = TypeVar("T")
@@ -87,36 +88,38 @@ def get_model_info(model_name: str) -> dict[str, str]:
     #     if not model:
     #         raise ValueError(f"Model {model_name} not supported now.")
     #
+
+    # TODO: Fixed value
+    return {
+        "ai_model_name": "gpt-4o-mini",
+        "provider_name": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "api_key": env_settings.LLM_DEFAULT_API_KEY,  # 现在可以使用decrypted_api_key
+    }
+
+    # def _get_info(session: Session) -> dict[str, str]:
+    #     stmt = (
+    #         select(Model, ModelProvider)
+    #         .join(ModelProvider, Model.provider_id == ModelProvider.id)
+    #         .where(
+    #             Model.ai_model_name == model_name,
+    #             Model.is_deleted.is_(False),
+    #             ModelProvider.is_deleted.is_(False),
+    #         )
+    #     )
+    #     result = session.execute(stmt).first()
+    #     if not result:
+    #         raise ValueError(f"Model {model_name} not supported now.")
+
+    #     model, provider = result
     #     return {
     #         "ai_model_name": model.ai_model_name,
-    #         "provider_name": model.provider.provider_name,
-    #         "base_url": model.provider.base_url,
-    #         "api_key": model.provider.decrypted_api_key,  # 现在可以使用decrypted_api_key
+    #         "provider_name": provider.provider_name,
+    #         "base_url": provider.base_url,
+    #         "api_key": provider.decrypted_api_key,
     #     }
 
-    def _get_info(session: Session) -> dict[str, str]:
-        stmt = (
-            select(Model, ModelProvider)
-            .join(ModelProvider, Model.provider_id == ModelProvider.id)
-            .where(
-                Model.ai_model_name == model_name,
-                Model.is_deleted.is_(False),
-                ModelProvider.is_deleted.is_(False),
-            )
-        )
-        result = session.execute(stmt).first()
-        if not result:
-            raise ValueError(f"Model {model_name} not supported now.")
-
-        model, provider = result
-        return {
-            "ai_model_name": model.ai_model_name,
-            "provider_name": provider.provider_name,
-            "base_url": provider.base_url,
-            "api_key": provider.decrypted_api_key,
-        }
-
-    return db_operation(_get_info)
+    # return db_operation(_get_info)
 
 
 def get_subgraph_by_id(subgraph_id: str) -> tuple[str, dict[str, Any]]:
@@ -133,6 +136,6 @@ def get_subgraph_by_id(subgraph_id: str) -> tuple[str, dict[str, Any]]:
         subgraph = session.get(Subgraph, subgraph_id)
         if not subgraph:
             raise ValueError(f"Subgraph {subgraph_id} not found")
-        return subgraph.name, subgraph.config
+        return subgraph.name, subgraph.config  # type: ignore
 
     return db_operation(_get_subgraph)

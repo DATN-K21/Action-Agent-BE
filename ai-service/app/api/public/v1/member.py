@@ -71,7 +71,7 @@ async def aread_members(
         if not assistant:
             return ResponseWrapper(status=404, message="assistant not found").to_response()
 
-        if x_user_role.lower() not in ["admin", "super admin"] and assistant.user_id != x_user_id:
+        if x_user_role.lower() not in ["admin", "super admin"] and str(assistant.user_id) != x_user_id:
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         all_members = [m for m in assistant.members if not m.is_deleted]

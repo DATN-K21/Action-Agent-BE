@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -282,7 +283,11 @@ async def astream(
     """
     try:
         # Get team and join members and skills
-        statement = select(Team).where(Team.id == team_id, Team.is_deleted.is_(False))
+        statement = (
+            select(Team)
+            .options(selectinload(Team.assistant), selectinload(Team.graphs), selectinload(Team.subgraphs), selectinload(Team.members))
+            .where(Team.id == team_id, Team.is_deleted.is_(False))
+        )
 
         result = await session.execute(statement)
         team = result.scalar_one_or_none()
@@ -303,11 +308,17 @@ async def astream(
             return ResponseWrapper(status=404, message="Thread not found").to_response()
 
         # Ensure the thread is associated with the requested assistant
-        if str(thread.assistant_id) != team_id:
+        if len(team.assistant) == 1 and str(thread.assistant_id) != str(team.assistant[0].id):
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
-        # Populate the skills and accessible uploads for each member
-        members = team.members
+        # Populate the skills and accessible uploads for each member        # Load members for this team
+        statement = (
+            select(Member)
+            .options(selectinload(Member.skills), selectinload(Member.uploads), selectinload(Member.team))
+            .where(Member.team_id == team.id, Member.is_deleted.is_(False))
+        )
+        result = await session.execute(statement)
+        members = result.scalars().all()
         for member in members:
             member.skills = member.skills
             member.uploads = member.uploads
@@ -315,7 +326,7 @@ async def astream(
         for graph in graphs:
             graph.config = graph.config
         return StreamingResponse(
-            generator(team, members, team_chat.messages, thread_id, team_chat.interrupt),
+            generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt),
             media_type="text/event-stream",
         )
     except Exception as e:

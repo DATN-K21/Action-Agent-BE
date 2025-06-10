@@ -50,16 +50,20 @@ def _standardize_name_part(text_part: str) -> str:
     return processed_text
 
 
-def create_unique_key(skill_id: str, skill_name: str) -> str:
+def create_unique_key(id_: str, name: str | None) -> str:
     """
     Creates a unique and standardized personal skill name.
     It joins a standardized skill_id and a standardized, lowercase skill_name.
     """
-    if not skill_id:
+    if not id_:
         raise ValueError("skill_id cannot be empty.")
 
-    standardized_id = _standardize_name_part(skill_id)
-    standardized_name = _standardize_name_part(skill_name)  # skill_name part is already lowercased by _standardize_name_part
+    standardized_id = _standardize_name_part(id_)
+
+    if name is None:
+        name = "unknown name"  # Default name if None, can be customized
+
+    standardized_name = _standardize_name_part(name)  # skill_name part is already lowercased by _standardize_name_part
 
     if not standardized_id and not standardized_name:
         # This could happen if both inputs consist only of characters that are removed

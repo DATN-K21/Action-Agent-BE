@@ -10,7 +10,7 @@ class Skill(BaseEntity):
     __tablename__ = "skills"
 
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     icon = Column(String, nullable=True)
     display_name = Column(String, nullable=True)

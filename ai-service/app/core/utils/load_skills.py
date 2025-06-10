@@ -78,7 +78,7 @@ async def aload_skills(member_id: str, mcp: str | ConnectedMcp | None, extension
                     # Add tool to cache
                     tool_manager.add_personal_tool(
                         user_id=str(mcp.user_id),
-                        tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                        tool_key=create_unique_key(id_=str(skill.id), name=str(skill.name)),
                         tool_info=tool_info,
                     )
 
@@ -130,7 +130,7 @@ async def aload_skills(member_id: str, mcp: str | ConnectedMcp | None, extension
                     # Add tool to cache
                     tool_manager.add_personal_tool(
                         user_id=str(extension.user_id),
-                        tool_key=create_unique_key(skill_id=str(skill.id), skill_name=str(skill.name)),
+                        tool_key=create_unique_key(id_=str(skill.id), name=str(skill.name)),
                         tool_info=tool_info,
                     )
 
