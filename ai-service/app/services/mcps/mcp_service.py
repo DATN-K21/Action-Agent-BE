@@ -14,9 +14,9 @@ class McpService:
         """
         Retrieve information about a specific MCP tool for a user.
 
-        :param user_id: The ID of the user.
-        :param connections: A dictionary containing MCP connection details.
-        :return: ToolInfo object containing details about the MCP tool.
+        :param connections: A dictionary containing MCP connection details in format:
+                          {"server_name": {"url": "...", "transport": "..."}}
+        :return: List of ToolInfo objects containing details about the MCP tools.
         """
 
         client = MultiServerMCPClient(connections=connections)

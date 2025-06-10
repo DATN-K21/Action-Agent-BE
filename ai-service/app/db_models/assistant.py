@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Enum, ForeignKey, String
+from sqlalchemy import Column, Enum, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.core.enums import AssistantType
@@ -15,6 +15,11 @@ class Assistant(BaseEntity):
 
     # Only have one general assistant per user
     assistant_type = Column(Enum(AssistantType), nullable=False, default=AssistantType.ADVANCED_ASSISTANT)
+
+    # Configuration for the assistant
+    provider = Column(String, nullable=True)  # e.g., 'openai', 'anthropic'
+    model_name = Column(String, nullable=True)  # Name of the model to use with the assistant
+    temperature = Column(Float, nullable=True)  # Controls randomness of the output, e.g., '0.7'
 
     # Relationships
     user = relationship("User", back_populates="assistants")
