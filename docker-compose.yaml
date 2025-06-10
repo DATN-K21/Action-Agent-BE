@@ -12,6 +12,8 @@ services:
       SSL_CERT_PATH: "certs/cert.pem"
       USER_SERVICE_URL: http://user-service:15100
       AI_SERVICE_URL: http://ai-service:15200
+      EXTENSION_SERVICE_URL: http://extension-service:15300
+      VOICE_SERVICE_URL: http://voice-service:15400
       ELASTICSEARCH_URL: http://elasticsearch:9200
       RABBITMQ_URL: amqp://root:root@rabbitmq:5672
       REDIS_URL: redis://root:root@redis:6379
@@ -88,6 +90,21 @@ services:
       DATABASE_URL: mongodb://localhost:27017/datn-extension-database
     ports:
       - "15300:15300"
+    restart: always
+    
+  voice-service:
+    build:
+      context: ./voice-service/speech-recognition
+      dockerfile: Dockerfile
+    container_name: voice-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:15400
+      Speech_Options__SubscriptionKey: 71mWp8uR08ntPZTGX0z53VB15mrdnUUIzDxnBN5G7ftE1UrWxfxfJQQJ99BFACYeBjFXJ3w3AAAYACOGap9C
+      Speech_Options__Endpoint: https://eastus.api.cognitive.microsoft.com
+      Speech_Options__SupportedLanguages: "en-US,vi-VN"
+    ports:
+      - "15400:15400"
     restart: always
 
   ####################################################
