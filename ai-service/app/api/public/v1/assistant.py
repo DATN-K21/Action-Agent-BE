@@ -155,9 +155,6 @@ def format_team_data(teams: List[Team]) -> List[Dict[str, Any]]:
 def format_assistant_response(
     assistant: Assistant,
     teams_data: List[Dict[str, Any]],
-    provider: str = "",
-    model_name: str = "",
-    temperature: float = 0.0,
     mcp_ids: Optional[List[str]] = None,
     extension_ids: Optional[List[str]] = None,
 ) -> GetAssistantResponse | GetAdvancedAssistantResponse:
@@ -183,9 +180,9 @@ def format_assistant_response(
         "assistant_type": assistant.assistant_type,
         "description": str(assistant.description),
         "system_prompt": str(assistant.system_prompt),
-        "provider": provider,
-        "model_name": model_name,
-        "temperature": temperature,
+        "provider": str(assistant.provider),
+        "model_name": str(assistant.model_name),
+        "temperature": assistant.temperature,
         "support_units": extract_support_units(assistant),
         "teams": teams_data,
         "created_at": assistant.created_at,
@@ -963,6 +960,55 @@ def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistan
     )
 
 
+async def aextract_service_ids_from_team(session: AsyncSession, team: Team) -> Tuple[List[str], List[str]]:
+    """
+    Extract MCP IDs and extension IDs from the members of a hierarchical team.
+
+    This function examines all worker members in the team and extracts the unique
+    MCP and extension IDs from their associated skills.
+
+    Args:
+        session: Database session
+        team: Team object containing members
+
+    Returns:
+        Tuple of (mcp_ids, extension_ids) lists
+    """
+    mcp_ids = []
+    extension_ids = []
+
+    # Get all worker members (MCPs and extensions are created as worker members)
+    worker_members = [member for member in team.members if member.type == "worker"]
+
+    if not worker_members:
+        return mcp_ids, extension_ids
+
+    # Get all member IDs to query their skills
+    member_ids = [member.id for member in worker_members]
+
+    # Query skills associated with these members that have MCP or extension references
+    skills_statement = (
+        select(Skill)
+        .select_from(Skill)
+        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+        .where(MemberSkillLink.member_id.in_(member_ids), Skill.reference_type.in_([ConnectedServiceType.MCP, ConnectedServiceType.EXTENSION]))
+    )
+
+    skills_result = await session.execute(skills_statement)
+    skills = skills_result.scalars().all()
+
+    # Extract unique MCP and extension IDs
+    for skill in skills:
+        if str(skill.reference_type) == ConnectedServiceType.MCP and skill.mcp_id is not None:
+            if skill.mcp_id not in mcp_ids:
+                mcp_ids.append(skill.mcp_id)
+        elif str(skill.reference_type) == ConnectedServiceType.EXTENSION and skill.extension_id is not None:
+            if skill.extension_id not in extension_ids:
+                extension_ids.append(skill.extension_id)
+
+    return mcp_ids, extension_ids
+
+
 # ================================
 # API ENDPOINTS
 # ================================
@@ -1056,6 +1102,9 @@ async def create_advanced_assistant(
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
+            provider=request.provider,
+            model_name=request.model_name,
+            temperature=request.temperature,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1175,15 +1224,27 @@ async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id:
         # Format teams data using helper function
         teams_data = format_team_data(assistant.teams)
 
+        # Extract MCP and extension IDs if this is an advanced assistant
+        mcp_ids = None
+        extension_ids = None
+
+        if str(assistant.assistant_type) == AssistantType.ADVANCED_ASSISTANT:
+            # Find the hierarchical team
+            hierarchical_team = None
+            for team in assistant.teams:
+                if str(team.workflow_type) == WorkflowType.HIERARCHICAL:
+                    hierarchical_team = team
+                    break
+
+            if hierarchical_team:
+                mcp_ids, extension_ids = await aextract_service_ids_from_team(session, hierarchical_team)
+
         # Format response using helper function
         response = format_assistant_response(
             assistant=assistant,
             teams_data=teams_data,
-            provider="",  # TODO: Add provider support later
-            model_name="",  # TODO: Add model support later
-            temperature=0.0,  # TODO: Add temperature support later
-            mcp_ids=None,  # TODO: Add MCP support later
-            extension_ids=None,  # TODO: Add extension support later
+            mcp_ids=mcp_ids,
+            extension_ids=extension_ids,
         )
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
