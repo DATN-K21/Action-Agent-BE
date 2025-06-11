@@ -6,8 +6,6 @@ metadata:
 data:
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
-  REDIS_USER: "root"
-  REDIS_PASSWORD: "root"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +30,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: redis-config
+            - secretRef:
+                name: redis-secret
           volumeMounts:
             - name: data
               mountPath: /data

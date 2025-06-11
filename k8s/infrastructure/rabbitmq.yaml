@@ -4,8 +4,8 @@ metadata:
   name: rabbitmq-config
   namespace: default
 data:
-  RABBITMQ_DEFAULT_USER: "root"
-  RABBITMQ_DEFAULT_PASS: "root"
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +32,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: rabbitmq-config
+            - secretRef:
+                name: rabbitmq-secret
           volumeMounts:
             - name: data
               mountPath: /var/lib/rabbitmq
