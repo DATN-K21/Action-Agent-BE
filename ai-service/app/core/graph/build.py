@@ -466,9 +466,7 @@ async def acreate_hierarchical_graph(
 
     build.set_entry_point(leader_name)
     build.set_finish_point("FinalAnswer")
-    graph = build.compile(
-        checkpointer=checkpointer, interrupt_before=interrupt_member_names, debug=True
-    )
+    graph = build.compile(checkpointer=checkpointer, interrupt_before=interrupt_member_names, debug=env_settings.DEBUG_AGENT)
 
     return graph
 

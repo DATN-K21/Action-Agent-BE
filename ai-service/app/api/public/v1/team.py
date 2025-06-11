@@ -311,7 +311,8 @@ async def astream(
         if thread.assistant_id != team.assistant.id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
-        # Populate the skills and accessible uploads for each member        # Load members for this team
+        # Populate the skills and accessible uploads for each member
+        # Load members for this team
         statement = (
             select(Member)
             .options(selectinload(Member.skills), selectinload(Member.uploads), selectinload(Member.team))
@@ -325,6 +326,7 @@ async def astream(
         graphs = team.graphs
         for graph in graphs:
             graph.config = graph.config
+
         return StreamingResponse(
             generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt),
             media_type="text/event-stream",

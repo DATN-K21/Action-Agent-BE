@@ -900,9 +900,8 @@ async def aupdate_support_units(
         user_id: User ID
     """
     if not request.support_units or len(request.support_units) == 0:
-        return
+        return  # Delete all support teams (non-hierarchical teams)
 
-    # Delete all support teams (non-hierarchical teams)
     all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
     all_teams_result = await session.execute(all_teams_statement)
     all_teams = all_teams_result.scalars().all()
@@ -911,13 +910,26 @@ async def aupdate_support_units(
     teams_to_delete = [team.id for team in all_teams if team.workflow_type != WorkflowType.HIERARCHICAL]
 
     if teams_to_delete:
-        # Delete member skill links
+        # Delete member skill links and skills
         member_statement = select(Member.id).where(Member.team_id.in_(teams_to_delete))
         member_result = await session.execute(member_statement)
         member_ids = member_result.scalars().all()
 
         if member_ids:
+            # Delete member skill links
             await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+
+            # Delete skills associated with these members
+            await session.execute(
+                delete(Skill).where(
+                    Skill.id.in_(
+                        select(Skill.id)
+                        .select_from(Skill)
+                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                        .where(MemberSkillLink.member_id.in_(member_ids))
+                    )
+                )
+            )
 
         # Delete members
         await session.execute(delete(Member).where(Member.team_id.in_(teams_to_delete)))
@@ -1322,10 +1334,11 @@ async def update_assistant(
     Update an assistant's information.
     """
     try:
-        # Fetch the assistant by ID
+        # Fetch the assistant by ID with teams eagerly loaded
         statement = (
             select(Assistant)
             .select_from(Assistant)
+            .options(selectinload(Assistant.teams).selectinload(Team.members))
             .where(Assistant.id == assistant_id, Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
         )
         result = await session.execute(statement)

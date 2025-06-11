@@ -35,7 +35,7 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = Field(None, min_length=3, max_length=500)
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
-    provider: str = Field(..., min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
+    provider: Optional[str] = Field(None, min_length=3, max_length=50)
     model_name: Optional[str] = Field(None, min_length=1, max_length=50)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     support_units: Optional[list[WorkflowType]] = None
@@ -71,7 +71,7 @@ class CreateAdvancedAssistantResponse(AssistantBase, BaseResponse):
     assistant_type: AssistantType
     description: Optional[str]
     system_prompt: Optional[str]
-    provider: str  # e.g., 'openai', 'anthropic'
+    provider: Optional[str]  # e.g., 'openai', 'anthropic'
     model_name: Optional[str]
     temperature: Optional[float]
     main_unit: WorkflowType

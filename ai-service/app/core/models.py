@@ -17,7 +17,7 @@ class ToolInfo(BaseModel):
 class ChatMessage(BaseModel):
     type: ChatMessageType
     content: str
-    imgdata: str | None = None  # 添加 imgdata 字段
+    imgdata: str | None = None  # Add imgdata field
 
 
 class Interrupt(BaseModel):
