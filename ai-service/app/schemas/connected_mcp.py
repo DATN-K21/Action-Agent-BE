@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
+from app.core.enums import McpTransport
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
@@ -12,13 +13,13 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 class CreateConnectedMcpRequest(BaseRequest):
     mcp_name: str = Field(..., min_length=3, max_length=50, examples=["mcpname"])
     url: str = Field(..., min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
+    transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
     description: Optional[str] = Field(None, min_length=3, max_length=200, examples=["description"])
 
 class UpdateConnectedMcpRequest(BaseRequest):
     mcp_name: Optional[str] = Field(None, min_length=3, max_length=50, examples=["mcpname"])
     url: Optional[str] = Field(None, min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
+    transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
     description: Optional[str] = Field(None, min_length=3, max_length=200, examples=["description"])
 
 ##################################################
@@ -28,7 +29,7 @@ class CreateConnectedMcpResponse(BaseResponse):
     id: str
     user_id: str
     mcp_name: str
-    connection_type: str
+    transport: McpTransport
     url: str
     description: Optional[str] = None
     created_at: datetime

@@ -16,7 +16,7 @@ from app.schemas.skill import CreateSkillRequest, SkillResponse, SkillsResponse,
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/skill", tags=["Skill"])
 
 
 def validate_tool_definition(tool_definition: dict[str, Any]) -> ToolDefinition | None:

@@ -81,6 +81,12 @@ class ConnectedServiceType(str, Enum):
     NONE = "None"
 
 
+class McpTransport(str, Enum):
+    SSE = "sse"
+    WEBSOCKET = "websocket"
+    STREAMABLE_HTTP = "streamable_http"
+
+
 class ConnectionStatus(str, Enum):
     PENDING = "pending"
     SUCCESS = "success"

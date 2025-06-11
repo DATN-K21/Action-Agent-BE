@@ -165,7 +165,7 @@ class WorkerNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.tool for tool in member.tools]
+            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -232,7 +232,7 @@ class SequentialWorkerNode(WorkerNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.tool for tool in member.tools]
+            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -457,7 +457,7 @@ class ChatBotNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.tool for tool in member.tools]
+            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -517,7 +517,7 @@ class RAGBotNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.tool for tool in member.tools]
+            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]

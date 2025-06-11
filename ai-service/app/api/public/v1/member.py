@@ -12,7 +12,7 @@ from app.db_models import Member, Skill, Team, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.member import CreateMemberRequest, MemberResponse, MembersResponse, UpdateMemberRequest
 
-router = APIRouter()
+router = APIRouter(prefix="/member", tags=["Member"])
 
 logger = logging.get_logger(__name__)
 

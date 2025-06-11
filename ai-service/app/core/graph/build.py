@@ -100,6 +100,9 @@ def convert_hierarchical_team_to_dict(members: list[Member]
                 tools: list[GraphSkill | GraphUpload]
                 tools = [
                     GraphSkill(
+                        skill_id=skill.id,
+                        member_id=member.id,
+                        display_name=skill.display_name,
                         user_id=member.team.user_id,
                         name=skill.name,
                         strategy=skill.strategy,
@@ -173,6 +176,9 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
         tools: list[GraphSkill | GraphUpload]
         tools = [
             GraphSkill(
+                skill_id=skill.id,
+                member_id=member.id,
+                display_name=skill.display_name,
                 user_id=member.team.user_id,
                 name=skill.name,
                 strategy=skill.strategy,
@@ -240,6 +246,9 @@ def convert_chatbot_ragbot_searchbot_team_to_dict(members: list[Member], workflo
             if upload.user_id is not None
         ] + [
             GraphSkill(
+                skill_id=skill.id,
+                member_id=member.id,
+                display_name=skill.display_name,
                 user_id=member.team.user_id,
                 name=skill.name,
                 strategy=skill.strategy,
@@ -250,6 +259,9 @@ def convert_chatbot_ragbot_searchbot_team_to_dict(members: list[Member], workflo
     elif workflow_type == WorkflowType.SEARCHBOT:
         tools = [
             GraphSkill(
+                skill_id=skill.id,
+                member_id=member.id,
+                display_name=skill.display_name,
                 user_id=member.team.user_id,
                 name=skill.name,
                 strategy=skill.strategy,
@@ -345,10 +357,10 @@ def ask_human_node(state: GraphTeamState) -> None:
     """Dummy node for ask human tool"""
 
 
-def create_hierarchical_graph(
-        teams: dict[str, GraphTeam],
-        leader_name: str,
-        checkpointer: BaseCheckpointSaver | None = None,
+async def acreate_hierarchical_graph(
+    teams: dict[str, GraphTeam],
+    leader_name: str,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph:
     """Create the team's graph.
 
@@ -403,7 +415,7 @@ def create_hierarchical_graph(
                         provider=member.provider,
                         model=member.model,
                         temperature=member.temperature,
-                    ).work  # type: ignore[arg-type]
+                    ).work
                 ),
             )
             if member.tools:
@@ -416,7 +428,8 @@ def create_hierarchical_graph(
                         build.add_node(f"{name}_askHuman_tool", ask_human_node)
                         build.add_edge(f"{name}_askHuman_tool", name)
                     else:
-                        normal_tools.append(tool.tool)
+                        tool_object = await tool.aget_tool()
+                        normal_tools.append(tool_object)
 
                 if normal_tools:
                     # Add node for normal tools
@@ -428,9 +441,7 @@ def create_hierarchical_graph(
                         interrupt_member_names.append(f"{name}_tools")
 
         elif isinstance(member, GraphLeader):
-            subgraph = create_hierarchical_graph(
-                teams, leader_name=name, checkpointer=checkpointer
-            )
+            subgraph = await acreate_hierarchical_graph(teams, leader_name=name, checkpointer=checkpointer)
             enter = partial(enter_chain, team=teams[name])
             build.add_node(
                 name,
@@ -462,9 +473,7 @@ def create_hierarchical_graph(
     return graph
 
 
-def create_sequential_graph(
-        team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver
-) -> CompiledGraph:
+async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
     """
     Creates a sequential graph from a list of team members.
 
@@ -491,7 +500,7 @@ def create_sequential_graph(
                     provider=member.provider,
                     model=member.model,
                     temperature=member.temperature,
-                ).work  # type: ignore[arg-type]
+                ).work
             ),
         )
         if member.tools:
@@ -504,7 +513,8 @@ def create_sequential_graph(
                     graph.add_node(f"{member.name}_askHuman_tool", ask_human_node)
                     graph.add_edge(f"{member.name}_askHuman_tool", member.name)
                 else:
-                    normal_tools.append(tool.tool)
+                    tool_object = await tool.aget_tool()
+                    normal_tools.append(tool_object)
 
             if normal_tools:
                 # Add node for normal tools
@@ -547,7 +557,7 @@ def create_sequential_graph(
     return graph
 
 
-def create_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
+async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
     """
     Creates a simple chatbot graph for a single team member.
     Args:
@@ -585,7 +595,8 @@ def create_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkp
                 graph.add_node(f"{member.name}_askHuman_tool", ask_human_node)
                 graph.add_edge(f"{member.name}_askHuman_tool", member.name)
             else:
-                normal_tools.append(tool.tool)
+                tool_object = await tool.aget_tool()
+                normal_tools.append(tool_object)
 
         if normal_tools:
             # Add node for normal tools
@@ -665,9 +676,7 @@ async def generator(
         if team.workflow_type == WorkflowType.HIERARCHICAL:
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
-            root = create_hierarchical_graph(
-                teams, leader_name=team_leader, checkpointer=checkpointer
-            )
+            root = await acreate_hierarchical_graph(teams, leader_name=team_leader, checkpointer=checkpointer)
             state = {
                 "history": formatted_messages,
                 "messages": [],
@@ -678,7 +687,7 @@ async def generator(
 
         elif team.workflow_type == WorkflowType.SEQUENTIAL:
             member_dict = convert_sequential_team_to_dict(members)
-            root = create_sequential_graph(member_dict, checkpointer)
+            root = await acreate_sequential_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -698,7 +707,7 @@ async def generator(
 
         elif team.workflow_type == WorkflowType.RAGBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
+            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -717,7 +726,7 @@ async def generator(
             }
         elif team.workflow_type == WorkflowType.CHATBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
+            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -736,7 +745,7 @@ async def generator(
             }
         elif team.workflow_type == WorkflowType.SEARCHBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = create_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
+            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,

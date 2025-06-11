@@ -8,28 +8,115 @@ from langgraph.graph import add_messages
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired, TypedDict
 
+from app.core import logging
 from app.core.enums import StorageStrategy
 from app.core.rag.pgvector import PGVectorWrapper
 from app.core.tools.api_tool import dynamic_api_tool
 from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
 from app.core.tools.tool_manager import global_tools, tool_manager
 
+logger = logging.get_logger(__name__)
+
 
 class GraphSkill(BaseModel):
+    skill_id: str = Field(description="The id of the skill")
+    member_id: str = Field(description="The id of the team that owns the skill. Optional, if not provided, the skill is personal.")
     user_id: str = Field(description="The id of the owner")
     name: str = Field(description="The name of the skill")
+    display_name: str | None = Field(description="The display name of the skill. Optional, if not provided, the name will be used.")
     definition: dict[str, Any] | None = Field(
         description="The skill definition. For api tool calling. Optional."
     )
 
     strategy: StorageStrategy = Field(description="Defines how a skill is persisted or accessed.")
 
-    @property
-    def tool(self) -> BaseTool:
+    async def aload_tool_cache(self) -> bool:
+        """
+        Asynchronously load tools into cache for this skill.
+        This method can be called explicitly to ensure tools are cached before accessing the tool property.
+
+        Returns:
+            bool: True if cache loading was successful, False otherwise
+        """
+        try:
+            from app.core.utils.tool_cache_loader import aload_tools_to_cache_by_skill
+
+            await aload_tools_to_cache_by_skill(self.skill_id, self.member_id)
+            logger.info(f"Successfully loaded cache for skill {self.skill_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load cache for skill {self.skill_id}: {e}", exc_info=True)
+            return False
+
+    async def aensure_tool_available(self) -> BaseTool:
+        """
+        Ensure the tool is available in cache and return it.
+        This method will attempt to load the cache if the tool is not found.
+
+        Returns:
+            BaseTool: The tool instance
+
+        Raises:
+            ValueError: If the tool cannot be loaded or accessed
+        """
+        if self.strategy == StorageStrategy.GLOBAL_TOOLS:
+            return global_tools[self.name].tool
+
+        elif self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
+            # First, try to get the tool from cache
+            try:
+                return tool_manager.get_personal_tool(self.user_id, self.name).tool
+            except Exception:
+                # Tool not in cache, try to load it
+                logger.info(f"Tool '{self.name}' not found in cache for user '{self.user_id}', attempting to load...")
+
+                cache_loaded = await self.aload_tool_cache()
+                if cache_loaded:
+                    # Try again after loading cache
+                    try:
+                        return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                    except Exception:
+                        raise ValueError(
+                            f"Personal tool '{self.name}' not found in cache for user '{self.user_id}' "
+                            f"even after cache loading. The skill may not be properly configured."
+                        )
+                else:
+                    raise ValueError(f"Failed to load cache for personal tool '{self.name}' for user '{self.user_id}'")
+
+        elif self.strategy == StorageStrategy.DEFINITION and self.definition:
+            return dynamic_api_tool(self.definition)
+
+        else:
+            raise ValueError("Skill is not managed and no definition provided.")
+
+    async def aget_tool(self) -> BaseTool:
         if self.strategy == StorageStrategy.GLOBAL_TOOLS:
             return global_tools[self.name].tool
         if self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
-            return tool_manager.get_personal_tool(self.user_id, self.name).tool
+            try:
+                return tool_manager.get_personal_tool(self.user_id, self.name).tool
+            except Exception:
+                # Attempt to load the tool cache before raising error
+                cache_loaded = await self.aload_tool_cache()
+
+                if cache_loaded:
+                    # Try one more time after scheduling cache load
+                    try:
+                        return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                    except Exception:
+                        # If still not found, provide a helpful error message
+                        logger.warning(f"Personal tool '{self.name}' not found in cache for user '{self.user_id}' even after cache loading attempt")
+                        raise ValueError(
+                            f"Personal tool '{self.name}' not found in cache for user '{self.user_id}'. "
+                            f"Cache loading has been scheduled - tool may be available in subsequent requests."
+                        )
+                else:
+                    # Could not load cache, provide informative error
+                    raise ValueError(
+                        f"Personal tool '{self.name}' not found in cache for user '{self.user_id}'. "
+                        f"Unable to load cache automatically. Please ensure the skill is properly configured and cached."
+                    )
         elif self.strategy == StorageStrategy.DEFINITION and self.definition:
             return dynamic_api_tool(self.definition)
         else:
@@ -42,8 +129,7 @@ class GraphUpload(BaseModel):
     user_id: str = Field(description="Id of the user that owns this upload")
     upload_id: str = Field(description="Id of the upload")
 
-    @property
-    def tool(self) -> BaseTool:
+    async def aget_tool(self) -> BaseTool:
         retriever = PGVectorWrapper().retriever(self.user_id, self.upload_id)
         return create_retriever_tool_custom_modified(retriever)
 

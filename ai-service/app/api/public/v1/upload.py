@@ -21,7 +21,7 @@ from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_uploa
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.upload import CreateUploadRequest, UploadResponse, UploadsResponse
 
-router = APIRouter()
+router = APIRouter(prefix="/upload", tags=["Upload"])
 
 logger = logging.getLogger(__name__)
 

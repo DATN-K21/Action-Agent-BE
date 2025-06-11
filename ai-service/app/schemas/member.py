@@ -1,10 +1,10 @@
 from typing import Literal, Optional
 
-from openai import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from app.db_models import Skill, Upload
 from app.schemas.base import BaseRequest, BaseResponse
+from app.schemas.skill import SkillResponse
+from app.schemas.upload import UploadResponse
 
 
 class MemberBase(BaseModel):
@@ -37,8 +37,8 @@ class UpdateMemberRequest(MemberBase, BaseRequest):
     team_id: int | None = Field(None, description="The id of the member")
     position_x: float | None = Field(None, description="X coordinate of the member's position")
     position_y: float | None = Field(None, description="Y coordinate of the member's position")
-    skills: list["Skill"] | None = Field(None, description="List of skills associated with the member")
-    uploads: list["Upload"] | None = Field(None, description="List of uploads associated with the member")
+    skills: list[SkillResponse] | None = Field(None, description="List of skills associated with the member")
+    uploads: list[UploadResponse] | None = Field(None, description="List of uploads associated with the member")
     provider: str | None = Field(None, description="The provider of the member, e.g., 'openai', 'anthropic'")
     model: str | None = Field(None, description="The model of the member")
     temperature: float | None = Field(None, ge=0.0, le=1.0, description="Temperature for the member's responses")
@@ -52,8 +52,8 @@ class UpdateMemberRequest(MemberBase, BaseRequest):
 class MemberResponse(MemberBase, BaseResponse):
     id: int
     belongs_to: int
-    skills: list["Skill"]
-    uploads: list["Upload"]
+    skills: list[SkillResponse]
+    uploads: list[UploadResponse]
 
 
 class MembersResponse(BaseResponse):

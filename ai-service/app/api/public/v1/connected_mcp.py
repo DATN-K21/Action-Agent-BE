@@ -97,7 +97,7 @@ async def acreate(
     x_user_role: str = Header(None),
 ):
     try:
-        connected_mcp = ConnectedMcp(user_id=x_user_id, mcp_name=request.mcp_name, url=request.url, connection_type=request.connection_type)
+        connected_mcp = ConnectedMcp(user_id=x_user_id, mcp_name=request.mcp_name, url=request.url, transport=request.transport)
 
         session.add(connected_mcp)
         await session.commit()

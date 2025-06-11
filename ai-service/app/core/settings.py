@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Logging
     LOGGING_LOG_LEVEL: str = "INFO"
 
+    # User Agent for web requests
+    USER_AGENT: str = "Action-LLM-AI-Service/1.0 (Educational Project)"
+
     # LLM
     LLM_DEFAULT_API_KEY: str = "<your-api-key>"
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI

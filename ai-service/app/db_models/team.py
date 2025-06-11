@@ -23,4 +23,4 @@ class Team(BaseEntity):
     graphs = relationship("Graph", back_populates="team", cascade="all, delete-orphan")
     subgraphs = relationship("Subgraph", back_populates="team", cascade="all, delete-orphan")
     apikeys = relationship("ApiKey", back_populates="team", cascade="all, delete-orphan")
-    assistant = relationship("Assistant", secondary="team_assistant_links", back_populates="teams")
+    assistant = relationship("Assistant", back_populates="teams")

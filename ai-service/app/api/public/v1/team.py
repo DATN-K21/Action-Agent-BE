@@ -13,7 +13,7 @@ from app.db_models import Member, Team, Thread
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.team import ChatTeamRequest, CreateTeamRequest, TeamResponse, TeamsResponse, UpdateTeamRequest
 
-router = APIRouter()
+router = APIRouter(prefix="/team", tags=["Team"])
 
 logger = logging.get_logger(__name__)
 
@@ -308,7 +308,7 @@ async def astream(
             return ResponseWrapper(status=404, message="Thread not found").to_response()
 
         # Ensure the thread is associated with the requested assistant
-        if len(team.assistant) == 1 and thread.assistant_id != team.assistant[0].id:
+        if thread.assistant_id != team.assistant.id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
         # Populate the skills and accessible uploads for each member        # Load members for this team

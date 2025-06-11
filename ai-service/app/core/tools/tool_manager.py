@@ -13,6 +13,13 @@ from app.core import logging
 from app.core.models import ToolInfo
 from app.core.settings import env_settings
 
+# Set USER_AGENT environment variable early to prevent warnings from libraries
+# The warning you're seeing is coming from the duckduckgo-search
+# library (version 8.0.2) that your application uses.
+# This library expects a USER_AGENT environment variable to
+# be set to identify HTTP requests.
+os.environ.setdefault("USER_AGENT", env_settings.USER_AGENT)
+
 logger = logging.get_logger(__name__)
 
 # --- Constants ---

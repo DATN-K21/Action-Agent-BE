@@ -1,6 +1,7 @@
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.enums import McpTransport
 from app.db_models.base_entity import BaseEntity
 
 
@@ -10,7 +11,7 @@ class ConnectedMcp(BaseEntity):
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     mcp_name: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
-    transport: Mapped[str] = mapped_column(String, nullable=False, default="sse")
+    transport: Mapped[McpTransport] = mapped_column(Enum(McpTransport), nullable=False, default=McpTransport.STREAMABLE_HTTP)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Relationships

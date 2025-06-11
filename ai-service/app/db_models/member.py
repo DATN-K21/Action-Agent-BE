@@ -7,7 +7,7 @@ from app.db_models.base_entity import BaseEntity
 class Member(BaseEntity):
     __tablename__ = "members"
 
-    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     team_id: Mapped[str] = mapped_column(String, ForeignKey("teams.id"), nullable=False)
 
     backstory: Mapped[str | None] = mapped_column(String, nullable=True)

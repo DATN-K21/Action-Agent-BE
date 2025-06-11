@@ -10,7 +10,7 @@ from app.schemas.connected_extension import GetConnectedExtensionResponse, GetCo
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/connected-extension", tags=["API-V2 | Connected Extension"])
+router = APIRouter(prefix="/connected-extension", tags=["Connected Extension"])
 
 
 @router.get("/get-all", summary="Get all connections.", response_model=ResponseWrapper[GetConnectedExtensionsResponse])
