@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
     EMBEDDING_PROVIDER: str = "openai"
+    DEFAULT_TEMPERATURE: float = 0.0
 
     # Database
     POSTGRES_HOST: str = "localhost"

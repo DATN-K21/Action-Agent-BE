@@ -115,7 +115,7 @@ async def acreate_team(
         team_dict = team_in.model_dump(exclude_unset=True)
         team_dict["user_id"] = x_user_id
 
-        if str(team_dict.get("workflow")) not in [
+        if team_dict.get("workflow_type") not in [
             "hierarchical",
             "sequential",
             "chatbot",
@@ -131,7 +131,7 @@ async def acreate_team(
         session.add(team)
         await session.commit()
 
-        if str(team.workflow_type) == str(WorkflowType.HIERARCHICAL):
+        if team.workflow_type == WorkflowType.HIERARCHICAL:
             # Create team leader
             member = Member(
                 # The leader name will be used as the team's name in the graph, so it has to be specific
@@ -142,7 +142,7 @@ async def acreate_team(
                 position_y=0,
                 team_id=team.id,
             )
-        elif str(team.workflow_type) == str(WorkflowType.SEQUENTIAL):
+        elif team.workflow_type == WorkflowType.SEQUENTIAL:
             # Create a freelancer head
             member = Member(
                 name="Worker0",
@@ -152,7 +152,7 @@ async def acreate_team(
                 position_y=0,
                 team_id=team.id,
             )
-        elif str(team.workflow_type) == str(WorkflowType.CHATBOT):
+        elif team.workflow_type == WorkflowType.CHATBOT:
             # Create a freelancer head
             member = Member(
                 name="ChatBot",
@@ -162,7 +162,7 @@ async def acreate_team(
                 position_y=0,
                 team_id=team.id,
             )
-        elif str(team.workflow_type) == str(WorkflowType.RAGBOT):
+        elif team.workflow_type == WorkflowType.RAGBOT:
             # Create a freelancer head
             member = Member(
                 name="RagBot",
@@ -172,7 +172,7 @@ async def acreate_team(
                 position_y=0,
                 team_id=team.id,
             )
-        elif str(team.workflow_type) == str(WorkflowType.SEARCHBOT):
+        elif team.workflow_type == WorkflowType.SEARCHBOT:
             # Create a freelancer head
             member = Member(
                 name="Workflow",
@@ -218,7 +218,7 @@ async def aupdate_team(
 
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (str(team.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (team.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         update_dict = team_in.model_dump(exclude_unset=True)
@@ -254,7 +254,7 @@ async def adelete_team(
 
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (str(team.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (team.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         await session.delete(team)
@@ -308,7 +308,7 @@ async def astream(
             return ResponseWrapper(status=404, message="Thread not found").to_response()
 
         # Ensure the thread is associated with the requested assistant
-        if len(team.assistant) == 1 and str(thread.assistant_id) != str(team.assistant[0].id):
+        if len(team.assistant) == 1 and thread.assistant_id != team.assistant[0].id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
         # Populate the skills and accessible uploads for each member        # Load members for this team

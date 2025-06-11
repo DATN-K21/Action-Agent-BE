@@ -18,7 +18,7 @@ class SubgraphNode:
     def __init__(
         self,
         node_id: str,
-        subgraph_id: int,
+        subgraph_id: str,
         input: str = "",
     ):
         self.node_id = node_id
@@ -80,7 +80,7 @@ class SubgraphNode:
                 return return_state
 
             except Exception as e:
-                # 处理子图执行错误
+                # Handle subgraph execution error
                 error_message = f"Subgraph execution failed: {str(e)}"
                 print(f"Error in subgraph {self.node_id}: {error_message}")
 

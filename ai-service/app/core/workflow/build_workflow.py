@@ -33,7 +33,7 @@ def validate_config(config: dict[str, Any]) -> bool:
     return all(key in config for key in required_keys)
 
 
-# 添加一个全局变量来存储工具名称到节点ID的映射
+# Add a global variable to store the mapping from tool names to node IDs
 tool_name_to_node_id: dict[str, str] = {}
 
 
@@ -50,7 +50,7 @@ def should_continue_tools(state: WorkflowTeamState) -> str:
 
 
 def should_continue_classifier(state: WorkflowTeamState) -> str:
-    """专门处理分类器节点的条件判断"""
+    """Handle conditional judgment for classifier nodes"""
     if "node_outputs" in state:
         for node_id, outputs in state["node_outputs"].items():
             if "category_id" in outputs:
@@ -59,12 +59,12 @@ def should_continue_classifier(state: WorkflowTeamState) -> str:
 
 
 def should_continue_ifelse(state: WorkflowTeamState) -> str:
-    """处理 if-else 节点的条件判断"""
+    """Handle conditional judgment for if-else nodes"""
     if "node_outputs" in state:
         for node_id, outputs in state["node_outputs"].items():
             if "result" in outputs:
                 return outputs["result"]
-    return "false_else"  # 默认返回 ELSE 分支
+    return "false_else"  # Default return ELSE branch
 
 
 def _add_tools_conditional_edges(graph_builder, conditional_edges, nodes):
@@ -87,76 +87,72 @@ def _add_tools_conditional_edges(graph_builder, conditional_edges, nodes):
 def _add_classifier_conditional_edges(
         graph_builder, classifier_node_id: str, nodes: list, edges: list
 ):
-    """专门处理分类器节点的条件边"""
-    # 获取分类器节点的配置
+    """Handle conditional edges for classifier nodes"""
+    # Get classifier node configuration
     classifier_node = next(
         (node for node in nodes if node["id"] == classifier_node_id), None
     )
     if not classifier_node:
         return
 
-    # 构建分类器的条件边字典
+    # Build conditional edges dictionary for classifier
     edges_dict = {}
 
-    # 获取所有从分类器出发的边
+    # Get all edges from the classifier node
     classifier_edges = [edge for edge in edges if edge["source"] == classifier_node_id]
 
-    # 为每个分类类别创建条件边
+    # Create conditional edges for each classification category
     for edge in classifier_edges:
         target_node = next(
             (node for node in nodes if node["id"] == edge["target"]), None
         )
         if target_node:
-            # 检查边的sourceHandle是否匹配任何category_id
+            # Check if the edge's sourceHandle matches any category_id
             source_handle = edge.get("sourceHandle")
-            if source_handle:  # 如果有sourceHandle，使用它作为路由键
-                edges_dict[source_handle] = edge["target"]
+            # If there is sourceHandle, use it as routing key
+            edges_dict[source_handle] = edge["target"]
 
-    # 添加默认路径
+    # Add default path
     default_edge = next(
         (edge for edge in classifier_edges if edge.get("type") == "default"), None
     )
     edges_dict["default"] = default_edge["target"] if default_edge else END
 
-    # 添加条件边到图中
+    # Add conditional edges to graph
     if edges_dict:
         graph_builder.add_conditional_edges(
             classifier_node_id, should_continue_classifier, edges_dict
         )
 
 
-def _add_ifelse_conditional_edges(
-        graph_builder, ifelse_node_id: str, nodes: list, edges: list
-):
-    """处理 if-else 节点的条件边"""
-    # 获取 if-else 节点的配置
+def _add_ifelse_conditional_edges(graph_builder, ifelse_node_id: str, nodes: list, edges: list):
+    """Handle conditional edges for if-else nodes"""
+    # Get if-else node configuration
     ifelse_node = next((node for node in nodes if node["id"] == ifelse_node_id), None)
     if not ifelse_node:
         return
 
-    # 构建条件边字典
+    # Build conditional edges dictionary
     edges_dict = {}
 
-    # 获取所有从 if-else 出发的边
+    # Get all edges from the if-else node
     ifelse_edges = [edge for edge in edges if edge["source"] == ifelse_node_id]
 
-    # 为每个 case 创建条件边
+    # Create conditional edges for each case
     for edge in ifelse_edges:
         target_node = next(
             (node for node in nodes if node["id"] == edge["target"]), None
         )
         if target_node:
             source_handle = edge.get("sourceHandle")
-            if source_handle:  # 如果有 sourceHandle，使用它作为路由键
+            if source_handle:  # If there is sourceHandle, use it as routing key
                 edges_dict[source_handle] = edge["target"]
 
-    # 添加默认路径
-    default_edge = next(
-        (edge for edge in ifelse_edges if edge.get("sourceHandle") == "false"), None
-    )
+    # Add default path
+    default_edge = next((edge for edge in ifelse_edges if edge.get("sourceHandle") == "false"), None)
     edges_dict["false"] = default_edge["target"] if default_edge else END
 
-    # 添加条件边到图中
+    # Add conditional edges to graph
     if edges_dict:
         graph_builder.add_conditional_edges(
             ifelse_node_id, should_continue_ifelse, edges_dict
@@ -180,7 +176,7 @@ def initialize_graph(
 
         graph_builder.add_node("InputNode", InputNode)
 
-        # 创建工具名称到节点ID的映射
+        # Create tool name to node ID mapping
         tool_name_to_node_id = _create_tool_name_mapping(nodes)
 
         # Determine graph type
@@ -241,7 +237,7 @@ def initialize_graph(
         # Add conditional edges
         _add_tools_conditional_edges(graph_builder, conditional_edges, nodes)
 
-        # 添加分类器节点的条件边
+        # Add conditional edges for classifier nodes
         classifier_nodes = [
             node["id"] for node in nodes if node["type"] == "classifier"
         ]
@@ -264,7 +260,7 @@ def initialize_graph(
         interrupt_after = hitl_config.get("interrupt_after", [])
         graph = graph_builder.compile(
             checkpointer=checkpointer,
-            # interrupt_before=["tool-4"],  # 测试 interrupt ok
+            # interrupt_before=["tool-4"],  # Test interrupt ok
             interrupt_before=interrupt_before,
             interrupt_after=interrupt_after,
         )
@@ -287,7 +283,7 @@ def initialize_graph(
         raise RuntimeError(f"Failed to initialize graph: {e}")
 
 
-# 辅助函数
+# Helper functions
 def _create_tool_name_mapping(nodes):
     tool_name_to_node_id = {}
     for node in nodes:
@@ -404,7 +400,7 @@ def _add_llm_node(
 
 def _get_tools_to_bind(node_id, edges, nodes):
     tools_to_bind = []
-    # 存储已处理过的节点，避免循环
+    # Store processed nodes to avoid loops
     processed_nodes = set()
 
     def get_connected_tools(current_node_id, processed):
@@ -418,7 +414,7 @@ def _get_tools_to_bind(node_id, edges, nodes):
                     (n for n in nodes if n["id"] == edge["target"]), None
                 )
                 if target_node:
-                    # 如果是工具节点，添加工具
+                    # If it's a tool node, add tools
                     if target_node["type"] == "tool":
                         tools_to_bind.extend(
                             [
@@ -438,11 +434,11 @@ def _get_tools_to_bind(node_id, edges, nodes):
                                 for tool in target_node["data"]["tools"]
                             ]
                         )
-                    # 如果是human节点，继续遍历其后续节点
+                    # If it's a human node, continue traversing its subsequent nodes
                     elif target_node["type"] == "human":
                         get_connected_tools(target_node["id"], processed)
 
-    # 从起始节点开始遍历
+    # Start traversal from the initial node
     get_connected_tools(node_id, processed_nodes)
     return tools_to_bind
 
@@ -531,7 +527,8 @@ def _add_edge(graph_builder, edge, nodes, conditional_edges):
     elif source_node["type"] in [
         "classifier",
         "ifelse",
-    ]:  # classifier 必定是conditional_edges 不会有普通边，if else node也一样
+    ]:
+        # Classifier nodes always use conditional_edges and never have normal edges, same for if-else nodes
         if target_node["type"] == "end":
             graph_builder.add_edge(edge["source"], END)
     elif source_node["type"] == "human":
@@ -563,7 +560,7 @@ def _add_edge(graph_builder, edge, nodes, conditional_edges):
 
 def _add_crewai_node(graph_builder, node_id, node_data):
     """Add a CrewAI node to the graph"""
-    # 确保必要的配置存在
+    # Ensure necessary configuration exists
     if not node_data.get("agents"):
         raise ValueError("CrewAI node requires agents configuration")
     if not node_data.get("tasks"):
@@ -575,7 +572,7 @@ def _add_crewai_node(graph_builder, node_id, node_data):
 
     process_type = node_data.get("process_type", "sequential")
 
-    # 创建 CrewAI 节点
+    # Create CrewAI node
     crewai_node = CrewAINode(
         node_id=node_id,
         model_name=llm_config["model"],
@@ -586,10 +583,10 @@ def _add_crewai_node(graph_builder, node_id, node_data):
         config=node_data.get("config", {}),
     )
 
-    # 添加节点到图中
+    # Add node to graph
     graph_builder.add_node(node_id, crewai_node.work)
 
-    # 如果是 hierarchical 模式，确保有 manager 配置
+    # If it's hierarchical mode, ensure there is manager configuration
     if process_type == "hierarchical" and not node_data.get("manager_config", {}).get(
             "agent"
     ):

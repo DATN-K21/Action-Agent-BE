@@ -292,7 +292,7 @@ async def aupdate_upload(
 
     if not upload:
         return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_role not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
         return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
     update_data: dict[str, Any] = {}
@@ -380,7 +380,7 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
 
     if not upload:
         return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_role not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
         return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
     try:
         # Set upload status to in progress
@@ -421,7 +421,7 @@ async def search_upload(
 
     if not upload:
         return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_id not in ["admin", "super admin"] and str(upload.user_id) != x_user_id:
+    if x_user_id not in ["admin", "super admin"] and upload.user_id != x_user_id:
         return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
     search_type = search_params.get("search_type", "vector")

@@ -92,11 +92,7 @@ async def aread_skill(session: SessionDep, skill_id: str, x_user_id: str = Heade
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found")
-        if (
-            x_user_id not in ["admin", "super admin"]
-            and str(skill.strategy) != str(StorageStrategy.GLOBAL_TOOLS)
-            and (str(skill.user_id) != x_user_id)
-        ):
+        if x_user_id not in ["admin", "super admin"] and skill.strategy != StorageStrategy.GLOBAL_TOOLS and (skill.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions")
 
         data = SkillResponse.model_validate(skill)
@@ -153,7 +149,7 @@ async def aupdate_skill(
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (skill.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         if skill_in.tool_definition:
@@ -193,9 +189,9 @@ async def adelete_skill(
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (skill.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
-        if str(skill.strategy) == str(StorageStrategy.GLOBAL_TOOLS):
+        if skill.strategy == StorageStrategy.GLOBAL_TOOLS:
             return ResponseWrapper(status=400, message="Cannot delete global tools").to_response()
 
         statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
@@ -253,7 +249,7 @@ async def aupdate_skill_credentials(
 
         if not skill:
             return ResponseWrapper(status=404, message="Skill not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (str(skill.user_id) != x_user_id):
+        if x_user_role not in ["admin", "super admin"] and (skill.user_id != x_user_id):
             return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         statement = update(Skill).where(Skill.id == skill_id, Skill.is_deleted.is_(False)).values(credentials=credentials)

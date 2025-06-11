@@ -50,14 +50,12 @@ class GraphUpload(BaseModel):
 
 class GraphPerson(BaseModel):
     name: str = Field(description="The name of the person")
-    role: str = Field(description="Role of the person")
-    provider: str = Field(description="The provider for the llm model")
-    model: str = Field(description="The llm model to use for this person")
+    role: str | None = Field(description="Role of the person")
+    provider: str | None = Field(description="The provider for the llm model")
+    model: str | None = Field(description="The llm model to use for this person")
 
-    temperature: float = Field(description="The temperature of the llm model")
-    backstory: str = Field(
-        description="Description of the person's experience, motives and concerns."
-    )
+    temperature: float | None = Field(description="The temperature of the llm model")
+    backstory: str | None = Field(description="Description of the person's experience, motives and concerns.")
 
     @property
     def persona(self) -> str:
@@ -81,19 +79,14 @@ class GraphLeader(GraphPerson):
 
 class GraphTeam(BaseModel):
     name: str = Field(description="The name of the team")
-    role: str = Field(description="Role of the team leader")
-    backstory: str = Field(
-        description="Description of the team leader's experience, motives and concerns."
-    )
+    role: str | None = Field(description="Role of the team leader")
+    backstory: str | None = Field(description="Description of the team leader's experience, motives and concerns.")
     members: dict[str, GraphMember | GraphLeader] = Field(
         description="The members of the team"
     )
-    provider: str = Field(description="The provider of the team leader's llm model")
-    model: str = Field(description="The llm model to use for this team leader")
-
-    temperature: float = Field(
-        description="The temperature of the team leader's llm model"
-    )
+    provider: str | None = Field(description="The provider of the team leader's llm model")
+    model: str | None = Field(description="The llm model to use for this team leader")
+    temperature: float | None = Field(description="The temperature of the team leader's llm model")
 
     @property
     def persona(self) -> str:

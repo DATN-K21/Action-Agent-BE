@@ -15,6 +15,7 @@ from langgraph.graph import add_messages
 from typing_extensions import NotRequired, TypedDict
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
+from app.core.settings import env_settings
 from app.core.state import (
     GraphLeader,
     GraphMember,
@@ -51,12 +52,19 @@ class ReturnGraphTeamState(TypedDict):
 
 class BaseNode:
     def __init__(
-            self,
-            provider: str,
-            model: str,
-            temperature: float,
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
     ):
         try:
+            if provider is None or model is None:
+                provider = env_settings.LLM_DEFAULT_PROVIDER
+                model = env_settings.LLM_DEFAULT_MODEL
+
+            if temperature is None:
+                temperature = env_settings.DEFAULT_TEMPERATURE
+
             self.model_info = get_model_info(model)
             self.model = model_provider_manager.init_model(
                 provider_name=provider,

@@ -44,7 +44,7 @@ async def active(
         await session.refresh(connected_extension)
 
         # Initialize the connection
-        connection_request = extension_service.initialize_connection(user_id=x_user_id, connected_extension_id=str(connected_extension.id))
+        connection_request = extension_service.initialize_connection(user_id=x_user_id, connected_extension_id=connected_extension.id)
 
         if connection_request is None:
             response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
@@ -90,7 +90,7 @@ async def disconnect(
             return ResponseWrapper.wrap(status=404, message="Connected Extension not found").to_response()
 
         # Get the extension service
-        extension_service_info = extension_service_manager.get_service_info(str(connected_extension.extension_enum))
+        extension_service_info = extension_service_manager.get_service_info(connected_extension.extension_enum)
         if extension_service_info is None or extension_service_info.service_object is None:
             return ResponseWrapper.wrap(status=404, message="Extension Info or Extension Service not found").to_response()
 
@@ -100,7 +100,7 @@ async def disconnect(
         if connected_extension.connected_account_id is None:
             return ResponseWrapper.wrap(status=404, message="Account not found").to_response()
 
-        account_id = str(connected_extension.connected_account_id)
+        account_id = connected_extension.connected_account_id
 
         # Disconnect the account
         result = extension_service.disconnect(account_id)
@@ -176,7 +176,7 @@ async def check_active(
             return ResponseWrapper.wrap(status=404, message="Connected Extension not found").to_response()
 
         # Get the extension service
-        extension_service_info = extension_service_manager.get_service_info(service_enum=str(connected_extension.extension_enum))
+        extension_service_info = extension_service_manager.get_service_info(service_enum=connected_extension.extension_enum)
         if extension_service_info is None or extension_service_info.service_object is None:
             logger.warning("Extension service not found for enum: %s", connected_extension.extension_enum)
             return ResponseWrapper.wrap(status=404, message="Extension Info or Extension Service not found").to_response()

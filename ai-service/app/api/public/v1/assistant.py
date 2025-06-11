@@ -396,7 +396,7 @@ async def acreate_extension_member_with_skills(
         skill = Skill(
             id=skill_id,
             name=skill_name,
-            user_id=str(connected_extension.user_id),
+            user_id=connected_extension.user_id,
             description=tool_info.description,
             icon="",
             display_name=tool_info.display_name,
@@ -735,9 +735,11 @@ async def aupdate_mcp_members(
 
         if connected_mcp:
             # Create member directly
+            member_id = str(uuid.uuid4())
+            member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
             member = Member(
-                id=str(uuid.uuid4()),
-                name=connected_mcp.mcp_name,
+                id=member_id,
+                name=member_name,
                 team_id=main_team.id,
                 backstory=connected_mcp.description if connected_mcp.description is not None else None,
                 role="Execute actions based on provided tasks using binding tools and return the results",
@@ -760,10 +762,12 @@ async def aupdate_mcp_members(
             tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
 
             for tool_info in tool_infos:
+                skill_id = str(uuid.uuid4())
+                skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
                 skill = Skill(
-                    id=str(uuid.uuid4()),
+                    id=skill_id,
+                    name=skill_name,
                     user_id=user_id,
-                    name=tool_info.display_name,
                     description=tool_info.description,
                     icon="",
                     display_name=tool_info.display_name,
@@ -826,9 +830,11 @@ async def aupdate_extension_members(
 
         if connected_extension:
             # Create member directly
+            member_id = str(uuid.uuid4())
+            member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
             member = Member(
-                id=str(uuid.uuid4()),
-                name=str(connected_extension.extension_name),
+                id=member_id,
+                name=member_name,
                 team_id=main_team.id,
                 backstory="",  # TODO: Let's get description of the extension later
                 role="Execute actions based on provided tasks using binding tools and return the results",
@@ -853,10 +859,12 @@ async def aupdate_extension_members(
             tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
 
             for tool_info in tool_infos:
+                skill_id = str(uuid.uuid4())
+                skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
                 skill = Skill(
-                    id=str(uuid.uuid4()),
+                    id=skill_id,
+                    name=skill_name,
                     user_id=user_id,
-                    name=tool_info.display_name,
                     description=tool_info.description,
                     icon="",
                     display_name=tool_info.display_name,
@@ -920,9 +928,11 @@ async def aupdate_support_units(
     # Create new support teams directly (avoiding type compatibility issues)
     for unit in request.support_units:
         # Create a support team for each unit
+        support_team_id = str(uuid.uuid4())
+        support_team_name = create_unique_key(id_=support_team_id, name=f"Support Unit - {unit}")
         support_team = Team(
-            id=str(uuid.uuid4()),
-            name=f"Support Unit - {unit}",
+            id=support_team_id,
+            name=support_team_name,
             description=f"Support unit for {unit} in advanced assistant.",
             workflow_type=unit,
             user_id=user_id,
@@ -932,9 +942,11 @@ async def aupdate_support_units(
         await session.flush()
 
         # Create root member for the support team
+        support_root_member_id = str(uuid.uuid4())
+        support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit} Support Root")
         support_root_member = Member(
-            id=str(uuid.uuid4()),
-            name=f"{unit}",
+            id=support_root_member_id,
+            name=support_root_member_name,
             team_id=support_team.id,
             backstory=f"Unit for advanced assistant: {unit}.",
             role="Answer the user's question.",
@@ -1170,7 +1182,7 @@ async def create_advanced_assistant(
                     await acreate_mcp_member_with_skills(
                         session,
                         connected_mcp,
-                        str(main_team.id),
+                        main_team.id,
                         root_member_id,
                         request,
                     )
@@ -1191,7 +1203,7 @@ async def create_advanced_assistant(
                     await acreate_extension_member_with_skills(
                         session,
                         connected_extension,
-                        str(main_team.id),
+                        main_team.id,
                         root_member_id,
                         request,
                     )
