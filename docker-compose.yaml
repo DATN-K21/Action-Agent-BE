@@ -76,16 +76,14 @@ services:
     restart: always
 
   extension-service:
-    build:
-      context: ./extension-service
-      dockerfile: Dockerfile
+    image: aagent.azurecr.io/extension-service:stg
     container_name: extension-service
     environment:
       NODE_ENV: dev
       PORT: 15300
       COMPOSIO_API_BASE_URL: https://backend.composio.dev/api
       COMPOSIO_API_KEY: d04n821zcnqtop53g98fx
-      DATABASE_URL: mongodb://localhost:27017/datn-extension-database
+      DATABASE_URL: mongodb://root:root@extension-database:27017/datn-extension-database?authSource=admin
     ports:
       - "15300:15300"
     restart: always
@@ -118,6 +116,18 @@ services:
       - "27017:27017"
     volumes:
       - user-database:/data/db
+    restart: always
+
+  extension-database:
+    image: mongo:latest
+    container_name: extension-database
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - "27018:27017"
+    volumes:
+      - extension-database:/data/db
     restart: always
 
   ####################################################
@@ -184,5 +194,6 @@ volumes:
   es-data:
   ai-database:
   user-database:
+  extension-database:
   rabbitmq:
   redis:
