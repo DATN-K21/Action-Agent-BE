@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: aagent.azurecr.io/ai-service:stg
+          ports:
+            - containerPort: 15200
+          env:
+            - name: DEBUG_AGENT
+              value: "False"
+            - name: DEBUG_SERVER
+              value: "False"
+            - name: DEBUG_SQLALCHEMY
+              value: "False"
+            - name: LOGGING_LOG_LEVEL
+              value: INFO
+            - name: LLM_DEFAULT_PROVIDER
+              value: openai
+            - name: LLM_DEFAULT_MODEL
+              value: gpt-4o-mini
+            - name: POSTGRES_HOST
+              value: ai-database
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ai-db-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ai-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: ai-database
+            - name: COMPOSIO_LOGGING_LEVEL
+              value: debug
+            - name: COMPOSIO_REDIRECT_URL
+              value: https://localhost:15000/ai/api/v1/callback/extension
+            - name: FRONTEND_REDIRECT_URL
+              value: http://localhost:3000/callback/extension
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+spec:
+  selector:
+    app: ai-service
+  ports:
+    - protocol: TCP
+      port: 15200
+      targetPort: 15200
