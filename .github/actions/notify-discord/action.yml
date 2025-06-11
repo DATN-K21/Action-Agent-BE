@@ -9,7 +9,7 @@ inputs:
     description: 'The name of the service'
     required: true
   image:
-    description: 'The Docker image and tag (e.g., actionagent.azurecr.io/ai-service:dev)'
+    description: 'The Docker image and tag (e.g., aagent.azurecr.io/ai-service:dev)'
     required: true
   branch:
     description: 'The branch name from which the action was triggered'
