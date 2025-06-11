@@ -887,19 +887,24 @@ async def generator(
                 raise ValueError(
                     f"Unsupported interrupt type: {interrupt.interaction_type}"
                 )
-        async for event in root.astream_events(state, version="v2", config=config):  # If workflow type and graph_config exists, pass nodes parameter
+
+        async for event in root.astream_events(state, version="v2", config=config):
+            # If workflow type and graph_config exists, pass nodes parameter
+            print("[event]", event)
             nodes = graph_config["nodes"] if team.workflow_type == WorkflowType.WORKFLOW and hasattr(graph_config, "nodes") else None
             response = event_to_response(event, nodes=nodes)
             if response:
                 formatted_output = f"data: {response.model_dump_json()}\n\n"
                 yield formatted_output
-        snapshot = await root.aget_state(config)
 
+        snapshot = await root.aget_state(config)
         if snapshot.next:
             try:
                 message = snapshot.values["messages"][-1]
             except Exception:
-                message = snapshot.values["all_messages"][-1]  # Handle non-workflow type
+                message = snapshot.values["all_messages"][-1]
+
+            # Handle non-workflow type
             # Determine if it should return default or ask-human interrupt based on whether AskHuman tool was called.
             if team.workflow_type != WorkflowType.WORKFLOW:
                 if not isinstance(message, AIMessage):
@@ -913,13 +918,13 @@ async def generator(
                             id=str(uuid4()),
                         )
                         break
-                else:
-                    response = ChatResponse(
-                        type="interrupt",
-                        name="interrupt",
-                        tool_calls=message.tool_calls,
-                        id=str(uuid4()),
-                    )
+                    else:
+                        response = ChatResponse(
+                            type="interrupt",
+                            name="interrupt",
+                            tool_calls=message.tool_calls,
+                            id=str(uuid4()),
+                        )
             # Handle workflow type
             else:
                 next_node = snapshot.next[0]

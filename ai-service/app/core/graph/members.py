@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Annotated, Any
 
 from langchain_core.messages import AIMessage, AnyMessage
@@ -165,7 +165,10 @@ class WorkerNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
+            tools: list[BaseTool] = []
+            for tool in member.tools:
+                tool_instance = await tool.aget_tool()
+                tools.append(tool_instance)
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -232,7 +235,10 @@ class SequentialWorkerNode(WorkerNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
+            tools: list[BaseTool] = []
+            for tool in member.tools:
+                tool_instance = await tool.aget_tool()
+                tools.append(tool_instance)
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -457,7 +463,10 @@ class ChatBotNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
+            tools: list[BaseTool] = []
+            for tool in member.tools:
+                tool_instance = await tool.aget_tool()
+                tools.append(tool_instance)
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
@@ -517,7 +526,10 @@ class RAGBotNode(BaseNode):
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
-            tools: Sequence[BaseTool] = [tool.aget_tool for tool in member.tools]
+            tools: list[BaseTool] = []
+            for tool in member.tools:
+                tool_instance = await tool.aget_tool()
+                tools.append(tool_instance)
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
