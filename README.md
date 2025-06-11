@@ -70,6 +70,15 @@ In the production environment:
 1. Whenever code is updated on the `dev` branch, a pipeline is triggered.
 2. The pipeline builds new Docker images and pushes them to the production environment.
 
+### Kubernetes
+Kubernetes manifests for the services live in the `k8s/` folder. To deploy them run:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Some `ConfigMap` values may need to be adjusted before applying them to your cluster.
+
 ## Notes
 - Ensure all the environment variables are setup correctly.
 

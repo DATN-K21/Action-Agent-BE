@@ -121,3 +121,15 @@ psql --version
   ```
 
 ## 5. Hosted service
+
+When running the whole stack with Docker Compose, this service listens on port
+`15200`. It is reachable directly at `http://localhost:15200` and is also
+proxied through the API Gateway under the `/ai` prefix. You can verify that the
+service is healthy by calling the `/ping` endpoint:
+
+```bash
+curl https://localhost:15000/ai/ping
+```
+
+The interactive API documentation is available at
+`http://localhost:15200/docs` when running locally.
