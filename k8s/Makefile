@@ -2,7 +2,7 @@
 
 .PHONY: help deploy upgrade uninstall status dry-run
 
-ENV ?= dev
+ENV ?= stg
 NAMESPACE ?= default
 RELEASE_NAME ?= action-agent
 
