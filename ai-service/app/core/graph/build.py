@@ -890,7 +890,6 @@ async def generator(
 
         async for event in root.astream_events(state, version="v2", config=config):
             # If workflow type and graph_config exists, pass nodes parameter
-            print("[event]", event)
             nodes = graph_config["nodes"] if team.workflow_type == WorkflowType.WORKFLOW and hasattr(graph_config, "nodes") else None
             response = event_to_response(event, nodes=nodes)
             if response:

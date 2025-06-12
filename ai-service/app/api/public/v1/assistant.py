@@ -1,8 +1,9 @@
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Header
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,6 +19,7 @@ from app.db_models.member import Member
 from app.db_models.member_skill_link import MemberSkillLink
 from app.db_models.skill import Skill
 from app.db_models.team import Team
+from app.db_models.thread import Thread
 from app.schemas.assistant import (
     CreateAdvancedAssistantRequest,
     CreateAdvancedAssistantResponse,
@@ -592,9 +594,26 @@ async def adelete_members_with_service_type(session: AsyncSession, team: Team, s
             if skills:
                 member_ids_to_delete.append(member.id)
 
-    # Delete member skills first, then members
+    # Delete member skills and skills first, then members
     if member_ids_to_delete:
+        # Get all skill IDs associated with these members before deleting links
+        skills_statement = (
+            select(Skill.id)
+            .select_from(Skill)
+            .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+            .where(MemberSkillLink.member_id.in_(member_ids_to_delete), Skill.reference_type == service_type)
+        )
+        skills_result = await session.execute(skills_statement)
+        skill_ids = skills_result.scalars().all()
+
+        # Delete member skill links
         await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids_to_delete)))
+
+        # Delete skills associated with these members
+        if skill_ids:
+            await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
+
+        # Delete members
         await session.execute(delete(Member).where(Member.id.in_(member_ids_to_delete)))
 
 
@@ -606,32 +625,38 @@ async def adelete_assistant_cascade(session: AsyncSession, assistant_id: str) ->
         session: Database session
         assistant_id: ID of the assistant to delete
     """
+    # Update threads that reference this assistant to set assistant_id to null and mark as deleted
+    await session.execute(
+        update(Thread).where(Thread.assistant_id == assistant_id).values(assistant_id=None, is_deleted=True, deleted_at=datetime.now())
+    )
+
     # Get all team IDs associated with the assistant
     teams_statement = select(Team.id).select_from(Team).where(Team.assistant_id == assistant_id)
     teams_result = await session.execute(teams_statement)
     team_ids = teams_result.scalars().all()
 
-    if team_ids:
-        # Get all member IDs from these teams
+    if team_ids:  # Get all member IDs from these teams
         members_statement = select(Member.id).where(Member.team_id.in_(team_ids))
         members_result = await session.execute(members_statement)
         member_ids = members_result.scalars().all()
 
         if member_ids:
+            # Get all skill IDs associated with these members before deleting links
+            skills_statement = (
+                select(Skill.id)
+                .select_from(Skill)
+                .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                .where(MemberSkillLink.member_id.in_(member_ids))
+            )
+            skills_result = await session.execute(skills_statement)
+            skill_ids = skills_result.scalars().all()
+
             # Delete member skill links
             await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
 
             # Delete skills associated with these members
-            await session.execute(
-                delete(Skill).where(
-                    Skill.id.in_(
-                        select(Skill.id)
-                        .select_from(Skill)
-                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                        .where(MemberSkillLink.member_id.in_(member_ids))
-                    )
-                )
-            )
+            if skill_ids:
+                await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
 
             # Delete members
             await session.execute(delete(Member).where(Member.id.in_(member_ids)))
@@ -708,83 +733,98 @@ async def aupdate_mcp_members(
         request: Update request containing new MCP IDs
         user_id: User ID
     """
-    if not request.mcp_ids or len(request.mcp_ids) == 0:
-        return
+    # Only delete existing MCP members if new ones are provided
+    if request.mcp_ids is not None:
+        await adelete_members_with_service_type(session, main_team, ConnectedServiceType.MCP)
 
-    # Find and delete existing MCP members
-    await adelete_members_with_service_type(session, main_team, ConnectedServiceType.MCP)  # Get root member ID for linking new MCP members
-    root_member_id = None
-    for member in main_team.members:
-        if member.type == "root":
-            root_member_id = member.id
-            break
+        # If empty list provided, just return after deletion (remove all)
+        if len(request.mcp_ids) == 0:
+            return
 
-    if not root_member_id:
-        raise ValueError("Root member not found in main team")
+        # Get root member ID for linking new MCP members
+        root_member_id = None
+        for member in main_team.members:
+            if member.type == "root":
+                root_member_id = member.id
+                break
 
-    # Create new MCP members directly (avoiding type compatibility issues)
-    for mcp_id in request.mcp_ids:
-        statement = select(ConnectedMcp).where(
-            ConnectedMcp.id == mcp_id,
-            ConnectedMcp.user_id == user_id,
-            ConnectedMcp.is_deleted.is_(False),
-        )
+        if not root_member_id:
+            raise ValueError("Root member not found in main team")
 
-        result = await session.execute(statement)
-        connected_mcp = result.scalar_one_or_none()
-
-        if connected_mcp:
-            # Create member directly
-            member_id = str(uuid.uuid4())
-            member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
-            member = Member(
-                id=member_id,
-                name=member_name,
-                team_id=main_team.id,
-                backstory=connected_mcp.description if connected_mcp.description is not None else None,
-                role="Execute actions based on provided tasks using binding tools and return the results",
-                type="worker",
-                source=root_member_id,
-                provider=request.provider,
-                model=request.model_name,
-                temperature=request.temperature,
-                interrupt=True,
-                position_x=0.0,
-                position_y=0.0,
+        # Create new MCP members and their skills
+        for mcp_id in request.mcp_ids:
+            statement = select(ConnectedMcp).where(
+                ConnectedMcp.id == mcp_id,
+                ConnectedMcp.user_id == user_id,
+                ConnectedMcp.is_deleted.is_(False),
             )
-            session.add(member)
-            await session.flush()  # Create MCP skills using proper connection format
-            connections = {}
-            connections[connected_mcp.mcp_name] = {
-                "url": connected_mcp.url,
-                "transport": connected_mcp.transport,
-            }
-            tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
 
-            for tool_info in tool_infos:
-                skill_id = str(uuid.uuid4())
-                skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
-                skill = Skill(
-                    id=skill_id,
-                    name=skill_name,
-                    user_id=user_id,
-                    description=tool_info.description,
-                    icon="",
-                    display_name=tool_info.display_name,
-                    strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
-                    input_parameters=tool_info.input_parameters,
-                    reference_type=ConnectedServiceType.MCP,
-                    mcp_id=connected_mcp.id,
+            result = await session.execute(statement)
+            connected_mcp = result.scalar_one_or_none()
+
+            if connected_mcp:
+                # Create member
+                member_id = str(uuid.uuid4())
+                member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
+                member = Member(
+                    id=member_id,
+                    name=member_name,
+                    team_id=main_team.id,
+                    backstory=connected_mcp.description if connected_mcp.description is not None else None,
+                    role="Execute actions based on provided tasks using binding tools and return the results",
+                    type="worker",
+                    source=root_member_id,
+                    provider=request.provider,
+                    model=request.model_name,
+                    temperature=request.temperature,
+                    interrupt=True,
+                    position_x=0.0,
+                    position_y=0.0,
                 )
-                session.add(skill)
+                session.add(member)
                 await session.flush()
 
-                member_skill_link = MemberSkillLink(
-                    member_id=member.id,
-                    skill_id=skill.id,
-                )
-                session.add(member_skill_link)
-                await session.flush()
+                # Create MCP skills using proper connection format
+                connections = {}
+                connections[connected_mcp.mcp_name] = {
+                    "url": connected_mcp.url,
+                    "transport": connected_mcp.transport,
+                }
+                tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+
+                # Create skills and link them to the member
+                for tool_info in tool_infos:
+                    skill_id = str(uuid.uuid4())
+                    skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
+                    skill = Skill(
+                        id=skill_id,
+                        name=skill_name,
+                        user_id=user_id,
+                        description=tool_info.description,
+                        icon="",
+                        display_name=tool_info.display_name,
+                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                        input_parameters=tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.MCP,
+                        mcp_id=connected_mcp.id,
+                    )
+                    session.add(skill)
+                    await session.flush()
+
+                    # Link skill to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=member.id,
+                        skill_id=skill.id,
+                    )
+                    session.add(member_skill_link)
+                    await session.flush()
+
+                    # Add tool to cache
+                    tool_manager.add_personal_tool(
+                        user_id=user_id,
+                        tool_key=skill_name,
+                        tool_info=tool_info,
+                    )
 
 
 async def aupdate_extension_members(
@@ -802,86 +842,99 @@ async def aupdate_extension_members(
         request: Update request containing new extension IDs
         user_id: User ID
     """
-    if not request.extension_ids or len(request.extension_ids) == 0:
-        return
+    # Only delete existing extension members if new ones are provided
+    if request.extension_ids is not None:
+        await adelete_members_with_service_type(session, main_team, ConnectedServiceType.EXTENSION)
 
-    # Find and delete existing extension members
-    await adelete_members_with_service_type(
-        session, main_team, ConnectedServiceType.EXTENSION
-    )  # Get root member ID for linking new extension members
-    root_member_id = None
-    for member in main_team.members:
-        if member.type == "root":
-            root_member_id = member.id
-            break
+        # If empty list provided, just return after deletion (remove all)
+        if len(request.extension_ids) == 0:
+            return
 
-    if not root_member_id:
-        raise ValueError("Root member not found in main team")
+        # Get root member ID for linking new extension members
+        root_member_id = None
+        for member in main_team.members:
+            if member.type == "root":
+                root_member_id = member.id
+                break
 
-    # Create new extension members directly
-    for extension_id in request.extension_ids:
-        statement = select(ConnectedExtension).where(
-            ConnectedExtension.id == extension_id,
-            ConnectedExtension.user_id == user_id,
-            ConnectedExtension.is_deleted.is_(False),
-        )
-        result = await session.execute(statement)
-        connected_extension = result.scalar_one_or_none()
+        if not root_member_id:
+            raise ValueError("Root member not found in main team")
 
-        if connected_extension:
-            # Create member directly
-            member_id = str(uuid.uuid4())
-            member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
-            member = Member(
-                id=member_id,
-                name=member_name,
-                team_id=main_team.id,
-                backstory="",  # TODO: Let's get description of the extension later
-                role="Execute actions based on provided tasks using binding tools and return the results",
-                type="worker",
-                source=root_member_id,
-                provider=request.provider,
-                model=request.model_name,
-                temperature=request.temperature,
-                interrupt=True,
-                position_x=0.0,
-                position_y=0.0,
+        # Create new extension members and their skills
+        for extension_id in request.extension_ids:
+            statement = select(ConnectedExtension).where(
+                ConnectedExtension.id == extension_id,
+                ConnectedExtension.user_id == user_id,
+                ConnectedExtension.is_deleted.is_(False),
             )
-            session.add(member)
-            await session.flush()  # Create extension skills
-            extension_service_info = extension_service_manager.get_service_info(service_enum=connected_extension.extension_enum)
+            result = await session.execute(statement)
+            connected_extension = result.scalar_one_or_none()
 
-            if not extension_service_info or not extension_service_info.service_object:
-                raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
-
-            extension_service = extension_service_info.service_object
-            tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
-            tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
-
-            for tool_info in tool_infos:
-                skill_id = str(uuid.uuid4())
-                skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
-                skill = Skill(
-                    id=skill_id,
-                    name=skill_name,
-                    user_id=user_id,
-                    description=tool_info.description,
-                    icon="",
-                    display_name=tool_info.display_name,
-                    strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
-                    input_parameters=tool_info.input_parameters,
-                    reference_type=ConnectedServiceType.EXTENSION,
-                    extension_id=connected_extension.id,
+            if connected_extension:
+                # Create member
+                member_id = str(uuid.uuid4())
+                member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
+                member = Member(
+                    id=member_id,
+                    name=member_name,
+                    team_id=main_team.id,
+                    backstory="",
+                    role="Execute actions based on provided tasks using binding tools and return the results",
+                    type="worker",
+                    source=root_member_id,
+                    provider=request.provider,
+                    model=request.model_name,
+                    temperature=request.temperature,
+                    interrupt=True,
+                    position_x=0.0,
+                    position_y=0.0,
                 )
-                session.add(skill)
+                session.add(member)
                 await session.flush()
 
-                member_skill_link = MemberSkillLink(
-                    member_id=member.id,
-                    skill_id=skill.id,
-                )
-                session.add(member_skill_link)
-                await session.flush()
+                # Create extension skills
+                extension_service_info = extension_service_manager.get_service_info(service_enum=connected_extension.extension_enum)
+
+                if not extension_service_info or not extension_service_info.service_object:
+                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
+                extension_service = extension_service_info.service_object
+                tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
+                tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
+
+                # Create skills and link them to the member
+                for tool_info in tool_infos:
+                    skill_id = str(uuid.uuid4())
+                    skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
+                    skill = Skill(
+                        id=skill_id,
+                        name=skill_name,
+                        user_id=user_id,
+                        description=tool_info.description,
+                        icon="",
+                        display_name=tool_info.display_name,
+                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
+                        input_parameters=tool_info.input_parameters,
+                        reference_type=ConnectedServiceType.EXTENSION,
+                        extension_id=connected_extension.id,
+                    )
+                    session.add(skill)
+                    await session.flush()
+
+                    # Link skill to member
+                    member_skill_link = MemberSkillLink(
+                        member_id=member.id,
+                        skill_id=skill.id,
+                    )
+                    session.add(member_skill_link)
+                    await session.flush()
+
+                    # Add tool to cache
+                    tool_manager.add_personal_tool(
+                        user_id=user_id,
+                        tool_key=skill_name,
+                        tool_info=tool_info,
+                    )
 
 
 async def aupdate_support_units(
@@ -899,87 +952,90 @@ async def aupdate_support_units(
         request: Update request containing new support units
         user_id: User ID
     """
-    if not request.support_units or len(request.support_units) == 0:
-        return  # Delete all support teams (non-hierarchical teams)
+    # Only update support units if they are provided in the request
+    if request.support_units is not None:
+        # Delete all support teams (non-hierarchical teams)
+        all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
+        all_teams_result = await session.execute(all_teams_statement)
+        all_teams = all_teams_result.scalars().all()
 
-    all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
-    all_teams_result = await session.execute(all_teams_statement)
-    all_teams = all_teams_result.scalars().all()
+        # Find teams to delete (all except the hierarchical/main team)
+        teams_to_delete = [team.id for team in all_teams if team.workflow_type != WorkflowType.HIERARCHICAL]
 
-    # Find teams to delete (all except the hierarchical/main team)
-    teams_to_delete = [team.id for team in all_teams if team.workflow_type != WorkflowType.HIERARCHICAL]
+        if teams_to_delete:
+            # Get member IDs before deleting teams
+            member_statement = select(Member.id).where(Member.team_id.in_(teams_to_delete))
+            member_result = await session.execute(member_statement)
+            member_ids = member_result.scalars().all()
 
-    if teams_to_delete:
-        # Delete member skill links and skills
-        member_statement = select(Member.id).where(Member.team_id.in_(teams_to_delete))
-        member_result = await session.execute(member_statement)
-        member_ids = member_result.scalars().all()
-
-        if member_ids:
-            # Delete member skill links
-            await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
-
-            # Delete skills associated with these members
-            await session.execute(
-                delete(Skill).where(
-                    Skill.id.in_(
-                        select(Skill.id)
-                        .select_from(Skill)
-                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                        .where(MemberSkillLink.member_id.in_(member_ids))
-                    )
+            if member_ids:
+                # Get all skill IDs associated with these members before deleting links
+                skills_statement = (
+                    select(Skill.id)
+                    .select_from(Skill)
+                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                    .where(MemberSkillLink.member_id.in_(member_ids))
                 )
-            )
+                skills_result = await session.execute(skills_statement)
+                skill_ids = skills_result.scalars().all()
 
-        # Delete members
-        await session.execute(delete(Member).where(Member.team_id.in_(teams_to_delete)))
+                # Delete member skill links
+                await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
 
-        # Delete teams
-        await session.execute(delete(Team).where(Team.id.in_(teams_to_delete)))
+                # Delete skills associated with these members
+                if skill_ids:
+                    await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
 
-    # Create new support teams directly (avoiding type compatibility issues)
-    for unit in request.support_units:
-        # Create a support team for each unit
-        support_team_id = str(uuid.uuid4())
-        support_team_name = create_unique_key(id_=support_team_id, name=f"Support Unit - {unit}")
-        support_team = Team(
-            id=support_team_id,
-            name=support_team_name,
-            description=f"Support unit for {unit} in advanced assistant.",
-            workflow_type=unit,
-            user_id=user_id,
-            assistant_id=assistant.id,
-        )
-        session.add(support_team)
-        await session.flush()
+            # Delete members
+            await session.execute(delete(Member).where(Member.team_id.in_(teams_to_delete)))
 
-        # Create root member for the support team
-        support_root_member_id = str(uuid.uuid4())
-        support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit} Support Root")
-        support_root_member = Member(
-            id=support_root_member_id,
-            name=support_root_member_name,
-            team_id=support_team.id,
-            backstory=f"Unit for advanced assistant: {unit}.",
-            role="Answer the user's question.",
-            type=f"{unit}",
-            provider=request.provider,
-            model=request.model_name,
-            temperature=request.temperature,
-            interrupt=False,
-            position_x=0.0,
-            position_y=0.0,
-        )
-        session.add(support_root_member)
-        await session.flush()
+            # Delete teams
+            await session.execute(delete(Team).where(Team.id.in_(teams_to_delete)))
 
-        # Load skill for RAGBOT unit
-        if unit == WorkflowType.RAGBOT:
-            await _create_rag_skill(session, support_root_member.id, user_id)
+        # Create new support teams if any are provided
+        if len(request.support_units) > 0:
+            for unit in request.support_units:
+                # Create a support team for each unit
+                support_team_id = str(uuid.uuid4())
+                support_team_name = create_unique_key(id_=support_team_id, name=f"Support Unit - {unit}")
+                support_team = Team(
+                    id=support_team_id,
+                    name=support_team_name,
+                    description=f"Support unit for {unit} in advanced assistant.",
+                    workflow_type=unit,
+                    user_id=user_id,
+                    assistant_id=assistant.id,
+                )
+                session.add(support_team)
+                await session.flush()
 
-        # Load skill for SEARCHBOT unit
-        if unit == WorkflowType.SEARCHBOT:
-            await _acreate_search_skills(session, support_root_member.id, user_id)
+                # Create root member for the support team
+                support_root_member_id = str(uuid.uuid4())
+                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit} Support Root")
+                support_root_member = Member(
+                    id=support_root_member_id,
+                    name=support_root_member_name,
+                    team_id=support_team.id,
+                    backstory=f"Unit for advanced assistant: {unit}.",
+                    role="Answer the user's question.",
+                    type=f"{unit}",
+                    provider=request.provider,
+                    model=request.model_name,
+                    temperature=request.temperature,
+                    interrupt=False,
+                    position_x=0.0,
+                    position_y=0.0,
+                )
+                session.add(support_root_member)
+                await session.flush()
+
+                # Load skill for RAGBOT unit
+                if unit == WorkflowType.RAGBOT:
+                    await _create_rag_skill(session, support_root_member.id, user_id)
+
+                # Load skill for SEARCHBOT unit
+                if unit == WorkflowType.SEARCHBOT:
+                    await _acreate_search_skills(session, support_root_member.id, user_id)
 
 
 def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> UpdateAdvancedAssistantResponse:

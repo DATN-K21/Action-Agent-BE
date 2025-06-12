@@ -6,20 +6,27 @@ from typing import Any
 import requests
 from langchain.tools import StructuredTool
 from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, ValidationError, create_model, field_validator
+from pydantic import BaseModel, Field, ValidationError, create_model, field_validator, model_validator
 
 
 class ParameterProperties(BaseModel):
     type: str
     description: str
     enum: list[str | int | float | bool] | None = None
+    items: dict[str, Any] | None = None  # For array types
 
     @classmethod
     @field_validator("type")
     def type_must_be_valid(cls, v: Any) -> Any:
-        if v not in {"string", "integer", "number", "boolean"}:
+        if v not in {"string", "integer", "number", "boolean", "array"}:
             raise ValueError("Unsupported type")
         return v
+
+    @model_validator(mode="after")
+    def validate_array_items(self) -> "ParameterProperties":
+        if self.type == "array" and self.items is None:
+            raise ValueError("Array type parameters must have 'items' property defined")
+        return self
 
 
 class Parameters(BaseModel):
@@ -77,9 +84,7 @@ def dynamic_api_tool(tool_definition: dict[str, Any]) -> StructuredTool:
     name = function_info.name
     description = function_info.description
     parameters = function_info.parameters
-    required_fields = set(parameters.required or [])
-
-    # Create the argument schema dynamically using pydantic
+    required_fields = set(parameters.required or [])  # Create the argument schema dynamically using pydantic
     fields = {}
     for arg, properties in parameters.properties.items():
         if properties.enum:
@@ -94,6 +99,25 @@ def dynamic_api_tool(tool_definition: dict[str, Any]) -> StructuredTool:
             field_type = float
         elif properties.type == "boolean":
             field_type = bool
+        elif properties.type == "array":
+            # Handle array types - items should always be specified due to validation
+            if properties.items and properties.items.get("type"):
+                item_type = properties.items["type"]
+                if item_type == "string":
+                    field_type = list[str]
+                elif item_type == "integer":
+                    field_type = list[int]
+                elif item_type == "number":
+                    field_type = list[float]
+                elif item_type == "boolean":
+                    field_type = list[bool]
+                else:
+                    # Default to list of strings for unknown item types
+                    field_type = list[str]
+            else:
+                # This should not happen due to validation, but provide fallback
+                # Default to list of strings when no items specified
+                field_type = list[str]
         else:
             raise ValueError(f"Unsupported parameter type: {properties.type}")
         default = ... if arg in required_fields else None

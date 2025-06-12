@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     LLM_DEFAULT_API_KEY: str = "<your-api-key>"
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
+    LLM_DEFAULT_BASE_URL: str = "https://api.openai.com/v1/chat/completions"
     EMBEDDING_PROVIDER: str = "openai"
     DEFAULT_TEMPERATURE: float = 0.0
 
@@ -58,11 +59,9 @@ class Settings(BaseSettings):
     PGVECTOR_COLLECTION: str = "<collection-name>"
 
     # Graph settings
-    RECURSION_LIMIT: int = 25
-
-    # Cache settings
-    MAX_PERSONAL_TOOLS_PER_USER: int = 200
-    MAX_CACHED_USERS: int = 100
+    RECURSION_LIMIT: int = 25  # Cache settings
+    MAX_PERSONAL_TOOLS_PER_USER: int = 500
+    MAX_CACHED_USERS: int = 200
     MAX_CACHED_EXTENSION_SERVICES: int = 400
     MAX_CACHED_MCP_USERS: int = 100
     MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20

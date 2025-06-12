@@ -91,10 +91,10 @@ def get_model_info(model_name: str) -> dict[str, str]:
 
     # TODO: Fixed value
     return {
-        "ai_model_name": "gpt-4o-mini",
-        "provider_name": "openai",
-        "base_url": "https://api.openai.com/v1",
-        "api_key": env_settings.LLM_DEFAULT_API_KEY,  # 现在可以使用decrypted_api_key
+        "ai_model_name": env_settings.LLM_DEFAULT_MODEL,
+        "provider_name": env_settings.LLM_DEFAULT_PROVIDER,
+        "base_url": env_settings.LLM_DEFAULT_BASE_URL,
+        "api_key": env_settings.LLM_DEFAULT_API_KEY,
     }
 
     # def _get_info(session: Session) -> dict[str, str]:
