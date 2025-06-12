@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
 
+from app.core.tools.tool_args_sanitizer import sanitize_tool_args
 from app.core.workflow.utils.tools_utils import get_tool
 
 
@@ -22,6 +23,9 @@ def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
     """
     Invoke a tool by name with the provided arguments.
     """
+    # Sanitize tool arguments to fix common LLM issues like string "null" values
+    sanitized_args = sanitize_tool_args(args)
+
     tool_call_id = str(uuid.uuid4())
 
     # Create the AIMessage for the tool call
@@ -30,7 +34,7 @@ def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
         tool_calls=[
             {
                 "name": tool_name,
-                "args": args,
+                "args": sanitized_args,
                 "id": tool_call_id,
                 "type": "tool_call",
             }

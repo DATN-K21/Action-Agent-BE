@@ -12,6 +12,7 @@ from app.core.state import (
     parse_variables,
     update_node_outputs,
 )
+from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.workflow.utils.db_utils import get_model_info
 from app.core.workflow.utils.tools_utils import get_retrieval_tool, get_tool
 
@@ -174,10 +175,15 @@ class AgentNode:
         )
 
         # Invoke the Agent
-        agent_result = await self.agent.ainvoke(agent_input)
-
-        # Get the final reply
+        agent_result = await self.agent.ainvoke(agent_input)  # Get the final reply
         messages = agent_result["messages"]
+
+        # Sanitize tool calls in all messages to fix common LLM issues like string "null" values
+        from langchain_core.messages import AIMessage
+
+        for msg in messages:
+            if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+                msg.tool_calls = sanitize_tool_calls_list(msg.tool_calls)
 
         # Find the first AI message from the end that does not contain a tool call
         for msg in reversed(messages):

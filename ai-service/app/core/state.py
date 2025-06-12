@@ -46,7 +46,7 @@ class GraphSkill(BaseModel):
             return True
 
         except Exception as e:
-            logger.error(f"Failed to load cache for skill {self.skill_id}: {e}", exc_info=True)
+            logger.error(f"Failed to load cache for skill {self.skill_id}: {e}")
             return False
 
     async def aensure_tool_available(self) -> BaseTool:
@@ -96,7 +96,7 @@ class GraphSkill(BaseModel):
         if self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
             try:
                 return tool_manager.get_personal_tool(self.user_id, self.name).tool
-            except Exception:
+            except KeyError:
                 # Attempt to load the tool cache before raising error
                 cache_loaded = await self.aload_tool_cache()
 

@@ -290,7 +290,7 @@ async def acreate_upload(
         )
 
         session.add(upload)
-        await session.commit()
+        await session.flush()
         await session.refresh(upload)
 
         if upload.id is None:

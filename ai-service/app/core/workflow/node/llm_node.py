@@ -14,6 +14,7 @@ from app.core.state import (
     parse_variables,
     update_node_outputs,
 )
+from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.workflow.utils.db_utils import get_model_info
 
 
@@ -123,17 +124,20 @@ class LLMNode(LLMBaseNode):
                 for item in all_messages[-1].content
             )
         ):
+            from langchain_core.messages import HumanMessage  # Create new temporary state for handling image messages
 
-            from langchain_core.messages import HumanMessage
-
-            # Create new temporary state for handling image messages
             temp_state = [HumanMessage(content=all_messages[-1].content, name="user")]
-
             result: AnyMessage = await self.model.ainvoke(temp_state, config)
         else:
             # Normal messages maintain the original processing method
             # Convert WorkflowTeamState to dict before passing to ainvoke
             result: AnyMessage = await chain.ainvoke({"messages": state.get("messages", [])}, config)
+
+        # Sanitize tool calls if present to fix common LLM issues like string "null" values
+        from langchain_core.messages import AIMessage
+
+        if isinstance(result, AIMessage) and hasattr(result, "tool_calls") and result.tool_calls:
+            result.tool_calls = sanitize_tool_calls_list(result.tool_calls)
 
         # 更新 node_outputs
         new_output = {self.node_id: {"response": result.content}}

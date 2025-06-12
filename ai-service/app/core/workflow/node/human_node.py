@@ -8,6 +8,7 @@ from langgraph.types import Command, interrupt
 
 from app.core.enums import InterruptDecision, InterruptType
 from app.core.state import ReturnWorkflowTeamState, WorkflowTeamState
+from app.core.tools.tool_args_sanitizer import sanitize_tool_args
 
 
 class HumanNode:
@@ -128,7 +129,6 @@ class HumanNode:
                     "messages": result,
                     "all_messages": (self.all_messages or []) + result,
                 }
-
                 next_node = self.routes.get("rejected", "call_llm")
                 return Command(goto=next_node, update=return_state)
 
@@ -141,13 +141,16 @@ class HumanNode:
                     else json.loads(review_data)
                 )
 
+                # Sanitize tool arguments to fix common LLM issues like string "null" values
+                sanitized_args = sanitize_tool_args(args)
+
                 updated_message = AIMessage(
                     content=self.last_message.content,
                     tool_calls=[
                         {
                             "id": tool_call["id"],
                             "name": tool_call["name"],
-                            "args": args,  # Now ensure its dictionary type
+                            "args": sanitized_args,  # Use sanitized arguments
                         }
                     ],
                     id=self.last_message.id,

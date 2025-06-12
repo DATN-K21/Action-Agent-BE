@@ -23,6 +23,7 @@ from app.core.state import (
     add_or_replace_messages,
     format_messages,
 )
+from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.workflow.utils.db_utils import get_model_info
 
 
@@ -72,9 +73,7 @@ class BaseNode:
                 temperature=temperature,
                 api_key=self.model_info["api_key"],
                 base_url=self.model_info["base_url"],
-            )
-
-            # Use temperature = 0 when initializing final_answer_model
+            )  # Use temperature = 0 when initializing final_answer_model
             self.final_answer_model = model_provider_manager.init_model(
                 provider_name=provider,
                 model=model,
@@ -119,9 +118,15 @@ class BaseNode:
             from langchain_core.messages import HumanMessage
 
             temp_state = [HumanMessage(content=all_messages[-1].content, name="user")]
-            return await self.model.ainvoke(temp_state, config)
+            result = await self.model.ainvoke(temp_state, config)
+        else:
+            result = await chain.ainvoke(state, config)
 
-        return await chain.ainvoke(state, config)
+        # Sanitize tool calls if present
+        if hasattr(result, "tool_calls") and result.tool_calls:
+            result.tool_calls = sanitize_tool_calls_list(result.tool_calls)
+
+        return result
 
 
 class WorkerNode(BaseNode):

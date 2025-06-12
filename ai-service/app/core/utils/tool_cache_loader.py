@@ -70,7 +70,7 @@ async def aload_tools_to_cache_by_skill(skill_id: str, member_id: str) -> None:
             logger.info(f"Successfully loaded tools to cache for skill {skill_id} and member {member_id}")
 
         except Exception as e:
-            logger.error(f"Error loading tools to cache for skill {skill_id}: {e}", exc_info=True)
+            logger.error(f"Error loading tools to cache for skill {skill_id}: {e}")
             raise
 
 
