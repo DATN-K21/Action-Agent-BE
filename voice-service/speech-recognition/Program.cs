@@ -14,6 +14,7 @@ builder.Services.AddOptions<SpeechOptions>()
 builder.Services.AddScoped<ISpeechRecognition, SpeechRecognition>();
 
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

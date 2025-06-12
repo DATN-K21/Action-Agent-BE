@@ -25,8 +25,8 @@ public class SpeechRecognizeController : ControllerBase
         if (audioFile == null || audioFile.Length == 0)
             return response.ToBadRequestResponse("No audio file provided.");
 
-        if (!Path.GetExtension(audioFile.FileName).Equals(".wav", StringComparison.CurrentCultureIgnoreCase))
-            return response.ToBadRequestResponse("Only .wav files are supported.");
+        // if (!Path.GetExtension(audioFile.FileName).Equals(".wav", StringComparison.CurrentCultureIgnoreCase))
+        //     return response.ToBadRequestResponse("Only .wav files are supported.");
 
         var result = await _speechRecognition.FromFile(audioFile);
 
