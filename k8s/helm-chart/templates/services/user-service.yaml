@@ -1,0 +1,168 @@
+{{- if .Values.userService.enabled }}
+{{- if .Values.userService.database.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-database
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app: user-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "action-agent.selectorLabels" . | nindent 6 }}
+      app: user-database
+  template:
+    metadata:
+      labels:
+        {{- include "action-agent.selectorLabels" . | nindent 8 }}
+        app: user-database
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.userService.database.image.repository }}:{{ .Values.userService.database.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          envFrom:
+            {{- if .Values.secrets.createSecrets }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "name" "user-db") }}
+            {{- end }}
+          {{- if .Values.userService.database.persistence.enabled }}
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          {{- end }}
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+      {{- if .Values.userService.database.persistence.enabled }}
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: {{ include "action-agent.fullname" . }}-user-database-pvc
+      {{- else }}
+      volumes:
+        - name: mongodb-data
+          emptyDir: {}
+      {{- end }}
+
+{{- if .Values.userService.database.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-database-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.userService.database.persistence.size }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-database
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app: user-database
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+      name: mongodb
+
+{{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app: user-service
+spec:
+  replicas: {{ .Values.userService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "action-agent.selectorLabels" . | nindent 6 }}
+      app: user-service
+  template:
+    metadata:
+      labels:
+        {{- include "action-agent.selectorLabels" . | nindent 8 }}
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: "{{ .Values.userService.image.repository }}:{{ .Values.userService.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.userService.service.port }}
+              name: http
+          env:
+            - name: PORT
+              value: {{ .Values.userService.service.port | quote }}
+          envFrom:
+            {{- if .Values.secrets.createSecrets }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "name" "user-service") }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "name" "email") }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.userService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: {{ .Values.userService.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: {{ .Values.userService.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.userService.service.type }}
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app: user-service
+  ports:
+    - protocol: TCP
+      port: {{ .Values.userService.service.port }}
+      targetPort: {{ .Values.userService.service.port }}
+      name: http
+
+{{- end }}

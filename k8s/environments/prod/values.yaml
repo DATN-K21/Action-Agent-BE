@@ -1,0 +1,10 @@
+# Production environment external secrets configuration
+# This file defines how to fetch secrets from external secret stores
+
+# External URLs for managed services
+config:
+  externalRedisUrl: "redis://prod-redis.example.com:6379"
+  externalRabbitmqUrl: "amqp://user:pass@prod-rabbitmq.example.com:5672"
+  externalElasticsearchUrl: "https://prod-elasticsearch.example.com:9200"
+  externalMongoUrl: "mongodb://user:pass@prod-mongo.example.com:27017/user-service"
+  externalPostgresUrl: "postgresql://user:pass@prod-postgres.example.com:5432/ai-service"

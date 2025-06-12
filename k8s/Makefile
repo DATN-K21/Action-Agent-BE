@@ -1,21 +1,41 @@
 # Kubernetes Management Makefile for Action-Agent Backend
+# Supports both traditional kubectl and Helm deployments
 
-.PHONY: help deploy cleanup status secrets infra apps logs port-forward
+.PHONY: help deploy cleanup status secrets infra apps logs port-forward helm-deploy helm-upgrade helm-uninstall helm-status
+
+# Default values
+ENV ?= dev
+NAMESPACE ?= default
+RELEASE_NAME ?= action-agent
 
 # Default target
 help:
 	@echo "Action-Agent Kubernetes Management"
 	@echo ""
-	@echo "Available commands:"
-	@echo "  deploy       - Deploy all services in correct order"
+	@echo "Traditional kubectl commands:"
+	@echo "  deploy       - Deploy all services using kubectl"
 	@echo "  cleanup      - Remove all Action-Agent resources"
 	@echo "  status       - Show deployment status"
 	@echo "  secrets      - Deploy only secrets"
 	@echo "  infra        - Deploy only infrastructure services"
 	@echo "  apps         - Deploy only application services"
+	@echo ""
+	@echo "Helm commands:"
+	@echo "  helm-deploy  - Deploy using Helm (ENV=dev|stg|prod)"
+	@echo "  helm-upgrade - Upgrade existing Helm release"
+	@echo "  helm-uninstall - Uninstall Helm release"
+	@echo "  helm-status  - Show Helm release status"
+	@echo "  helm-dry-run - Perform Helm dry run"
+	@echo ""
+	@echo "Other commands:"
 	@echo "  logs         - Show logs for all services"
 	@echo "  port-forward - Forward API Gateway port to localhost"
 	@echo "  help         - Show this help message"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make helm-deploy ENV=dev"
+	@echo "  make helm-deploy ENV=stg NAMESPACE=action-agent-stg"
+	@echo "  make helm-upgrade ENV=prod"
 
 # Deploy everything
 deploy:
@@ -80,3 +100,24 @@ port-forward:
 	@echo "Access the API at: https://localhost:15000"
 	@echo "Press Ctrl+C to stop"
 	kubectl port-forward service/api-gateway 15000:15000
+
+# Helm deployment commands
+helm-deploy:
+	@echo "🚀 Deploying with Helm (Environment: $(ENV))..."
+	./helm-deploy.sh --environment $(ENV) --namespace $(NAMESPACE) --release $(RELEASE_NAME)
+
+helm-upgrade:
+	@echo "⬆️  Upgrading Helm release (Environment: $(ENV))..."
+	./helm-deploy.sh --environment $(ENV) --namespace $(NAMESPACE) --release $(RELEASE_NAME) --upgrade
+
+helm-uninstall:
+	@echo "🗑️  Uninstalling Helm release..."
+	helm uninstall $(RELEASE_NAME)-$(ENV) --namespace $(NAMESPACE)
+
+helm-status:
+	@echo "📊 Helm Release Status:"
+	helm status $(RELEASE_NAME)-$(ENV) --namespace $(NAMESPACE)
+
+helm-dry-run:
+	@echo "🧪 Performing Helm dry run (Environment: $(ENV))..."
+	./helm-deploy.sh --environment $(ENV) --namespace $(NAMESPACE) --release $(RELEASE_NAME) --dry-run

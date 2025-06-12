@@ -1,0 +1,76 @@
+{{- if .Values.kibana.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "action-agent.fullname" . }}-kibana-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+data:
+  {{- if .Values.elasticsearch.enabled }}
+  ELASTICSEARCH_HOSTS: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.port }}"
+  {{- else }}
+  ELASTICSEARCH_HOSTS: {{ .Values.kibana.config.elasticsearchHosts | quote }}
+  {{- end }}
+  SERVER_NAME: {{ .Values.kibana.config.serverName | quote }}
+  XPACK_SECURITY_ENABLED: {{ .Values.kibana.config.xpackSecurityEnabled | quote }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-kibana
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "action-agent.selectorLabels" . | nindent 6 }}
+      app: kibana
+  template:
+    metadata:
+      labels:
+        {{- include "action-agent.selectorLabels" . | nindent 8 }}
+        app: kibana
+    spec:
+      containers:
+        - name: kibana
+          image: "{{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.kibana.service.port }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ include "action-agent.fullname" . }}-kibana-config
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-kibana
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app: kibana
+  ports:
+    - protocol: TCP
+      port: {{ .Values.kibana.service.port }}
+      targetPort: {{ .Values.kibana.service.port }}
+      name: http
+
+{{- end }}

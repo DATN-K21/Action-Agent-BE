@@ -1,0 +1,132 @@
+# Production environment values
+global:
+  environment: prod
+  namespace: action-agent-prod
+
+# Infrastructure - Disable local infrastructure, use managed services
+redis:
+  enabled: false  # Use managed Redis service
+  # External Redis configuration will be provided via secrets
+
+rabbitmq:
+  enabled: false  # Use managed RabbitMQ service
+  # External RabbitMQ configuration will be provided via secrets
+
+elasticsearch:
+  enabled: false  # Use managed Elasticsearch service
+  # External Elasticsearch configuration will be provided via secrets
+
+kibana:
+  enabled: false  # Use managed Kibana service
+
+# Application Services - Production-grade resources
+apiGateway:
+  replicaCount: 3
+  image:
+    tag: "stable"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+userService:
+  replicaCount: 3
+  image:
+    tag: "stable"
+  database:
+    enabled: false  # Use managed MongoDB
+    # External MongoDB configuration will be provided via secrets
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+aiService:
+  replicaCount: 3
+  image:
+    tag: "stable"
+  database:
+    enabled: false  # Use managed PostgreSQL
+    # External PostgreSQL configuration will be provided via secrets
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+
+extensionService:
+  replicaCount: 3
+  image:
+    tag: "stable"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+# Secret Management - Use external secrets in production
+secrets:
+  createSecrets: false
+  external:
+    provider: "vault"
+    secretStore: "production-vault-store"
+
+# Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: api.action-agent.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: action-agent-prod-tls
+      hosts:
+        - api.action-agent.com
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+# Node selection for production workloads
+nodeSelector:
+  node-type: "application"
+
+tolerations:
+  - key: "dedicated"
+    operator: "Equal"
+    value: "application"
+    effect: "NoSchedule"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                  - action-agent-prod
+          topologyKey: kubernetes.io/hostname

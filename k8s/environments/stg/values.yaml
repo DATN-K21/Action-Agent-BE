@@ -1,0 +1,10 @@
+# Staging environment external secrets configuration
+# This file defines how to fetch secrets from external secret stores
+
+# External URLs for managed services
+config:
+  externalRedisUrl: "redis://staging-redis.example.com:6379"
+  externalRabbitmqUrl: "amqp://user:pass@staging-rabbitmq.example.com:5672"
+  externalElasticsearchUrl: "https://staging-elasticsearch.example.com:9200"
+  externalMongoUrl: "mongodb://user:pass@staging-mongo.example.com:27017/user-service"
+  externalPostgresUrl: "postgresql://user:pass@staging-postgres.example.com:5432/ai-service"
