@@ -20,4 +20,10 @@ RUN dotnet publish "speech-recognition.csproj" -c $BUILD_CONFIGURATION -o /app/p
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# Copy GCloud keys
+COPY GCloudKeys/speech-api-account.json ./GCloudKeys/speech-api-account.json
+
+# Set GOOGLE_APPLICATION_CREDENTIALS env variable
+ENV GOOGLE_APPLICATION_CREDENTIALS=GCloudKeys/speech-api-account.json
+
 ENTRYPOINT ["dotnet", "speech-recognition.dll"]

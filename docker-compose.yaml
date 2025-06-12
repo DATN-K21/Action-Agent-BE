@@ -100,9 +100,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ASPNETCORE_URLS: http://+:15400
-      Speech_Options__SubscriptionKey: 71mWp8uR08ntPZTGX0z53VB15mrdnUUIzDxnBN5G7ftE1UrWxfxfJQQJ99BFACYeBjFXJ3w3AAAYACOGap9C
-      Speech_Options__Endpoint: https://eastus.api.cognitive.microsoft.com
-      Speech_Options__SupportedLanguages: "en-US,vi-VN"
+      Speech_Options__GoogleApplicationCredentials: GCloudKeys/speech-api-account.json
     ports:
       - "15400:15400"
     restart: always
