@@ -1,3 +1,4 @@
+using speech_recognition.Exceptions.Handler;
 using speech_recognition.Options;
 using speech_recognition.Services;
 
@@ -8,12 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
 builder.Services.AddOptions<SpeechOptions>()
     .BindConfiguration(nameof(SpeechOptions));
 
 builder.Services.AddScoped<ISpeechRecognition, SpeechRecognition>();
 
-
+builder.Services.AddExceptionHandler<CustomExceptionHandler>();
 
 var app = builder.Build();
 
@@ -30,5 +32,8 @@ app.MapGet("/ping", () => "pong")
     .Produces<string>(StatusCodes.Status200OK);
 
 app.MapControllers();
+
+app.UseExceptionHandler(options => { });
+
 
 app.Run();

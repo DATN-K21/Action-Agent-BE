@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using speech_recognition.Exceptions;
 using speech_recognition.Models;
 using speech_recognition.Responses;
 using speech_recognition.Services;
@@ -25,13 +26,15 @@ public class SpeechRecognizeController : ControllerBase
         if (audioFile == null || audioFile.Length == 0)
             return response.ToBadRequestResponse("No audio file provided.");
 
-        // if (!Path.GetExtension(audioFile.FileName).Equals(".wav", StringComparison.CurrentCultureIgnoreCase))
-        //     return response.ToBadRequestResponse("Only .wav files are supported.");
+        if (!Path.GetExtension(audioFile.FileName).Equals(".wav", StringComparison.CurrentCultureIgnoreCase))
+        {
+            throw new BadRequestException("Invalid file format", "Only .wav files are supported for speech recognition.");;
+        }
 
         var result = await _speechRecognition.FromFile(audioFile);
 
         if (string.IsNullOrEmpty(result))
-            return response.ToBadRequestResponse("No speech recognized in the provided audio file.");
+            throw new BadRequestException("No speech recognized in the provided audio file.");
 
         return response.ToSuccessResponse(result, "Speech recognized successfully.");
     }
