@@ -43,7 +43,7 @@ router = APIRouter(prefix="/assistant", tags=["Assistant"])
 # ================================
 
 
-def extract_support_units(assistant: Assistant) -> List[WorkflowType]:
+def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
     """
     Extract support units from the assistant object.
     This function identifies which workflow types are used as support units
@@ -63,7 +63,7 @@ def extract_support_units(assistant: Assistant) -> List[WorkflowType]:
     return support_units
 
 
-async def abuild_assistant_query(
+async def _abuild_assistant_query(
     session: AsyncSession,
     user_id: Optional[str] = None,
     user_role: Optional[str] = None,
@@ -129,7 +129,7 @@ async def abuild_assistant_query(
     return result, count, total_pages
 
 
-def format_team_data(teams: List[Team]) -> List[Dict[str, Any]]:
+def _format_team_data(teams: List[Team]) -> List[Dict[str, Any]]:
     """
     Format team data for API response.
 
@@ -159,7 +159,7 @@ def format_team_data(teams: List[Team]) -> List[Dict[str, Any]]:
     ]
 
 
-def format_assistant_response(
+def _format_assistant_response(
     assistant: Assistant,
     teams_data: List[Dict[str, Any]],
     mcp_ids: Optional[List[str]] = None,
@@ -190,7 +190,7 @@ def format_assistant_response(
         "provider": assistant.provider,
         "model_name": assistant.model_name,
         "temperature": assistant.temperature,
-        "support_units": extract_support_units(assistant),
+        "support_units": _extract_support_units(assistant),
         "teams": teams_data,
         "created_at": assistant.created_at,
     }
@@ -209,7 +209,7 @@ def format_assistant_response(
         )
 
 
-async def acreate_main_team(
+async def _acreate_main_team(
     session: AsyncSession, assistant: Assistant, request: CreateAdvancedAssistantRequest, user_id: str
 ) -> Tuple[Team, Member]:
     """
@@ -261,7 +261,51 @@ async def acreate_main_team(
     return main_team, root_member
 
 
-async def acreate_mcp_member_with_skills(
+async def _acreate_chatbot_member(
+    session: AsyncSession,
+    team_id: str,
+    root_member_id: str,
+    request: CreateAdvancedAssistantRequest,
+    user_id: str,
+) -> Member:
+    """
+    Create a chatbot member for the main team.
+
+    Args:
+        session: Database session
+        team_id: Team ID to add member to
+        root_member_id: Root member ID for source reference
+        request: Request data containing provider/model info
+
+    Returns:
+        Created Member object
+    """
+    chatbot_member_id = str(uuid.uuid4())
+    chatbot_member_name = create_unique_key(id_=chatbot_member_id, name="Chatbot Assistant")
+    chatbot_member = Member(
+        id=chatbot_member_id,
+        name=chatbot_member_name,
+        team_id=team_id,
+        backstory="A friendly chatbot assistant designed to handle general conversations, provide greetings, engage in small talk, and help users with their questions using available tools.",
+        role="Handle greetings, small talk, and general questions. Use search and knowledge base tools when needed. Politely decline inappropriate requests and ask for clarification when context is insufficient.",
+        type="worker",
+        source=root_member_id,
+        provider=request.provider,
+        model=request.model_name,
+        temperature=request.temperature,
+        interrupt=False,
+        position_x=0.0,
+        position_y=0.0,
+    )
+    session.add(chatbot_member)
+    await session.flush()
+
+    await _acreate_search_skills(session, chatbot_member.id, user_id)
+
+    return chatbot_member
+
+
+async def _acreate_mcp_member_with_skills(
     session: AsyncSession,
     connected_mcp: ConnectedMcp,
     team_id: str,
@@ -343,7 +387,7 @@ async def acreate_mcp_member_with_skills(
         )
 
 
-async def acreate_extension_member_with_skills(
+async def _acreate_extension_member_with_skills(
     session: AsyncSession,
     connected_extension: ConnectedExtension,
     team_id: str,
@@ -426,7 +470,7 @@ async def acreate_extension_member_with_skills(
         )
 
 
-async def acreate_support_team(
+async def _acreate_support_team(
     session: AsyncSession, assistant: Assistant, workflow_type: WorkflowType, request: CreateAdvancedAssistantRequest, user_id: str
 ) -> Team:
     """
@@ -476,38 +520,10 @@ async def acreate_support_team(
     session.add(support_root_member)
     await session.flush()
 
-    # Add specific skills based on workflow type
-    if workflow_type == WorkflowType.RAGBOT:
-        await _create_rag_skill(session, support_root_member.id, user_id)
-    elif workflow_type == WorkflowType.SEARCHBOT:
+    if workflow_type == WorkflowType.SEARCHBOT:
         await _acreate_search_skills(session, support_root_member.id, user_id)
 
     return support_team
-
-
-async def _create_rag_skill(session: SessionDep, member_id: str, user_id: str) -> None:
-    """Create RAG skill for RAGBOT workflow type."""
-    rag_skill_id = str(uuid.uuid4())
-    rag_skill_name = create_unique_key(id_=rag_skill_id, name="Knowledge Base")
-    rag_skill = Skill(
-        id=rag_skill_id,
-        name=rag_skill_name,
-        user_id=user_id,
-        description="Query documents for answers.",
-        icon="",
-        display_name="Knowledge Base",
-        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
-        input_parameters={},
-        reference_type=ConnectedServiceType.NONE,
-    )
-    session.add(rag_skill)
-    await session.flush()
-
-    member_skill_link = MemberSkillLink(
-        member_id=member_id,
-        skill_id=rag_skill.id,
-    )
-    session.add(member_skill_link)
 
 
 async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: str) -> None:
@@ -567,7 +583,7 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
     await session.flush()
 
 
-async def adelete_members_with_service_type(session: AsyncSession, team: Team, service_type: ConnectedServiceType) -> None:
+async def _adelete_members_with_service_type(session: AsyncSession, team: Team, service_type: ConnectedServiceType) -> None:
     """
     Delete members and their skills based on service type.
 
@@ -617,7 +633,7 @@ async def adelete_members_with_service_type(session: AsyncSession, team: Team, s
         await session.execute(delete(Member).where(Member.id.in_(member_ids_to_delete)))
 
 
-async def adelete_assistant_cascade(session: AsyncSession, assistant_id: str) -> None:
+async def _adelete_assistant_cascade(session: AsyncSession, assistant_id: str) -> None:
     """
     Delete an assistant and all related entities in cascade.
 
@@ -668,7 +684,7 @@ async def adelete_assistant_cascade(session: AsyncSession, assistant_id: str) ->
     await session.execute(delete(Assistant).where(Assistant.id == assistant_id))
 
 
-async def aget_main_team_for_assistant(session: AsyncSession, assistant_id: str, user_id: str) -> Optional[Team]:
+async def _aget_main_team_for_assistant(session: AsyncSession, assistant_id: str, user_id: str) -> Optional[Team]:
     """
     Get the main hierarchical team for an assistant.
 
@@ -696,7 +712,7 @@ async def aget_main_team_for_assistant(session: AsyncSession, assistant_id: str,
     return result.scalar_one_or_none()
 
 
-def update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> None:
+def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> None:
     """
     Update basic assistant information (name, description, system_prompt).
 
@@ -718,7 +734,7 @@ def update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAss
         setattr(assistant, "temperature", request.temperature)
 
 
-async def aupdate_mcp_members(
+async def _aupdate_mcp_members(
     session: AsyncSession,
     main_team: Team,
     request: UpdateAdvancedAssistantRequest,
@@ -735,7 +751,7 @@ async def aupdate_mcp_members(
     """
     # Only delete existing MCP members if new ones are provided
     if request.mcp_ids is not None:
-        await adelete_members_with_service_type(session, main_team, ConnectedServiceType.MCP)
+        await _adelete_members_with_service_type(session, main_team, ConnectedServiceType.MCP)
 
         # If empty list provided, just return after deletion (remove all)
         if len(request.mcp_ids) == 0:
@@ -827,7 +843,7 @@ async def aupdate_mcp_members(
                     )
 
 
-async def aupdate_extension_members(
+async def _aupdate_extension_members(
     session: AsyncSession,
     main_team: Team,
     request: UpdateAdvancedAssistantRequest,
@@ -844,7 +860,7 @@ async def aupdate_extension_members(
     """
     # Only delete existing extension members if new ones are provided
     if request.extension_ids is not None:
-        await adelete_members_with_service_type(session, main_team, ConnectedServiceType.EXTENSION)
+        await _adelete_members_with_service_type(session, main_team, ConnectedServiceType.EXTENSION)
 
         # If empty list provided, just return after deletion (remove all)
         if len(request.extension_ids) == 0:
@@ -937,7 +953,7 @@ async def aupdate_extension_members(
                     )
 
 
-async def aupdate_support_units(
+async def _aupdate_support_units(
     session: AsyncSession,
     assistant: Assistant,
     request: UpdateAdvancedAssistantRequest,
@@ -1029,16 +1045,12 @@ async def aupdate_support_units(
                 session.add(support_root_member)
                 await session.flush()
 
-                # Load skill for RAGBOT unit
-                if unit == WorkflowType.RAGBOT:
-                    await _create_rag_skill(session, support_root_member.id, user_id)
-
                 # Load skill for SEARCHBOT unit
                 if unit == WorkflowType.SEARCHBOT:
                     await _acreate_search_skills(session, support_root_member.id, user_id)
 
 
-def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> UpdateAdvancedAssistantResponse:
+def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> UpdateAdvancedAssistantResponse:
     """
     Format the response data for updated assistant.
 
@@ -1050,7 +1062,7 @@ def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistan
         Formatted response object
     """
     # Format teams data using existing helper
-    teams_data = format_team_data(assistant.teams)
+    teams_data = _format_team_data(assistant.teams)
 
     return UpdateAdvancedAssistantResponse(
         id=assistant.id,
@@ -1063,7 +1075,7 @@ def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistan
         model_name=request.model_name,
         temperature=request.temperature,
         main_unit=WorkflowType.HIERARCHICAL,
-        support_units=request.support_units or extract_support_units(assistant),
+        support_units=request.support_units or _extract_support_units(assistant),
         mcp_ids=request.mcp_ids,
         extension_ids=request.extension_ids,
         teams=teams_data,
@@ -1071,7 +1083,7 @@ def format_update_response(assistant: Assistant, request: UpdateAdvancedAssistan
     )
 
 
-async def aextract_service_ids_from_team(session: AsyncSession, team: Team) -> Tuple[List[str], List[str]]:
+async def _aextract_service_ids_from_team(session: AsyncSession, team: Team) -> Tuple[List[str], List[str]]:
     """
     Extract MCP IDs and extension IDs from the members of a hierarchical team.
 
@@ -1145,7 +1157,7 @@ async def aget_assistants(
         max_per_page = paging.max_per_page if paging.max_per_page else 10
 
         # Use helper function to build and execute query
-        result, count, total_pages = await abuild_assistant_query(
+        result, count, total_pages = await _abuild_assistant_query(
             session=session,
             user_id=x_user_id,
             user_role=x_user_role,
@@ -1165,8 +1177,8 @@ async def aget_assistants(
         # Format responses using helper function
         wrapped_assistants = []
         for assistant in assistants:
-            assistant_teams = format_team_data(assistant.teams)
-            formatted_response = format_assistant_response(assistant, assistant_teams)
+            assistant_teams = _format_team_data(assistant.teams)
+            formatted_response = _format_assistant_response(assistant, assistant_teams)
             wrapped_assistants.append(formatted_response)
 
         return ResponseWrapper.wrap(
@@ -1185,7 +1197,7 @@ async def aget_assistants(
 
 
 @router.post("/create", summary="Create an advanced assistant.", response_model=ResponseWrapper[CreateAdvancedAssistantResponse])
-async def create_advanced_assistant(
+async def acreate_advanced_assistant(
     session: SessionDep,
     request: CreateAdvancedAssistantRequest,
     x_user_id: str = Header(None),
@@ -1225,7 +1237,7 @@ async def create_advanced_assistant(
         await session.flush()  # Ensure assistant exists before creating teams
 
         # Create the main hierarchical team using helper function
-        main_team, root_member = await acreate_main_team(session, new_assistant, request, x_user_id)
+        main_team, root_member = await _acreate_main_team(session, new_assistant, request, x_user_id)
 
         # Get the root member ID for linking MCP/extension members
         root_member_id = None
@@ -1235,6 +1247,9 @@ async def create_advanced_assistant(
 
         if not root_member_id:
             raise ValueError("Root member not found in main team")
+
+        # Create chatbot member for the main team
+        await _acreate_chatbot_member(session, main_team.id, root_member_id, request, x_user_id)
 
         # Create MCP members and their skills using helper function
         if request.mcp_ids:
@@ -1247,7 +1262,7 @@ async def create_advanced_assistant(
                 connected_mcp = mcp_result.scalar_one_or_none()
 
                 if connected_mcp:
-                    await acreate_mcp_member_with_skills(
+                    await _acreate_mcp_member_with_skills(
                         session,
                         connected_mcp,
                         main_team.id,
@@ -1268,7 +1283,7 @@ async def create_advanced_assistant(
                 connected_extension = ext_result.scalar_one_or_none()
 
                 if connected_extension:
-                    await acreate_extension_member_with_skills(
+                    await _acreate_extension_member_with_skills(
                         session,
                         connected_extension,
                         main_team.id,
@@ -1279,7 +1294,7 @@ async def create_advanced_assistant(
         # Create support teams for each workflow type using helper function
         if request.support_units:
             for workflow_type in request.support_units:
-                await acreate_support_team(session, new_assistant, workflow_type, request, x_user_id)
+                await _acreate_support_team(session, new_assistant, workflow_type, request, x_user_id)
 
         # Commit all changes
         await session.commit()
@@ -1292,7 +1307,7 @@ async def create_advanced_assistant(
         created_assistant = assistant_result.scalar_one()
 
         # Format teams data for response using helper function
-        teams_data = format_team_data(created_assistant.teams)  # Create response using helper function
+        teams_data = _format_team_data(created_assistant.teams)  # Create response using helper function
         response = CreateAdvancedAssistantResponse(
             id=created_assistant.id,
             user_id=x_user_id,
@@ -1324,7 +1339,7 @@ async def create_advanced_assistant(
     summary="Get assistant details.",
     response_model=ResponseWrapper[GetAssistantResponse | GetAdvancedAssistantResponse],
 )
-async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
     """
     Get details of an assistant by its ID using helper functions.
 
@@ -1339,7 +1354,7 @@ async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id:
     """
     try:
         # Use helper function to build and execute query for single assistant
-        result, count, _ = await abuild_assistant_query(
+        result, count, _ = await _abuild_assistant_query(
             session=session, user_id=x_user_id, user_role=x_user_role, assistant_id=assistant_id, page_number=1, max_per_page=1
         )
 
@@ -1349,7 +1364,7 @@ async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id:
         assistant = result.scalar_one()
 
         # Format teams data using helper function
-        teams_data = format_team_data(assistant.teams)  # Extract MCP and extension IDs if this is an advanced assistant
+        teams_data = _format_team_data(assistant.teams)  # Extract MCP and extension IDs if this is an advanced assistant
         mcp_ids = None
         extension_ids = None
 
@@ -1362,10 +1377,10 @@ async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id:
                     break
 
             if hierarchical_team:
-                mcp_ids, extension_ids = await aextract_service_ids_from_team(session, hierarchical_team)
+                mcp_ids, extension_ids = await _aextract_service_ids_from_team(session, hierarchical_team)
 
         # Format response using helper function
-        response = format_assistant_response(
+        response = _format_assistant_response(
             assistant=assistant,
             teams_data=teams_data,
             mcp_ids=mcp_ids,
@@ -1380,7 +1395,7 @@ async def get_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id:
 
 
 @router.patch("{assistant_id}/update", summary="Update assistant information.", response_model=ResponseWrapper[UpdateAdvancedAssistantResponse])
-async def update_assistant(
+async def aupdate_assistant(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAdvancedAssistantRequest,
@@ -1404,28 +1419,28 @@ async def update_assistant(
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
 
         # Update the assistant table
-        update_assistant_basic_info(assistant, request)
+        _update_assistant_basic_info(assistant, request)
 
         # Get main team (main unit)
-        main_team = await aget_main_team_for_assistant(session, assistant_id, x_user_id)
+        main_team = await _aget_main_team_for_assistant(session, assistant_id, x_user_id)
 
         if not main_team:
             return ResponseWrapper.wrap(status=404, message="Main team not found").to_response()
 
         # Update mcp members of the main team (main unit)
-        await aupdate_mcp_members(session, main_team, request, x_user_id)
+        await _aupdate_mcp_members(session, main_team, request, x_user_id)
 
         # Update extension members of the main team (main unit)
-        await aupdate_extension_members(session, main_team, request, x_user_id)
+        await _aupdate_extension_members(session, main_team, request, x_user_id)
 
         # Update support units
-        await aupdate_support_units(session, assistant, request, x_user_id)
+        await _aupdate_support_units(session, assistant, request, x_user_id)
 
         # Commit the transaction
         await session.commit()
 
         # Format and return the response
-        response = format_update_response(assistant, request)
+        response = _format_update_response(assistant, request)
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:
@@ -1462,7 +1477,7 @@ async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: st
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
 
         # Use helper function to delete assistant and all related entities
-        await adelete_assistant_cascade(session, assistant_id)
+        await _adelete_assistant_cascade(session, assistant_id)
 
         # Commit the transaction
         await session.commit()
