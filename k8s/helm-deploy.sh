@@ -35,7 +35,7 @@ print_error() {
 ENVIRONMENT="dev"
 NAMESPACE="default"
 RELEASE_NAME="action-agent"
-CHART_PATH="./helm-chart"
+CHART_PATH="./helm"
 DRY_RUN=false
 UPGRADE=false
 
