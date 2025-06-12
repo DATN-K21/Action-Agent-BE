@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
+from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, ConnectedServiceType, StorageStrategy, WorkflowType
 from app.core.tools.tool_manager import create_unique_key, global_tools, tool_manager
 from app.core.utils.convert_type import convert_base_tool_to_tool_info
@@ -296,6 +297,7 @@ async def _acreate_chatbot_member(
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
+        created_by=SYSTEM,
     )
     session.add(chatbot_member)
     await session.flush()

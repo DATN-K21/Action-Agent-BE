@@ -10,11 +10,16 @@ import aiofiles
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy import and_, func, select
+from sqlalchemy.orm import selectinload
 from starlette import status
 
 from app.api.deps import SessionDep
-from app.core.enums import UploadStatus
+from app.core.constants import SYSTEM
+from app.core.enums import AssistantType, UploadStatus, WorkflowType
 from app.core.settings import env_settings
+from app.db_models.assistant import Assistant
+from app.db_models.member_upload_link import MemberUploadLink
+from app.db_models.team import Team
 from app.db_models.upload import Upload
 from app.db_models.upload_thread_link import UploadThreadLink
 from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
@@ -26,13 +31,87 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 logger = logging.getLogger(__name__)
 
 
-async def valid_content_length(
+async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str, thread_id: str, user_id: str) -> None:
+    """
+    Link upload to appropriate assistant members based on assistant type.
+
+    For General Assistant:
+    - Add upload to root member of main team (chatbot team)
+    - Add upload to root member of RAG team
+
+    For Advanced Assistant:
+    - Add upload to chatbot assistant member of main team
+    - Add upload to root member of RAG team
+
+    Args:
+        session: Database session
+        upload_id: ID of the upload to link
+        thread_id: ID of the thread
+        user_id: User ID
+    """
+    try:
+        # Get thread with assistant
+        from app.db_models.thread import Thread
+
+        thread_statement = (
+            select(Thread)
+            .options(selectinload(Thread.assistant).selectinload(Assistant.teams).selectinload(Team.members))
+            .where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+        )
+
+        thread_result = await session.execute(thread_statement)
+        thread = thread_result.scalar_one_or_none()
+
+        if not thread or not thread.assistant:
+            logger.warning(f"Thread {thread_id} or assistant not found for upload linking")
+            return
+
+        assistant = thread.assistant
+
+        # Find target members based on assistant type
+        members_to_link = []
+
+        if assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
+            # For general assistant: get root member of main team (chatbot) and root member of RAG team
+            for team in assistant.teams:
+                if team.workflow_type == WorkflowType.CHATBOT or team.workflow_type == WorkflowType.RAGBOT:
+                    for member in team.members:
+                        members_to_link.append(member.id)
+
+        elif assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
+            # For advanced assistant: get chatbot member of main team and root member of RAG team
+            for team in assistant.teams:
+                if team.workflow_type == WorkflowType.HIERARCHICAL:
+                    # Main team - find chatbot member
+                    for member in team.members:
+                        if member.type == "worker" and "chatbot" in member.name.lower() and member.created_by == SYSTEM:
+                            members_to_link.append(member.id)
+                            break
+                elif team.workflow_type == WorkflowType.RAGBOT:
+                    # RAG team - find root member
+                    for member in team.members:
+                        members_to_link.append(member.id)
+
+        # Create member-upload links
+        for member_id in members_to_link:
+            member_upload_link = MemberUploadLink(member_id=member_id, upload_id=upload_id)
+            session.add(member_upload_link)
+
+        await session.flush()
+        logger.info(f"Upload {upload_id} linked to {len(members_to_link)} members")
+
+    except Exception as e:
+        logger.error(f"Error linking upload to assistant members: {e}", exc_info=True)
+        # Don't raise the exception to avoid breaking the upload creation process
+
+
+async def _valid_content_length(
     content_length: int = Header(..., le=env_settings.MAX_UPLOAD_SIZE),
 ) -> int:
     return content_length
 
 
-def save_file_if_within_size_limit(file: UploadFile, file_size: int) -> IO[bytes]:
+def _save_file_if_within_size_limit(file: UploadFile, file_size: int) -> IO[bytes]:
     """
     Check if the uploaded file size is smaller than the specified file size.
     This is to restrict an attacker from sending a valid Content-Length header and a
@@ -64,7 +143,7 @@ def save_file_if_within_size_limit(file: UploadFile, file_size: int) -> IO[bytes
     return temp
 
 
-def move_upload_to_shared_folder(filename: str, temp_file_dir: str) -> str:
+def _move_upload_to_shared_folder(filename: str, temp_file_dir: str) -> str:
     """
     Move an uploaded file to a shared folder with a unique name and set its permissions.
 
@@ -127,7 +206,7 @@ async def aread_uploads(
     ).to_response()
 
 
-def get_file_type(filename: str) -> str:
+def _get_file_type(filename: str) -> str:
     extension = filename.split(".")[-1].lower()
     file_types = {
         "pdf": "pdf",
@@ -180,7 +259,7 @@ async def acreate_upload(
 
         if file_type == "file":
             if file and file.filename:
-                actual_file_type = get_file_type(file.filename)
+                actual_file_type = _get_file_type(file.filename)
                 if actual_file_type == "unknown":
                     return ResponseWrapper.wrap(status=400, message="Unsupported file type").to_response()
             else:
@@ -216,7 +295,8 @@ async def acreate_upload(
 
         if upload.id is None:
             raise HTTPException(status_code=500, detail="Failed to create upload")
-        elif thread_id is not None:
+
+        if thread_id is not None:
             # Associate upload with thread if thread_id is provided
             from app.db_models.thread import Thread
 
@@ -234,6 +314,9 @@ async def acreate_upload(
             session.add(link)
             await session.commit()
             await session.refresh(link)
+
+            # Link upload to appropriate assistant members based on assistant type
+            await _alink_upload_to_assistant_members(session, upload.id, thread_id, x_user_id)
 
         if file_type == "web":
             # Handle web upload
@@ -280,7 +363,7 @@ async def aupdate_upload(
     chunk_overlap: Annotated[int, Form(ge=0)] | None = Form(None),
     web_url: str | None = Form(None),
     file: UploadFile | None = File(None),
-    file_size: int = Depends(valid_content_length),
+    file_size: int = Depends(_valid_content_length),
     x_user_id: str = Header(None),
     x_user_role: str = Header(None),
 ) -> Any:
@@ -341,7 +424,7 @@ async def aupdate_upload(
         ]:
             return ResponseWrapper.wrap(status=400, message="Invalid file type. Supported types: pdf, docx, pptx, xlsx, txt, html, md").to_response()
 
-        temp_file = save_file_if_within_size_limit(file, file_size)
+        temp_file = _save_file_if_within_size_limit(file, file_size)
         if upload.user_id is None:
             return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
 
@@ -352,7 +435,7 @@ async def aupdate_upload(
         if not file.filename or not isinstance(temp_file.name, str):
             raise HTTPException(status_code=500, detail="Failed to upload file")
 
-        file_path = move_upload_to_shared_folder(file.filename, temp_file.name)
+        file_path = _move_upload_to_shared_folder(file.filename, temp_file.name)
         edit_upload.delay(
             file_path,
             id,
@@ -402,7 +485,7 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
 
 
 @router.post("/{upload_id}/search")
-async def search_upload(
+async def asearch_upload(
     session: SessionDep,
     upload_id: str,
     search_params: dict[str, Any],
@@ -441,7 +524,7 @@ async def search_upload(
 
 
 @router.get("/{upload_id}/search/{task_id}")
-async def get_search_results(task_id: str):
+async def aget_search_results(task_id: str):
     """
     Retrieve the results of an asynchronous search task.
     """
