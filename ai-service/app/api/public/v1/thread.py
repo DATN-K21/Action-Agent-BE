@@ -16,6 +16,7 @@ from app.schemas.base import CursorPagingRequest, MessageResponse, ResponseWrapp
 from app.schemas.thread import (
     CreateThreadRequest,
     CreateThreadResponse,
+    GetHistoryResponse,
     GetThreadResponse,
     GetThreadsResponse,
     UpdateThreadRequest,
@@ -247,4 +248,47 @@ Given the following content, please generate a suitable title:
     except Exception as e:
         logger.exception("Has error: %s", str(e))
         await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+@router.post("/{thread_id}/get-history", summary="Get history of the thread", response_model=ResponseWrapper[GetHistoryResponse])
+async def get_thread_history(
+    session: SessionDep,
+    thread_id: str,
+    x_user_id: str = Header(None),
+):
+    try:
+        # Check the thread
+        statement = (
+            select(Thread)
+            .where(
+                Thread.user_id == x_user_id,
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+
+        result = await session.execute(statement)
+        thread = result.scalar_one_or_none()
+
+        if thread is None:
+            return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+        # Get the thread messages from the latest checkpoint
+        checkpoint_tuple = await get_checkpoint_tuples(thread_id)
+        messages = convert_checkpoint_tuple_to_messages(checkpoint_tuple) if checkpoint_tuple else []
+        if not messages:
+            return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+        response_data = GetHistoryResponse(
+            user_id=x_user_id,
+            thread_id=thread_id,
+            assistant_id=thread.assistant_id,
+            messages=messages,
+        )
+        return ResponseWrapper.wrap(status=200, data=response_data)
+
+    except Exception as e:
+        logger.exception("Has error: %s", str(e))
         return ResponseWrapper.wrap(status=500, message="Internal server error")

@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
+from app.core.graph.messages import ChatResponse
 from app.schemas.base import BaseRequest, BaseResponse, CursorPagingResponse
 
 
@@ -41,3 +42,13 @@ class GetThreadsResponse(CursorPagingResponse):
 
 class UpdateThreadResponse(CreateThreadResponse):
     pass
+
+
+class GetHistoryResponse(BaseResponse):
+    user_id: str
+    thread_id: str
+    assistant_id: Optional[str] = None
+    messages: list[ChatResponse] = Field(
+        default_factory=list,
+        description="List of messages in the thread, formatted as per the application's message schema",
+    )
