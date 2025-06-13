@@ -19,6 +19,7 @@ from app.db_models.connected_extension import ConnectedExtension
 from app.db_models.connected_mcp import ConnectedMcp
 from app.db_models.member import Member
 from app.db_models.member_skill_link import MemberSkillLink
+from app.db_models.member_upload_link import MemberUploadLink
 from app.db_models.skill import Skill
 from app.db_models.team import Team
 from app.db_models.thread import Thread
@@ -658,10 +659,11 @@ async def _adelete_members_with_service_type(session: AsyncSession, team: Team, 
             .where(MemberSkillLink.member_id.in_(member_ids_to_delete), Skill.reference_type == service_type)
         )
         skills_result = await session.execute(skills_statement)
-        skill_ids = skills_result.scalars().all()
-
-        # Delete member skill links
+        skill_ids = skills_result.scalars().all()  # Delete member skill links
         await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids_to_delete)))
+
+        # Delete member upload links
+        await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids_to_delete)))
 
         # Delete skills associated with these members
         if skill_ids:
@@ -671,7 +673,7 @@ async def _adelete_members_with_service_type(session: AsyncSession, team: Team, 
         await session.execute(delete(Member).where(Member.id.in_(member_ids_to_delete)))
 
 
-async def _adelete_assistant_cascade(session: AsyncSession, assistant_id: str) -> None:
+async def _ahard_delete_assistant_cascade(session: AsyncSession, assistant_id: str) -> None:
     """
     Delete an assistant and all related entities in cascade.
 
@@ -703,10 +705,11 @@ async def _adelete_assistant_cascade(session: AsyncSession, assistant_id: str) -
                 .where(MemberSkillLink.member_id.in_(member_ids))
             )
             skills_result = await session.execute(skills_statement)
-            skill_ids = skills_result.scalars().all()
-
-            # Delete member skill links
+            skill_ids = skills_result.scalars().all()  # Delete member skill links
             await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+
+            # Delete member upload links
+            await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
 
             # Delete skills associated with these members
             if skill_ids:
@@ -1031,10 +1034,11 @@ async def _aupdate_support_units(
                     .where(MemberSkillLink.member_id.in_(member_ids))
                 )
                 skills_result = await session.execute(skills_statement)
-                skill_ids = skills_result.scalars().all()
-
-                # Delete member skill links
+                skill_ids = skills_result.scalars().all()  # Delete member skill links
                 await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+
+                # Delete member upload links
+                await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
 
                 # Delete skills associated with these members
                 if skill_ids:
@@ -1172,6 +1176,77 @@ async def _aextract_service_ids_from_team(session: AsyncSession, team: Team) -> 
                 extension_ids.append(skill.extension_id)
 
     return mcp_ids, extension_ids
+
+
+async def _asoft_delete_assistant_cascade(session: AsyncSession, assistant_id: str) -> None:
+    """
+    Soft delete an assistant and all related entities by setting is_deleted=True.
+
+    Args:
+        session: Database session
+        assistant_id: ID of the assistant to soft delete
+    """
+    # Update threads that reference this assistant to mark as deleted
+    await session.execute(
+        update(Thread).where(Thread.assistant_id == assistant_id, Thread.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
+    )
+
+    # Get all team IDs associated with the assistant
+    teams_statement = select(Team.id).select_from(Team).where(Team.assistant_id == assistant_id, Team.is_deleted.is_(False))
+    teams_result = await session.execute(teams_statement)
+    team_ids = teams_result.scalars().all()
+
+    if team_ids:
+        # Get all member IDs from these teams
+        members_statement = select(Member.id).where(Member.team_id.in_(team_ids), Member.is_deleted.is_(False))
+        members_result = await session.execute(members_statement)
+        member_ids = members_result.scalars().all()
+
+        if member_ids:
+            # Get all skill IDs associated with these members before soft deleting
+            skills_statement = (
+                select(Skill.id)
+                .select_from(Skill)
+                .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                .where(MemberSkillLink.member_id.in_(member_ids), Skill.is_deleted.is_(False))
+            )
+            skills_result = await session.execute(skills_statement)
+            skill_ids = skills_result.scalars().all()
+
+            # Soft delete member skill links
+            await session.execute(
+                update(MemberSkillLink)
+                .where(MemberSkillLink.member_id.in_(member_ids), MemberSkillLink.is_deleted.is_(False))
+                .values(is_deleted=True, deleted_at=datetime.now())
+            )
+
+            # Soft delete member upload links
+            await session.execute(
+                update(MemberUploadLink)
+                .where(MemberUploadLink.member_id.in_(member_ids), MemberUploadLink.is_deleted.is_(False))
+                .values(is_deleted=True, deleted_at=datetime.now())
+            )
+
+            # Soft delete skills associated with these members
+            if skill_ids:
+                await session.execute(
+                    update(Skill).where(Skill.id.in_(skill_ids), Skill.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
+                )
+
+            # Soft delete members
+            await session.execute(
+                update(Member).where(Member.id.in_(member_ids), Member.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
+            )
+
+        # Soft delete teams
+        await session.execute(
+            update(Team).where(Team.id.in_(team_ids), Team.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
+        )
+
+    # Finally, soft delete the assistant
+    await session.execute(
+        update(Assistant).where(Assistant.id == assistant_id, Assistant.is_deleted.is_(False)).values(is_deleted=True, deleted_at=datetime.now())
+    )
 
 
 # ================================
@@ -1505,8 +1580,12 @@ async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
-@router.patch("{assistant_id}/update", summary="Update assistant information.", response_model=ResponseWrapper[UpdateAdvancedAssistantResponse])
-async def aupdate_assistant(
+@router.patch(
+    "{assistant_id}/update-advanced-assistant",
+    summary="Update advanced assistant information.",
+    response_model=ResponseWrapper[UpdateAdvancedAssistantResponse],
+)
+async def aupdate_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAdvancedAssistantRequest,
@@ -1521,7 +1600,12 @@ async def aupdate_assistant(
             select(Assistant)
             .select_from(Assistant)
             .options(selectinload(Assistant.teams).selectinload(Team.members))
-            .where(Assistant.id == assistant_id, Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
+            .where(
+                Assistant.id == assistant_id,
+                Assistant.user_id == x_user_id,
+                Assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT,
+                Assistant.is_deleted.is_(False),
+            )
         )
         result = await session.execute(statement)
         assistant = result.scalar_one_or_none()
@@ -1560,10 +1644,18 @@ async def aupdate_assistant(
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
-@router.delete("/{user_id}/{assistant_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[MessageResponse])
-async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: str):
+@router.delete(
+    "/{user_id}/{assistant_id}/hard-delete-advanced-assistant",
+    summary="Delete an advanced asssistant, cannot recover",
+    response_model=ResponseWrapper[MessageResponse],
+)
+async def ahard_delete_advanced_assistant(
+    session: SessionDep,
+    assistant_id: str,
+    x_user_id: str = Header(None),
+):
     """
-    Delete an assistant and all related entities using helper functions.
+    Delete an advanced assistant and all related entities using helper functions.
 
     This function:
     1. Validates the assistant exists and belongs to the user
@@ -1580,7 +1672,12 @@ async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: st
     """
     try:
         # Verify the assistant exists and belongs to the user
-        statement = select(Assistant).where(Assistant.id == assistant_id, Assistant.user_id == x_user_id, Assistant.is_deleted.is_(False))
+        statement = select(Assistant).where(
+            Assistant.id == assistant_id,
+            Assistant.user_id == x_user_id,
+            Assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT,
+            Assistant.is_deleted.is_(False),
+        )
         result = await session.execute(statement)
         assistant = result.scalar_one_or_none()
 
@@ -1588,9 +1685,7 @@ async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: st
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
 
         # Use helper function to delete assistant and all related entities
-        await _adelete_assistant_cascade(session, assistant_id)
-
-        # Commit the transaction
+        await _ahard_delete_assistant_cascade(session, assistant_id)  # Commit the transaction
         await session.commit()
 
         message = MessageResponse(message="Assistant deleted successfully")
@@ -1598,5 +1693,56 @@ async def delete_assistant(session: SessionDep, assistant_id: str, x_user_id: st
 
     except Exception as e:
         logger.error(f"Error deleting assistant: {e}")
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
+
+
+@router.delete("/{assistant_id}/soft-delete-advanced-assistant", summary="Soft delete an advanced assistant.")
+async def asoft_delete_advanced_assistant(
+    session: SessionDep,
+    assistant_id: str,
+    x_user_id: str = Header(None),
+):
+    """
+    Soft delete an advanced assistant and all related entities by setting is_deleted=True.
+
+    This function:
+    1. Validates the assistant exists and belongs to the user
+    2. Uses the soft delete assistant cascade helper to mark all related entities as deleted
+    3. Commits the transaction
+
+    Args:
+        session: Database session
+        assistant_id: ID of the assistant to soft delete
+        x_user_id: User ID from request
+
+    Returns:
+        Response indicating success or failure
+    """
+    try:
+        # Verify the assistant exists and belongs to the user
+        statement = select(Assistant).where(
+            Assistant.id == assistant_id,
+            Assistant.user_id == x_user_id,
+            Assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT,
+            Assistant.is_deleted.is_(False),
+        )
+        result = await session.execute(statement)
+        assistant = result.scalar_one_or_none()
+
+        if not assistant:
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
+
+        # Use helper function to soft delete assistant and all related entities
+        await _asoft_delete_assistant_cascade(session, assistant_id)
+
+        # Commit the transaction
+        await session.commit()
+
+        message = MessageResponse(message="Assistant soft deleted successfully")
+        return ResponseWrapper.wrap(status=200, data=message).to_response()
+
+    except Exception as e:
+        logger.error(f"Error soft deleting assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()

@@ -361,9 +361,9 @@ class GeneralAssistantHelpers:
 
         # Use the existing cascade delete helper from assistant API
         # This will properly delete all related entities
-        from app.api.public.v1.assistant import _adelete_assistant_cascade
+        from app.api.public.v1.assistant import _ahard_delete_assistant_cascade
 
-        await _adelete_assistant_cascade(session, general_assistant.id)
+        await _ahard_delete_assistant_cascade(session, general_assistant.id)
 
         return True
 
