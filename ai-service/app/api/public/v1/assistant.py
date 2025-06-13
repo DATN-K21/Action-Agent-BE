@@ -190,40 +190,59 @@ def _format_assistant_response(
     Returns:
         GetGeneralAssistantResponse for general assistants or GetAdvancedAssistantResponse for advanced assistants
     """
-    base_data = {
-        "id": assistant.id,
-        "user_id": assistant.user_id,
-        "name": assistant.name,
-        "assistant_type": assistant.assistant_type,
-        "description": assistant.description,
-        "system_prompt": assistant.system_prompt,
-        "provider": assistant.provider,
-        "model_name": assistant.model_name,
-        "temperature": assistant.temperature,
-        "support_units": _extract_support_units(assistant),
-        "teams": teams_data,
-        "created_at": assistant.created_at,
-    }
+    # Import here to avoid circular imports
+    from app.core.settings import env_settings
 
     if assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
         return GetGeneralAssistantResponse(
-            **base_data,
+            id=assistant.id,
+            user_id=assistant.user_id,
+            name=assistant.name,
+            assistant_type=assistant.assistant_type,
+            description=assistant.description,
+            system_prompt=assistant.system_prompt,
+            provider=assistant.provider or env_settings.LLM_DEFAULT_PROVIDER,
+            model_name=assistant.model_name,
+            temperature=assistant.temperature,
             main_unit=WorkflowType.CHATBOT,
-            support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
+            support_units=_extract_support_units(assistant),
+            teams=teams_data,
+            created_at=assistant.created_at,
         )
     elif assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
         return GetAdvancedAssistantResponse(
-            **base_data,
+            id=assistant.id,
+            user_id=assistant.user_id,
+            name=assistant.name,
+            assistant_type=assistant.assistant_type,
+            description=assistant.description,
+            system_prompt=assistant.system_prompt,
+            provider=assistant.provider,
+            model_name=assistant.model_name,
+            temperature=assistant.temperature,
             main_unit=WorkflowType.HIERARCHICAL,
+            support_units=_extract_support_units(assistant),
+            teams=teams_data,
+            created_at=assistant.created_at,
             mcp_ids=mcp_ids,
             extension_ids=extension_ids,
         )
     else:
         # Default to general assistant response for unknown types
         return GetGeneralAssistantResponse(
-            **base_data,
+            id=assistant.id,
+            user_id=assistant.user_id,
+            name=assistant.name,
+            assistant_type=assistant.assistant_type,
+            description=assistant.description,
+            system_prompt=assistant.system_prompt,
+            provider=assistant.provider or env_settings.LLM_DEFAULT_PROVIDER,
+            model_name=assistant.model_name,
+            temperature=assistant.temperature,
             main_unit=WorkflowType.CHATBOT,
-            support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
+            support_units=_extract_support_units(assistant),
+            teams=teams_data,
+            created_at=assistant.created_at,
         )
 
 
