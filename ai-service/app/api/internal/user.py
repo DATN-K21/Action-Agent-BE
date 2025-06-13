@@ -6,6 +6,7 @@ from sqlalchemy import func, select, update
 from app.api.deps import SessionDep
 from app.core import logging
 from app.core.constants import SYSTEM, TRIAL_TOKENS
+from app.core.utils.general_assistant_helpers import GeneralAssistantHelpers
 from app.db_models.user import User
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.user import (
@@ -56,8 +57,19 @@ async def create_new_user(
         )
 
         session.add(db_user)
-        await session.commit()
+        await session.flush()
         await session.refresh(db_user)
+
+        # Create a general assistant for the new user
+        await GeneralAssistantHelpers.create_general_assistant(
+            session=session,
+            user_id=db_user.id,
+            description="General Assistant for general tasks",
+            name="General Assistant",
+        )
+
+        # Commit the session
+        await session.commit()
 
         response_data = CreateUserResponse.model_validate(db_user)
         return ResponseWrapper.wrap(status=200, data=response_data)

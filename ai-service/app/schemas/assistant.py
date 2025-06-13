@@ -46,24 +46,6 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 
-class GetAssistantResponse(BaseResponse):
-    id: str
-    user_id: str
-    name: str
-    assistant_type: AssistantType
-    description: Optional[str]
-    system_prompt: Optional[str]
-    provider: str  # e.g., 'openai', 'anthropic'
-    model_name: Optional[str]
-    temperature: Optional[float]
-    main_unit: WorkflowType
-    support_units: Optional[list[WorkflowType]]  # unit alias team in this case
-    teams: Optional[list[dict[str, Any]]] = Field(
-        None, description="List of teams (units) associated with the assistant. Each team is represented as a dictionary."
-    )
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp of the assistant")
-
-
 class CreateAdvancedAssistantResponse(AssistantBase, BaseResponse):
     id: str
     user_id: str
@@ -92,8 +74,26 @@ class GetAdvancedAssistantResponse(CreateAdvancedAssistantResponse):
     pass
 
 
+class GetGeneralAssistantResponse(BaseResponse):
+    id: str
+    user_id: str
+    name: str
+    assistant_type: AssistantType
+    description: Optional[str]
+    system_prompt: Optional[str]
+    provider: str  # e.g., 'openai', 'anthropic'
+    model_name: Optional[str]
+    temperature: Optional[float]
+    main_unit: WorkflowType  # Always CHATBOT for general assistant
+    support_units: list[WorkflowType]  # Always [RAGBOT, SEARCHBOT] for general assistant
+    teams: Optional[list[dict[str, Any]]] = Field(
+        None, description="List of teams (units) associated with the general assistant. Each team is represented as a dictionary."
+    )
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp of the assistant")
+
+
 class GetAssistantsResponse(PagingResponse):
-    assistants: list[GetAssistantResponse | GetAdvancedAssistantResponse]
+    assistants: list[GetAdvancedAssistantResponse | GetGeneralAssistantResponse]
 
 
 class UpdateAdvancedAssistantResponse(CreateAdvancedAssistantResponse):

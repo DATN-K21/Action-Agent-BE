@@ -13,6 +13,7 @@ from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, ConnectedServiceType, StorageStrategy, WorkflowType
 from app.core.tools.tool_manager import create_unique_key, global_tools, tool_manager
 from app.core.utils.convert_type import convert_base_tool_to_tool_info
+from app.core.utils.general_assistant_helpers import GeneralAssistantHelpers
 from app.db_models.assistant import Assistant
 from app.db_models.connected_extension import ConnectedExtension
 from app.db_models.connected_mcp import ConnectedMcp
@@ -25,8 +26,8 @@ from app.schemas.assistant import (
     CreateAdvancedAssistantRequest,
     CreateAdvancedAssistantResponse,
     GetAdvancedAssistantResponse,
-    GetAssistantResponse,
     GetAssistantsResponse,
+    GetGeneralAssistantResponse,
     UpdateAdvancedAssistantRequest,
     UpdateAdvancedAssistantResponse,
 )
@@ -51,12 +52,22 @@ def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
     by excluding the main unit type from the teams.
 
     Args:
-        assistant: The assistant object containing teams    Returns:
+        assistant: The assistant object containing teams
+
+    Returns:
         List of workflow types used as support units
     """
     support_units = []
-    main_unit = WorkflowType.HIERARCHICAL if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT else WorkflowType.CHATBOT
 
+    # Determine main unit based on assistant type
+    if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
+        main_unit = WorkflowType.HIERARCHICAL
+    elif assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
+        main_unit = WorkflowType.CHATBOT
+    else:
+        main_unit = WorkflowType.CHATBOT
+
+    # Extract support units from teams (exclude main unit)
     for team in assistant.teams:
         if team.workflow_type and team.workflow_type != main_unit:
             support_units.append(team.workflow_type)
@@ -165,21 +176,19 @@ def _format_assistant_response(
     teams_data: List[Dict[str, Any]],
     mcp_ids: Optional[List[str]] = None,
     extension_ids: Optional[List[str]] = None,
-) -> GetAssistantResponse | GetAdvancedAssistantResponse:
+) -> GetAdvancedAssistantResponse | GetGeneralAssistantResponse:
     """
     Format assistant data for API response.
+    Returns either GetGeneralAssistantResponse or GetAdvancedAssistantResponse based on assistant type.
 
     Args:
         assistant: Assistant object
         teams_data: Formatted team data
-        provider: Model provider
-        model_name: Model name
-        temperature: Model temperature
-        mcp_ids: List of MCP IDs
-        extension_ids: List of extension IDs
+        mcp_ids: List of MCP IDs for advanced assistants
+        extension_ids: List of extension IDs for advanced assistants
 
     Returns:
-        Formatted assistant response object
+        GetGeneralAssistantResponse for general assistants or GetAdvancedAssistantResponse for advanced assistants
     """
     base_data = {
         "id": assistant.id,
@@ -197,16 +206,24 @@ def _format_assistant_response(
     }
 
     if assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
-        return GetAssistantResponse(
+        return GetGeneralAssistantResponse(
             **base_data,
             main_unit=WorkflowType.CHATBOT,
+            support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
         )
-    else:
+    elif assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
         return GetAdvancedAssistantResponse(
             **base_data,
             main_unit=WorkflowType.HIERARCHICAL,
             mcp_ids=mcp_ids,
             extension_ids=extension_ids,
+        )
+    else:
+        # Default to general assistant response for unknown types
+        return GetGeneralAssistantResponse(
+            **base_data,
+            main_unit=WorkflowType.CHATBOT,
+            support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
         )
 
 
@@ -1152,13 +1169,12 @@ async def aget_assistants(
     x_user_role: str = Header(None),
 ):
     """
-    List all assistants for a user with pagination using helper functions.
+    List all assistants for a user with pagination.
+    Returns either GetGeneralAssistantResponse or GetAdvancedAssistantResponse based on assistant type.
     """
     try:
         page_number = paging.page_number if paging.page_number else 1
-        max_per_page = paging.max_per_page if paging.max_per_page else 10
-
-        # Use helper function to build and execute query
+        max_per_page = paging.max_per_page if paging.max_per_page else 10  # Use helper function to build and execute query
         result, count, total_pages = await _abuild_assistant_query(
             session=session,
             user_id=x_user_id,
@@ -1177,10 +1193,22 @@ async def aget_assistants(
         assistants = result.scalars().all()
 
         # Format responses using helper function
+        # Each assistant will return either GetGeneralAssistantResponse or GetAdvancedAssistantResponse
         wrapped_assistants = []
         for assistant in assistants:
             assistant_teams = _format_team_data(assistant.teams)
-            formatted_response = _format_assistant_response(assistant, assistant_teams)
+
+            # For advanced assistants, extract MCP and extension IDs from hierarchical team
+            mcp_ids = None
+            extension_ids = None
+            if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
+                # Find the hierarchical team (main team for advanced assistants)
+                hierarchical_team = next((team for team in assistant.teams if team.workflow_type == WorkflowType.HIERARCHICAL), None)
+                if hierarchical_team:
+                    mcp_ids, extension_ids = await _aextract_service_ids_from_team(session, hierarchical_team)
+
+            # Format response based on assistant type (General or Advanced)
+            formatted_response = _format_assistant_response(assistant, assistant_teams, mcp_ids=mcp_ids, extension_ids=extension_ids)
             wrapped_assistants.append(formatted_response)
 
         return ResponseWrapper.wrap(
@@ -1193,9 +1221,71 @@ async def aget_assistants(
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
-# ================================
-# API ENDPOINTS
-# ================================
+@router.get(
+    "/get-or-create-general-assistant",
+    summary="Get or create general assistant for a user",
+    response_model=ResponseWrapper[GetGeneralAssistantResponse],
+)
+async def aget_or_create_general_assistant(
+    session: SessionDep,
+    x_user_id: str = Header(None),
+):
+    """
+    Get or create a general assistant for the user.
+
+    This endpoint checks if a general assistant already exists for the user.
+    If it does, it returns the existing assistant. If not, it creates a new one.
+
+    Returns:
+        Response with either existing or newly created general assistant data.
+    """
+    try:
+        result = await GeneralAssistantHelpers.check_user_has_general_assistant(session=session, user_id=x_user_id)
+        if result:
+            # User has general assistant - get existing one
+            assistant = await GeneralAssistantHelpers.get_user_general_assistant(session=session, user_id=x_user_id)
+
+            if not assistant:
+                return ResponseWrapper.wrap(status=404, message="General assistant not found").to_response()
+
+            # Format teams data using helper function
+            teams_data = _format_team_data(assistant.teams)
+
+            # Format response as general assistant
+            response = _format_assistant_response(assistant=assistant, teams_data=teams_data)
+
+            return ResponseWrapper.wrap(status=200, data=response).to_response()
+        else:
+            # User doesn't have general assistant - create new one
+            assistant = await GeneralAssistantHelpers.create_general_assistant(
+                session=session,
+                user_id=x_user_id,
+                name="General Assistant",
+                description="A helpful general assistant for everyday tasks and conversations.",
+                system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Use your available tools when needed to provide accurate and helpful information.",
+            )
+
+            # Commit the creation
+            await session.commit()
+
+            # Get the created assistant with teams loaded
+            created_assistant = await GeneralAssistantHelpers.get_user_general_assistant(session=session, user_id=x_user_id)
+
+            if not created_assistant:
+                return ResponseWrapper.wrap(status=500, message="Failed to create general assistant").to_response()
+
+            # Format teams data using helper function
+            teams_data = _format_team_data(created_assistant.teams)
+
+            # Format response as general assistant
+            response = _format_assistant_response(assistant=created_assistant, teams_data=teams_data)
+
+            return ResponseWrapper.wrap(status=201, data=response).to_response()
+
+    except Exception as e:
+        logger.error(f"Error in get or create general assistant: {e}")
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
 @router.post("/create", summary="Create an advanced assistant.", response_model=ResponseWrapper[CreateAdvancedAssistantResponse])
@@ -1339,7 +1429,7 @@ async def acreate_advanced_assistant(
 @router.get(
     "/{assistant_id}/get-detail",
     summary="Get assistant details.",
-    response_model=ResponseWrapper[GetAssistantResponse | GetAdvancedAssistantResponse],
+    response_model=ResponseWrapper[GetGeneralAssistantResponse | GetAdvancedAssistantResponse],
 )
 async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
     """
