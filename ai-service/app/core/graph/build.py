@@ -579,7 +579,7 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
                 provider=member.provider,
                 model=member.model,
                 temperature=member.temperature,
-            ).work  # type: ignore[arg-type]
+            ).work
         ),
     )
     # if member can call tools, then add tool node

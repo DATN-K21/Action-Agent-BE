@@ -19,7 +19,15 @@ class AssistantBase(BaseModel):
 class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     provider: str = Field(..., min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
     model_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Name of the model to use with the assistant")
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Controls randomness of the output. Higher values mean more randomness")
+    temperature: Optional[float] = Field(None, ge=0.0, le=1.0, description="Controls randomness of the output. Higher values mean more randomness")
+    ask_human: Optional[bool] = Field(
+        None,
+        description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
+    )
+    interrupt: Optional[bool] = Field(
+        None,
+        description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
     support_units: Optional[list[WorkflowType]] = Field(
         None, description="List of units (teams) to be used by the assistant. If not provided, the assistant will not use any units."
     )
@@ -38,9 +46,33 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     provider: Optional[str] = Field(None, min_length=3, max_length=50)
     model_name: Optional[str] = Field(None, min_length=1, max_length=50)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    ask_human: Optional[bool] = Field(
+        None,
+        description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
+    )
+    interrupt: Optional[bool] = Field(
+        None,
+        description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
     support_units: Optional[list[WorkflowType]] = None
     mcp_ids: Optional[list[str]] = None
     extension_ids: Optional[list[str]] = None
+
+
+class UpdateAssistantConfigRequest(BaseRequest):
+    system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
+    provider: Optional[str] = Field(None, min_length=3, max_length=50)
+    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    temperature: Optional[float] = Field(None, ge=0.0, le=1.0)
+    ask_human: Optional[bool] = Field(
+        None,
+        description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
+    )
+    interrupt: Optional[bool] = Field(
+        None,
+        description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
+
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################
@@ -56,6 +88,14 @@ class CreateAdvancedAssistantResponse(AssistantBase, BaseResponse):
     provider: Optional[str]  # e.g., 'openai', 'anthropic'
     model_name: Optional[str]
     temperature: Optional[float]
+    ask_human: Optional[bool] = Field(
+        None,
+        description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
+    )
+    interrupt: Optional[bool] = Field(
+        None,
+        description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
     main_unit: WorkflowType
     support_units: Optional[list[WorkflowType]]  # unit alias team in this case
     mcp_ids: Optional[list[str]] = Field(
@@ -84,6 +124,14 @@ class GetGeneralAssistantResponse(BaseResponse):
     provider: str  # e.g., 'openai', 'anthropic'
     model_name: Optional[str]
     temperature: Optional[float]
+    ask_human: Optional[bool] = Field(
+        None,
+        description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
+    )
+    interrupt: Optional[bool] = Field(
+        None,
+        description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
     main_unit: WorkflowType  # Always CHATBOT for general assistant
     support_units: list[WorkflowType]  # Always [RAGBOT, SEARCHBOT] for general assistant
     teams: Optional[list[dict[str, Any]]] = Field(

@@ -21,6 +21,12 @@ class Assistant(BaseEntity):
     model_name: Mapped[str | None] = mapped_column(String, nullable=True)  # Name of the model to use with the assistant
     temperature: Mapped[float | None] = mapped_column(Float, nullable=True)  # Controls randomness of the output, e.g., '0.7'
 
+    # Confiugration actions for the advanced assistant (Only for advanced assistants - hierarchical units)
+    ask_human: Mapped[bool | None] = mapped_column(
+        default=False, nullable=True
+    )  # Whether to ask human for confirmation before executing the assistant's task
+    interrupt: Mapped[bool | None] = mapped_column(default=False, nullable=True)  # Whether to interrupt the assistant's current task
+
     # Relationships
     user = relationship("User", back_populates="assistants")
     threads = relationship("Thread", back_populates="assistant", cascade="all, delete-orphan")

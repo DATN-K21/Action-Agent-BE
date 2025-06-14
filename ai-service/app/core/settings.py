@@ -30,8 +30,9 @@ class Settings(BaseSettings):
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
     LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
     LLM_DEFAULT_BASE_URL: str = "https://api.openai.com/v1/chat/completions"
+    STRICT_TEMPERATURE: float = 0.1
+    CREATIVE_TEMPERATURE: float = 0.5
     EMBEDDING_PROVIDER: str = "openai"
-    DEFAULT_TEMPERATURE: float = 0.0
 
     # Database
     POSTGRES_HOST: str = "localhost"

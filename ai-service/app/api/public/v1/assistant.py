@@ -11,6 +11,7 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, ConnectedServiceType, StorageStrategy, WorkflowType
+from app.core.settings import env_settings
 from app.core.tools.tool_manager import create_unique_key, global_tools, tool_manager
 from app.core.utils.convert_type import convert_base_tool_to_tool_info
 from app.core.utils.general_assistant_helpers import GeneralAssistantHelpers
@@ -31,6 +32,7 @@ from app.schemas.assistant import (
     GetGeneralAssistantResponse,
     UpdateAdvancedAssistantRequest,
     UpdateAdvancedAssistantResponse,
+    UpdateAssistantConfigRequest,
 )
 from app.schemas.base import MessageResponse, PagingRequest, ResponseWrapper
 from app.services.extensions import extension_service_manager
@@ -190,8 +192,7 @@ def _format_assistant_response(
 
     Returns:
         GetGeneralAssistantResponse for general assistants or GetAdvancedAssistantResponse for advanced assistants
-    """
-    # Import here to avoid circular imports
+    """  # Import here to avoid circular imports
     from app.core.settings import env_settings
 
     if assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
@@ -203,8 +204,10 @@ def _format_assistant_response(
             description=assistant.description,
             system_prompt=assistant.system_prompt,
             provider=assistant.provider or env_settings.LLM_DEFAULT_PROVIDER,
-            model_name=assistant.model_name,
-            temperature=assistant.temperature,
+            model_name=assistant.model_name or env_settings.LLM_DEFAULT_MODEL,
+            temperature=assistant.temperature if assistant.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
+            ask_human=None,
+            interrupt=None,
             main_unit=WorkflowType.CHATBOT,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
@@ -218,9 +221,11 @@ def _format_assistant_response(
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider,
-            model_name=assistant.model_name,
-            temperature=assistant.temperature,
+            provider=assistant.provider or env_settings.LLM_DEFAULT_PROVIDER,
+            model_name=assistant.model_name or env_settings.LLM_DEFAULT_MODEL,
+            temperature=assistant.temperature if assistant.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
+            ask_human=assistant.ask_human,
+            interrupt=assistant.interrupt,
             main_unit=WorkflowType.HIERARCHICAL,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
@@ -238,8 +243,10 @@ def _format_assistant_response(
             description=assistant.description,
             system_prompt=assistant.system_prompt,
             provider=assistant.provider or env_settings.LLM_DEFAULT_PROVIDER,
-            model_name=assistant.model_name,
-            temperature=assistant.temperature,
+            model_name=assistant.model_name or env_settings.LLM_DEFAULT_MODEL,
+            temperature=assistant.temperature if assistant.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
+            ask_human=None,
+            interrupt=None,
             main_unit=WorkflowType.CHATBOT,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
@@ -276,7 +283,7 @@ async def _acreate_main_team(
     session.add(main_team)
     await session.flush()
 
-    # Create root member for the main team
+    # Create root member (leader) for the main team
     root_member_id = str(uuid.uuid4())
     root_member_name = create_unique_key(id_=root_member_id, name="Leader")
     root_member = Member(
@@ -286,9 +293,9 @@ async def _acreate_main_team(
         backstory="Leader of the main team for advanced assistant.",
         role="Gather inputs from your team and answer the question.",
         type="root",
-        provider=request.provider,
-        model=request.model_name,
-        temperature=request.temperature,
+        provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+        model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+        temperature=env_settings.STRICT_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -328,9 +335,9 @@ async def _acreate_chatbot_member(
         role="Handle greetings, small talk, and general questions. Use search and knowledge base tools when needed. Politely decline inappropriate requests and ask for clarification when context is insufficient.",
         type="worker",
         source=root_member_id,
-        provider=request.provider,
-        model=request.model_name,
-        temperature=request.temperature,
+        provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+        model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+        temperature=request.temperature if request.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -371,10 +378,10 @@ async def _acreate_mcp_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=request.provider,
-        model=request.model_name,
-        temperature=request.temperature,
-        interrupt=True,
+        provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+        model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+        temperature=env_settings.STRICT_TEMPERATURE,
+        interrupt=request.interrupt if request.interrupt is not None else False,
         position_x=0.0,
         position_y=0.0,
     )
@@ -454,10 +461,10 @@ async def _acreate_extension_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=request.provider,
-        model=request.model_name,
-        temperature=request.temperature,
-        interrupt=True,
+        provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+        model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+        temperature=env_settings.STRICT_TEMPERATURE,
+        interrupt=request.interrupt if request.interrupt is not None else False,
         position_x=0.0,
         position_y=0.0,
     )
@@ -510,7 +517,11 @@ async def _acreate_extension_member_with_skills(
 
 
 async def _acreate_support_team(
-    session: AsyncSession, assistant: Assistant, workflow_type: WorkflowType, request: CreateAdvancedAssistantRequest, user_id: str
+    session: AsyncSession,
+    assistant: Assistant,
+    workflow_type: WorkflowType,
+    request: CreateAdvancedAssistantRequest,
+    user_id: str,
 ) -> Team:
     """
     Create a support team for specific workflow type.
@@ -549,9 +560,9 @@ async def _acreate_support_team(
         backstory=f"Unit for advanced assistant: {workflow_type}.",
         role="Answer the user's question.",
         type=f"{workflow_type}",
-        provider=request.provider,
-        model=request.model_name,
-        temperature=request.temperature,
+        provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+        model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+        temperature=request.temperature if request.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -773,6 +784,10 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
         setattr(assistant, "model_name", request.model_name)
     if request.temperature is not None:
         setattr(assistant, "temperature", request.temperature)
+    if request.ask_human is not None:
+        setattr(assistant, "ask_human", request.ask_human)
+    if request.interrupt is not None:
+        setattr(assistant, "interrupt", request.interrupt)
 
 
 async def _aupdate_mcp_members(
@@ -831,10 +846,10 @@ async def _aupdate_mcp_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=request.provider,
-                    model=request.model_name,
-                    temperature=request.temperature,
-                    interrupt=True,
+                    provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+                    model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+                    temperature=env_settings.STRICT_TEMPERATURE,
+                    interrupt=request.interrupt if request.interrupt is not None else False,
                     position_x=0.0,
                     position_y=0.0,
                 )
@@ -939,10 +954,10 @@ async def _aupdate_extension_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=request.provider,
-                    model=request.model_name,
-                    temperature=request.temperature,
-                    interrupt=True,
+                    provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+                    model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+                    temperature=env_settings.STRICT_TEMPERATURE,
+                    interrupt=request.interrupt if request.interrupt is not None else False,
                     position_x=0.0,
                     position_y=0.0,
                 )
@@ -1077,9 +1092,9 @@ async def _aupdate_support_units(
                     backstory=f"Unit for advanced assistant: {unit}.",
                     role="Answer the user's question.",
                     type=f"{unit}",
-                    provider=request.provider,
-                    model=request.model_name,
-                    temperature=request.temperature,
+                    provider=request.provider or env_settings.LLM_DEFAULT_PROVIDER,
+                    model=request.model_name or env_settings.LLM_DEFAULT_MODEL,
+                    temperature=request.temperature if request.temperature is not None else env_settings.CREATIVE_TEMPERATURE,
                     interrupt=False,
                     position_x=0.0,
                     position_y=0.0,
@@ -1098,9 +1113,7 @@ def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssista
 
     Args:
         assistant: Updated assistant entity
-        request: Original update request
-
-    Returns:
+        request: Original update request    Returns:
         Formatted response object
     """
     # Format teams data using existing helper
@@ -1116,6 +1129,8 @@ def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssista
         provider=request.provider,
         model_name=request.model_name,
         temperature=request.temperature,
+        ask_human=assistant.ask_human,
+        interrupt=assistant.interrupt,
         main_unit=WorkflowType.HIERARCHICAL,
         support_units=request.support_units or _extract_support_units(assistant),
         mcp_ids=request.mcp_ids,
@@ -1490,10 +1505,10 @@ async def acreate_advanced_assistant(
             select(Assistant).options(selectinload(Assistant.teams).selectinload(Team.members)).where(Assistant.id == new_assistant.id)
         )
         assistant_result = await session.execute(assistant_statement)
-        created_assistant = assistant_result.scalar_one()
+        created_assistant = assistant_result.scalar_one()  # Format teams data for response using helper function
+        teams_data = _format_team_data(created_assistant.teams)
 
-        # Format teams data for response using helper function
-        teams_data = _format_team_data(created_assistant.teams)  # Create response using helper function
+        # Create response using helper function
         response = CreateAdvancedAssistantResponse(
             id=created_assistant.id,
             user_id=x_user_id,
@@ -1504,6 +1519,8 @@ async def acreate_advanced_assistant(
             provider=request.provider,
             model_name=request.model_name,
             temperature=request.temperature,
+            ask_human=request.ask_human,
+            interrupt=request.interrupt,
             main_unit=WorkflowType.HIERARCHICAL,
             support_units=request.support_units,
             mcp_ids=request.mcp_ids,
@@ -1744,5 +1761,60 @@ async def asoft_delete_advanced_assistant(
 
     except Exception as e:
         logger.error(f"Error soft deleting assistant: {e}")
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
+
+
+@router.patch("/{assistant_id}/update-config", description="Update advanced assistant configuration.", response_model=ResponseWrapper)
+async def aupdate_assistant_config(
+    session: SessionDep,
+    assistant_id: str,
+    request: UpdateAssistantConfigRequest,
+    x_user_id: str = Header(None),
+):
+    """Update the configuration of an assistant.
+    Args:
+        session: Database session
+        assistant_id: ID of the assistant to update
+        request: Request data containing configuration updates
+        x_user_id: User ID from header
+    Returns:
+        Response indicating success or failure
+    """
+    try:
+        # Fetch the assistant by ID and validate ownership
+        statement = select(Assistant).where(
+            Assistant.id == assistant_id,
+            Assistant.user_id == x_user_id,
+            Assistant.is_deleted.is_(False),
+        )
+        result = await session.execute(statement)
+        assistant = result.scalar_one_or_none()
+
+        if not assistant:
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
+
+        # Update assistant configuration fields
+        if request.system_prompt is not None:
+            assistant.system_prompt = request.system_prompt
+        if request.provider is not None:
+            assistant.provider = request.provider
+        if request.model_name is not None:
+            assistant.model_name = request.model_name
+        if request.temperature is not None:
+            assistant.temperature = request.temperature
+        if request.ask_human is not None:
+            assistant.ask_human = request.ask_human
+        if request.interrupt is not None:
+            assistant.interrupt = request.interrupt
+
+        # Commit the transaction
+        await session.commit()
+
+        message = MessageResponse(message="Assistant configuration updated successfully")
+        return ResponseWrapper.wrap(status=200, data=message).to_response()
+
+    except Exception as e:
+        logger.error(f"Error updating assistant configuration: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()

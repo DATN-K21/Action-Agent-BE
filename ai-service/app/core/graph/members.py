@@ -64,7 +64,7 @@ class BaseNode:
                 model = env_settings.LLM_DEFAULT_MODEL
 
             if temperature is None:
-                temperature = env_settings.DEFAULT_TEMPERATURE
+                temperature = env_settings.STRICT_TEMPERATURE
 
             self.model_info = get_model_info(model)
             self.model = model_provider_manager.init_model(
@@ -373,7 +373,14 @@ class LeaderNode(BaseNode):
                 | JsonOutputKeyToolsParser(key_name="route", first_tool_only=True)
         )
 
-        result: dict[str, Any] = await delegate_chain.ainvoke(state, config)
+        # result: dict[str, Any] = await delegate_chain.ainvoke(state, config)
+        result = await self._handle_messages(state, config, delegate_chain)
+
+        # Convert the result to dict if it's not already
+        if isinstance(result, dict):
+            result = result
+        else:
+            result = result.model_dump()
 
         if not result or result.get("next") is None or result["next"] == "FINISH":
             return {
