@@ -21,7 +21,6 @@ from app.core.state import (
     GraphMember,
     GraphTeam,
     add_or_replace_messages,
-    format_messages,
 )
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.workflow.utils.db_utils import get_model_info
@@ -128,6 +127,40 @@ class BaseNode:
 
         return result
 
+    def get_optimized_context_string(self, messages: list[AnyMessage]) -> str:
+        """
+        Get optimized context string for the current model.
+        This method applies context optimization based on the model's capabilities and limits.
+
+        Args:
+            messages: List of messages to format
+
+        Returns:
+            Optimized formatted message string
+        """
+        from app.core.state import format_messages_with_model_context
+
+        # Extract model name from model_info if available
+        model_name = None
+        provider = None
+
+        if hasattr(self, "model_info") and self.model_info:
+            model_name = self.model_info.get("model_name")
+            provider = self.model_info.get("provider")
+
+        # If we don't have model info, try to get it from the model object
+        if not model_name and hasattr(self, "model"):
+            try:
+                # Try to get model name from the model object
+                if hasattr(self.model, "model_name"):
+                    model_name = self.model.model_name
+                elif hasattr(self.model, "model"):
+                    model_name = self.model.model
+            except Exception:
+                pass  # Fallback to default optimization
+
+        return format_messages_with_model_context(messages, model_name, provider)
+
 
 class WorkerNode(BaseNode):
     worker_prompt = ChatPromptTemplate.from_messages(
@@ -165,8 +198,8 @@ class WorkerNode(BaseNode):
             team_name=state["team"].name,
             team_members_name=team_members_name,
             persona=member.persona,
-            history_string=format_messages(state["history"]),
-            task_string=format_messages(state["task"]),
+            history_string=self.get_optimized_context_string(state["history"]),
+            task_string=self.get_optimized_context_string(state["task"]),
         )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
@@ -235,9 +268,7 @@ class SequentialWorkerNode(WorkerNode):
         name = state["next"]
         member = team.members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
-        prompt = self.worker_prompt.partial(
-            persona=member.persona, history_string=format_messages(state["history"])
-        )
+        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []
@@ -360,17 +391,17 @@ class LeaderNode(BaseNode):
             bind_tool = self.model.bind_tools(tools=tools)
 
         delegate_chain: RunnableSerializable[Any, Any] = (
-                self.leader_prompt.partial(
-                    team_name=team.name,
-                    team_members_name=team_members_name,
-                    team_members_info=team_members_info,
-                    persona=team.persona,
-                    team_task=state["main_task"][0].content,
-                    history_string=format_messages(state["history"]),
-                    options=str(options),
-                )
-                | bind_tool
-                | JsonOutputKeyToolsParser(key_name="route", first_tool_only=True)
+            self.leader_prompt.partial(
+                team_name=team.name,
+                team_members_name=team_members_name,
+                team_members_info=team_members_info,
+                persona=team.persona,
+                team_task=state["main_task"][0].content,
+                history_string=self.get_optimized_context_string(state["history"]),
+                options=str(options),
+            )
+            | bind_tool
+            | JsonOutputKeyToolsParser(key_name="route", first_tool_only=True)
         )
 
         # result: dict[str, Any] = await delegate_chain.ainvoke(state, config)
@@ -427,14 +458,14 @@ class SummariserNode(BaseNode):
         team_task = tasks[0].content if tasks else ""
 
         summarise_chain: RunnableSerializable[Any, Any] = (
-                self.summariser_prompt.partial(
-                    team_name=team.name,
-                    team_members_name=team_members_name,
-                    team_task=team_task,
-                    history_string=format_messages(state["history"]),
-                )
-                | self.final_answer_model
-                | RunnableLambda(self.tag_with_name).bind(name=f"{team.name}_answer")  # type: ignore[arg-type]
+            self.summariser_prompt.partial(
+                team_name=team.name,
+                team_members_name=team_members_name,
+                team_task=team_task,
+                history_string=self.get_optimized_context_string(state["history"]),
+            )
+            | self.final_answer_model
+            | RunnableLambda(self.tag_with_name).bind(name=f"{team.name}_answer")  # type: ignore[arg-type]
         )
         result = await summarise_chain.ainvoke(state, config)
         return {"history": [result], "all_messages": [result]}
@@ -470,9 +501,7 @@ class ChatBotNode(BaseNode):
         member = state["team"].members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
 
-        prompt = self.worker_prompt.partial(
-            persona=member.persona, history_string=format_messages(state["history"])
-        )
+        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []
@@ -533,9 +562,7 @@ class RAGBotNode(BaseNode):
         member = state["team"].members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
 
-        prompt = self.worker_prompt.partial(
-            persona=member.persona, history_string=format_messages(state["history"])
-        )
+        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []

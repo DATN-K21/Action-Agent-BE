@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
+from langchain_core.messages import AnyMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import add_messages
 from pydantic import BaseModel, Field
@@ -190,36 +190,41 @@ def add_or_replace_messages(
 
 
 def format_messages(messages: list[AnyMessage]) -> str:
-    """Format list of messages to string"""
-    message_str: str = ""
-    for message in messages:
-        # Determine message name
-        name = (
-            message.name
-            if message.name
-            else (
-                "AI"
-                if isinstance(message, AIMessage)
-                else "Tool" if isinstance(message, ToolMessage) else "User"
-            )
-        )
+    """Format list of messages to string with context optimization"""
+    from app.core.utils.context_manager import default_context_manager
 
-        # Handle cases where message content is a list (messages containing images)
-        if isinstance(message.content, list):
-            # Extract all text content
-            text_contents = []
-            for item in message.content:
-                if isinstance(item, dict):
-                    if item.get("type") == "text":
-                        text_contents.append(item.get("text", ""))
-                    elif item.get("type") == "image_url":
-                        text_contents.append("[Image]")
-            content = " ".join(text_contents)
-        else:
-            content = message.content
+    # Use optimized context formatting to manage token usage efficiently
+    return default_context_manager.format_optimized_messages(messages)
 
-        message_str += f"{name}: {content}\n\n"
-    return message_str
+
+def format_messages_with_model_context(messages: list[AnyMessage], model_name: str | None = None, provider: str | None = None) -> str:
+    """
+    Format list of messages to string with model-specific context optimization.
+
+    Args:
+        messages: List of messages to format
+        model_name: Name of the model being used (for optimization)
+        provider: Provider of the model (for optimization)
+
+    Returns:
+        Formatted and optimized message string
+    """
+    from app.core.enums import LlmProvider
+    from app.core.utils.model_context_config import get_optimized_format_messages_for_model
+
+    if model_name:
+        # Try to convert provider string to enum
+        provider_enum = None
+        if provider:
+            try:
+                provider_enum = LlmProvider(provider.lower())
+            except ValueError:
+                provider_enum = None
+
+        return get_optimized_format_messages_for_model(messages, model_name, provider_enum)
+    else:
+        # Fallback to default optimization
+        return format_messages(messages)
 
 
 def update_node_outputs(node_outputs: dict[str, Any], new_outputs: dict[str, Any]) -> dict[str, Any]:

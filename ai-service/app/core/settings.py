@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     LLM_DEFAULT_BASE_URL: str = "https://api.openai.com/v1/chat/completions"
     STRICT_TEMPERATURE: float = 0.1
     CREATIVE_TEMPERATURE: float = 0.5
+    DEFAULT_CONTEXT_LIMIT: int = 8000  # Default context limit in tokens
+    CONTEXT_RATIO: float = 0.6  # Ratio of context to response tokens
+
+    # Embedding
     EMBEDDING_PROVIDER: str = "openai"
 
     # Database
