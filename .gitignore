@@ -14,3 +14,7 @@ mock
 /.DS_Store
 
 docker-compose.override.yaml
+
+voice-service/speech-recognition/bin
+voice-service/speech-recognition/obj
+**/.idea/

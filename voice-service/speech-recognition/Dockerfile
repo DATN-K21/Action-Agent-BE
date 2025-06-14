@@ -1,0 +1,29 @@
+﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER $APP_UID
+WORKDIR /app
+
+EXPOSE 15400
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR "/src"
+COPY ["speech-recognition.csproj", "./"]
+RUN dotnet restore "speech-recognition.csproj"
+COPY . .
+WORKDIR "/src"
+RUN dotnet build "speech-recognition.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "speech-recognition.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+# Copy GCloud keys
+COPY GCloudKeys/speech-api-account.json ./GCloudKeys/speech-api-account.json
+
+# Set GOOGLE_APPLICATION_CREDENTIALS env variable
+ENV GOOGLE_APPLICATION_CREDENTIALS=GCloudKeys/speech-api-account.json
+
+ENTRYPOINT ["dotnet", "speech-recognition.dll"]

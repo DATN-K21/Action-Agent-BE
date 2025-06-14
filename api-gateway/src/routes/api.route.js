@@ -9,6 +9,7 @@ const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
     'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
     'extension:': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
+    'voice': ENDPOINT_CONFIGS.VOICE_SERVICE_URL
 };
 
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
