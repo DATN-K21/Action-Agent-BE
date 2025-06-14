@@ -5,10 +5,10 @@ This module provides efficient context management to optimize token usage
 and prevent exceeding model input limits while preserving conversation quality.
 """
 
-import re
 from typing import Optional
 
 from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage
+from langchain_core.messages.utils import count_tokens_approximately
 
 from app.core import logging
 from app.core.settings import env_settings
@@ -62,13 +62,11 @@ class ContextManager:
         Returns:
             Estimated token count
         """
+
         if not text:
             return 0
 
-        # Remove extra whitespace and count characters
-        cleaned_text = re.sub(r"\s+", " ", text.strip())
-        # Approximate: 4 characters per token (conservative estimate)
-        return max(1, len(cleaned_text) // 4)
+        return count_tokens_approximately(text)  # Use LangChain's token counting utility
 
     def get_message_content_text(self, message: AnyMessage) -> str:
         """
