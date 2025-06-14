@@ -1264,6 +1264,79 @@ async def _asoft_delete_assistant_cascade(session: AsyncSession, assistant_id: s
     )
 
 
+def _update_assistant_config_info(assistant: Assistant, request: UpdateAssistantConfigRequest) -> None:
+    """
+    Update configuration-specific assistant information.
+
+    Args:
+        assistant: Assistant entity to update
+        request: Update request data containing configuration fields
+    """
+    if request.system_prompt is not None:
+        setattr(assistant, "system_prompt", request.system_prompt)
+    if request.provider is not None:
+        setattr(assistant, "provider", request.provider)
+    if request.model_name is not None:
+        setattr(assistant, "model_name", request.model_name)
+    if request.temperature is not None:
+        setattr(assistant, "temperature", request.temperature)
+    if request.ask_human is not None:
+        setattr(assistant, "ask_human", request.ask_human)
+    if request.interrupt is not None:
+        setattr(assistant, "interrupt", request.interrupt)
+
+
+async def _aupdate_member_configurations(
+    session: AsyncSession,
+    main_team: Team,
+    assistant: Assistant,
+    request: UpdateAssistantConfigRequest,
+) -> None:
+    """
+    Update configuration of existing members without deleting them.
+
+    This function updates the configuration of existing MCP and extension members
+    to reflect the new assistant configuration settings.
+
+    Args:
+        session: Database session
+        main_team: Main team containing members to update
+        assistant: Assistant being updated (contains updated config)
+        request: Update request containing configuration changes
+    """
+    # Get the updated configuration values
+    updated_provider = request.provider or assistant.provider
+    updated_model_name = request.model_name or assistant.model_name
+    updated_temperature = request.temperature if request.temperature is not None else assistant.temperature
+    updated_ask_human = request.ask_human if request.ask_human is not None else assistant.ask_human
+    updated_interrupt = request.interrupt if request.interrupt is not None else assistant.interrupt
+
+    # Update configuration for all worker members
+    for member in main_team.members:
+        if member.type == "worker":
+            # Update member configuration fields
+            if updated_provider:
+                member.provider = updated_provider
+            if updated_model_name:
+                member.model_name = updated_model_name
+            if updated_temperature is not None:
+                member.temperature = updated_temperature
+            if updated_ask_human is not None:
+                member.ask_human = updated_ask_human
+            if updated_interrupt is not None:
+                member.interrupt = updated_interrupt
+
+            # Update member's system prompt if it was updated
+            if request.system_prompt is not None:
+                member.system_prompt = request.system_prompt
+
+            # Mark member as modified
+            member.updated_at = datetime.now()
+
+    # Commit the changes to the session
+    await session.flush()
+
+
 # ================================
 # API ENDPOINTS
 # ================================
@@ -1773,20 +1846,31 @@ async def aupdate_assistant_config(
     x_user_id: str = Header(None),
 ):
     """Update the configuration of an assistant.
+
+    This function updates only the configuration fields of an assistant and its members
+    without affecting the connected services (MCP and extensions). Unlike advanced assistant
+    updates, this only modifies configuration settings and updates existing member configs.
+
     Args:
         session: Database session
         assistant_id: ID of the assistant to update
         request: Request data containing configuration updates
         x_user_id: User ID from header
+
     Returns:
         Response indicating success or failure
     """
     try:
-        # Fetch the assistant by ID and validate ownership
-        statement = select(Assistant).where(
-            Assistant.id == assistant_id,
-            Assistant.user_id == x_user_id,
-            Assistant.is_deleted.is_(False),
+        # Fetch the assistant by ID with teams eagerly loaded
+        statement = (
+            select(Assistant)
+            .select_from(Assistant)
+            .options(selectinload(Assistant.teams).selectinload(Team.members))
+            .where(
+                Assistant.id == assistant_id,
+                Assistant.user_id == x_user_id,
+                Assistant.is_deleted.is_(False),
+            )
         )
         result = await session.execute(statement)
         assistant = result.scalar_one_or_none()
@@ -1794,19 +1878,18 @@ async def aupdate_assistant_config(
         if not assistant:
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
 
-        # Update assistant configuration fields
-        if request.system_prompt is not None:
-            assistant.system_prompt = request.system_prompt
-        if request.provider is not None:
-            assistant.provider = request.provider
-        if request.model_name is not None:
-            assistant.model_name = request.model_name
-        if request.temperature is not None:
-            assistant.temperature = request.temperature
-        if request.ask_human is not None:
-            assistant.ask_human = request.ask_human
-        if request.interrupt is not None:
-            assistant.interrupt = request.interrupt
+        # Update the assistant configuration fields
+        _update_assistant_config_info(assistant, request)
+
+        # Get main team for advanced assistants and update member configurations
+        if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
+            main_team = await _aget_main_team_for_assistant(session, assistant_id, x_user_id)
+
+            if not main_team:
+                return ResponseWrapper.wrap(status=404, message="Main team not found").to_response()
+
+            # Update configuration of existing members without deleting them
+            await _aupdate_member_configurations(session, main_team, assistant, request)
 
         # Commit the transaction
         await session.commit()
