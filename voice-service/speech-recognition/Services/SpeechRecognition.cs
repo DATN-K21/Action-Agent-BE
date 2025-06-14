@@ -29,7 +29,8 @@ public class SpeechRecognition : ISpeechRecognition
 
         var config = new RecognitionConfig
         {
-            // Encoding = RecognitionConfig.Types.AudioEncoding.Linear16,
+            Encoding = RecognitionConfig.Types.AudioEncoding.WebmOpus,
+            SampleRateHertz = 48000,
             LanguageCode = "en-US",
             AlternativeLanguageCodes = { "vi-VN" },
             Model = "default"
