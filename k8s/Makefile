@@ -46,19 +46,20 @@ help:
 	@echo '  make diff           → helm diff upgrade (no changes applied)'
 	@echo '  make lint           → helm lint + kubeconform'
 	@echo ''
+	@echo 'Azure Container Registry:'
+	@echo '  make build-push-images → build and push all Docker images to ACR'
+	@echo ''
 	@echo 'Local Development:'
 	@echo '  make setup-dev      → copy values-dev.yaml.example to values-dev.yaml'
 	@echo '  make kind-up        → start local Kind cluster'
 	@echo '  make kind-down      → delete local Kind cluster'
-	@echo '  make build-images   → build all service Docker images locally'
-	@echo '  make load-images    → load images into Kind cluster'
-	@echo '  make dev-setup      → create Kind cluster and load images'
 	@echo '  make dev-deploy     → deploy with dev environment values'
-	@echo '  make dev            → build, load images, and deploy with dev values'
+	@echo '  make dev            → deploy with dev values (uses Azure Container Registry)'
 	@echo ''
 	@echo 'Examples:'
 	@echo '  make deploy ENV=stg     → deploy to staging'
 	@echo '  make deploy ENV=prod ARGS="--atomic"  → deploy to prod with rollback'
+	@echo '  make dev                → quick deploy to local cluster with dev values'
 
 deploy: require-context check-dev-values  ## upgrade or fresh install
 	./helm-deploy.sh -e $(ENV) \
@@ -99,34 +100,36 @@ kind-up:
 kind-down:
 	kind delete cluster --name action-agent
 
+## -------- Azure Container Registry helpers ----------------------------------
+.PHONY: build-push-images
+
+build-push-images:  ## Build and push all service images to Azure Container Registry
+	@echo "Building and pushing AI Service image..."
+	docker build -t aagent.azurecr.io/ai-service:dev ../ai-service
+	docker push aagent.azurecr.io/ai-service:dev
+	@echo "Building and pushing User Service image..."
+	docker build -t aagent.azurecr.io/user-service:dev ../user-service
+	docker push aagent.azurecr.io/user-service:dev
+	@echo "Building and pushing API Gateway image..."
+	docker build -t aagent.azurecr.io/api-gateway:dev ../api-gateway
+	docker push aagent.azurecr.io/api-gateway:dev
+	@echo "Building and pushing Extension Service image..."
+	docker build -t aagent.azurecr.io/extension-service:dev ../extension-service
+	docker push aagent.azurecr.io/extension-service:dev
+	@echo "All images built and pushed successfully to Azure Container Registry!"
+
 ## -------- Local image building and loading -----------------------------------
-.PHONY: build-images load-images build-load-images
-
-build-images:  ## Build all service images locally
-	@echo "Building AI Service image..."
-	docker build -t ai-service:dev ../ai-service
-	@echo "Building User Service image..."
-	docker build -t user-service:dev ../user-service
-	@echo "Building API Gateway image..."
-	docker build -t api-gateway:dev ../api-gateway
-	@echo "Building Extension Service image..."
-	docker build -t extension-service:dev ../extension-service
-	@echo "All images built successfully!"
-
-load-images:  ## Load locally built images into Kind cluster
-	@echo "Loading images into Kind cluster..."
-	kind load docker-image ai-service:dev --name action-agent
-	kind load docker-image user-service:dev --name action-agent
-	kind load docker-image api-gateway:dev --name action-agent
-	kind load docker-image extension-service:dev --name action-agent
-	@echo "All images loaded successfully!"
-
-build-load-images: build-images load-images  ## Build and load images in one command
-
-dev-setup: kind-up build-load-images  ## Complete setup for local development
+# NOTE: Images are now built and pushed to Azure Container Registry (aagent.azurecr.io)
+# No longer needed for local development as all environments use ACR images
+#
+# If you need to build images locally for testing, use:
+#   docker build -t aagent.azurecr.io/ai-service:dev ../ai-service
+#   docker build -t aagent.azurecr.io/user-service:dev ../user-service  
+#   docker build -t aagent.azurecr.io/api-gateway:dev ../api-gateway
+#   docker build -t aagent.azurecr.io/extension-service:dev ../extension-service
 
 dev-deploy: ## Deploy the application using dev values
 	@echo "Deploying with dev environment values..."
 	make deploy ENV=dev
 
-dev: build-load-images dev-deploy ## Build, load images, and deploy with dev values
+dev: dev-deploy ## Deploy with dev values (uses Azure Container Registry images)
