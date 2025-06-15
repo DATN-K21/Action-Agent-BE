@@ -44,12 +44,18 @@ externalServices:
 # ---------------------------------------------------------
 apiGateway:
   replicaCount: 1
+  image:
+    repository: api-gateway
+    tag: "stg"
   resources:
     requests: { cpu: 256m, memory: 256Mi }
     limits:   { cpu: 1000m, memory: 1Gi }
 
 userService:
   replicaCount: 1
+  image:
+    repository: user-service
+    tag: "stg"
   database:
     enabled: true
     image:
@@ -66,6 +72,9 @@ userService:
 
 aiService:
   replicaCount: 2
+  image:
+    repository: ai-service
+    tag: "stg"
   database:
     enabled: true
     image:
@@ -82,16 +91,11 @@ aiService:
 
 extensionService:
   replicaCount: 2
+  image:
+    repository: extension-service
+    tag: "stg"
   database:
-    enabled: true
-    image:
-      repository: mongo
-      tag: "latest"
-    username: root
-    password: root
-    persistence:
-      enabled: true
-      size: 1Gi
+    enabled: false
   resources:
     requests: { cpu: 100m, memory: 100Mi }
     limits:   { cpu: 1000m, memory: 1Gi }

@@ -89,7 +89,7 @@ Usage: {{ include "action-agent.serviceName" (dict "root" . "name" "service-name
 Generate database connection string for MongoDB
 */}}
 {{- define "action-agent.mongoConnectionString" -}}
-{{- $host := printf "%s-%s" (include "action-agent.fullname" .) "user-database" }}
+{{- $host := printf "%s-%s" (include "action-agent.fullname" .) "mongo-database" }}
 {{- printf "mongodb://%s:%s@%s:27017/%s?authSource=admin" .Values.userService.database.username .Values.userService.database.password $host .Values.userService.database.name }}
 {{- end }}
 

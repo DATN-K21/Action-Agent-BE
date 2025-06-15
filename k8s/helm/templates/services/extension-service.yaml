@@ -1,101 +1,7 @@
-{{- /*
------------------------------------------------------------------
-  EXTENSION-SERVICE ── OPTIONAL MONGO DATABASE
------------------------------------------------------------------
+{{- /* 
+  Extension-service now uses shared mongo-database (previously user-database)
+  The dedicated database deployment has been removed
 */ -}}
-{{- if and .Values.extensionService.enabled .Values.extensionService.database.enabled }}
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "action-agent.fullname" . }}-extension-database
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: extension-database
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: extension-database
-  template:
-    metadata:
-      labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: extension-database
-    spec:
-      containers:
-        - name: mongodb
-          image: "{{ .Values.extensionService.database.image.repository }}:{{ .Values.extensionService.database.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
-          ports:
-            - name: mongo
-              containerPort: 27017
-          env:
-            - name: MONGO_INITDB_ROOT_USERNAME
-              value: {{ .Values.extensionService.database.username | quote }}
-            - name: MONGO_INITDB_ROOT_PASSWORD
-              value: {{ .Values.extensionService.database.password | quote }}
-          {{- if .Values.extensionService.database.persistence.enabled }}
-          volumeMounts:
-            - name: mongo-data
-              mountPath: /data/db
-          {{- end }}
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 200m
-              memory: 256Mi
-      {{- if .Values.extensionService.database.persistence.enabled }}
-      volumes:
-        - name: mongo-data
-          persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-extension-database-pvc
-      {{- else }}
-      volumes:
-        - name: mongo-data
-          emptyDir: {}
-      {{- end }}
-
-{{- if .Values.extensionService.database.persistence.enabled }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "action-agent.fullname" . }}-extension-database-pvc
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.extensionService.database.persistence.size }}
-{{- end }}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "action-agent.fullname" . }}-extension-database
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-spec:
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: extension-database
-  ports:
-    - name: mongo
-      protocol: TCP
-      port: 27017
-      targetPort: 27017
-
-{{- end }}   {{/* END database.enabled */}}
 
 {{- /*
 -----------------------------------------------------------------
@@ -135,10 +41,8 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.extensionService.service.port | quote }}
-            {{- if not .Values.extensionService.database.enabled }}
             - name: DATABASE_URL
-              value: {{ .Values.extensionService.database.url | quote }}
-            {{- end }}
+              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/datn-extension-database?authSource=admin"
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:

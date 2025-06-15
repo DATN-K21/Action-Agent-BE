@@ -9,22 +9,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "action-agent.fullname" . }}-user-database
+  name: {{ include "action-agent.fullname" . }}-mongo-database
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: user-database
+    app: mongo-database
 spec:
   replicas: 1
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: user-database
+      app: mongo-database
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: user-database
+        app: mongo-database
     spec:
       containers:
         - name: mongodb
@@ -59,7 +59,7 @@ spec:
       volumes:
         - name: mongo-data
           persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-user-database-pvc
+            claimName: {{ include "action-agent.fullname" . }}-mongo-database-pvc
       {{- else }}
       volumes:
         - name: mongo-data
@@ -71,7 +71,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "action-agent.fullname" . }}-user-database-pvc
+  name: {{ include "action-agent.fullname" . }}-mongo-database-pvc
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
@@ -86,14 +86,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "action-agent.fullname" . }}-user-database
+  name: {{ include "action-agent.fullname" . }}-mongo-database
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: user-database
+    app: mongo-database
   ports:
     - name: mongo
       protocol: TCP
@@ -140,10 +140,8 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.userService.service.port | quote }}
-            {{- if not .Values.userService.database.enabled }}
-            - name: DATABASE_URL
-              value: {{ .Values.userService.database.url | quote }}
-            {{- end }}
+            - name: MONGODB_CONNECTION_STRING
+              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/user-service?authSource=admin"
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
