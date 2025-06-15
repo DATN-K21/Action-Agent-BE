@@ -1,14 +1,4 @@
-{{- /*
-───────────────────────────────────────────────────────────────
-  USER-SERVICE (main application)
-───────────────────────────────────────────────────────────────
-───────────────────────────────────────────────────────────────
-  USER-SERVICE  (main application)
-───────────────────────────────────────────────────────────────
-*/ -}}
-{{- if .Values.userService.enabled }}
-
----
+{{- if .Values.services.userService.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,48 +6,90 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: user-service
+    app.kubernetes.io/component: user-service
 spec:
-  replicas: {{ .Values.userService.replicaCount }}
+  replicas: {{ .Values.services.userService.replicaCount }}
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: user-service
+      app.kubernetes.io/component: user-service
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: user-service
+        app.kubernetes.io/component: user-service
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/security/secrets.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.services.userService.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "action-agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.services.userService.podSecurityContext | nindent 8 }}
       containers:
         - name: user-service
-          image: {{ include "action-agent.image" (dict "root" . "image" .Values.userService.image) }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml .Values.services.userService.securityContext | nindent 12 }}
+          image: {{ include "action-agent.image" (dict "Values" .Values "repository" .Values.services.userService.image.repository "tag" .Values.services.userService.image.tag) }}
+          imagePullPolicy: {{ .Values.services.userService.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.userService.service.port }}
+              containerPort: {{ .Values.services.userService.service.port }}
+              protocol: TCP
           env:
             - name: PORT
-              value: {{ .Values.userService.service.port | quote }}
-          envFrom:
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.fullname" . }}-user-service-secret
+              value: {{ .Values.services.userService.service.port | quote }}
+            - name: NODE_ENV
+              value: {{ .Values.global.environment | quote }}
+            - name: MONGODB_CONNECTION_STRING
+              value: {{ include "action-agent.mongoConnectionString" . | quote }}
+            - name: API_GATEWAY_URL
+              value: "http://{{ include "action-agent.fullname" . }}-api-gateway:{{ .Values.services.apiGateway.service.port }}"
+            {{- range $key, $value := .Values.services.userService.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
             {{- end }}
-          resources:
-            {{- toYaml .Values.userService.resources | nindent 12 }}
+          envFrom:
+            {{- if .Values.secrets.enabled }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "service" "user-service") }}
+            {{- end }}
+            {{- range .Values.services.userService.extraSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           livenessProbe:
             httpGet:
-              path: /ping
-              port: {{ .Values.userService.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
+              path: {{ .Values.services.userService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.userService.healthCheck.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.userService.healthCheck.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.userService.healthCheck.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.userService.healthCheck.livenessProbe.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: /ping
-              port: {{ .Values.userService.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
+              path: {{ .Values.services.userService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.userService.healthCheck.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.userService.healthCheck.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.userService.healthCheck.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.userService.healthCheck.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.services.userService.resources | nindent 12 }}
+      {{- with .Values.services.userService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.userService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.userService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
 ---
 apiVersion: v1
@@ -67,15 +99,19 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: user-service
+  {{- with .Values.services.userService.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: {{ .Values.userService.service.type | default "ClusterIP" }}
+  type: {{ .Values.services.userService.service.type }}
+  ports:
+    - port: {{ .Values.services.userService.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: user-service
-  ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.userService.service.port }}
-      targetPort: {{ .Values.userService.service.port }}
-
-{{- end }}   {{/* END userService.enabled */}}
+    app.kubernetes.io/component: user-service
+{{- end }}

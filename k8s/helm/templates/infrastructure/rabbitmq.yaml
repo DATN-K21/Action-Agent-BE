@@ -1,23 +1,4 @@
-{{- if .Values.rabbitmq.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-rabbitmq-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  RABBITMQ_HOST: {{ include "action-agent.fullname" . }}-rabbitmq
-  RABBITMQ_PORT: {{ .Values.rabbitmq.service.port | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
+{{- if and .Values.infrastructure.rabbitmq.enabled (not .Values.external.rabbitmq.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,60 +6,97 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: rabbitmq
+    app.kubernetes.io/component: rabbitmq
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: rabbitmq
+      app.kubernetes.io/component: rabbitmq
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: rabbitmq
+        app.kubernetes.io/component: rabbitmq
     spec:
+      securityContext:
+        {{- toYaml .Values.infrastructure.rabbitmq.podSecurityContext | nindent 8 }}
       containers:
         - name: rabbitmq
-          image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.infrastructure.rabbitmq.securityContext | nindent 12 }}
+          image: "{{ .Values.infrastructure.rabbitmq.image.repository }}:{{ .Values.infrastructure.rabbitmq.image.tag }}"
+          imagePullPolicy: {{ .Values.infrastructure.rabbitmq.image.pullPolicy }}
           ports:
             - name: amqp
-              containerPort: {{ .Values.rabbitmq.service.port }}
+              containerPort: {{ .Values.infrastructure.rabbitmq.service.amqpPort }}
+              protocol: TCP
             - name: management
-              containerPort: {{ .Values.rabbitmq.service.managementPort }}
+              containerPort: {{ .Values.infrastructure.rabbitmq.service.managementPort }}
+              protocol: TCP
             - name: metrics
-              containerPort: {{ .Values.rabbitmq.service.metricsPort }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-rabbitmq-config
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "infrastructure") }}
+              containerPort: {{ .Values.infrastructure.rabbitmq.service.metricsPort }}
+              protocol: TCP
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.infrastructure.rabbitmq.auth.username | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              value: {{ .Values.infrastructure.rabbitmq.auth.password | quote }}
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: {{ .Values.infrastructure.rabbitmq.auth.vhost | quote }}
+            {{- range $key, $value := .Values.infrastructure.rabbitmq.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
             {{- end }}
-          {{- if .Values.rabbitmq.persistence.enabled }}
+          resources:
+            {{- toYaml .Values.infrastructure.rabbitmq.resources | nindent 12 }}
+          {{- if .Values.infrastructure.rabbitmq.persistence.enabled }}
           volumeMounts:
             - name: rabbitmq-data
               mountPath: /var/lib/rabbitmq
           {{- end }}
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 200m
-              memory: 256Mi
+          livenessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - ping
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 20
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - check_port_connectivity
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 20
+            failureThreshold: 3
+      {{- if .Values.infrastructure.rabbitmq.persistence.enabled }}
       volumes:
         - name: rabbitmq-data
-          {{- if .Values.rabbitmq.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-rabbitmq-pvc
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
+      {{- end }}
+      {{- with .Values.infrastructure.rabbitmq.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.rabbitmq.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.rabbitmq.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
-# PVC only when persistence on
-{{- if .Values.rabbitmq.persistence.enabled }}
+{{- if .Values.infrastructure.rabbitmq.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -87,16 +105,18 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.rabbitmq.persistence.size }}
+      storage: {{ .Values.infrastructure.rabbitmq.persistence.size }}
+  {{- if .Values.infrastructure.rabbitmq.persistence.storageClass }}
+  storageClassName: {{ .Values.infrastructure.rabbitmq.persistence.storageClass }}
+  {{- end }}
 {{- end }}
 
-#---------------------------------------
-# Service
-#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -105,23 +125,23 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
 spec:
   type: ClusterIP
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: rabbitmq
   ports:
     - name: amqp
+      port: {{ .Values.infrastructure.rabbitmq.service.amqpPort }}
+      targetPort: amqp
       protocol: TCP
-      port: {{ .Values.rabbitmq.service.port }}
-      targetPort: {{ .Values.rabbitmq.service.port }}
     - name: management
+      port: {{ .Values.infrastructure.rabbitmq.service.managementPort }}
+      targetPort: management
       protocol: TCP
-      port: {{ .Values.rabbitmq.service.managementPort }}
-      targetPort: {{ .Values.rabbitmq.service.managementPort }}
     - name: metrics
+      port: {{ .Values.infrastructure.rabbitmq.service.metricsPort }}
+      targetPort: metrics
       protocol: TCP
-      port: {{ .Values.rabbitmq.service.metricsPort }}
-      targetPort: {{ .Values.rabbitmq.service.metricsPort }}
-
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
 {{- end }}

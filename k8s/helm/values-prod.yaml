@@ -1,0 +1,482 @@
+# Production environment configuration for Azure Kubernetes Service
+global:
+  namespace: action-agent-prod
+  environment: production
+  imageRegistry: "aagent.azurecr.io"  # Updated to correct ACR
+  imageTag: "prod"
+
+# Chart naming configuration
+nameOverride: ""
+fullnameOverride: ""
+
+# Use Azure Key Vault for secret management
+secrets:
+  enabled: true
+  provider: "azure"
+  azure:
+    secretStoreName: "action-agent-secret-store-prod"
+    tenantId: "${AZURE_TENANT_ID}"                     # Set via environment variable
+    vaultUrl: "https://action-agent-kv-prod.vault.azure.net/"
+    managedIdentityClientId: "${AZURE_MANAGED_IDENTITY_CLIENT_ID}"  # Set via environment variable
+    refreshInterval: "30s"
+    secretKeys:
+      api-gateway:
+        - envName: "HTTPS_PORT"
+          keyVaultKey: "prod-api-gateway-https-port"
+        - envName: "SSL_KEY_PATH" 
+          keyVaultKey: "prod-api-gateway-ssl-key"
+        - envName: "SSL_CERT_PATH"
+          keyVaultKey: "prod-api-gateway-ssl-cert"
+        - envName: "USER_SERVICE_URL"
+          keyVaultKey: "prod-user-service-url"
+        - envName: "AI_SERVICE_URL"
+          keyVaultKey: "prod-ai-service-url"
+        - envName: "EXTENSION_SERVICE_URL"
+          keyVaultKey: "prod-extension-service-url"
+      user-service:
+        - envName: "MONGODB_CONNECTION_STRING"
+          keyVaultKey: "prod-mongodb-connection-string"
+        - envName: "JWT_SECRET"
+          keyVaultKey: "prod-jwt-secret"
+        - envName: "EMAIL_USERNAME"
+          keyVaultKey: "prod-email-username"
+        - envName: "EMAIL_PASSWORD"
+          keyVaultKey: "prod-email-password"
+        - envName: "API_GATEWAY_URL"
+          keyVaultKey: "prod-api-gateway-url"
+        - envName: "GOOGLE_APP_CLIENT_ID"
+          keyVaultKey: "prod-google-client-id"
+        - envName: "GOOGLE_APP_CLIENT_SECRET"
+          keyVaultKey: "prod-google-client-secret"
+        - envName: "GOOGLE_APP_REDIRECT_URL"
+          keyVaultKey: "prod-google-redirect-url"
+        - envName: "FACEBOOK_APP_CLIENT_ID"
+          keyVaultKey: "prod-facebook-client-id"
+        - envName: "FACEBOOK_APP_CLIENT_SECRET"
+          keyVaultKey: "prod-facebook-client-secret"
+        - envName: "FACEBOOK_APP_REDIRECT_URL"
+          keyVaultKey: "prod-facebook-redirect-url"
+        - envName: "CLIENT_URL"
+          keyVaultKey: "prod-client-url"
+      ai-service:
+        - envName: "POSTGRES_HOST"
+          keyVaultKey: "prod-postgres-host"
+        - envName: "POSTGRES_PORT"
+          keyVaultKey: "prod-postgres-port"
+        - envName: "POSTGRES_USER"
+          keyVaultKey: "prod-postgres-user"
+        - envName: "POSTGRES_PASSWORD"
+          keyVaultKey: "prod-postgres-password"
+        - envName: "POSTGRES_DB"
+          keyVaultKey: "prod-postgres-db"
+        - envName: "LLM_DEFAULT_PROVIDER"
+          keyVaultKey: "prod-llm-default-provider"
+        - envName: "LLM_DEFAULT_MODEL"
+          keyVaultKey: "prod-llm-default-model"
+        - envName: "LLM_DEFAULT_API_KEY"
+          keyVaultKey: "prod-llm-default-api-key"
+        - envName: "TOOL_TAVILY_API_KEY"
+          keyVaultKey: "prod-tool-tavily-api-key"
+        - envName: "COMPOSIO_API_KEY"
+          keyVaultKey: "prod-composio-api-key"
+        - envName: "COMPOSIO_REDIRECT_URL"
+          keyVaultKey: "prod-composio-redirect-url"
+        - envName: "FRONTEND_REDIRECT_URL"
+          keyVaultKey: "prod-frontend-redirect-url"
+        - envName: "REDIS_URL"
+          keyVaultKey: "prod-redis-url"
+        - envName: "ELASTICSEARCH_URL"
+          keyVaultKey: "prod-elasticsearch-url"
+        - envName: "RABBITMQ_URL"
+          keyVaultKey: "prod-rabbitmq-url"
+      extension-service:
+        - envName: "COMPOSIO_API_BASE_URL"
+          keyVaultKey: "prod-composio-api-base-url"
+        - envName: "COMPOSIO_API_KEY"
+          keyVaultKey: "prod-composio-api-key"
+        - envName: "DATABASE_URL"
+          keyVaultKey: "prod-extension-database-url"
+
+# Service configurations - use Azure Container Registry images with production settings
+services:
+  apiGateway:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: "aagent.azurecr.io/api-gateway"
+      tag: "prod"
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: "acr-secret"  # Azure Container Registry pull secret
+    service:
+      type: ClusterIP
+      port: 15000
+    ssl:
+      enabled: true
+      secretName: "api-gateway-ssl-certs"
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-type: "application"
+    tolerations: []
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values:
+              - api-gateway
+          topologyKey: kubernetes.io/hostname
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: node-type
+              operator: In
+              values:
+              - "application"
+
+  userService:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: "aagent.azurecr.io/user-service"
+      tag: "prod"
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: "acr-secret"
+    service:
+      type: ClusterIP
+      port: 15100
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 45
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-type: "application"
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values:
+              - user-service
+          topologyKey: kubernetes.io/hostname
+
+  aiService:
+    enabled: true
+    replicaCount: 4
+    image:
+      repository: "aagent.azurecr.io/ai-service"
+      tag: "prod"
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: "acr-secret"
+    service:
+      type: ClusterIP
+      port: 15200
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 90
+        periodSeconds: 30
+        timeoutSeconds: 15
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 15
+        timeoutSeconds: 10
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-type: "ai-workload"
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values:
+              - ai-service
+          topologyKey: kubernetes.io/hostname
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: node-type
+              operator: In
+              values:
+              - "ai-workload"
+
+  extensionService:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: "aagent.azurecr.io/extension-service"
+      tag: "prod"
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: "acr-secret"
+    service:
+      type: ClusterIP
+      port: 15300
+    healthCheck:
+      path: "/"
+      livenessProbe:
+        initialDelaySeconds: 45
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-type: "application"
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values:
+              - extension-service
+          topologyKey: kubernetes.io/hostname
+
+# External services - using managed Azure services and 3rd party
+external:
+  elasticsearch:
+    enabled: true
+    url: "${ELASTICSEARCH_URL_PROD}"  # Set via environment variable - e.g., Elastic Cloud
+  kibana:
+    enabled: true
+    url: "${KIBANA_URL_PROD}"        # Set via environment variable - e.g., Elastic Cloud
+  rabbitmq:
+    enabled: true
+    url: "${RABBITMQ_URL_PROD}"      # Set via environment variable - e.g., CloudAMQP
+  mongodb:
+    enabled: true
+    connectionString: "${MONGODB_CONNECTION_STRING_PROD}"  # Set via environment variable - e.g., MongoDB Atlas
+  postgresql:
+    enabled: true
+    connectionString: "${POSTGRES_CONNECTION_STRING_PROD}" # Set via environment variable - e.g., Azure Database for PostgreSQL
+  redis:
+    enabled: true
+    connectionString: "${REDIS_CONNECTION_STRING_PROD}"    # Set via environment variable - e.g., Azure Cache for Redis
+
+# Disable local databases since we're using managed services
+databases:
+  postgresql:
+    enabled: false
+  mongodb:
+    enabled: false
+  redis:
+    enabled: false
+
+# Disable local infrastructure since we're using 3rd party/managed services
+infrastructure:
+  elasticsearch:
+    enabled: false
+  kibana:
+    enabled: false
+  rabbitmq:
+    enabled: false
+
+# Ingress configuration for production
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+  hosts:
+    - host: api.action-agent.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: api-gateway
+            port: 15000
+  tls:
+    - secretName: api-action-agent-com-tls
+      hosts:
+        - api.action-agent.com
+
+# Autoscaling for production - more aggressive scaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+
+# Service Account with workload identity for Azure
+serviceAccount:
+  create: true
+  automount: true
+  annotations:
+    azure.workload.identity/client-id: "${AZURE_MANAGED_IDENTITY_CLIENT_ID}"
+    azure.workload.identity/tenant-id: "${AZURE_TENANT_ID}"
+  name: "action-agent-workload-identity"
+  labels:
+    azure.workload.identity/use: "true"
+
+# Pod Disruption Budgets for high availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+  maxUnavailable: 1
+
+# Network Policies for security
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 15000
+    - from:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: action-agent-backend
+      ports:
+      - protocol: TCP
+        port: 15100
+      - protocol: TCP
+        port: 15200
+      - protocol: TCP
+        port: 15300
+  egress:
+    - to: []
+      ports:
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 80
+      - protocol: TCP
+        port: 5432
+      - protocol: TCP
+        port: 27017
+      - protocol: TCP
+        port: 6380
+      - protocol: TCP
+        port: 9243
+      - protocol: TCP
+        port: 5671
+
+# Resource quotas and limits
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    limits.cpu: "30"
+    limits.memory: "60Gi"
+    persistentvolumeclaims: "4"
+    pods: "50"
+    secrets: "20"
+    services: "10"
+
+# Security context for all pods
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+podSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true

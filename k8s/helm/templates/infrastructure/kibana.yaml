@@ -1,28 +1,4 @@
-{{- if .Values.kibana.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-kibana-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  {{- if .Values.elasticsearch.enabled }}
-  ELASTICSEARCH_HOSTS: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.port }}"
-  {{- else }}
-  ELASTICSEARCH_HOSTS: {{ .Values.kibana.config.elasticsearchHosts | quote }}
-  {{- end }}
-  SERVER_NAME: {{ .Values.kibana.config.serverName | quote }}
-  XPACK_SECURITY_ENABLED: {{ .Values.kibana.config.xpackSecurityEnabled | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
+{{- if and .Values.infrastructure.kibana.enabled (not .Values.external.kibana.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,40 +6,78 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: kibana
+    app.kubernetes.io/component: kibana
 spec:
   replicas: 1
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: kibana
+      app.kubernetes.io/component: kibana
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: kibana
+        app.kubernetes.io/component: kibana
     spec:
+      securityContext:
+        {{- toYaml .Values.infrastructure.kibana.podSecurityContext | nindent 8 }}
       containers:
         - name: kibana
-          image: "{{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.infrastructure.kibana.securityContext | nindent 12 }}
+          image: "{{ .Values.infrastructure.kibana.image.repository }}:{{ .Values.infrastructure.kibana.image.tag }}"
+          imagePullPolicy: {{ .Values.infrastructure.kibana.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.kibana.service.port }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-kibana-config
+              containerPort: {{ .Values.infrastructure.kibana.service.port }}
+              protocol: TCP
+          env:
+            {{- if .Values.external.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_HOSTS
+              value: {{ .Values.external.elasticsearch.url | quote }}
+            {{- else if .Values.infrastructure.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_HOSTS
+              value: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.infrastructure.elasticsearch.service.port }}"
+            {{- end }}
+            - name: SERVER_NAME
+              value: {{ include "action-agent.fullname" . }}-kibana
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+            {{- range $key, $value := .Values.infrastructure.kibana.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
           resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 200m
-              memory: 512Mi
+            {{- toYaml .Values.infrastructure.kibana.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- with .Values.infrastructure.kibana.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.kibana.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.kibana.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
-#---------------------------------------
-# Service
-#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -72,15 +86,15 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
 spec:
   type: ClusterIP
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: kibana
   ports:
     - name: http
+      port: {{ .Values.infrastructure.kibana.service.port }}
+      targetPort: http
       protocol: TCP
-      port: {{ .Values.kibana.service.port }}
-      targetPort: {{ .Values.kibana.service.port }}
-
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
 {{- end }}

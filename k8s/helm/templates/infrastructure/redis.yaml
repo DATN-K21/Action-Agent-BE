@@ -1,23 +1,4 @@
-{{- if .Values.redis.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-redis-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  REDIS_HOST: {{ include "action-agent.fullname" . }}-redis
-  REDIS_PORT: {{ .Values.redis.service.port | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
+{{- if and .Values.databases.redis.enabled (not .Values.external.redis.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,52 +6,99 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: redis
+    app.kubernetes.io/component: redis
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: redis
+      app.kubernetes.io/component: redis
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: redis
+        app.kubernetes.io/component: redis
     spec:
+      securityContext:
+        {{- toYaml .Values.databases.redis.podSecurityContext | nindent 8 }}
       containers:
         - name: redis
-          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml .Values.databases.redis.securityContext | nindent 12 }}
+          image: "{{ .Values.databases.redis.image.repository }}:{{ .Values.databases.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.databases.redis.image.pullPolicy }}
           ports:
             - name: redis
-              containerPort: {{ .Values.redis.service.port }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-redis-config
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.fullname" . }}-infrastructure-secret
+              containerPort: {{ .Values.databases.redis.service.port }}
+              protocol: TCP
+          env:
+            {{- if .Values.databases.redis.auth.password }}
+            - name: REDIS_PASSWORD
+              value: {{ .Values.databases.redis.auth.password | quote }}
+          command:
+            - redis-server
+            {{- if .Values.databases.redis.auth.password }}
+            - --requirepass
+            - $(REDIS_PASSWORD)
             {{- end }}
-          {{- if .Values.redis.persistence.enabled }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.databases.redis.resources | nindent 12 }}
+          {{- if .Values.databases.redis.persistence.enabled }}
           volumeMounts:
             - name: redis-data
               mountPath: /data
           {{- end }}
-          resources:
-            limits:   { cpu: 500m, memory: 512Mi }
-            requests: { cpu: 100m, memory: 128Mi }
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                {{- if .Values.databases.redis.auth.password }}
+                - redis-cli -a $REDIS_PASSWORD ping
+                {{- else }}
+                - redis-cli ping
+                {{- end }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                {{- if .Values.databases.redis.auth.password }}
+                - redis-cli -a $REDIS_PASSWORD ping
+                {{- else }}
+                - redis-cli ping
+                {{- end }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- if .Values.databases.redis.persistence.enabled }}
       volumes:
         - name: redis-data
-          {{- if .Values.redis.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-redis-pvc
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
+      {{- end }}
+      {{- with .Values.databases.redis.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databases.redis.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databases.redis.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
-# PVC only when persistence on
-{{- if .Values.redis.persistence.enabled }}
+{{- if .Values.databases.redis.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -79,16 +107,18 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.redis.persistence.size }}
+      storage: {{ .Values.databases.redis.persistence.size }}
+  {{- if .Values.databases.redis.persistence.storageClass }}
+  storageClassName: {{ .Values.databases.redis.persistence.storageClass }}
+  {{- end }}
 {{- end }}
 
-#---------------------------------------
-# Service
-#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -97,15 +127,15 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
 spec:
-  type: ClusterIP        # always internal
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: redis
+  type: ClusterIP
   ports:
     - name: redis
+      port: {{ .Values.databases.redis.service.port }}
+      targetPort: redis
       protocol: TCP
-      port: {{ .Values.redis.service.port }}
-      targetPort: {{ .Values.redis.service.port }}
-
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
 {{- end }}

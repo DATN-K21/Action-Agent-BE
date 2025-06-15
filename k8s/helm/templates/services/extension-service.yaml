@@ -1,6 +1,4 @@
-{{- if .Values.extensionService.enabled }}
-
----
+{{- if .Values.services.extensionService.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,51 +6,86 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: extension-service
+    app.kubernetes.io/component: extension-service
 spec:
-  replicas: {{ .Values.extensionService.replicaCount }}
+  replicas: {{ .Values.services.extensionService.replicaCount }}
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: extension-service
+      app.kubernetes.io/component: extension-service
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: extension-service
+        app.kubernetes.io/component: extension-service
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/security/secrets.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.services.extensionService.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "action-agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.services.extensionService.podSecurityContext | nindent 8 }}
       containers:
         - name: extension-service
-          image: {{ .Values.extensionService.image.repository }}:{{ .Values.extensionService.image.tag | default "latest" }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml .Values.services.extensionService.securityContext | nindent 12 }}
+          image: {{ include "action-agent.image" (dict "Values" .Values "repository" .Values.services.extensionService.image.repository "tag" .Values.services.extensionService.image.tag) }}
+          imagePullPolicy: {{ .Values.services.extensionService.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.extensionService.service.port }}
+              containerPort: {{ .Values.services.extensionService.service.port }}
+              protocol: TCP
           env:
             - name: PORT
-              value: {{ .Values.extensionService.service.port | quote }}
-          envFrom:
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.fullname" . }}-extension-service-secret
-            {{- else }}
+              value: {{ .Values.services.extensionService.service.port | quote }}
             - name: DATABASE_URL
-              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/datn-extension-database?authSource=admin"
+              value: {{ include "action-agent.mongoConnectionString" . }}/datn-extension-database
+            {{- range $key, $value := .Values.services.extensionService.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
             {{- end }}
-          resources:
-            {{- toYaml .Values.extensionService.resources | nindent 12 }}
+          envFrom:
+            {{- if .Values.secrets.enabled }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "service" "extension-service") }}
+            {{- end }}
+            {{- range .Values.services.extensionService.extraSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           livenessProbe:
             httpGet:
-              path: /
-              port: {{ .Values.extensionService.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
+              path: {{ .Values.services.extensionService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.extensionService.healthCheck.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.extensionService.healthCheck.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.extensionService.healthCheck.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.extensionService.healthCheck.livenessProbe.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: /
-              port: {{ .Values.extensionService.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
+              path: {{ .Values.services.extensionService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.extensionService.healthCheck.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.extensionService.healthCheck.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.extensionService.healthCheck.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.extensionService.healthCheck.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.services.extensionService.resources | nindent 12 }}
+      {{- with .Values.services.extensionService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.extensionService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.extensionService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
 ---
 apiVersion: v1
@@ -62,15 +95,19 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: extension-service
+  {{- with .Values.services.extensionService.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: {{ .Values.extensionService.service.type | default "ClusterIP" }}
+  type: {{ .Values.services.extensionService.service.type }}
+  ports:
+    - port: {{ .Values.services.extensionService.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: extension-service
-  ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.extensionService.service.port }}
-      targetPort: {{ .Values.extensionService.service.port }}
-
-{{- end }}   {{/* END extensionService.enabled */}}
+    app.kubernetes.io/component: extension-service
+{{- end }}

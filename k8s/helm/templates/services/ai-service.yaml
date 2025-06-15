@@ -1,6 +1,4 @@
-{{- if .Values.aiService.enabled }}
-
----
+{{- if .Values.services.aiService.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,48 +6,95 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: ai-service
+    app.kubernetes.io/component: ai-service
 spec:
-  replicas: {{ .Values.aiService.replicaCount }}
+  replicas: {{ .Values.services.aiService.replicaCount }}
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: ai-service
+      app.kubernetes.io/component: ai-service
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: ai-service
+        app.kubernetes.io/component: ai-service
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/security/secrets.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.services.aiService.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "action-agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.services.aiService.podSecurityContext | nindent 8 }}
       containers:
         - name: ai-service
-          image: {{ .Values.aiService.image.repository }}:{{ .Values.aiService.image.tag }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml .Values.services.aiService.securityContext | nindent 12 }}
+          image: {{ include "action-agent.image" (dict "Values" .Values "repository" .Values.services.aiService.image.repository "tag" .Values.services.aiService.image.tag) }}
+          imagePullPolicy: {{ .Values.services.aiService.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.aiService.service.port }}
+              containerPort: {{ .Values.services.aiService.service.port }}
+              protocol: TCP
           env:
             - name: PORT
-              value: {{ .Values.aiService.service.port | quote }}
-          envFrom:
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.fullname" . }}-ai-service-secret
+              value: {{ .Values.services.aiService.service.port | quote }}
+            - name: DATABASE_URL
+              value: {{ include "action-agent.postgresConnectionString" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "action-agent.redisConnectionString" . | quote }}
+            {{- if .Values.external.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_URL
+              value: {{ .Values.external.elasticsearch.url | quote }}
+            {{- else if .Values.infrastructure.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_URL
+              value: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.infrastructure.elasticsearch.service.port }}"
             {{- end }}
-          resources:
-            {{- toYaml .Values.aiService.resources | nindent 12 }}
+            {{- range $key, $value := .Values.services.aiService.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          envFrom:
+            {{- if .Values.secrets.enabled }}
+            - secretRef:
+                name: {{ include "action-agent.secretName" (dict "root" . "service" "ai-service") }}
+            {{- end }}
+            {{- range .Values.services.aiService.extraSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           livenessProbe:
             httpGet:
-              path: /ping
-              port: {{ .Values.aiService.service.port }}
-            initialDelaySeconds: 60
-            periodSeconds: 60
+              path: {{ .Values.services.aiService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.aiService.healthCheck.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.aiService.healthCheck.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.aiService.healthCheck.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.aiService.healthCheck.livenessProbe.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: /ping
-              port: {{ .Values.aiService.service.port }}
-            initialDelaySeconds: 60
-            periodSeconds: 60
+              path: {{ .Values.services.aiService.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.services.aiService.healthCheck.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.aiService.healthCheck.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.services.aiService.healthCheck.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.services.aiService.healthCheck.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.services.aiService.resources | nindent 12 }}
+      {{- with .Values.services.aiService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.aiService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.services.aiService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
 ---
 apiVersion: v1
@@ -59,14 +104,19 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-service
+  {{- with .Values.services.aiService.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: {{ .Values.aiService.service.type }}
+  type: {{ .Values.services.aiService.service.type }}
+  ports:
+    - port: {{ .Values.services.aiService.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: ai-service
-  ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.aiService.service.port }}
-      targetPort: {{ .Values.aiService.service.port }}
-{{- end }}  {{/* END aiService.enabled */}}
+    app.kubernetes.io/component: ai-service
+{{- end }}

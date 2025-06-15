@@ -1,24 +1,4 @@
-{{- if .Values.elasticsearch.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-elasticsearch-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  discovery.type: {{ .Values.elasticsearch.config.discoveryType | quote }}
-  xpack.security.enabled: {{ .Values.elasticsearch.config.xpackSecurityEnabled | quote }}
-  ES_JAVA_OPTS: {{ .Values.elasticsearch.config.javaOpts | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
+{{- if and .Values.infrastructure.elasticsearch.enabled (not .Values.external.elasticsearch.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,54 +6,92 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app: elasticsearch
+    app.kubernetes.io/component: elasticsearch
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: elasticsearch
+      app.kubernetes.io/component: elasticsearch
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: elasticsearch
+        app.kubernetes.io/component: elasticsearch
     spec:
+      securityContext:
+        {{- toYaml .Values.infrastructure.elasticsearch.podSecurityContext | nindent 8 }}
       containers:
         - name: elasticsearch
-          image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.infrastructure.elasticsearch.securityContext | nindent 12 }}
+          image: "{{ .Values.infrastructure.elasticsearch.image.repository }}:{{ .Values.infrastructure.elasticsearch.image.tag }}"
+          imagePullPolicy: {{ .Values.infrastructure.elasticsearch.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.elasticsearch.service.port }}
+              containerPort: {{ .Values.infrastructure.elasticsearch.service.port }}
+              protocol: TCP
             - name: transport
-              containerPort: {{ .Values.elasticsearch.service.nodePort }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-elasticsearch-config
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "infrastructure") }}
+              containerPort: {{ .Values.infrastructure.elasticsearch.service.transportPort }}
+              protocol: TCP
+          env:
+            - name: discovery.type
+              value: "single-node"
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: ES_JAVA_OPTS
+              value: {{ .Values.infrastructure.elasticsearch.javaOpts | quote }}
+            {{- range $key, $value := .Values.infrastructure.elasticsearch.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
             {{- end }}
-          {{- if .Values.elasticsearch.persistence.enabled }}
+          resources:
+            {{- toYaml .Values.infrastructure.elasticsearch.resources | nindent 12 }}
+          {{- if .Values.infrastructure.elasticsearch.persistence.enabled }}
           volumeMounts:
             - name: elasticsearch-data
               mountPath: /usr/share/elasticsearch/data
           {{- end }}
-          resources:
-            limits:   { cpu: 2000m, memory: 2Gi }
-            requests: { cpu: 500m, memory: 1Gi }
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?wait_for_status=yellow&timeout=1s
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- if .Values.infrastructure.elasticsearch.persistence.enabled }}
       volumes:
         - name: elasticsearch-data
-          {{- if .Values.elasticsearch.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-elasticsearch-pvc
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
+      {{- end }}
+      {{- with .Values.infrastructure.elasticsearch.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.elasticsearch.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.infrastructure.elasticsearch.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
-# PVC only when persistence on
-{{- if .Values.elasticsearch.persistence.enabled }}
+{{- if .Values.infrastructure.elasticsearch.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -82,16 +100,18 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.elasticsearch.persistence.size }}
+      storage: {{ .Values.infrastructure.elasticsearch.persistence.size }}
+  {{- if .Values.infrastructure.elasticsearch.persistence.storageClass }}
+  storageClassName: {{ .Values.infrastructure.elasticsearch.persistence.storageClass }}
+  {{- end }}
 {{- end }}
 
-#---------------------------------------
-# Service
-#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -100,19 +120,19 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
 spec:
   type: ClusterIP
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: elasticsearch
   ports:
     - name: http
+      port: {{ .Values.infrastructure.elasticsearch.service.port }}
+      targetPort: http
       protocol: TCP
-      port: {{ .Values.elasticsearch.service.port }}
-      targetPort: {{ .Values.elasticsearch.service.port }}
     - name: transport
+      port: {{ .Values.infrastructure.elasticsearch.service.transportPort }}
+      targetPort: transport
       protocol: TCP
-      port: {{ .Values.elasticsearch.service.nodePort }}
-      targetPort: {{ .Values.elasticsearch.service.nodePort }}
-
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
 {{- end }}

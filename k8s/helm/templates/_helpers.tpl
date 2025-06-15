@@ -1,4 +1,3 @@
-# Helm template helpers
 {{/*
 Expand the name of the chart.
 */}}
@@ -63,53 +62,76 @@ Create the name of the service account to use
 
 {{/*
 Generate secret name for a service
-Usage: {{ include "action-agent.secretName" (dict "root" . "name" "user-db") }}
 */}}
 {{- define "action-agent.secretName" -}}
-{{- printf "%s-%s-secret" (include "action-agent.fullname" .root) .name }}
+{{- printf "%s-%s-secret" (include "action-agent.fullname" .root) .service }}
 {{- end }}
 
 {{/*
-Generate configmap name for a service
-Usage: {{ include "action-agent.configMapName" (dict "root" . "name" "service-name") }}
+Generate image tag
 */}}
-{{- define "action-agent.configMapName" -}}
-{{- printf "%s-%s-config" (include "action-agent.fullname" .root) .name }}
+{{- define "action-agent.imageTag" -}}
+{{- if .tag }}
+{{- .tag }}
+{{- else }}
+{{- .root.Values.global.imageTag | default "latest" }}
+{{- end }}
 {{- end }}
 
 {{/*
-Generate service name
-Usage: {{ include "action-agent.serviceName" (dict "root" . "name" "service-name") }}
-*/}}
-{{- define "action-agent.serviceName" -}}
-{{- printf "%s-%s" (include "action-agent.fullname" .root) .name }}
-{{- end }}
-
-{{/*
-Generate database connection string for MongoDB
-*/}}
-{{- define "action-agent.mongoConnectionString" -}}
-mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/{{ .Values.userService.database.name | default "user-service" }}?authSource=admin
-{{- end }}
-
-{{/*
-Generate database connection string for PostgreSQL
-*/}}
-{{- define "action-agent.postgresConnectionString" -}}
-postgresql://{{ .Values.aiService.database.username }}:{{ .Values.aiService.database.password }}@{{ include "action-agent.fullname" . }}-ai-database:5432/{{ .Values.aiService.database.name | default "ai-database" }}
-{{- end }}
-
-{{/*
-Generate full image name with registry and tag
-Usage: {{ include "action-agent.image" (dict "root" . "image" .Values.someService.image) }}
+Generate full image name
 */}}
 {{- define "action-agent.image" -}}
-{{- $registry := .root.Values.global.imageRegistry -}}
-{{- $repository := .image.repository -}}
-{{- $tag := .image.tag | default "latest" -}}
-{{- if $registry -}}
-{{- printf "%s/%s:%s" $registry $repository $tag -}}
-{{- else -}}
-{{- printf "%s:%s" $repository $tag -}}
-{{- end -}}
-{{- end -}}
+{{- if .Values.global.imageRegistry }}
+{{- printf "%s/%s:%s" .Values.global.imageRegistry .repository (include "action-agent.imageTag" .) }}
+{{- else }}
+{{- printf "%s:%s" .repository (include "action-agent.imageTag" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate MongoDB connection string
+*/}}
+{{- define "action-agent.mongoConnectionString" -}}
+{{- if .Values.external.mongodb.enabled }}
+{{- .Values.external.mongodb.connectionString }}
+{{- else }}
+{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=admin" .Values.databases.mongodb.auth.username .Values.databases.mongodb.auth.password (include "action-agent.fullname" .) .Values.databases.mongodb.database }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate PostgreSQL connection string
+*/}}
+{{- define "action-agent.postgresConnectionString" -}}
+{{- if .Values.external.postgresql.enabled }}
+{{- .Values.external.postgresql.connectionString }}
+{{- else }}
+{{- printf "postgresql://%s:%s@%s-postgresql:5432/%s" .Values.databases.postgresql.auth.username .Values.databases.postgresql.auth.password (include "action-agent.fullname" .) .Values.databases.postgresql.database }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate Redis connection string
+*/}}
+{{- define "action-agent.redisConnectionString" -}}
+{{- if .Values.external.redis.enabled }}
+{{- .Values.external.redis.connectionString }}
+{{- else }}
+{{- printf "redis://:%s@%s-redis:6379" .Values.databases.redis.auth.password (include "action-agent.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if we should create internal databases
+*/}}
+{{- define "action-agent.createInternalDatabases" -}}
+{{- and (not .Values.external.mongodb.enabled) (not .Values.external.postgresql.enabled) }}
+{{- end }}
+
+{{/*
+Check if we should create internal infrastructure
+*/}}
+{{- define "action-agent.createInternalInfrastructure" -}}
+{{- and (not .Values.external.elasticsearch.enabled) (not .Values.external.rabbitmq.enabled) }}
+{{- end }}

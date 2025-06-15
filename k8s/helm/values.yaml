@@ -1,6 +1,10 @@
 global:
   namespace: default
 
+# Chart naming configuration
+nameOverride: ""
+fullnameOverride: ""
+
 image:
   pullPolicy: IfNotPresent
 
