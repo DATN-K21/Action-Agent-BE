@@ -51,6 +51,11 @@ SUPPORTED_MODELS = [
         "categories": [ModelCategory.LLM, ModelCategory.CHAT],
         "capabilities": [],
     },
+    {
+        "name": "gpt-4.1-mini",
+        "categories": [ModelCategory.LLM, ModelCategory.CHAT],
+        "capabilities": [],
+    },
 ]
 
 

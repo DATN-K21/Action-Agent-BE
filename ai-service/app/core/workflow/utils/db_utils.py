@@ -91,8 +91,8 @@ def get_model_info(model_name: str) -> dict[str, str]:
 
     # TODO: Fixed value
     return {
-        "ai_model_name": env_settings.LLM_DEFAULT_MODEL,
-        "provider_name": env_settings.LLM_DEFAULT_PROVIDER,
+        "model_name": env_settings.LLM_DEFAULT_MODEL,
+        "provider": env_settings.LLM_DEFAULT_PROVIDER,
         "base_url": env_settings.LLM_DEFAULT_BASE_URL,
         "api_key": env_settings.LLM_DEFAULT_API_KEY,
     }

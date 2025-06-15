@@ -8,18 +8,18 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
 class AssistantBase(BaseModel):
-    name: str = Field(..., min_length=3, max_length=50)
-    description: Optional[str] = Field(None, min_length=3, max_length=500)
-    system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
+    name: str = Field(..., min_length=3, max_length=100)
+    description: Optional[str] = Field(None, min_length=3, max_length=5000)
+    system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
 
 
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
-    provider: str = Field(..., min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
+    provider: Optional[str] = Field(None, min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
     model_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Name of the model to use with the assistant")
-    temperature: Optional[float] = Field(None, ge=0.0, le=1.0, description="Controls randomness of the output. Higher values mean more randomness")
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Controls randomness of the output. Higher values mean more randomness")
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -29,7 +29,11 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
     )
     support_units: Optional[list[WorkflowType]] = Field(
-        None, description="List of units (teams) to be used by the assistant. If not provided, the assistant will not use any units."
+        None,
+        description="List of units (teams) to be used by the assistant. If not provided, the assistant will not use any units.",
+        examples=[
+            '["searchbot","ragbot"]',  # Main unit for the assistant
+        ],
     )
     mcp_ids: Optional[list[str]] = Field(
         None, description="List of MCP IDs to be used by the assistant. If not provided, the assistant will not use any MCPs."
@@ -40,9 +44,9 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
 
 
 class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
-    name: Optional[str] = Field(None, min_length=3, max_length=50)
-    description: Optional[str] = Field(None, min_length=3, max_length=500)
-    system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
+    name: Optional[str] = Field(None, min_length=3, max_length=100)
+    description: Optional[str] = Field(None, min_length=3, max_length=5000)
+    system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
     provider: Optional[str] = Field(None, min_length=3, max_length=50)
     model_name: Optional[str] = Field(None, min_length=1, max_length=50)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
@@ -63,7 +67,7 @@ class UpdateAssistantConfigRequest(BaseRequest):
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
     provider: Optional[str] = Field(None, min_length=3, max_length=50)
     model_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    temperature: Optional[float] = Field(None, ge=0.0, le=1.0)
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -78,7 +82,7 @@ class UpdateAssistantConfigRequest(BaseRequest):
 ########### RESPONSE SCHEMAS #####################
 ##################################################
 
-class CreateAdvancedAssistantResponse(AssistantBase, BaseResponse):
+class CreateAdvancedAssistantResponse(BaseResponse):
     id: str
     user_id: str
     name: str

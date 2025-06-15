@@ -1308,30 +1308,22 @@ async def _aupdate_member_configurations(
     updated_provider = request.provider or assistant.provider
     updated_model_name = request.model_name or assistant.model_name
     updated_temperature = request.temperature if request.temperature is not None else assistant.temperature
-    updated_ask_human = request.ask_human if request.ask_human is not None else assistant.ask_human
     updated_interrupt = request.interrupt if request.interrupt is not None else assistant.interrupt
 
     # Update configuration for all worker members
     for member in main_team.members:
-        if member.type == "worker":
-            # Update member configuration fields
-            if updated_provider:
-                member.provider = updated_provider
-            if updated_model_name:
-                member.model_name = updated_model_name
-            if updated_temperature is not None:
-                member.temperature = updated_temperature
-            if updated_ask_human is not None:
-                member.ask_human = updated_ask_human
-            if updated_interrupt is not None:
-                member.interrupt = updated_interrupt
+        # Update member configuration fields
+        if updated_provider:
+            member.provider = updated_provider
+        if updated_model_name:
+            member.model = updated_model_name
+        if updated_temperature is not None:
+            member.temperature = updated_temperature
+        if updated_interrupt is not None:
+            member.interrupt = updated_interrupt
 
-            # Update member's system prompt if it was updated
-            if request.system_prompt is not None:
-                member.system_prompt = request.system_prompt
-
-            # Mark member as modified
-            member.updated_at = datetime.now()
+        # Mark member as modified
+        member.updated_at = datetime.now()
 
     # Commit the changes to the session
     await session.flush()
@@ -1880,6 +1872,7 @@ async def aupdate_assistant_config(
 
         # Update the assistant configuration fields
         _update_assistant_config_info(assistant, request)
+        await session.flush()  # Ensure changes are applied before proceeding
 
         # Get main team for advanced assistants and update member configurations
         if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
@@ -1890,6 +1883,11 @@ async def aupdate_assistant_config(
 
             # Update configuration of existing members without deleting them
             await _aupdate_member_configurations(session, main_team, assistant, request)
+
+            # Update configuration for support teams as well
+            for team in assistant.teams:
+                if team.workflow_type != WorkflowType.HIERARCHICAL:
+                    await _aupdate_member_configurations(session, team, assistant, request)
 
         # Commit the transaction
         await session.commit()

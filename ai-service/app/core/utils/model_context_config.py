@@ -16,6 +16,7 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # OpenAI Models
     "gpt-4o": 128000,
     "gpt-4o-mini": 128000,
+    "gpt-4.1-mini": 1000000,  # Example of a high-capacity model
     "gpt-4o-nano": 16384,  # Conservative limit for nano model
     "gpt-4": 8192,
     "gpt-4-turbo": 128000,
