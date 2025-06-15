@@ -1,6 +1,10 @@
 global:
   namespace: default
 
+# Azure Container Registry credentials (disabled by default)
+acrCredentials:
+  enabled: false
+
 # Chart naming configuration
 nameOverride: ""
 fullnameOverride: ""
@@ -10,7 +14,9 @@ image:
 
 secretProvider: local
 
+# Secret management configurations
 secrets:
+  enabled: false
   createSecrets: true
   apiGateway: "api-gateway-secrets"
   userService: "user-service-secrets"
@@ -19,199 +25,320 @@ secrets:
   database: "database-secrets"
   infrastructure: "infrastructure-secrets"
 
-# API Gateway settings
-apiGateway:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: api-gateway
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 15000
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# User Service settings
-userService:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: user-service
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 15100
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# AI Service settings
-aiService:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: ai-service
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 15200
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 750m
-      memory: 1Gi
-
-# Extension Service settings
-extensionService:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: extension-service
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 15300
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# PostgreSQL Database (pgvector)
-pgDatabase:
-  enabled: true
-  image:
-    repository: pgvector/pgvector
-    tag: pg16
-  service:
-    type: ClusterIP
-    port: 5432
-  persistence:
+# Service configurations
+services:
+  apiGateway:
     enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+    replicaCount: 1
+    image:
+      repository: api-gateway
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 15000
+    ssl:
+      enabled: false
+      secretName: ""
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    securityContext: {}
+    podSecurityContext: {}
 
-# MongoDB Database
-mongoDatabase:
-  enabled: true
-  image:
-    repository: mongo
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 27017
-  persistence:
+  userService:
     enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+    replicaCount: 1
+    image:
+      repository: user-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 15100
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    securityContext: {}
+    podSecurityContext: {}
 
-# Redis
-redis:
-  enabled: true
-  image:
-    repository: redis
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 6379
-  persistence:
+  aiService:
     enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+    replicaCount: 1
+    image:
+      repository: ai-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 15200
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 750m
+        memory: 1Gi
+    securityContext: {}
+    podSecurityContext: {}
 
-# Elasticsearch & Kibana
-elasticsearch:
+  extensionService:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: extension-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 15300
+    healthCheck:
+      path: "/ping"
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 60
+        timeoutSeconds: 5
+        failureThreshold: 3
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    securityContext: {}
+    podSecurityContext: {}
+
+# Database configurations
+databases:
+  postgresql:
+    enabled: true
+    image:
+      repository: pgvector/pgvector
+      tag: pg16
+    service:
+      type: ClusterIP
+      port: 5432
+    persistence:
+      enabled: true
+      size: 1Gi
+    auth:
+      username: postgres
+      password: password
+    database: actionagent
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  mongodb:
+    enabled: true
+    image:
+      repository: mongo
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 27017
+    persistence:
+      enabled: true
+      size: 1Gi
+    auth:
+      username: admin
+      password: password
+    database: actionagent
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  redis:
+    enabled: true
+    image:
+      repository: redis
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 6379
+    persistence:
+      enabled: true
+      size: 1Gi
+    auth:
+      password: ""  # Empty password means no authentication
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Infrastructure configurations
+infrastructure:
+  elasticsearch:
+    enabled: false
+    image:
+      repository: docker.elastic.co/elasticsearch/elasticsearch
+      tag: 8.16.1
+    service:
+      type: ClusterIP
+      port: 9200
+    env:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms256m -Xmx256m
+      xpack.security.enabled: "false"
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  kibana:
+    enabled: false
+    image:
+      repository: docker.elastic.co/kibana/kibana
+      tag: 8.16.1
+    service:
+      type: ClusterIP
+      port: 5601
+    env:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: kibana
+      XPACK_SECURITY_ENABLED: "false"
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  rabbitmq:
+    enabled: false
+    image:
+      repository: rabbitmq
+      tag: 3-management
+    service:
+      type: ClusterIP
+      port: 5672
+    managementPort: 15672
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Service Account configuration
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+  labels: {}
+
+# External services (disabled by default)
+external:
+  elasticsearch:
+    enabled: false
+  kibana:
+    enabled: false
+  rabbitmq:
+    enabled: false
+  mongodb:
+    enabled: false
+  postgresql:
+    enabled: false
+  redis:
+    enabled: false
+
+# Ingress configuration
+ingress:
   enabled: false
-  image:
-    repository: docker.elastic.co/elasticsearch/elasticsearch
-    tag: 8.16.1
-  service:
-    type: ClusterIP
-    port: 9200
-  env:
-    discovery.type: single-node
-    ES_JAVA_OPTS: -Xms256m -Xmx256m
-    xpack.security.enabled: "false"
-  persistence:
-    enabled: true
-    size: 2Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
 
-kibana:
+# Autoscaling configuration
+autoscaling:
   enabled: false
-  image:
-    repository: docker.elastic.co/kibana/kibana
-    tag: 8.16.1
-  service:
-    type: ClusterIP
-    port: 5601
-  env:
-    ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    SERVER_NAME: kibana
-    XPACK_SECURITY_ENABLED: "false"
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
 
-# RabbitMQ
-rabbitmq:
+# Pod Disruption Budget
+podDisruptionBudget:
   enabled: false
-  image:
-    repository: rabbitmq
-    tag: 3-management
-  service:
-    type: ClusterIP
-    port: 5672
-  managementPort: 15672
-  persistence:
-    enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+
+# Resource Quota
+resourceQuota:
+  enabled: false
+
+# Security Context (global)
+securityContext: {}
+podSecurityContext: {}

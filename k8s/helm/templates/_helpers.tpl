@@ -118,7 +118,11 @@ Generate Redis connection string
 {{- if .Values.external.redis.enabled }}
 {{- .Values.external.redis.connectionString }}
 {{- else }}
+{{- if .Values.databases.redis.auth.password }}
 {{- printf "redis://:%s@%s-redis:6379" .Values.databases.redis.auth.password (include "action-agent.fullname" .) }}
+{{- else }}
+{{- printf "redis://%s-redis:6379" (include "action-agent.fullname" .) }}
+{{- end }}
 {{- end }}
 {{- end }}
 
