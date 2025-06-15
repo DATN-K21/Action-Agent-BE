@@ -28,7 +28,7 @@ services:
     environment:
       NODE_ENV: dev
       PORT: 15100
-      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
+      MONGODB_CONNECTION_STRING: "mongodb://root:root@mongo-database:27017/user-service?authSource=admin"
       EMAIL_USERNAME: <EMAIL_USERNAME>
       EMAIL_PASSWORD: <EMAIL_PASSWORD>
       GOOGLE_APP_CLIENT_ID: <YOUR_GOOGLE_CLIENT_ID>
@@ -83,7 +83,7 @@ services:
       PORT: 15300
       COMPOSIO_API_BASE_URL: https://backend.composio.dev/api
       COMPOSIO_API_KEY: d04n821zcnqtop53g98fx
-      DATABASE_URL: mongodb://root:root@extension-database:27017/datn-extension-database?authSource=admin
+      DATABASE_URL: mongodb://root:root@mongo-database:27017/datn-extension-database?authSource=admin
     ports:
       - "15300:15300"
     restart: always
@@ -106,28 +106,16 @@ services:
       - ai-database:/var/lib/postgresql/data
     restart: always
 
-  user-database:
+  mongo-database:
     image: mongo:latest
-    container_name: user-database
+    container_name: mongo-database
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
     ports:
       - "27017:27017"
     volumes:
-      - user-database:/data/db
-    restart: always
-
-  extension-database:
-    image: mongo:latest
-    container_name: extension-database
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root
-    ports:
-      - "27018:27017"
-    volumes:
-      - extension-database:/data/db
+      - mongo-database:/data/db
     restart: always
 
   ####################################################
@@ -193,7 +181,6 @@ services:
 volumes:
   es-data:
   ai-database:
-  user-database:
-  extension-database:
+  mongo-database:
   rabbitmq:
   redis:
