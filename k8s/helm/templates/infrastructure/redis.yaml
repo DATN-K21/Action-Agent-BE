@@ -1,111 +1,75 @@
 {{- if .Values.redis.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-redis-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  REDIS_HOST: {{ include "action-agent.fullname" . }}-redis
-  REDIS_PORT: {{ .Values.redis.service.port | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "action-agent.fullname" . }}-redis
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: redis
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: redis
-  template:
-    metadata:
-      labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: redis
-    spec:
-      containers:
-        - name: redis
-          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
-          ports:
-            - name: redis
-              containerPort: {{ .Values.redis.service.port }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-redis-config
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.fullname" . }}-infrastructure-secret
-            {{- end }}
-          {{- if .Values.redis.persistence.enabled }}
-          volumeMounts:
-            - name: redis-data
-              mountPath: /data
-          {{- end }}
-          resources:
-            limits:   { cpu: 500m, memory: 512Mi }
-            requests: { cpu: 100m, memory: 128Mi }
-      volumes:
-        - name: redis-data
-          {{- if .Values.redis.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-redis-pvc
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
-
-# PVC only when persistence on
 {{- if .Values.redis.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "action-agent.fullname" . }}-redis-pvc
+  name: {{ include "aa.fullname" . }}-redis-pvc
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{- include "aa.labels" . | nindent 4 }}
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes: ["ReadWriteOnce"]
   resources:
     requests:
       storage: {{ .Values.redis.persistence.size }}
 {{- end }}
-
-#---------------------------------------
-# Service
-#---------------------------------------
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aa.fullname" . }}-redis
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aa.labels" . | nindent 6 }}
+      component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "aa.labels" . | nindent 8 }}
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ include "aa.image" (dict "root" . "image" .Values.redis.image) }}
+          ports:
+            - containerPort: {{ .Values.redis.service.port }}
+              name: redis
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          {{- if .Values.redis.persistence.enabled }}
+          volumeMounts:
+            - mountPath: /data
+              name: data
+          {{- end }}
+      {{- if .Values.redis.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "aa.fullname" . }}-redis-pvc
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "action-agent.fullname" . }}-redis
+  name: {{ include "aa.fullname" . }}-redis
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{- include "aa.labels" . | nindent 4 }}
+    component: redis
 spec:
-  type: ClusterIP        # always internal
+  type: ClusterIP
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: redis
+    {{- include "aa.labels" . | nindent 4 }}
+    component: redis
   ports:
-    - name: redis
-      protocol: TCP
-      port: {{ .Values.redis.service.port }}
+    - port: {{ .Values.redis.service.port }}
       targetPort: {{ .Values.redis.service.port }}
-
+      name: redis
 {{- end }}

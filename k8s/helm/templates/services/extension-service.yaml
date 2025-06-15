@@ -1,76 +1,52 @@
 {{- if .Values.extensionService.enabled }}
-
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "action-agent.fullname" . }}-extension-service
+  name: {{ include "aa.fullname" . }}-extension-service
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: extension-service
+    {{- include "aa.labels" . | nindent 4 }}
+    component: extension-service
 spec:
   replicas: {{ .Values.extensionService.replicaCount }}
   selector:
     matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: extension-service
+      {{- include "aa.labels" . | nindent 6 }}
+      component: extension-service
   template:
     metadata:
       labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: extension-service
+        {{- include "aa.labels" . | nindent 8 }}
+        component: extension-service
     spec:
       containers:
         - name: extension-service
-          image: {{ .Values.extensionService.image.repository }}:{{ .Values.extensionService.image.tag | default "latest" }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          image: {{ include "aa.image" (dict "root" . "image" .Values.extensionService.image) }}
           ports:
-            - name: http
-              containerPort: {{ .Values.extensionService.service.port }}
-          env:
-            - name: PORT
-              value: {{ .Values.extensionService.service.port | quote }}
+            - containerPort: {{ .Values.extensionService.service.port }}
+              name: http
           envFrom:
-            {{- if .Values.secrets.createSecrets }}
             - secretRef:
-                name: {{ include "action-agent.fullname" . }}-extension-service-secret
-            {{- else }}
-            - name: DATABASE_URL
-              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/datn-extension-database?authSource=admin"
-            {{- end }}
+                name: {{ .Values.secrets.extensionService }}
           resources:
             {{- toYaml .Values.extensionService.resources | nindent 12 }}
-          livenessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.extensionService.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.extensionService.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "action-agent.fullname" . }}-extension-service
+  name: {{ include "aa.fullname" . }}-extension-service
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{- include "aa.labels" . | nindent 4 }}
+    component: extension-service
 spec:
-  type: {{ .Values.extensionService.service.type | default "ClusterIP" }}
+  type: {{ .Values.extensionService.service.type }}
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: extension-service
+    {{- include "aa.labels" . | nindent 4 }}
+    component: extension-service
   ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.extensionService.service.port }}
+    - port: {{ .Values.extensionService.service.port }}
       targetPort: {{ .Values.extensionService.service.port }}
-
-{{- end }}   {{/* END extensionService.enabled */}}
+      name: http
+{{- end }}
