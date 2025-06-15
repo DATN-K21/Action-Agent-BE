@@ -84,18 +84,6 @@ spec:
             failureThreshold: {{ .Values.services.apiGateway.healthCheck.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.services.apiGateway.resources | nindent 12 }}
-          {{- if .Values.services.apiGateway.ssl.enabled }}
-          volumeMounts:
-            - name: ssl-certs
-              mountPath: /usr/src/app/certs
-              readOnly: true
-          {{- end }}
-      {{- if .Values.services.apiGateway.ssl.enabled }}
-      volumes:
-        - name: ssl-certs
-          secret:
-            secretName: {{ .Values.services.apiGateway.ssl.secretName }}
-      {{- end }}
       {{- with .Values.services.apiGateway.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
