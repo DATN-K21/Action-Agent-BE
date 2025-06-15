@@ -1,0 +1,65 @@
+{{- if .Values.aiService.database.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "action-agent.fullname" . }}-postgres-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{ include "action-agent.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.aiService.database.persistence.size }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{ include "action-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.aiService.database.image.repository }}:{{ .Values.aiService.database.image.tag }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "{{ .Values.aiService.database.name }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.aiService.database.username }}"
+            - name: POSTGRES_PASSWORD
+              value: "{{ .Values.aiService.database.password }}"
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pg-data
+          persistentVolumeClaim:
+            claimName: {{ include "action-agent.fullname" . }}-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{ include "action-agent.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres

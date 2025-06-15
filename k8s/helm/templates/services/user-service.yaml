@@ -1,64 +1,29 @@
-{{- /*
-───────────────────────────────────────────────────────────────
-  USER-SERVICE (main application)
-───────────────────────────────────────────────────────────────
-───────────────────────────────────────────────────────────────
-  USER-SERVICE  (main application)
-───────────────────────────────────────────────────────────────
-*/ -}}
 {{- if .Values.userService.enabled }}
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "action-agent.fullname" . }}-user-service
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: user-service
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.userService.replicaCount }}
   selector:
     matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
       app: user-service
   template:
     metadata:
       labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
         app: user-service
     spec:
       containers:
         - name: user-service
-          image: {{ include "action-agent.image" (dict "root" . "image" .Values.userService.image) }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          image: {{ include "action-agent.image" (dict "root" . "repository" .Values.userService.image.repository "tag" .Values.userService.image.tag) }}
           ports:
-            - name: http
-              containerPort: {{ .Values.userService.service.port }}
-          env:
-            - name: PORT
-              value: {{ .Values.userService.service.port | quote }}
+            - containerPort: {{ .Values.userService.service.port }}
           envFrom:
-            {{- if .Values.secrets.createSecrets }}
             - secretRef:
-                name: {{ include "action-agent.fullname" . }}-user-service-secret
-            {{- end }}
-          resources:
-            {{- toYaml .Values.userService.resources | nindent 12 }}
-          livenessProbe:
-            httpGet:
-              path: /ping
-              port: {{ .Values.userService.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /ping
-              port: {{ .Values.userService.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
-
+                name: {{ include "action-agent.secretName" (dict "root" . "name" .Values.secrets.userService) }}
 ---
 apiVersion: v1
 kind: Service
@@ -66,16 +31,12 @@ metadata:
   name: {{ include "action-agent.fullname" . }}-user-service
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.userService.service.type | default "ClusterIP" }}
+  type: {{ .Values.userService.service.type }}
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: user-service
   ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.userService.service.port }}
+    - port: {{ .Values.userService.service.port }}
       targetPort: {{ .Values.userService.service.port }}
-
-{{- end }}   {{/* END userService.enabled */}}
+{{- end }}
