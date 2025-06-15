@@ -1,69 +1,26 @@
 {{- if .Values.kibana.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-kibana-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  {{- if .Values.elasticsearch.enabled }}
-  ELASTICSEARCH_HOSTS: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.elasticsearch.service.port }}"
-  {{- else }}
-  ELASTICSEARCH_HOSTS: {{ .Values.kibana.config.elasticsearchHosts | quote }}
-  {{- end }}
-  SERVER_NAME: {{ .Values.kibana.config.serverName | quote }}
-  XPACK_SECURITY_ENABLED: {{ .Values.kibana.config.xpackSecurityEnabled | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "action-agent.fullname" . }}-kibana
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: kibana
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
       app: kibana
   template:
     metadata:
       labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
         app: kibana
     spec:
       containers:
         - name: kibana
-          image: "{{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}
           ports:
-            - name: http
-              containerPort: {{ .Values.kibana.service.port }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-kibana-config
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 200m
-              memory: 512Mi
-
-#---------------------------------------
-# Service
-#---------------------------------------
+            - containerPort: {{ .Values.kibana.service.port }}
 ---
 apiVersion: v1
 kind: Service
@@ -71,16 +28,11 @@ metadata:
   name: {{ include "action-agent.fullname" . }}-kibana
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: kibana
   ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.kibana.service.port }}
+    - port: {{ .Values.kibana.service.port }}
       targetPort: {{ .Values.kibana.service.port }}
-
 {{- end }}

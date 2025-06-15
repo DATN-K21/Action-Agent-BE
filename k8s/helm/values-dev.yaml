@@ -1,29 +1,12 @@
 secretProvider: local
 
-secrets:
-  apiGateway: api-gateway-creds
-  userService: user-service-creds
-  aiService: ai-service-creds
-  extensionService: extension-service-creds
+# Images built locally
+global:
+  imageRegistry: ""
 
-# now inject the actual creds into a “localSecrets” map
-localSecrets:
-  api-gateway-creds:
-    HTTPS_PORT: "15000"
-    SSL_KEY_PATH: |-
-      -----BEGIN PRIVATE KEY-----
-      …your dev key…
-      -----END PRIVATE KEY-----
-    SSL_CERT_PATH: |-
-      -----BEGIN CERTIFICATE-----
-      …your dev cert…
-      -----END CERTIFICATE-----
-    USER_SERVICE_URL: http://user-service:15100
-    # …and so on for every env var
-
-  user-service-creds:
-    MONGODB_CONNECTION_STRING: mongodb://root:root@mongo-database:27017/user-service?authSource=admin
-    JWT_SECRET: super-dev-jwt
-    # …
-
-  # ai-service-creds, extension-service-creds, etc…
+elasticsearch:
+  enabled: true
+kibana:
+  enabled: true
+rabbitmq:
+  enabled: true

@@ -1,21 +1,17 @@
 global:
   namespace: default
-
-image:
-  pullPolicy: IfNotPresent
+  imageRegistry: ""
 
 secretProvider: local
 
 secrets:
-  createSecrets: true
-  apiGateway: "api-gateway-secrets"
-  userService: "user-service-secrets"
-  aiService:   "ai-service-secrets"
-  extensionService: "extension-service-secrets"
-  database: "database-secrets"
-  infrastructure: "infrastructure-secrets"
+  apiGateway: api-gateway
+  userService: user-service
+  aiService: ai-service
+  extensionService: extension-service
+  databases: databases
+  infrastructure: infrastructure
 
-# API Gateway settings
 apiGateway:
   enabled: true
   replicaCount: 1
@@ -23,17 +19,9 @@ apiGateway:
     repository: api-gateway
     tag: latest
   service:
-    type: ClusterIP
     port: 15000
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+    type: ClusterIP
 
-# User Service settings
 userService:
   enabled: true
   replicaCount: 1
@@ -41,17 +29,19 @@ userService:
     repository: user-service
     tag: latest
   service:
-    type: ClusterIP
     port: 15100
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+    type: ClusterIP
+  database:
+    name: user-service
+    username: root
+    password: root
+    image:
+      repository: mongo
+      tag: latest
+    persistence:
+      enabled: true
+      size: 1Gi
 
-# AI Service settings
 aiService:
   enabled: true
   replicaCount: 1
@@ -59,17 +49,19 @@ aiService:
     repository: ai-service
     tag: latest
   service:
-    type: ClusterIP
     port: 15200
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 750m
-      memory: 1Gi
+    type: ClusterIP
+  database:
+    name: ai-database
+    username: postgres
+    password: "123456"
+    image:
+      repository: pgvector/pgvector
+      tag: pg16
+    persistence:
+      enabled: true
+      size: 1Gi
 
-# Extension Service settings
 extensionService:
   enabled: true
   replicaCount: 1
@@ -77,99 +69,30 @@ extensionService:
     repository: extension-service
     tag: latest
   service:
-    type: ClusterIP
     port: 15300
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# PostgreSQL Database (pgvector)
-pgDatabase:
-  enabled: true
-  image:
-    repository: pgvector/pgvector
-    tag: pg16
-  service:
     type: ClusterIP
-    port: 5432
-  persistence:
-    enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
-# MongoDB Database
-mongoDatabase:
-  enabled: true
-  image:
-    repository: mongo
-    tag: latest
-  service:
-    type: ClusterIP
-    port: 27017
-  persistence:
-    enabled: true
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# Redis
 redis:
   enabled: true
   image:
     repository: redis
     tag: latest
   service:
-    type: ClusterIP
     port: 6379
   persistence:
     enabled: true
     size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
-# Elasticsearch & Kibana
 elasticsearch:
   enabled: false
   image:
     repository: docker.elastic.co/elasticsearch/elasticsearch
     tag: 8.16.1
   service:
-    type: ClusterIP
     port: 9200
-  env:
-    discovery.type: single-node
-    ES_JAVA_OPTS: -Xms256m -Xmx256m
-    xpack.security.enabled: "false"
   persistence:
     enabled: true
     size: 2Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
 
 kibana:
   enabled: false
@@ -177,37 +100,16 @@ kibana:
     repository: docker.elastic.co/kibana/kibana
     tag: 8.16.1
   service:
-    type: ClusterIP
     port: 5601
-  env:
-    ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-    SERVER_NAME: kibana
-    XPACK_SECURITY_ENABLED: "false"
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
-# RabbitMQ
 rabbitmq:
   enabled: false
   image:
     repository: rabbitmq
     tag: 3-management
   service:
-    type: ClusterIP
     port: 5672
-  managementPort: 15672
+    managementPort: 15672
   persistence:
     enabled: true
     size: 1Gi
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi

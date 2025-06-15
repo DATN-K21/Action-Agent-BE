@@ -1,97 +1,26 @@
 {{- if .Values.elasticsearch.enabled }}
-
-#---------------------------------------
-# ConfigMap – host/port for app pods
-#---------------------------------------
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "action-agent.fullname" . }}-elasticsearch-config
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-data:
-  discovery.type: {{ .Values.elasticsearch.config.discoveryType | quote }}
-  xpack.security.enabled: {{ .Values.elasticsearch.config.xpackSecurityEnabled | quote }}
-  ES_JAVA_OPTS: {{ .Values.elasticsearch.config.javaOpts | quote }}
-
-#---------------------------------------
-# Deployment
-#---------------------------------------
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "action-agent.fullname" . }}-elasticsearch
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: elasticsearch
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
       app: elasticsearch
   template:
     metadata:
       labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
         app: elasticsearch
     spec:
       containers:
         - name: elasticsearch
-          image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}
           ports:
-            - name: http
-              containerPort: {{ .Values.elasticsearch.service.port }}
-            - name: transport
-              containerPort: {{ .Values.elasticsearch.service.nodePort }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "action-agent.fullname" . }}-elasticsearch-config
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "infrastructure") }}
-            {{- end }}
-          {{- if .Values.elasticsearch.persistence.enabled }}
-          volumeMounts:
-            - name: elasticsearch-data
-              mountPath: /usr/share/elasticsearch/data
-          {{- end }}
-          resources:
-            limits:   { cpu: 2000m, memory: 2Gi }
-            requests: { cpu: 500m, memory: 1Gi }
-      volumes:
-        - name: elasticsearch-data
-          {{- if .Values.elasticsearch.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-elasticsearch-pvc
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
-
-# PVC only when persistence on
-{{- if .Values.elasticsearch.persistence.enabled }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "action-agent.fullname" . }}-elasticsearch-pvc
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.elasticsearch.persistence.size }}
-{{- end }}
-
-#---------------------------------------
-# Service
-#---------------------------------------
+            - containerPort: {{ .Values.elasticsearch.service.port }}
 ---
 apiVersion: v1
 kind: Service
@@ -99,20 +28,11 @@ metadata:
   name: {{ include "action-agent.fullname" . }}-elasticsearch
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: elasticsearch
   ports:
-    - name: http
-      protocol: TCP
-      port: {{ .Values.elasticsearch.service.port }}
+    - port: {{ .Values.elasticsearch.service.port }}
       targetPort: {{ .Values.elasticsearch.service.port }}
-    - name: transport
-      protocol: TCP
-      port: {{ .Values.elasticsearch.service.nodePort }}
-      targetPort: {{ .Values.elasticsearch.service.nodePort }}
-
 {{- end }}

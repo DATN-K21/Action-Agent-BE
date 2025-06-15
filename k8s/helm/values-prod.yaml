@@ -1,0 +1,23 @@
+secretProvider: azure
+global:
+  imageRegistry: aagent.azurecr.io
+
+apiGateway:
+  image:
+    tag: prod
+userService:
+  image:
+    tag: prod
+aiService:
+  image:
+    tag: prod
+extensionService:
+  image:
+    tag: prod
+
+elasticsearch:
+  enabled: false
+kibana:
+  enabled: false
+rabbitmq:
+  enabled: false

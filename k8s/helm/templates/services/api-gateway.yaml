@@ -1,66 +1,29 @@
 {{- if .Values.apiGateway.enabled }}
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "action-agent.fullname" . }}-api-gateway
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: api-gateway
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.apiGateway.replicaCount }}
   selector:
     matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
       app: api-gateway
   template:
     metadata:
       labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
         app: api-gateway
     spec:
       containers:
         - name: api-gateway
-          image: {{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag | default "latest" }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          image: {{ include "action-agent.image" (dict "root" . "repository" .Values.apiGateway.image.repository "tag" .Values.apiGateway.image.tag) }}
           ports:
-            - name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
-              containerPort: {{ .Values.apiGateway.service.port }}
-          env:
-            - name: PORT
-              value: {{ .Values.apiGateway.service.port | quote }}
+            - containerPort: {{ .Values.apiGateway.service.port }}
           envFrom:
-            {{- if .Values.secrets.createSecrets }}
             - secretRef:
-                name: {{ include "action-agent.fullname" . }}-api-gateway-secret
-            {{- else }}
-            {{- if .Values.apiGateway.ssl.enabled }}
-            - name: SSL_KEY_PATH
-              value: {{ .Values.apiGateway.ssl.keyPath | quote }}
-            - name: SSL_CERT_PATH
-              value: {{ .Values.apiGateway.ssl.certPath | quote }}
-            {{- end }}
-            {{- end }}
-          resources:
-            {{- toYaml .Values.apiGateway.resources | nindent 12 }}
-          # ---------- probes ----------
-          livenessProbe:
-            httpGet:
-              path: /ping
-              port: {{ .Values.apiGateway.service.port }}
-              scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
-            initialDelaySeconds: 60
-            periodSeconds: 60
-          readinessProbe:
-            httpGet:
-              path: /ping
-              port: {{ .Values.apiGateway.service.port }}
-              scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
-            initialDelaySeconds: 60
-            periodSeconds: 60
-
+                name: {{ include "action-agent.secretName" (dict "root" . "name" .Values.secrets.apiGateway) }}
 ---
 apiVersion: v1
 kind: Service
@@ -68,16 +31,12 @@ metadata:
   name: {{ include "action-agent.fullname" . }}-api-gateway
   namespace: {{ .Values.global.namespace }}
   labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
+    {{ include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.apiGateway.service.type | default "ClusterIP" }}
+  type: {{ .Values.apiGateway.service.type }}
   selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: api-gateway
   ports:
-    - name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
-      protocol: TCP
-      port: {{ .Values.apiGateway.service.port }}
+    - port: {{ .Values.apiGateway.service.port }}
       targetPort: {{ .Values.apiGateway.service.port }}
-
-{{- end }}  {{/* END apiGateway.enabled */}}
+{{- end }}

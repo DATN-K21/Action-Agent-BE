@@ -1,0 +1,10 @@
+secretProvider: azure
+global:
+  imageRegistry: aagent.azurecr.io
+
+elasticsearch:
+  enabled: false
+kibana:
+  enabled: false
+rabbitmq:
+  enabled: false
