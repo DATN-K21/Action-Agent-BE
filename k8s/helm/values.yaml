@@ -1,228 +1,111 @@
-# Default values for action-agent-backend
-# This is a YAML-formatted file.
-
+# =====================================================================
+#  Global defaults (do not change per-environment here)
+# =====================================================================
 global:
-  environment: dev
-  namespace: default
-  
-# Global image settings
+  imageRegistry: ""          # overridden per env
+  environment: ""            # dev | stg | prod
+  namespace: ""              # release namespace
+
 image:
   pullPolicy: IfNotPresent
-  # pullSecrets: []
+  pullSecrets: []            # registry secret names per env
 
-# Service Account
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
-# Infrastructure Services
+# ---------------------------------------------------------------------
+# Infrastructure – OFF by default (each env enables what it needs)
+# ---------------------------------------------------------------------
 redis:
-  enabled: true
-  image:
-    repository: redis
-    tag: "latest"
-  auth:
-    username: "root"
-    password: "root"
-  service:
-    port: 6379
-  persistence:
-    enabled: false
-    size: 1Gi
+  enabled: false
 
 rabbitmq:
-  enabled: true
-  image:
-    repository: rabbitmq
-    tag: "3-management"
-  auth:
-    username: "root"
-    password: "root"
-  service:
-    port: 5672
-    managementPort: 15672
-    metricsPort: 15692
-  persistence:
-    enabled: false
-    size: 1Gi
+  enabled: false
 
 elasticsearch:
-  enabled: true
-  image:
-    repository: docker.elastic.co/elasticsearch/elasticsearch
-    tag: "8.16.1"
-  auth:
-    username: "elastic"
-    password: "elastic"
-  service:
-    port: 9200
-    nodePort: 9300
-  persistence:
-    enabled: false
-    size: 1Gi
-  config:
-    discoveryType: "single-node"
-    xpackSecurityEnabled: "false"
-    javaOpts: "-Xms512m -Xmx512m"
+  enabled: false
 
 kibana:
-  enabled: true
-  image:
-    repository: docker.elastic.co/kibana/kibana
-    tag: "8.16.1"
-  service:
-    port: 5601
-  config:
-    elasticsearchHosts: "http://elasticsearch:9200"
-    serverName: "kibana"
-    xpackSecurityEnabled: "false"
+  enabled: false
 
-# Application Services
+# ---------------------------------------------------------------------
+# Micro-services (image.tag & resources overridden per env)
+# ---------------------------------------------------------------------
 apiGateway:
   enabled: true
   replicaCount: 1
   image:
-    repository: action-agent/api-gateway
-    tag: "latest"
+    repository: api-gateway
+    tag: ""
   service:
     type: ClusterIP
     port: 15000
   ssl:
     enabled: true
-    keyPath: "/app/certs/key.pem"
-    certPath: "/app/certs/cert.pem"
+    keyPath: /app/certs/key.pem
+    certPath: /app/certs/cert.pem
   resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 250m
-      memory: 256Mi
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
 
 userService:
   enabled: true
   replicaCount: 1
   image:
-    repository: action-agent/user-service
-    tag: "latest"
+    repository: user-service
+    tag: ""
   service:
     type: ClusterIP
     port: 15100
   database:
-    enabled: true
-    image:
-      repository: mongo
-      tag: "latest"
-    name: "user-service"
-    username: "root"
-    password: "root"
-    persistence:
-      enabled: false
-      size: 1Gi
+    enabled: false
   resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 250m
-      memory: 256Mi
+    requests: { cpu: 50m,  memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
 
 aiService:
   enabled: true
   replicaCount: 1
   image:
-    repository: action-agent/ai-service
-    tag: "latest"
+    repository: ai-service
+    tag: ""
   service:
     type: ClusterIP
     port: 15200
   database:
-    enabled: true
-    image:
-      repository: postgres
-      tag: "16"
-    name: "ai-service"
-    username: "postgres"
-    password: "postgres"
-    persistence:
-      enabled: false
-      size: 1Gi
+    enabled: false
   resources:
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-    requests:
-      cpu: 500m
-      memory: 512Mi
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
 
 extensionService:
   enabled: true
   replicaCount: 1
   image:
-    repository: action-agent/extension-service
-    tag: "latest"
+    repository: extension-service
+    tag: ""
   service:
     type: ClusterIP
     port: 15300
   database:
-    url: "mongodb://root:root@user-database:27017/composio?authSource=admin"
+    enabled: false
   resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 250m
-      memory: 256Mi
+    requests: { cpu: 50m,  memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
 
-# Application Configuration
-config:
-  jwt:
-    secret: "c667d2a6dfcc7fbf5efe64de40fdf3e37dc8a00c1311cf9c449922cb92e4858e0d7c0fa010c883c4ff3edeb89ccfd72c3fc7b9cdd287c7da2e163bde933b1cca"
-  
-  composio:
-    apiKey: "your-composio-api-key"
-    apiBaseUrl: "https://backend.composio.dev/api"
-  
-  email:
-    username: "your-email@example.com"
-    password: "your-email-password"
-  
-  microserviceTimeout: 300000
-
-# Secret Management
+# ---------------------------------------------------------------------
+# Secret strategy – overriden per env
+# ---------------------------------------------------------------------
 secrets:
-  # Set to true to create secrets from values
-  # Set to false to use external secret management
-  createSecrets: true
-  
-  # External secret management (when createSecrets: false)
+  createSecrets: true        # dev uses local env-files
   external:
-    # Options: vault, aws-secrets-manager, azure-keyvault, external-secrets
-    provider: ""
+    provider: ""             # azure-keyvault for stg/prod
     secretStore: ""
 
-# Ingress
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: action-agent.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
-
-# Autoscaling
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
-
-# Node selection
+ingress: { enabled: false }
+autoscaling: { enabled: false }
 nodeSelector: {}
 tolerations: []
 affinity: {}

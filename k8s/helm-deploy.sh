@@ -1,199 +1,125 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Helm-based Action-Agent Kubernetes Deployment Script
-# This script deploys the Action-Agent backend services using Helm
+# ---------------------------------------------------------------------------
+# Helm‑based Action‑Agent Deployment Helper
+# ---------------------------------------------------------------------------
+# ▸ Smart wrapper around `helm upgrade --install`                                      
+# ▸ Works idempotently in CI and from your laptop                                     
+# ▸ Automatically handles namespaces, env‑specific values, and FAILED releases        
+# ---------------------------------------------------------------------------
+# Usage examples
+#   ./helm-deploy.sh -e dev               # fresh dev deploy (namespace = default)
+#   ./helm-deploy.sh -e stg               # deploy to stg namespace action-agent-stg
+#   ./helm-deploy.sh -e stg --dry-run     # render manifests only
+#   ./helm-deploy.sh -e prod --atomic     # prod rollout with automatic rollback
+# ---------------------------------------------------------------------------
 
-set -e
+set -euo pipefail
 
-echo "🚀 Starting Action-Agent Helm Deployment..."
+# ───────────────────────── Colors ─────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; YELLOW='\033[1;33m'; NC='\033[0m'
+info()    { echo -e "${BLUE}[INFO]${NC}    $*"; }
+ok()      { echo -e "${GREEN}[OK]${NC}      $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}    $*"; }
+err()     { echo -e "${RED}[ERROR]${NC}   $*" >&2; }
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Default values
-ENVIRONMENT="dev"
+# ──────────────────────── Defaults ────────────────────────
+ENVIRONMENT=dev
 NAMESPACE="default"
-RELEASE_NAME="action-agent"
+RELEASE="action-agent"
 CHART_PATH="./helm"
+VALUES_FILE=""
 DRY_RUN=false
-UPGRADE=false
+ATOMIC=false
+TIMEOUT="600s"
 
-# Parse command line arguments
+# ─────────────────────── Argument parse ───────────────────
+print_help() {
+  cat <<EOF
+Usage: $(basename "$0") [options]
+Options:
+  -e, --environment ENV   dev|stg|prod   (default: dev)
+  -n, --namespace   NS    override namespace (default derived from env)
+  -r, --release     NAME  helm release name (default: action-agent)
+  -c, --chart       PATH  chart directory (default: ./helm)
+  -t, --timeout     DUR   helm --timeout duration (default: 600s)
+      --dry-run            render only, no apply
+      --atomic             rollback on failed upgrade (prod safe)
+  -h, --help               show this help and exit
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        -e|--environment)
-            ENVIRONMENT="$2"
-            shift 2
-            ;;
-        -n|--namespace)
-            NAMESPACE="$2"
-            shift 2
-            ;;
-        -r|--release)
-            RELEASE_NAME="$2"
-            shift 2
-            ;;
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        --upgrade)
-            UPGRADE=true
-            shift
-            ;;
-        -h|--help)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  -e, --environment    Environment (dev, stg, prod) [default: dev]"
-            echo "  -n, --namespace      Kubernetes namespace [default: default]"
-            echo "  -r, --release        Helm release name [default: action-agent]"
-            echo "  --dry-run           Perform a dry run"
-            echo "  --upgrade           Upgrade existing release"
-            echo "  -h, --help          Show this help message"
-            exit 0
-            ;;
-        *)
-            print_error "Unknown option $1"
-            exit 1
-            ;;
-    esac
+  case $1 in
+    -e|--environment) ENVIRONMENT=$2; shift 2;;
+    -n|--namespace)   NAMESPACE=$2;   shift 2;;
+    -r|--release)     RELEASE=$2;     shift 2;;
+    -c|--chart)       CHART_PATH=$2;  shift 2;;
+    -t|--timeout)     TIMEOUT=$2;     shift 2;;
+    --dry-run)        DRY_RUN=true;   shift;;
+    --atomic)         ATOMIC=true;    shift;;
+    -h|--help)        print_help; exit 0;;
+    *) err "Unknown option $1"; print_help; exit 1;;
+  esac
 done
 
-# Set namespace based on environment if not explicitly provided
+# ───────────────── Namespace & values derivation ──────────
 if [[ "$NAMESPACE" == "default" ]]; then
-    case $ENVIRONMENT in
-        stg)
-            NAMESPACE="action-agent-stg"
-            ;;
-        prod)
-            NAMESPACE="action-agent-prod"
-            ;;
-        *)
-            NAMESPACE="default"
-            ;;
-    esac
+  case $ENVIRONMENT in
+    stg)  NAMESPACE="action-agent-stg";;
+    prod) NAMESPACE="action-agent-prod";;
+  esac
+fi
+RELEASE="${RELEASE}-${ENVIRONMENT}"
+
+DEFAULT_VALUES="${CHART_PATH}/values.yaml"
+ENV_VALUES="${CHART_PATH}/values-${ENVIRONMENT}.yaml"
+if [[ -f "$ENV_VALUES" ]]; then VALUES_FILE=$ENV_VALUES; else VALUES_FILE=$DEFAULT_VALUES; fi
+
+# ───────────────── Prerequisite checks ────────────────────
+command -v helm >/dev/null || { err "Helm not found"; exit 1; }
+command -v kubectl >/dev/null || { err "kubectl not found"; exit 1; }
+
+kubectl cluster-info >/dev/null || { err "Cannot reach Kubernetes cluster"; exit 1; }
+ok "Connected to cluster"
+
+kubectl get ns "$NAMESPACE" >/dev/null 2>&1 || {
+  info "Creating namespace $NAMESPACE"; kubectl create ns "$NAMESPACE"; }
+
+# ─────────────── FAILED release auto‑cleanup ──────────────
+if helm status "$RELEASE" -n "$NAMESPACE" >/dev/null 2>&1; then
+  CURRENT_STATUS=$(helm status "$RELEASE" -n "$NAMESPACE" -o json | jq -r .info.status)
+  if [[ "$CURRENT_STATUS" == "failed" ]]; then
+    warn "Release exists in FAILED state → uninstalling"
+    helm uninstall "$RELEASE" -n "$NAMESPACE" --no-hooks || true
+  fi
 fi
 
-# Update release name with environment
-RELEASE_NAME="${RELEASE_NAME}-${ENVIRONMENT}"
+# ───────────────────── Helm command build ─────────────────
+set +u  # values file may be unset but we still rely on var expansion below
+HELM_ARGS=( upgrade --install "$RELEASE" "$CHART_PATH" \
+  --namespace "$NAMESPACE" \
+  --values "$VALUES_FILE" \
+  --set "global.environment=$ENVIRONMENT" \
+  --set "global.namespace=$NAMESPACE" \
+  --timeout "$TIMEOUT" )
 
-print_status "Deployment Configuration:"
-echo "  Environment: $ENVIRONMENT"
-echo "  Namespace: $NAMESPACE"
-echo "  Release: $RELEASE_NAME"
-echo "  Chart: $CHART_PATH"
-echo ""
+$DRY_RUN   && HELM_ARGS+=( --dry-run --debug )
+$ATOMIC    && HELM_ARGS+=( --atomic )
 
-# Check if helm is available
-if ! command -v helm &> /dev/null; then
-    print_error "Helm is not installed or not in PATH"
-    exit 1
-fi
+info "Helm cmd ➜ helm ${HELM_ARGS[*]}"
+helm "${HELM_ARGS[@]}"
 
-# Check if kubectl is available
-if ! command -v kubectl &> /dev/null; then
-    print_error "kubectl is not installed or not in PATH"
-    exit 1
-fi
+if $DRY_RUN; then ok "Dry‑run complete"; exit 0; fi
 
-# Check if we can connect to cluster
-if ! kubectl cluster-info &> /dev/null; then
-    print_error "Cannot connect to Kubernetes cluster"
-    exit 1
-fi
+# ────────────────────── Summary output ────────────────────
+helm status "$RELEASE" -n "$NAMESPACE"
+echo
+kubectl get pods,svc -n "$NAMESPACE"
 
-print_status "Connected to Kubernetes cluster"
+echo -e "${BLUE}Useful:
+  ✦ Logs:     kubectl logs -f deployment/${RELEASE}-action-agent-backend-api-gateway -n ${NAMESPACE}
+  ✦ Port‑fw:  kubectl port-forward svc/${RELEASE}-action-agent-backend-api-gateway 15000:15000 -n ${NAMESPACE}
+${NC}"
 
-# Create namespace if it doesn't exist
-if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
-    print_status "Creating namespace: $NAMESPACE"
-    kubectl create namespace "$NAMESPACE"
-fi
-
-# Determine values file
-VALUES_FILE="$CHART_PATH/values.yaml"
-if [[ "$ENVIRONMENT" != "dev" ]]; then
-    ENV_VALUES_FILE="$CHART_PATH/values-${ENVIRONMENT}.yaml"
-    if [[ -f "$ENV_VALUES_FILE" ]]; then
-        VALUES_FILE="$ENV_VALUES_FILE"
-        print_status "Using environment-specific values: $ENV_VALUES_FILE"
-    else
-        print_warning "Environment values file not found: $ENV_VALUES_FILE"
-        print_warning "Using default values file: $VALUES_FILE"
-    fi
-fi
-
-# Build helm command
-HELM_CMD="helm"
-if [[ "$UPGRADE" == "true" ]]; then
-    HELM_CMD="$HELM_CMD upgrade --install"
-else
-    HELM_CMD="$HELM_CMD install"
-fi
-
-HELM_CMD="$HELM_CMD $RELEASE_NAME $CHART_PATH"
-HELM_CMD="$HELM_CMD --namespace $NAMESPACE"
-HELM_CMD="$HELM_CMD --values $VALUES_FILE"
-HELM_CMD="$HELM_CMD --set global.environment=$ENVIRONMENT"
-HELM_CMD="$HELM_CMD --set global.namespace=$NAMESPACE"
-
-if [[ "$DRY_RUN" == "true" ]]; then
-    HELM_CMD="$HELM_CMD --dry-run --debug"
-    print_status "Performing dry run..."
-else
-    HELM_CMD="$HELM_CMD --wait --timeout=600s"
-fi
-
-# Execute helm command
-print_status "Executing: $HELM_CMD"
-eval $HELM_CMD
-
-if [[ "$DRY_RUN" == "false" ]]; then
-    print_success "🎉 Action-Agent backend deployment completed successfully!"
-    
-    # Display deployment status
-    echo ""
-    print_status "Deployment Summary:"
-    helm status $RELEASE_NAME -n $NAMESPACE
-    echo ""
-    kubectl get pods -n $NAMESPACE
-    echo ""
-    kubectl get services -n $NAMESPACE
-    echo ""
-    
-    print_status "Useful commands:"
-    echo "  - Check status: helm status $RELEASE_NAME -n $NAMESPACE"
-    echo "  - View pods: kubectl get pods -n $NAMESPACE"
-    echo "  - View logs: kubectl logs -f deployment/action-agent-$ENVIRONMENT-api-gateway -n $NAMESPACE"
-    echo "  - Port forward: kubectl port-forward service/action-agent-$ENVIRONMENT-api-gateway 15000:15000 -n $NAMESPACE"
-    echo "  - Upgrade: $0 --environment $ENVIRONMENT --upgrade"
-    echo "  - Uninstall: helm uninstall $RELEASE_NAME -n $NAMESPACE"
-    
-    if [[ "$ENVIRONMENT" == "dev" ]]; then
-        print_warning "Remember to update secret values with your actual credentials!"
-    fi
-else
-    print_success "Dry run completed successfully!"
-fi
+ok "Deployment finished"

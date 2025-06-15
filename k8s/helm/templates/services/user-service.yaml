@@ -1,5 +1,10 @@
-{{- if .Values.userService.enabled }}
-{{- if .Values.userService.database.enabled }}
+{{- /*
+───────────────────────────────────────────────────────────────
+  USER-DATABASE (optional MongoDB)
+───────────────────────────────────────────────────────────────
+*/ -}}
+{{- if and .Values.userService.enabled .Values.userService.database.enabled }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -24,10 +29,15 @@ spec:
       containers:
         - name: mongodb
           image: "{{ .Values.userService.database.image.repository }}:{{ .Values.userService.database.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: 27017
-              name: mongodb
+            - name: mongo
+              containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: {{ .Values.userService.database.username | quote }}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: {{ .Values.userService.database.password | quote }}
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
@@ -35,7 +45,7 @@ spec:
             {{- end }}
           {{- if .Values.userService.database.persistence.enabled }}
           volumeMounts:
-            - name: mongodb-data
+            - name: mongo-data
               mountPath: /data/db
           {{- end }}
           resources:
@@ -47,12 +57,12 @@ spec:
               memory: 256Mi
       {{- if .Values.userService.database.persistence.enabled }}
       volumes:
-        - name: mongodb-data
+        - name: mongo-data
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-user-database-pvc
       {{- else }}
       volumes:
-        - name: mongodb-data
+        - name: mongo-data
           emptyDir: {}
       {{- end }}
 
@@ -66,8 +76,7 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: {{ .Values.userService.database.persistence.size }}
@@ -86,12 +95,19 @@ spec:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: user-database
   ports:
-    - protocol: TCP
+    - name: mongo
+      protocol: TCP
       port: 27017
       targetPort: 27017
-      name: mongodb
 
-{{- end }}
+{{- end }}   {{/* END database.enabled */}}
+
+{{- /*
+───────────────────────────────────────────────────────────────
+  USER-SERVICE  (main application)
+───────────────────────────────────────────────────────────────
+*/ -}}
+{{- if .Values.userService.enabled }}
 
 ---
 apiVersion: apps/v1
@@ -117,13 +133,17 @@ spec:
       containers:
         - name: user-service
           image: "{{ .Values.userService.image.repository }}:{{ .Values.userService.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.userService.service.port }}
-              name: http
+            - name: http
+              containerPort: {{ .Values.userService.service.port }}
           env:
             - name: PORT
               value: {{ .Values.userService.service.port | quote }}
+            {{- if not .Values.userService.database.enabled }}
+            - name: DATABASE_URL
+              value: {{ .Values.userService.database.url | quote }}
+            {{- end }}
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
@@ -155,14 +175,14 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.userService.service.type }}
+  type: {{ .Values.userService.service.type | default "ClusterIP" }}
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: user-service
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: {{ .Values.userService.service.port }}
       targetPort: {{ .Values.userService.service.port }}
-      name: http
 
-{{- end }}
+{{- end }}   {{/* END userService.enabled */}}

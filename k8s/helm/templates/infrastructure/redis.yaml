@@ -1,5 +1,8 @@
 {{- if .Values.redis.enabled }}
----
+
+#---------------------------------------
+# ConfigMap – host/port for app pods
+#---------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,6 +14,9 @@ data:
   REDIS_HOST: {{ include "action-agent.fullname" . }}-redis
   REDIS_PORT: {{ .Values.redis.service.port | quote }}
 
+#---------------------------------------
+# Deployment
+#---------------------------------------
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -35,10 +41,10 @@ spec:
       containers:
         - name: redis
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.redis.service.port }}
-              name: redis
+            - name: redis
+              containerPort: {{ .Values.redis.service.port }}
           envFrom:
             - configMapRef:
                 name: {{ include "action-agent.fullname" . }}-redis-config
@@ -52,23 +58,18 @@ spec:
               mountPath: /data
           {{- end }}
           resources:
-            limits:
-              cpu: 500m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-      {{- if .Values.redis.persistence.enabled }}
+            limits:   { cpu: 500m, memory: 512Mi }
+            requests: { cpu: 100m, memory: 128Mi }
       volumes:
         - name: redis-data
+          {{- if .Values.redis.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-redis-pvc
-      {{- else }}
-      volumes:
-        - name: redis-data
+          {{- else }}
           emptyDir: {}
-      {{- end }}
+          {{- end }}
 
+# PVC only when persistence on
 {{- if .Values.redis.persistence.enabled }}
 ---
 apiVersion: v1
@@ -79,13 +80,15 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: {{ .Values.redis.persistence.size }}
 {{- end }}
 
+#---------------------------------------
+# Service
+#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -95,13 +98,14 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
+  type: ClusterIP        # always internal
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: redis
   ports:
-    - protocol: TCP
+    - name: redis
+      protocol: TCP
       port: {{ .Values.redis.service.port }}
       targetPort: {{ .Values.redis.service.port }}
-      name: redis
 
-{{- end }}
+{{- end }}   # redis.enabled

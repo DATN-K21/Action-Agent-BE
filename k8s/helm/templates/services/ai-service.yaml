@@ -1,5 +1,10 @@
-{{- if .Values.aiService.enabled }}
-{{- if .Values.aiService.database.enabled }}
+{{- /*
+-----------------------------------------------------------------
+ AI-SERVICE ── DATABASE SECTION  (optional)
+-----------------------------------------------------------------
+*/ -}}
+{{- if and .Values.aiService.enabled .Values.aiService.database.enabled }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -26,8 +31,15 @@ spec:
           image: "{{ .Values.aiService.database.image.repository }}:{{ .Values.aiService.database.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 5432
-              name: postgres
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.aiService.database.name | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.aiService.database.username | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.aiService.database.password | quote }}
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
@@ -45,6 +57,7 @@ spec:
             requests:
               cpu: 200m
               memory: 256Mi
+
       {{- if .Values.aiService.database.persistence.enabled }}
       volumes:
         - name: postgres-data
@@ -66,8 +79,7 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: {{ .Values.aiService.database.persistence.size }}
@@ -86,12 +98,18 @@ spec:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: ai-database
   ports:
-    - protocol: TCP
+    - name: postgres
+      protocol: TCP
       port: 5432
       targetPort: 5432
-      name: postgres
+{{- end }}   {{/* END database.enabled */}}
 
-{{- end }}
+{{- /*
+-----------------------------------------------------------------
+ AI-SERVICE ── MAIN APPLICATION DEPLOYMENT
+-----------------------------------------------------------------
+*/ -}}
+{{- if .Values.aiService.enabled }}
 
 ---
 apiVersion: apps/v1
@@ -119,8 +137,8 @@ spec:
           image: "{{ .Values.aiService.image.repository }}:{{ .Values.aiService.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.aiService.service.port }}
-              name: http
+            - name: http
+              containerPort: {{ .Values.aiService.service.port }}
           env:
             - name: PORT
               value: {{ .Values.aiService.service.port | quote }}
@@ -158,9 +176,8 @@ spec:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: ai-service
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: {{ .Values.aiService.service.port }}
       targetPort: {{ .Values.aiService.service.port }}
-      name: http
-
-{{- end }}
+{{- end }}  {{/* END aiService.enabled */}}

@@ -1,5 +1,8 @@
 {{- if .Values.rabbitmq.enabled }}
----
+
+#---------------------------------------
+# ConfigMap – host/port for app pods
+#---------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,9 +11,12 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 data:
-  RABBITMQ_HOST: {{ include "action-agent.serviceName" (dict "root" . "name" "rabbitmq") | quote }}
+  RABBITMQ_HOST: {{ include "action-agent.fullname" . }}-rabbitmq
   RABBITMQ_PORT: {{ .Values.rabbitmq.service.port | quote }}
 
+#---------------------------------------
+# Deployment
+#---------------------------------------
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,12 +43,12 @@ spec:
           image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.rabbitmq.service.port }}
-              name: amqp
-            - containerPort: {{ .Values.rabbitmq.service.managementPort }}
-              name: management
-            - containerPort: {{ .Values.rabbitmq.service.metricsPort }}
-              name: metrics
+            - name: amqp
+              containerPort: {{ .Values.rabbitmq.service.port }}
+            - name: management
+              containerPort: {{ .Values.rabbitmq.service.managementPort }}
+            - name: metrics
+              containerPort: {{ .Values.rabbitmq.service.metricsPort }}
           envFrom:
             - configMapRef:
                 name: {{ include "action-agent.fullname" . }}-rabbitmq-config
@@ -62,17 +68,16 @@ spec:
             requests:
               cpu: 200m
               memory: 256Mi
-      {{- if .Values.rabbitmq.persistence.enabled }}
       volumes:
         - name: rabbitmq-data
+          {{- if .Values.rabbitmq.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-rabbitmq-pvc
-      {{- else }}
-      volumes:
-        - name: rabbitmq-data
+          {{- else }}
           emptyDir: {}
-      {{- end }}
+          {{- end }}
 
+# PVC only when persistence on
 {{- if .Values.rabbitmq.persistence.enabled }}
 ---
 apiVersion: v1
@@ -83,13 +88,15 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: {{ .Values.rabbitmq.persistence.size }}
 {{- end }}
 
+#---------------------------------------
+# Service
+#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -99,21 +106,22 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
+  type: ClusterIP
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: rabbitmq
   ports:
-    - protocol: TCP
+    - name: amqp
+      protocol: TCP
       port: {{ .Values.rabbitmq.service.port }}
       targetPort: {{ .Values.rabbitmq.service.port }}
-      name: amqp
-    - protocol: TCP
+    - name: management
+      protocol: TCP
       port: {{ .Values.rabbitmq.service.managementPort }}
       targetPort: {{ .Values.rabbitmq.service.managementPort }}
-      name: management
-    - protocol: TCP
+    - name: metrics
+      protocol: TCP
       port: {{ .Values.rabbitmq.service.metricsPort }}
       targetPort: {{ .Values.rabbitmq.service.metricsPort }}
-      name: metrics
 
 {{- end }}

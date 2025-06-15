@@ -1,4 +1,10 @@
+{{- /*
+-----------------------------------------------------------------
+  API-GATEWAY  ──  Deployment + Service
+-----------------------------------------------------------------
+*/ -}}
 {{- if .Values.apiGateway.enabled }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,10 +29,10 @@ spec:
       containers:
         - name: api-gateway
           image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.apiGateway.service.port }}
-              name: https
+            - name: {{- if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
+              containerPort: {{ .Values.apiGateway.service.port }}
           env:
             - name: PORT
               value: {{ .Values.apiGateway.service.port | quote }}
@@ -43,18 +49,19 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+          # ---------- probes ----------
           livenessProbe:
             httpGet:
               path: /ping
               port: {{ .Values.apiGateway.service.port }}
-              scheme: {{ if .Values.apiGateway.ssl.enabled }}HTTPS{{ else }}HTTP{{ end }}
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ping
               port: {{ .Values.apiGateway.service.port }}
-              scheme: {{ if .Values.apiGateway.ssl.enabled }}HTTPS{{ else }}HTTP{{ end }}
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
             initialDelaySeconds: 5
             periodSeconds: 5
 
@@ -67,14 +74,14 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.apiGateway.service.type }}
+  type: {{ .Values.apiGateway.service.type | default "ClusterIP" }}
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: api-gateway
   ports:
-    - protocol: TCP
+    - name: {{- if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
+      protocol: TCP
       port: {{ .Values.apiGateway.service.port }}
       targetPort: {{ .Values.apiGateway.service.port }}
-      name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
 
-{{- end }}
+{{- end }}  {{/* END apiGateway.enabled */}}

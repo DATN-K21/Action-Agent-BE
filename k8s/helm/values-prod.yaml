@@ -1,95 +1,112 @@
-# Production environment values
+# =========================================================
+#  Production values  (AKS)  —  databases run as pods
+# =========================================================
 global:
   environment: prod
   namespace: action-agent-prod
+  imageRegistry: aagent.azurecr.io
 
-# Infrastructure - Disable local infrastructure, use managed services
+image:
+  pullSecrets: [acr-pull]
+
+# ---------------------------------------------------------
+# Infrastructure
+# ---------------------------------------------------------
 redis:
-  enabled: false  # Use managed Redis service
-  # External Redis configuration will be provided via secrets
+  enabled: true
+  persistence:
+    enabled: true
+    size: 1Gi
 
 rabbitmq:
-  enabled: false  # Use managed RabbitMQ service
-  # External RabbitMQ configuration will be provided via secrets
+  enabled: false
 
 elasticsearch:
-  enabled: false  # Use managed Elasticsearch service
-  # External Elasticsearch configuration will be provided via secrets
+  enabled: false
 
 kibana:
-  enabled: false  # Use managed Kibana service
+  enabled: false
 
-# Application Services - Production-grade resources
+externalServices:
+  rabbitmqUrl:  amqps://user:pass@vhost.lil.cloudamqp.com/vhost
+  elasticUrl:   https://abcd.bonsaisearch.net
+
+# ---------------------------------------------------------
+# Micro-services
+# ---------------------------------------------------------
 apiGateway:
-  replicaCount: 3
-  image:
-    tag: "stable"
+  replicaCount: 1
   resources:
-    limits:
-      cpu: 2000m
-      memory: 2Gi
-    requests:
-      cpu: 1000m
-      memory: 1Gi
+    requests: { cpu: 256m, memory: 256Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
 
 userService:
-  replicaCount: 3
-  image:
-    tag: "stable"
+  replicaCount: 1
   database:
-    enabled: false  # Use managed MongoDB
-    # External MongoDB configuration will be provided via secrets
+    enabled: true
+    image:
+      repository: mongo
+      tag: "latest"
+    username: root
+    password: root
+    persistence:
+      enabled: true
+      size: 1Gi
   resources:
-    limits:
-      cpu: 2000m
-      memory: 2Gi
-    requests:
-      cpu: 1000m
-      memory: 1Gi
+    requests: { cpu: 100m, memory: 100Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
 
 aiService:
-  replicaCount: 3
-  image:
-    tag: "stable"
+  replicaCount: 2
   database:
-    enabled: false  # Use managed PostgreSQL
-    # External PostgreSQL configuration will be provided via secrets
+    enabled: true
+    image:
+      repository: pgvector/pgvector
+      tag: "pg16"
+    username: postgres
+    password: postgres
+    persistence:
+      enabled: true
+      size: 1Gi
   resources:
-    limits:
-      cpu: 4000m
-      memory: 4Gi
-    requests:
-      cpu: 2000m
-      memory: 2Gi
+    requests: { cpu: 256m, memory: 256Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
 
 extensionService:
-  replicaCount: 3
-  image:
-    tag: "stable"
+  replicaCount: 2
+  database:
+    enabled: true
+    image:
+      repository: mongo
+      tag: "latest"
+    username: root
+    password: root
+    persistence:
+      enabled: true
+      size: 1Gi
   resources:
-    limits:
-      cpu: 2000m
-      memory: 2Gi
-    requests:
-      cpu: 1000m
-      memory: 1Gi
+    requests: { cpu: 100m, memory: 100Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
 
-# Secret Management - Use external secrets in production
+# ---------------------------------------------------------
+# Secrets — still via Key Vault for API keys, but DB creds
+# are created as in-cluster Secrets by the chart.
+# ---------------------------------------------------------
 secrets:
-  createSecrets: false
+  createSecrets: true        # chart will create DB secrets
   external:
-    provider: "vault"
-    secretStore: "production-vault-store"
+    provider: azure-keyvault
+    secretStore: action-agent-kv
 
-# Ingress
+# ---------------------------------------------------------
+# Ingress & autoscaling stay unchanged
+# ---------------------------------------------------------
 ingress:
   enabled: true
-  className: "nginx"
+  className: nginx
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
   hosts:
     - host: api.action-agent.com
       paths:
@@ -97,36 +114,10 @@ ingress:
           pathType: Prefix
   tls:
     - secretName: action-agent-prod-tls
-      hosts:
-        - api.action-agent.com
+      hosts: [api.action-agent.com]
 
-# Autoscaling
 autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 20
-  targetCPUUtilizationPercentage: 60
-  targetMemoryUtilizationPercentage: 70
-
-# Node selection for production workloads
-nodeSelector:
-  node-type: "application"
-
-tolerations:
-  - key: "dedicated"
-    operator: "Equal"
-    value: "application"
-    effect: "NoSchedule"
-
-affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-              - key: app.kubernetes.io/instance
-                operator: In
-                values:
-                  - action-agent-prod
-          topologyKey: kubernetes.io/hostname
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

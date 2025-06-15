@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "action-agent.fullname" . }}
+  name: {{ include "action-agent.fullname" $ }}
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
@@ -37,11 +37,11 @@ spec:
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
               service:
-                name: {{ include "action-agent.fullname" . }}-api-gateway
+                name: {{ include "action-agent.fullname" $ }}-api-gateway
                 port:
                   number: {{ $.Values.apiGateway.service.port }}
               {{- else }}
-              serviceName: {{ include "action-agent.fullname" . }}-api-gateway
+              serviceName: {{ include "action-agent.fullname" $ }}-api-gateway
               servicePort: {{ $.Values.apiGateway.service.port }}
               {{- end }}
           {{- end }}

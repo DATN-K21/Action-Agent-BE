@@ -1,0 +1,134 @@
+global:
+  environment: dev
+  namespace: action-agent-dev
+  imageRegistry: localhost:5000      # kind "load" or local registry
+
+image:
+  pullSecrets: []
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "alpine"
+  service:
+    port: 6379
+  auth:
+    username: "default"
+    password: "root"
+  persistence:
+    enabled: false
+
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: "3-management"
+  service:
+    port: 5672
+    managementPort: 15672
+    metricsPort: 15692
+  auth:
+    username: "root"
+    password: "root"
+  persistence:
+    enabled: false
+
+elasticsearch:
+  enabled: true
+  image:
+    repository: elasticsearch
+    tag: "7.17.0"
+  service:
+    port: 9200
+    nodePort: 9300
+  auth:
+    username: "elastic"
+    password: "changeme"
+  config:
+    discoveryType: "single-node"
+    xpackSecurityEnabled: "false"
+    javaOpts: "-Xms256m -Xmx256m"
+  persistence:
+    enabled: false
+
+kibana:
+  enabled: true
+  image:
+    repository: kibana
+    tag: "7.17.0"
+  service:
+    port: 5601
+  config:
+    serverName: "kibana"
+    elasticsearchHosts: "http://elasticsearch:9200"
+    xpackSecurityEnabled: "false"
+
+# Configuration for JWT and other app settings
+config:
+  jwt:
+    secret: "c667d2a6dfcc7fbf5efe64de40fdf3e37dc8a00c1311cf9c449922cb92e4858e0d7c0fa010c883c4ff3edeb89ccfd72c3fc7b9cdd287c7da2e163bde933b1cca"
+  microserviceTimeout: "300000"
+  composio:
+    apiKey: "test-key"
+    apiBaseUrl: "https://api.compos.io"
+
+externalServices:
+  mongoUrl: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
+  postgresUrl: "postgresql://postgres:postgres@ai-database:5432/ai-service"
+  redisUrl: "redis://root:root@redis:6379"
+  rabbitmqUrl: "amqp://root:root@rabbitmq:5672"
+  elasticUrl: "http://elasticsearch:9200"
+
+# local Mongo/Postgres embedded
+userService:
+  database:
+    enabled: true
+    image:
+      repository: mongo
+      tag: "latest"
+    username: "root"
+    password: "root"
+    persistence:
+      enabled: false
+      size: 1Gi
+  service:
+    port: 15100
+
+aiService:
+  database:
+    enabled: true
+    image:
+      repository: pgvector/pgvector
+      tag: "pg16"
+    username: "postgres"
+    password: "postgres"
+    persistence:
+      enabled: false
+      size: 1Gi
+  service:
+    port: 15200
+
+extensionService:
+  database:
+    enabled: true
+    image:
+      repository: mongo
+      tag: "latest"
+    username: "root"
+    password: "root"
+    persistence:
+      enabled: false
+      size: 1Gi
+  service:
+    port: 15300
+
+# Dev tags (built by docker compose or kind load)
+apiGateway.image.tag: dev
+userService.image.tag: dev
+aiService.image.tag: dev
+extensionService.image.tag: dev
+
+# Secrets come from local files (ignored by Git)
+secrets:
+  createSecrets: true

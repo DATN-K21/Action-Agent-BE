@@ -1,5 +1,8 @@
 {{- if .Values.kibana.enabled }}
----
+
+#---------------------------------------
+# ConfigMap – host/port for app pods
+#---------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,6 +19,9 @@ data:
   SERVER_NAME: {{ .Values.kibana.config.serverName | quote }}
   XPACK_SECURITY_ENABLED: {{ .Values.kibana.config.xpackSecurityEnabled | quote }}
 
+#---------------------------------------
+# Deployment
+#---------------------------------------
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -42,8 +48,8 @@ spec:
           image: "{{ .Values.kibana.image.repository }}:{{ .Values.kibana.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.kibana.service.port }}
-              name: http
+            - name: http
+              containerPort: {{ .Values.kibana.service.port }}
           envFrom:
             - configMapRef:
                 name: {{ include "action-agent.fullname" . }}-kibana-config
@@ -55,6 +61,9 @@ spec:
               cpu: 200m
               memory: 512Mi
 
+#---------------------------------------
+# Service
+#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -64,13 +73,14 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
+  type: ClusterIP
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: kibana
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: {{ .Values.kibana.service.port }}
       targetPort: {{ .Values.kibana.service.port }}
-      name: http
 
 {{- end }}

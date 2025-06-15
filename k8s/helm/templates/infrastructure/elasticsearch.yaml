@@ -1,5 +1,8 @@
 {{- if .Values.elasticsearch.enabled }}
----
+
+#---------------------------------------
+# ConfigMap – host/port for app pods
+#---------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,6 +15,9 @@ data:
   xpack.security.enabled: {{ .Values.elasticsearch.config.xpackSecurityEnabled | quote }}
   ES_JAVA_OPTS: {{ .Values.elasticsearch.config.javaOpts | quote }}
 
+#---------------------------------------
+# Deployment
+#---------------------------------------
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -38,10 +44,10 @@ spec:
           image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.elasticsearch.service.port }}
-              name: http
-            - containerPort: {{ .Values.elasticsearch.service.nodePort }}
-              name: transport
+            - name: http
+              containerPort: {{ .Values.elasticsearch.service.port }}
+            - name: transport
+              containerPort: {{ .Values.elasticsearch.service.nodePort }}
           envFrom:
             - configMapRef:
                 name: {{ include "action-agent.fullname" . }}-elasticsearch-config
@@ -55,23 +61,18 @@ spec:
               mountPath: /usr/share/elasticsearch/data
           {{- end }}
           resources:
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-            requests:
-              cpu: 500m
-              memory: 1Gi
-      {{- if .Values.elasticsearch.persistence.enabled }}
+            limits:   { cpu: 2000m, memory: 2Gi }
+            requests: { cpu: 500m, memory: 1Gi }
       volumes:
         - name: elasticsearch-data
+          {{- if .Values.elasticsearch.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-elasticsearch-pvc
-      {{- else }}
-      volumes:
-        - name: elasticsearch-data
+          {{- else }}
           emptyDir: {}
-      {{- end }}
+          {{- end }}
 
+# PVC only when persistence on
 {{- if .Values.elasticsearch.persistence.enabled }}
 ---
 apiVersion: v1
@@ -82,13 +83,15 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: {{ .Values.elasticsearch.persistence.size }}
 {{- end }}
 
+#---------------------------------------
+# Service
+#---------------------------------------
 ---
 apiVersion: v1
 kind: Service
@@ -98,17 +101,18 @@ metadata:
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
 spec:
+  type: ClusterIP
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: elasticsearch
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: {{ .Values.elasticsearch.service.port }}
       targetPort: {{ .Values.elasticsearch.service.port }}
-      name: http
-    - protocol: TCP
+    - name: transport
+      protocol: TCP
       port: {{ .Values.elasticsearch.service.nodePort }}
       targetPort: {{ .Values.elasticsearch.service.nodePort }}
-      name: transport
 
 {{- end }}
