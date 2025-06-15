@@ -1,0 +1,34 @@
+secretProvider: azure
+azureKeyVault:
+  tenantId: <AZURE_TENANT_ID>
+  vaultName: <AKV_NAME>
+externalSecrets:
+  - name: api-gateway-secret
+    data:
+      - key: apiGateway/HTTPS_PORT
+        name: HTTPS_PORT
+      - key: apiGateway/USER_SERVICE_URL
+        name: USER_SERVICE_URL
+  - name: user-service-secret
+    data:
+      - key: userService/MONGODB_CONNECTION_STRING
+        name: MONGODB_CONNECTION_STRING
+      - key: userService/JWT_SECRET
+        name: JWT_SECRET
+  - name: ai-service-secret
+    data:
+      - key: aiService/POSTGRES_HOST
+        name: POSTGRES_HOST
+      - key: aiService/POSTGRES_PASSWORD
+        name: POSTGRES_PASSWORD
+  - name: extension-service-secret
+    data:
+      - key: extensionService/DATABASE_URL
+        name: DATABASE_URL
+
+elasticsearch:
+  enabled: false
+kibana:
+  enabled: false
+rabbitmq:
+  enabled: false

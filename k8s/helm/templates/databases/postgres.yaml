@@ -1,0 +1,82 @@
+{{- if .Values.postgres.enabled }}
+{{- if .Values.postgres.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aa.fullname" . }}-postgres-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aa.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aa.labels" . | nindent 6 }}
+      component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "aa.labels" . | nindent 8 }}
+        component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ include "aa.image" (dict "root" . "image" .Values.postgres.image) }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.auth.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgres.auth.password | quote }}
+          ports:
+            - containerPort: {{ .Values.postgres.service.port }}
+              name: postgres
+          {{- if .Values.postgres.persistence.enabled }}
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: data
+          {{- end }}
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+      {{- if .Values.postgres.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "aa.fullname" . }}-postgres-pvc
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aa.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: postgres
+spec:
+  type: {{ .Values.postgres.service.type }}
+  selector:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: postgres
+  ports:
+    - port: {{ .Values.postgres.service.port }}
+      targetPort: {{ .Values.postgres.service.port }}
+      name: postgres
+{{- end }}

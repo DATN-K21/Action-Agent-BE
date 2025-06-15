@@ -1,0 +1,80 @@
+{{- if .Values.mongo.enabled }}
+{{- if .Values.mongo.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aa.fullname" . }}-mongo-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.mongo.persistence.size }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aa.fullname" . }}-mongo
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aa.labels" . | nindent 6 }}
+      component: mongo
+  template:
+    metadata:
+      labels:
+        {{- include "aa.labels" . | nindent 8 }}
+        component: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: {{ include "aa.image" (dict "root" . "image" .Values.mongo.image) }}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: {{ .Values.mongo.auth.username | quote }}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: {{ .Values.mongo.auth.password | quote }}
+          ports:
+            - containerPort: {{ .Values.mongo.service.port }}
+              name: mongo
+          {{- if .Values.mongo.persistence.enabled }}
+          volumeMounts:
+            - mountPath: /data/db
+              name: data
+          {{- end }}
+          resources:
+            {{- toYaml .Values.mongo.resources | nindent 12 }}
+      {{- if .Values.mongo.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "aa.fullname" . }}-mongo-pvc
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aa.fullname" . }}-mongo
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: mongo
+spec:
+  type: {{ .Values.mongo.service.type }}
+  selector:
+    {{- include "aa.labels" . | nindent 4 }}
+    component: mongo
+  ports:
+    - port: {{ .Values.mongo.service.port }}
+      targetPort: {{ .Values.mongo.service.port }}
+      name: mongo
+{{- end }}
