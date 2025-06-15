@@ -1,8 +1,3 @@
-{{- /*
------------------------------------------------------------------
-  API-GATEWAY  ──  Deployment + Service
------------------------------------------------------------------
-*/ -}}
 {{- if .Values.apiGateway.enabled }}
 
 ---
@@ -28,7 +23,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: {{ include "action-agent.image" (dict "root" . "image" .Values.apiGateway.image) }}
+          image: {{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag | default "latest" }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
@@ -36,16 +31,17 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.apiGateway.service.port | quote }}
+          envFrom:
+            {{- if .Values.secrets.createSecrets }}
+            - secretRef:
+                name: {{ include "action-agent.fullname" . }}-api-gateway-secret
+            {{- else }}
             {{- if .Values.apiGateway.ssl.enabled }}
             - name: SSL_KEY_PATH
               value: {{ .Values.apiGateway.ssl.keyPath | quote }}
             - name: SSL_CERT_PATH
               value: {{ .Values.apiGateway.ssl.certPath | quote }}
             {{- end }}
-          envFrom:
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "api-gateway") }}
             {{- end }}
           resources:
             {{- toYaml .Values.apiGateway.resources | nindent 12 }}
@@ -55,15 +51,15 @@ spec:
               path: /ping
               port: {{ .Values.apiGateway.service.port }}
               scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 60
           readinessProbe:
             httpGet:
               path: /ping
               port: {{ .Values.apiGateway.service.port }}
               scheme: {{ ternary "HTTPS" "HTTP" .Values.apiGateway.ssl.enabled }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 60
+            periodSeconds: 60
 
 ---
 apiVersion: v1

@@ -1,114 +1,3 @@
-{{- /*
------------------------------------------------------------------
- AI-SERVICE ── DATABASE SECTION  (optional)
------------------------------------------------------------------
-*/ -}}
-{{- if and .Values.aiService.enabled .Values.aiService.database.enabled }}
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "action-agent.fullname" . }}-ai-database
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-    app: ai-database
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app: ai-database
-  template:
-    metadata:
-      labels:
-        {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app: ai-database
-    spec:
-      containers:
-        - name: postgres
-          image: "{{ .Values.aiService.database.image.repository }}:{{ .Values.aiService.database.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: postgres
-              containerPort: 5432
-          env:
-            - name: POSTGRES_DB
-              value: {{ .Values.aiService.database.name | quote }}
-            - name: POSTGRES_USER
-              value: {{ .Values.aiService.database.username | quote }}
-            - name: POSTGRES_PASSWORD
-              value: {{ .Values.aiService.database.password | quote }}
-          envFrom:
-            {{- if .Values.secrets.createSecrets }}
-            - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "ai-db") }}
-            {{- end }}
-          {{- if .Values.aiService.database.persistence.enabled }}
-          volumeMounts:
-            - name: postgres-data
-              mountPath: /var/lib/postgresql/data
-          {{- end }}
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 200m
-              memory: 256Mi
-
-      {{- if .Values.aiService.database.persistence.enabled }}
-      volumes:
-        - name: postgres-data
-          persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-ai-database-pvc
-      {{- else }}
-      volumes:
-        - name: postgres-data
-          emptyDir: {}
-      {{- end }}
-
-{{- if .Values.aiService.database.persistence.enabled }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "action-agent.fullname" . }}-ai-database-pvc
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.aiService.database.persistence.size }}
-{{- end }}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "action-agent.fullname" . }}-ai-database
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "action-agent.labels" . | nindent 4 }}
-spec:
-  selector:
-    {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app: ai-database
-  ports:
-    - name: postgres
-      protocol: TCP
-      port: 5432
-      targetPort: 5432
-{{- end }}   {{/* END database.enabled */}}
-
-{{- /*
------------------------------------------------------------------
- AI-SERVICE ── MAIN APPLICATION DEPLOYMENT
------------------------------------------------------------------
-*/ -}}
 {{- if .Values.aiService.enabled }}
 
 ---
@@ -134,8 +23,8 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: {{ include "action-agent.image" (dict "root" . "image" .Values.aiService.image) }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ .Values.aiService.image.repository }}:{{ .Values.aiService.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
               containerPort: {{ .Values.aiService.service.port }}
@@ -145,7 +34,7 @@ spec:
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "ai-service") }}
+                name: {{ include "action-agent.fullname" . }}-ai-service-secret
             {{- end }}
           resources:
             {{- toYaml .Values.aiService.resources | nindent 12 }}
@@ -153,14 +42,14 @@ spec:
             httpGet:
               path: /ping
               port: {{ .Values.aiService.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 60
           readinessProbe:
             httpGet:
               path: /ping
               port: {{ .Values.aiService.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 60
+            periodSeconds: 60
 
 ---
 apiVersion: v1

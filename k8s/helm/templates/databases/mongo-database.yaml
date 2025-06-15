@@ -1,0 +1,104 @@
+{{- /*
+───────────────────────────────────────────────────────────────
+  MONGO-DATABASE (MongoDB)
+───────────────────────────────────────────────────────────────
+*/ -}}
+{{- if and .Values.userService.database.enabled }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-mongo-database
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app: mongo-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "action-agent.selectorLabels" . | nindent 6 }}
+      app: mongo-database
+  template:
+    metadata:
+      labels:
+        {{- include "action-agent.selectorLabels" . | nindent 8 }}
+        app: mongo-database
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.userService.database.image.repository }}:{{ .Values.userService.database.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: mongo
+              containerPort: 27017
+          envFrom:
+            {{- if .Values.secrets.createSecrets }}
+            - secretRef:
+                name: {{ include "action-agent.fullname" . }}-mongo-database-secret
+            {{- else }}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: {{ .Values.userService.database.username | quote }}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: {{ .Values.userService.database.password | quote }}
+            {{- end }}
+          {{- if .Values.userService.database.persistence.enabled }}
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          {{- end }}
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+      {{- if .Values.userService.database.persistence.enabled }}
+      volumes:
+        - name: mongo-data
+          persistentVolumeClaim:
+            claimName: {{ include "action-agent.fullname" . }}-mongo-database-pvc
+      {{- else }}
+      volumes:
+        - name: mongo-data
+          emptyDir: {}
+      {{- end }}
+
+{{- if .Values.userService.database.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "action-agent.fullname" . }}-mongo-database-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.userService.database.persistence.size }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-mongo-database
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app: mongo-database
+  ports:
+    - name: mongo
+      protocol: TCP
+      port: 27017
+      targetPort: 27017
+
+{{- end }}

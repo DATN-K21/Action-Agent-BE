@@ -1,135 +1,213 @@
-# =====================================================================
-#  Global defaults (do not change per-environment here)
-# =====================================================================
 global:
-  imageRegistry: ""          # overridden per env
-  environment: ""            # dev | stg | prod
-  namespace: ""              # release namespace
+  namespace: default
 
 image:
   pullPolicy: IfNotPresent
-  pullSecrets: []            # registry secret names per env
 
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
+secretProvider: local
 
-# ---------------------------------------------------------------------
-# Infrastructure – OFF by default (each env enables what it needs)
-# ---------------------------------------------------------------------
-redis:
-  enabled: false
-  auth:
-    password: ""  # Will be overridden in environment-specific values files
+secrets:
+  createSecrets: true
+  apiGateway: "api-gateway-secrets"
+  userService: "user-service-secrets"
+  aiService:   "ai-service-secrets"
+  extensionService: "extension-service-secrets"
+  database: "database-secrets"
+  infrastructure: "infrastructure-secrets"
 
-rabbitmq:
-  enabled: false
-  auth:
-    username: ""  # Will be overridden in environment-specific values files
-    password: ""  # Will be overridden in environment-specific values files
-
-elasticsearch:
-  enabled: false
-  auth:
-    username: ""  # Will be overridden in environment-specific values files
-    password: ""  # Will be overridden in environment-specific values files
-
-kibana:
-  enabled: false
-
-# ---------------------------------------------------------------------
-# Micro-services (image.tag & resources overridden per env)
-# ---------------------------------------------------------------------
+# API Gateway settings
 apiGateway:
   enabled: true
   replicaCount: 1
   image:
     repository: api-gateway
-    tag: ""
+    tag: latest
   service:
     type: ClusterIP
     port: 15000
-  ssl:
-    enabled: true
-    keyPath: /app/certs/key.pem
-    certPath: /app/certs/cert.pem
   resources:
-    requests: { cpu: 50m,  memory: 64Mi }
-    limits:   { cpu: 250m, memory: 256Mi }
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
+# User Service settings
 userService:
   enabled: true
   replicaCount: 1
   image:
     repository: user-service
-    tag: ""
+    tag: latest
   service:
     type: ClusterIP
     port: 15100
-  database:
-    enabled: false
   resources:
-    requests: { cpu: 50m,  memory: 128Mi }
-    limits:   { cpu: 250m, memory: 256Mi }
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
+# AI Service settings
 aiService:
   enabled: true
   replicaCount: 1
   image:
     repository: ai-service
-    tag: ""
+    tag: latest
   service:
     type: ClusterIP
     port: 15200
-  database:
-    enabled: false
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 500m, memory: 512Mi }
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 750m
+      memory: 1Gi
 
+# Extension Service settings
 extensionService:
   enabled: true
   replicaCount: 1
   image:
     repository: extension-service
-    tag: ""
+    tag: latest
   service:
     type: ClusterIP
     port: 15300
-  database:
-    enabled: false
   resources:
-    requests: { cpu: 50m,  memory: 128Mi }
-    limits:   { cpu: 250m, memory: 256Mi }
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
-# ---------------------------------------------------------------------
-# Secret strategy – overriden per env
-# ---------------------------------------------------------------------
-secrets:
-  createSecrets: true        # dev uses local env-files
-  external:
-    provider: ""             # azure-keyvault for stg/prod
-    secretStore: ""
+# PostgreSQL Database (pgvector)
+pgDatabase:
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg16
+  service:
+    type: ClusterIP
+    port: 5432
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
-# Config values
-config:
-  jwt:
-    secret: ""  # Will be overridden in environment-specific values files
-  composio:
-    apiKey: ""  # Will be overridden in environment-specific values files
-    apiBaseUrl: ""  # Will be overridden in environment-specific values files
-  microserviceTimeout: "5000"  # Default timeout in milliseconds
-  email:
-    username: ""  # Will be overridden in environment-specific values files
-    password: ""  # Will be overridden in environment-specific values files
+# MongoDB Database
+mongoDatabase:
+  enabled: true
+  image:
+    repository: mongo
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 27017
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
-# External services configuration
-externalServices:
-  mongoUrl: ""  # Will be overridden in environment-specific values files
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 6379
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
-ingress: { enabled: false }
-autoscaling: { enabled: false }
-nodeSelector: {}
-tolerations: []
-affinity: {}
+# Elasticsearch & Kibana
+elasticsearch:
+  enabled: false
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    tag: 8.16.1
+  service:
+    type: ClusterIP
+    port: 9200
+  env:
+    discovery.type: single-node
+    ES_JAVA_OPTS: -Xms256m -Xmx256m
+    xpack.security.enabled: "false"
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+kibana:
+  enabled: false
+  image:
+    repository: docker.elastic.co/kibana/kibana
+    tag: 8.16.1
+  service:
+    type: ClusterIP
+    port: 5601
+  env:
+    ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    SERVER_NAME: kibana
+    XPACK_SECURITY_ENABLED: "false"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# RabbitMQ
+rabbitmq:
+  enabled: false
+  image:
+    repository: rabbitmq
+    tag: 3-management
+  service:
+    type: ClusterIP
+    port: 5672
+  managementPort: 15672
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

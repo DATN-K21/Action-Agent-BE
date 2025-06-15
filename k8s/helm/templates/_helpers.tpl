@@ -89,16 +89,14 @@ Usage: {{ include "action-agent.serviceName" (dict "root" . "name" "service-name
 Generate database connection string for MongoDB
 */}}
 {{- define "action-agent.mongoConnectionString" -}}
-{{- $host := printf "%s-%s" (include "action-agent.fullname" .) "mongo-database" }}
-{{- printf "mongodb://%s:%s@%s:27017/%s?authSource=admin" .Values.userService.database.username .Values.userService.database.password $host .Values.userService.database.name }}
+mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/{{ .Values.userService.database.name | default "user-service" }}?authSource=admin
 {{- end }}
 
 {{/*
 Generate database connection string for PostgreSQL
 */}}
 {{- define "action-agent.postgresConnectionString" -}}
-{{- $host := printf "%s-%s" (include "action-agent.fullname" .) "ai-database" }}
-{{- printf "postgresql://%s:%s@%s:5432/%s" .Values.aiService.database.username .Values.aiService.database.password $host .Values.aiService.database.name }}
+postgresql://{{ .Values.aiService.database.username }}:{{ .Values.aiService.database.password }}@{{ include "action-agent.fullname" . }}-ai-database:5432/{{ .Values.aiService.database.name | default "ai-database" }}
 {{- end }}
 
 {{/*

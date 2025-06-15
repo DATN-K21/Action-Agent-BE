@@ -1,13 +1,3 @@
-{{- /* 
-  Extension-service now uses shared mongo-database (previously user-database)
-  The dedicated database deployment has been removed
-*/ -}}
-
-{{- /*
------------------------------------------------------------------
-  EXTENSION-SERVICE ── MAIN APP DEPLOYMENT
------------------------------------------------------------------
-*/ -}}
 {{- if .Values.extensionService.enabled }}
 
 ---
@@ -33,7 +23,7 @@ spec:
     spec:
       containers:
         - name: extension-service
-          image: {{ include "action-agent.image" (dict "root" . "image" .Values.extensionService.image) }}
+          image: {{ .Values.extensionService.image.repository }}:{{ .Values.extensionService.image.tag | default "latest" }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
@@ -41,12 +31,13 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.extensionService.service.port | quote }}
-            - name: DATABASE_URL
-              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/datn-extension-database?authSource=admin"
           envFrom:
             {{- if .Values.secrets.createSecrets }}
             - secretRef:
-                name: {{ include "action-agent.secretName" (dict "root" . "name" "extension-service") }}
+                name: {{ include "action-agent.fullname" . }}-extension-service-secret
+            {{- else }}
+            - name: DATABASE_URL
+              value: "mongodb://{{ .Values.userService.database.username }}:{{ .Values.userService.database.password }}@{{ include "action-agent.fullname" . }}-mongo-database:27017/datn-extension-database?authSource=admin"
             {{- end }}
           resources:
             {{- toYaml .Values.extensionService.resources | nindent 12 }}
