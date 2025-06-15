@@ -134,7 +134,7 @@ spec:
     spec:
       containers:
         - name: ai-service
-          image: "{{ .Values.aiService.image.repository }}:{{ .Values.aiService.image.tag }}"
+          image: {{ include "action-agent.image" (dict "root" . "image" .Values.aiService.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

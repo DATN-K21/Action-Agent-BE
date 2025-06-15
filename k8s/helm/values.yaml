@@ -20,12 +20,20 @@ serviceAccount:
 # ---------------------------------------------------------------------
 redis:
   enabled: false
+  auth:
+    password: ""  # Will be overridden in environment-specific values files
 
 rabbitmq:
   enabled: false
+  auth:
+    username: ""  # Will be overridden in environment-specific values files
+    password: ""  # Will be overridden in environment-specific values files
 
 elasticsearch:
   enabled: false
+  auth:
+    username: ""  # Will be overridden in environment-specific values files
+    password: ""  # Will be overridden in environment-specific values files
 
 kibana:
   enabled: false
@@ -103,6 +111,22 @@ secrets:
   external:
     provider: ""             # azure-keyvault for stg/prod
     secretStore: ""
+
+# Config values
+config:
+  jwt:
+    secret: ""  # Will be overridden in environment-specific values files
+  composio:
+    apiKey: ""  # Will be overridden in environment-specific values files
+    apiBaseUrl: ""  # Will be overridden in environment-specific values files
+  microserviceTimeout: "5000"  # Default timeout in milliseconds
+  email:
+    username: ""  # Will be overridden in environment-specific values files
+    password: ""  # Will be overridden in environment-specific values files
+
+# External services configuration
+externalServices:
+  mongoUrl: ""  # Will be overridden in environment-specific values files
 
 ingress: { enabled: false }
 autoscaling: { enabled: false }

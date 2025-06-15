@@ -132,7 +132,7 @@ spec:
     spec:
       containers:
         - name: user-service
-          image: "{{ .Values.userService.image.repository }}:{{ .Values.userService.image.tag }}"
+          image: {{ include "action-agent.image" (dict "root" . "image" .Values.userService.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http

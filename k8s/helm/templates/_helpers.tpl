@@ -100,3 +100,18 @@ Generate database connection string for PostgreSQL
 {{- $host := printf "%s-%s" (include "action-agent.fullname" .) "ai-database" }}
 {{- printf "postgresql://%s:%s@%s:5432/%s" .Values.aiService.database.username .Values.aiService.database.password $host .Values.aiService.database.name }}
 {{- end }}
+
+{{/*
+Generate full image name with registry and tag
+Usage: {{ include "action-agent.image" (dict "root" . "image" .Values.someService.image) }}
+*/}}
+{{- define "action-agent.image" -}}
+{{- $registry := .root.Values.global.imageRegistry -}}
+{{- $repository := .image.repository -}}
+{{- $tag := .image.tag | default "latest" -}}
+{{- if $registry -}}
+{{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repository $tag -}}
+{{- end -}}
+{{- end -}}

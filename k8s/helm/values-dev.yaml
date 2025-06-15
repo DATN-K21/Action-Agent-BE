@@ -1,7 +1,7 @@
 global:
   environment: dev
   namespace: action-agent-dev
-  imageRegistry: localhost:5000      # kind "load" or local registry
+  imageRegistry: ""      # Empty for local images, they're loaded directly into Kind
 
 image:
   pullSecrets: []
@@ -18,6 +18,13 @@ redis:
     password: "root"
   persistence:
     enabled: false
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
 
 rabbitmq:
   enabled: true
@@ -33,6 +40,13 @@ rabbitmq:
     password: "root"
   persistence:
     enabled: false
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 20m
+      memory: 64Mi
 
 elasticsearch:
   enabled: true
@@ -51,6 +65,13 @@ elasticsearch:
     javaOpts: "-Xms256m -Xmx256m"
   persistence:
     enabled: false
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
 
 kibana:
   enabled: true
@@ -63,8 +84,15 @@ kibana:
     serverName: "kibana"
     elasticsearchHosts: "http://elasticsearch:9200"
     xpackSecurityEnabled: "false"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 20m
+      memory: 128Mi
 
-# Configuration for JWT and other app settings
+# Config values
 config:
   jwt:
     secret: "c667d2a6dfcc7fbf5efe64de40fdf3e37dc8a00c1311cf9c449922cb92e4858e0d7c0fa010c883c4ff3edeb89ccfd72c3fc7b9cdd287c7da2e163bde933b1cca"
@@ -72,16 +100,34 @@ config:
   composio:
     apiKey: "test-key"
     apiBaseUrl: "https://api.compos.io"
+  email:
+    username: "dev@example.com"
+    password: "dev-password"
 
+# External services configuration
 externalServices:
-  mongoUrl: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
+  mongoUrl: "mongodb://root:root@mongo:27017/?authSource=admin"
   postgresUrl: "postgresql://postgres:postgres@ai-database:5432/ai-service"
   redisUrl: "redis://root:root@redis:6379"
   rabbitmqUrl: "amqp://root:root@rabbitmq:5672"
   elasticUrl: "http://elasticsearch:9200"
 
-# local Mongo/Postgres embedded
+apiGateway:
+  image:
+    repository: api-gateway
+    tag: "dev"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
 userService:
+  image:
+    repository: user-service
+    tag: "dev"
   database:
     enabled: true
     image:
@@ -94,8 +140,18 @@ userService:
       size: 1Gi
   service:
     port: 15100
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
 
 aiService:
+  image:
+    repository: ai-service
+    tag: "dev"
   database:
     enabled: true
     image:
@@ -108,8 +164,18 @@ aiService:
       size: 1Gi
   service:
     port: 15200
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 20m
+      memory: 64Mi
 
 extensionService:
+  image:
+    repository: extension-service
+    tag: "dev"
   database:
     enabled: true
     image:
@@ -122,13 +188,16 @@ extensionService:
       size: 1Gi
   service:
     port: 15300
-
-# Dev tags (built by docker compose or kind load)
-apiGateway.image.tag: dev
-userService.image.tag: dev
-aiService.image.tag: dev
-extensionService.image.tag: dev
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
 
 # Secrets come from local files (ignored by Git)
 secrets:
   createSecrets: true
+
+

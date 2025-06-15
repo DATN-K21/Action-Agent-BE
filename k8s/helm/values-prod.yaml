@@ -14,6 +14,14 @@ image:
 # ---------------------------------------------------------
 redis:
   enabled: true
+  image:
+    repository: redis
+    tag: "alpine"
+  service:
+    port: 6379
+  auth:
+    username: "default"
+    password: ""  # Will be set through external secrets
   persistence:
     enabled: true
     size: 1Gi
@@ -87,6 +95,18 @@ extensionService:
   resources:
     requests: { cpu: 100m, memory: 100Mi }
     limits:   { cpu: 1000m, memory: 1Gi }
+  
+# Application settings and API secrets
+config:
+  jwt:
+    secret: "change-me"
+  microserviceTimeout: "300000"
+  composio:
+    apiKey: "prod-key"
+    apiBaseUrl: "https://api.compos.io"
+  email:
+    username: "prod@example.com"
+    password: "prod-password"
 
 # ---------------------------------------------------------
 # Secrets — still via Key Vault for API keys, but DB creds

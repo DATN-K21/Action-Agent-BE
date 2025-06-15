@@ -28,10 +28,10 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
+          image: {{ include "action-agent.image" (dict "root" . "image" .Values.apiGateway.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - name: {{- if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
+            - name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
               containerPort: {{ .Values.apiGateway.service.port }}
           env:
             - name: PORT
@@ -79,7 +79,7 @@ spec:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
     app: api-gateway
   ports:
-    - name: {{- if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
+    - name: {{ if .Values.apiGateway.ssl.enabled }}https{{ else }}http{{ end }}
       protocol: TCP
       port: {{ .Values.apiGateway.service.port }}
       targetPort: {{ .Values.apiGateway.service.port }}

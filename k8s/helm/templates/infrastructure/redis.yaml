@@ -108,4 +108,4 @@ spec:
       port: {{ .Values.redis.service.port }}
       targetPort: {{ .Values.redis.service.port }}
 
-{{- end }}   # redis.enabled
+{{- end }}

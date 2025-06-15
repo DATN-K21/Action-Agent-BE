@@ -127,7 +127,7 @@ spec:
     spec:
       containers:
         - name: extension-service
-          image: "{{ .Values.extensionService.image.repository }}:{{ .Values.extensionService.image.tag }}"
+          image: {{ include "action-agent.image" (dict "root" . "image" .Values.extensionService.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
