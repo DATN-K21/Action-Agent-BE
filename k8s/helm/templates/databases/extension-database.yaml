@@ -1,4 +1,18 @@
 {{- if and .Values.databases.extensionDatabase.enabled (not .Values.external.extensionDatabase.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "action-agent.fullname" . }}-extension-db-init
+  namespace: {{ .Values.global.namespace }}
+data:
+  create-user.js: |
+    db = db.getSiblingDB("{{ .Values.databases.extensionDatabase.database }}");
+    db.createUser({
+      user:   "{{ .Values.databases.extensionDatabase.auth.username }}",
+      pwd:    "{{ .Values.databases.extensionDatabase.auth.password }}",
+      roles:  [{ role: "readWrite", db: "{{ .Values.databases.extensionDatabase.database }}" }]
+    });
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,20 +47,16 @@ spec:
             - name: extension-db
               containerPort: {{ .Values.databases.extensionDatabase.service.port }}
               protocol: TCP
-          env:
-            - name: MONGO_INITDB_ROOT_USERNAME
-              value: {{ .Values.databases.extensionDatabase.auth.username | quote }}
-            - name: MONGO_INITDB_ROOT_PASSWORD
-              value: {{ .Values.databases.extensionDatabase.auth.password | quote }}
-            - name: MONGO_INITDB_DATABASE
-              value: {{ .Values.databases.extensionDatabase.database | quote }}
           resources:
             {{- toYaml .Values.databases.extensionDatabase.resources | nindent 12 }}
-          {{- if .Values.databases.extensionDatabase.persistence.enabled }}
           volumeMounts:
+            - name: extension-db-init
+              mountPath: /docker-entrypoint-initdb.d/create-user.js
+              subPath: create-user.js
+            {{- if .Values.databases.extensionDatabase.persistence.enabled }}
             - name: extension-db-data
               mountPath: /data/db
-          {{- end }}
+            {{- end }}
           livenessProbe:
             exec:
               command:
@@ -69,12 +79,15 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-      {{- if .Values.databases.extensionDatabase.persistence.enabled }}
       volumes:
+        - name: extension-db-init
+          configMap:
+            name: {{ include "action-agent.fullname" . }}-extension-db-init
+        {{- if .Values.databases.extensionDatabase.persistence.enabled }}
         - name: extension-db-data
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-extension-db-pvc
-      {{- end }}
+        {{- end }}
       {{- with .Values.databases.extensionDatabase.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

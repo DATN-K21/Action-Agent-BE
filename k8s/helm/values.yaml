@@ -231,7 +231,8 @@ databases:
       enabled: true
       size: 1Gi
     auth:
-      password: "root"  # Redis authentication password
+      username: "root"
+      password: "root"
     resources:
       requests:
         cpu: 10m

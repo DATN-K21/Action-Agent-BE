@@ -41,8 +41,13 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.services.extensionService.service.port | quote }}
+            {{- if .Values.databases.extensionDatabase.enabled }}
             - name: DATABASE_URL
-              value: "mongodb://{{ .Values.databases.extensionDatabase.auth.username }}:{{ .Values.databases.extensionDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-extension-db:27017/{{ .Values.databases.extensionDatabase.database }}?authSource=admin"
+              value: "mongodb://{{ .Values.databases.extensionDatabase.auth.username }}:{{ .Values.databases.extensionDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-extension-db:27017/{{ .Values.databases.extensionDatabase.database }}?authSource={{ .Values.databases.extensionDatabase.database }}"
+            {{- else if .Values.external.extensionDatabase.enabled }}
+            - name: DATABASE_URL
+              value: {{ .Values.external.extensionDatabase.url | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.services.extensionService.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

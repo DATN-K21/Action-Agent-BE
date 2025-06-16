@@ -43,8 +43,13 @@ spec:
               value: {{ .Values.services.userService.service.port | quote }}
             - name: NODE_ENV
               value: {{ .Values.global.environment | quote }}
+            {{- if .Values.databases.userDatabase.enabled }}
             - name: MONGODB_CONNECTION_STRING
-              value: "mongodb://{{ .Values.databases.userDatabase.auth.username }}:{{ .Values.databases.userDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-user-db:27017/{{ .Values.databases.userDatabase.database }}?authSource=admin"
+              value: "mongodb://{{ .Values.databases.userDatabase.auth.username }}:{{ .Values.databases.userDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-user-db:27017/{{ .Values.databases.userDatabase.database }}?authSource={{ .Values.databases.userDatabase.database }}"
+            {{- else if .Values.external.userDatabase.enabled }}
+            - name: MONGODB_CONNECTION_STRING
+              value: {{ .Values.external.userDatabase.url | quote }}
+            {{- end }}
             - name: API_GATEWAY_URL
               value: "http://{{ include "action-agent.fullname" . }}-api-gateway:{{ .Values.services.apiGateway.service.port }}"
             - name: AI_SERVICE_URL

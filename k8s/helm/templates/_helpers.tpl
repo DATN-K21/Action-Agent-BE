@@ -96,7 +96,7 @@ Generate userDatabase connection string
 {{- if .Values.external.userDatabase.enabled }}
 {{- .Values.external.userDatabase.connectionString }}
 {{- else }}
-{{- printf "mongodb://%s:%s@%s-user-db:27017/%s?authSource=admin" .Values.databases.userDatabase.auth.username .Values.databases.userDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.userDatabase.database }}
+{{- printf "mongodb://%s:%s@%s-user-db:27017/%s?authSource=%s" .Values.databases.userDatabase.auth.username .Values.databases.userDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.userDatabase.database .Values.databases.userDatabase.database }}
 {{- end }}
 {{- end }}
 
@@ -107,7 +107,7 @@ Generate extensionDatabase connection string
 {{- if .Values.external.extensionDatabase.enabled }}
 {{- .Values.external.extensionDatabase.connectionString }}
 {{- else }}
-{{- printf "mongodb://%s:%s@%s-extension-db:27017/%s?authSource=admin" .Values.databases.extensionDatabase.auth.username .Values.databases.extensionDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.extensionDatabase.database }}
+{{- printf "mongodb://%s:%s@%s-extension-db:27017/%s?authSource=%s" .Values.databases.extensionDatabase.auth.username .Values.databases.extensionDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.extensionDatabase.database .Values.databases.extensionDatabase.database }}
 {{- end }}
 {{- end }}
 

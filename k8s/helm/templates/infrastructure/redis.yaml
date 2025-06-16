@@ -34,10 +34,12 @@ spec:
               containerPort: {{ .Values.databases.redis.service.port }}
               protocol: TCP
           env:
-            {{- if .Values.databases.redis.auth.password }}
+            - name: REDIS_USERNAME
+              value: {{ .Values.databases.redis.auth.username | quote }}
             - name: REDIS_PASSWORD
               value: {{ .Values.databases.redis.auth.password | quote }}
-            {{- end }}
+            - name: REDIS_PORT
+              value: "{{ .Values.databases.redis.service.port }}"
           {{- if .Values.databases.redis.auth.password }}
           command:
             - redis-server
@@ -56,8 +58,8 @@ spec:
               command:
                 - sh
                 - -c
-                {{- if .Values.databases.redis.auth.password }}
-                - redis-cli -a $REDIS_PASSWORD ping
+                {{- if .Values.databases.redis.auth.username }}
+                - redis-cli -h 127.0.0.1 -p {{ .Values.databases.redis.service.port }} --user $(REDIS_USERNAME) --pass $(REDIS_PASSWORD) ping
                 {{- else }}
                 - redis-cli ping
                 {{- end }}
@@ -70,8 +72,8 @@ spec:
               command:
                 - sh
                 - -c
-                {{- if .Values.databases.redis.auth.password }}
-                - redis-cli -a $REDIS_PASSWORD ping
+                {{- if .Values.databases.redis.auth.username }}
+                - redis-cli -h 127.0.0.1 -p {{ .Values.databases.redis.service.port }} --user $(REDIS_USERNAME) --pass $(REDIS_PASSWORD) ping
                 {{- else }}
                 - redis-cli ping
                 {{- end }}

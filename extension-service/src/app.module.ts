@@ -9,7 +9,7 @@ import { CrawlerModule } from './crawler/crawler.module';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(EnvironmentConfig.DATABASE_URL || 'mongodb://localhost:27017/composio'),
+    MongooseModule.forRoot(EnvironmentConfig.DATABASE_URL || 'mongodb://localhost:27017/extension-db'),
     AppsModule, 
     ActionsModule,
     CrawlerModule,

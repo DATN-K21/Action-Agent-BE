@@ -1,4 +1,18 @@
 {{- if and .Values.databases.userDatabase.enabled (not .Values.external.userDatabase.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "action-agent.fullname" . }}-user-db-init
+  namespace: {{ .Values.global.namespace }}
+data:
+  create-user.js: |
+    db = db.getSiblingDB("{{ .Values.databases.userDatabase.database }}");
+    db.createUser({
+      user:   "{{ .Values.databases.userDatabase.auth.username }}",
+      pwd:    "{{ .Values.databases.userDatabase.auth.password }}",
+      roles:  [{ role: "readWrite", db: "{{ .Values.databases.userDatabase.database }}" }]
+    });
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,19 +48,18 @@ spec:
               containerPort: {{ .Values.databases.userDatabase.service.port }}
               protocol: TCP
           env:
-            - name: MONGO_INITDB_ROOT_USERNAME
-              value: {{ .Values.databases.userDatabase.auth.username | quote }}
-            - name: MONGO_INITDB_ROOT_PASSWORD
-              value: {{ .Values.databases.userDatabase.auth.password | quote }}
             - name: MONGO_INITDB_DATABASE
               value: {{ .Values.databases.userDatabase.database | quote }}
           resources:
             {{- toYaml .Values.databases.userDatabase.resources | nindent 12 }}
-          {{- if .Values.databases.userDatabase.persistence.enabled }}
           volumeMounts:
+            {{- if .Values.databases.userDatabase.persistence.enabled }}
             - name: user-db-data
               mountPath: /data/db
-          {{- end }}
+            {{- end }}
+            - name: user-db-init
+              mountPath: /docker-entrypoint-initdb.d/create-user.js
+              subPath: create-user.js
           livenessProbe:
             exec:
               command:
@@ -69,12 +82,15 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-      {{- if .Values.databases.userDatabase.persistence.enabled }}
       volumes:
+        - name: user-db-init
+          configMap:
+            name: {{ include "action-agent.fullname" . }}-user-db-init
+        {{- if .Values.databases.userDatabase.persistence.enabled }}
         - name: user-db-data
           persistentVolumeClaim:
             claimName: {{ include "action-agent.fullname" . }}-user-db-pvc
-      {{- end }}
+        {{- end }}
       {{- with .Values.databases.userDatabase.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
