@@ -41,7 +41,7 @@ services:
         timeoutSeconds: 5
         failureThreshold: 3
       readinessProbe:
-        initialDelaySeconds: 5
+        initialDelaySeconds: 60
         periodSeconds: 60
         timeoutSeconds: 5
         failureThreshold: 3
@@ -98,12 +98,12 @@ services:
     healthCheck:
       path: "/ping"
       livenessProbe:
-        initialDelaySeconds: 30
+        initialDelaySeconds: 60
         periodSeconds: 60
         timeoutSeconds: 5
         failureThreshold: 3
       readinessProbe:
-        initialDelaySeconds: 5
+        initialDelaySeconds: 60
         periodSeconds: 60
         timeoutSeconds: 5
         failureThreshold: 3
@@ -187,7 +187,7 @@ databases:
     auth:
       username: root
       password: root
-    database: user-db
+    database: user-database
     resources:
       requests:
         cpu: 10m
@@ -210,7 +210,7 @@ databases:
     auth:
       username: root
       password: root
-    database: extension-db
+    database: extension-database
     resources:
       requests:
         cpu: 10m
