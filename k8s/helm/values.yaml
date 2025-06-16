@@ -177,7 +177,7 @@ databases:
     enabled: true
     image:
       repository: mongo
-      tag: latest
+      tag: "7.0"
     service:
       type: ClusterIP
       port: 27017
@@ -200,7 +200,7 @@ databases:
     enabled: true
     image:
       repository: mongo
-      tag: latest
+      tag: "7.0"
     service:
       type: ClusterIP
       port: 27017
