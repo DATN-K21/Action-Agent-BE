@@ -1,0 +1,129 @@
+{{- if and .Values.databases.extensionDatabase.enabled (not .Values.external.extensionDatabase.enabled) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "action-agent.fullname" . }}-extension-db
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: extension-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "action-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: extension-db
+  template:
+    metadata:
+      labels:
+        {{- include "action-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: extension-db
+    spec:
+      securityContext:
+        {{- toYaml .Values.databases.extensionDatabase.podSecurityContext | nindent 8 }}
+      containers:
+        - name: extension-db
+          securityContext:
+            {{- toYaml .Values.databases.extensionDatabase.securityContext | nindent 12 }}
+          image: "{{ .Values.databases.extensionDatabase.image.repository }}:{{ .Values.databases.extensionDatabase.image.tag }}"
+          imagePullPolicy: {{ .Values.databases.extensionDatabase.image.pullPolicy }}
+          ports:
+            - name: extension-db
+              containerPort: {{ .Values.databases.extensionDatabase.service.port }}
+              protocol: TCP
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: {{ .Values.databases.extensionDatabase.auth.username | quote }}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: {{ .Values.databases.extensionDatabase.auth.password | quote }}
+            - name: MONGO_INITDB_DATABASE
+              value: {{ .Values.databases.extensionDatabase.database | quote }}
+          resources:
+            {{- toYaml .Values.databases.extensionDatabase.resources | nindent 12 }}
+          {{- if .Values.databases.extensionDatabase.persistence.enabled }}
+          volumeMounts:
+            - name: extension-db-data
+              mountPath: /data/db
+          {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+      {{- if .Values.databases.extensionDatabase.persistence.enabled }}
+      volumes:
+        - name: extension-db-data
+          persistentVolumeClaim:
+            claimName: {{ include "action-agent.fullname" . }}-extension-db-pvc
+      {{- end }}
+      {{- with .Values.databases.extensionDatabase.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databases.extensionDatabase.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databases.extensionDatabase.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if .Values.databases.extensionDatabase.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "action-agent.fullname" . }}-extension-db-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: extension-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.databases.extensionDatabase.persistence.size }}
+  {{- if .Values.databases.extensionDatabase.persistence.storageClass }}
+  storageClassName: {{ .Values.databases.extensionDatabase.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "action-agent.fullname" . }}-extension-db
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "action-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: extension-db
+spec:
+  type: ClusterIP
+  ports:
+    - name: extension-db
+      port: {{ .Values.databases.extensionDatabase.service.port }}
+      targetPort: extension-db
+      protocol: TCP
+  selector:
+    {{- include "action-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: extension-db
+{{- end }}

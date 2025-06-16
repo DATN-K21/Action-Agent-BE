@@ -42,7 +42,7 @@ spec:
             - name: PORT
               value: {{ .Values.services.aiService.service.port | quote }}
             - name: DATABASE_URL
-              value: {{ include "action-agent.postgresConnectionString" . | quote }}
+              value: {{ include "action-agent.aiDatabaseConnectionString" . | quote }}
             - name: REDIS_URL
               value: {{ include "action-agent.redisConnectionString" . | quote }}
             {{- if .Values.external.elasticsearch.enabled }}

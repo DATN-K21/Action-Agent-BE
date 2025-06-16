@@ -37,13 +37,13 @@ spec:
             {{- if .Values.databases.redis.auth.password }}
             - name: REDIS_PASSWORD
               value: {{ .Values.databases.redis.auth.password | quote }}
+            {{- end }}
+          {{- if .Values.databases.redis.auth.password }}
           command:
             - redis-server
-            {{- if .Values.databases.redis.auth.password }}
             - --requirepass
             - $(REDIS_PASSWORD)
-            {{- end }}
-            {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.databases.redis.resources | nindent 12 }}
           {{- if .Values.databases.redis.persistence.enabled }}

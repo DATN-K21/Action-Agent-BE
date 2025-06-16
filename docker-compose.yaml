@@ -59,7 +59,7 @@ services:
       LLM_DEFAULT_PROVIDER: openai
       LLM_DEFAULT_MODEL: gpt-4o-mini
       LLM_DEFAULT_API_KEY: <YOUR_OPENAI_API_KEY>
-      POSTGRES_HOST: ai-database
+      POSTGRES_HOST: ai-db
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
@@ -81,7 +81,7 @@ services:
       PORT: 15300
       COMPOSIO_API_BASE_URL: https://backend.composio.dev/api
       COMPOSIO_API_KEY: d04n821zcnqtop53g98fx
-      DATABASE_URL: mongodb://root:root@mongo-database:27017/datn-extension-database?authSource=admin
+      DATABASE_URL: mongodb://root:root@mongo-database:27017/datn-extension-db?authSource=admin
     ports:
       - "15300:15300"
     restart: always
@@ -89,19 +89,19 @@ services:
   ####################################################
   ################ Databases #########################
   ####################################################
-  ai-database:
+  ai-db:
     image: pgvector/pgvector:pg16
-    container_name: ai-database
+    container_name: ai-db
     environment:
       POSTGRES_DB: ai-database
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
-      POSTGRES_HOST: ai-database
+      POSTGRES_HOST: ai-db
       POSTGRES_PORT: 5432
     ports:
       - "5433:5432"
     volumes:
-      - ai-database:/var/lib/postgresql/data
+      - ai-db:/var/lib/postgresql/data
     restart: always
 
   mongo-database:
@@ -178,7 +178,7 @@ services:
 
 volumes:
   es-data:
-  ai-database:
+  ai-db:
   mongo-database:
   rabbitmq:
   redis:

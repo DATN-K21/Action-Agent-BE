@@ -42,7 +42,7 @@ spec:
             - name: PORT
               value: {{ .Values.services.extensionService.service.port | quote }}
             - name: DATABASE_URL
-              value: {{ include "action-agent.mongoConnectionString" . }}/datn-extension-database
+              value: "mongodb://{{ .Values.databases.extensionDatabase.auth.username }}:{{ .Values.databases.extensionDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-extension-db:27017/{{ .Values.databases.extensionDatabase.database }}?authSource=admin"
             {{- range $key, $value := .Values.services.extensionService.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

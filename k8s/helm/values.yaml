@@ -1,5 +1,6 @@
 global:
   namespace: default
+  environment: dev
 
 # Azure Container Registry credentials (disabled by default)
 acrCredentials:
@@ -17,13 +18,6 @@ secretProvider: local
 # Secret management configurations
 secrets:
   enabled: false
-  createSecrets: true
-  apiGateway: "api-gateway-secrets"
-  userService: "user-service-secrets"
-  aiService:   "ai-service-secrets"
-  extensionService: "extension-service-secrets"
-  database: "database-secrets"
-  infrastructure: "infrastructure-secrets"
 
 # Service configurations
 services:
@@ -156,7 +150,7 @@ services:
 
 # Database configurations
 databases:
-  postgresql:
+  aiDatabase:
     enabled: true
     image:
       repository: pgvector/pgvector
@@ -169,8 +163,8 @@ databases:
       size: 1Gi
     auth:
       username: postgres
-      password: password
-    database: actionagent
+      password: 123456
+    database: ai-database
     resources:
       requests:
         cpu: 10m
@@ -179,7 +173,7 @@ databases:
         cpu: 500m
         memory: 512Mi
 
-  mongodb:
+  userDatabase:
     enabled: true
     image:
       repository: mongo
@@ -191,9 +185,32 @@ databases:
       enabled: true
       size: 1Gi
     auth:
-      username: admin
-      password: password
-    database: actionagent
+      username: root
+      password: root
+    database: user-db
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  extensionDatabase:
+    enabled: true
+    image:
+      repository: mongo
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 27017
+    persistence:
+      enabled: true
+      size: 1Gi
+    auth:
+      username: root
+      password: root
+    database: extension-db
     resources:
       requests:
         cpu: 10m
@@ -214,7 +231,7 @@ databases:
       enabled: true
       size: 1Gi
     auth:
-      password: ""  # Empty password means no authentication
+      password: "root"  # Redis authentication password
     resources:
       requests:
         cpu: 10m
@@ -277,6 +294,9 @@ infrastructure:
       type: ClusterIP
       port: 5672
     managementPort: 15672
+    auth:
+      username: root
+      password: root
     persistence:
       enabled: true
       size: 1Gi
@@ -304,9 +324,11 @@ external:
     enabled: false
   rabbitmq:
     enabled: false
-  mongodb:
+  userDatabase:
     enabled: false
-  postgresql:
+  extensionDatabase:
+    enabled: false
+  aiDatabase:
     enabled: false
   redis:
     enabled: false

@@ -47,6 +47,26 @@ spec:
             - name: HTTPS_PORT
               value: {{ .Values.services.apiGateway.service.port | quote }}
             {{- end }}
+            - name: USER_SERVICE_URL
+              value: "http://{{ include "action-agent.fullname" . }}-user-service:{{ .Values.services.userService.service.port }}"
+            - name: AI_SERVICE_URL
+              value: "http://{{ include "action-agent.fullname" . }}-ai-service:{{ .Values.services.aiService.service.port }}"
+            {{- if .Values.infrastructure.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_URL
+              value: "http://{{ include "action-agent.fullname" . }}-elasticsearch:{{ .Values.infrastructure.elasticsearch.service.port }}"
+            {{- else if .Values.external.elasticsearch.enabled }}
+            - name: ELASTICSEARCH_URL
+              value: {{ .Values.external.elasticsearch.url | quote }}
+            {{- end }}
+            {{- if .Values.infrastructure.rabbitmq.enabled }}
+            - name: RABBITMQ_URL
+              value: "amqp://{{ .Values.infrastructure.rabbitmq.auth.username }}:{{ .Values.infrastructure.rabbitmq.auth.password }}@{{ include "action-agent.fullname" . }}-rabbitmq:{{ .Values.infrastructure.rabbitmq.service.port }}"
+            {{- else if .Values.external.rabbitmq.enabled }}
+            - name: RABBITMQ_URL
+              value: {{ .Values.external.rabbitmq.url | quote }}
+            {{- end }}
+            - name: REDIS_URL
+              value: {{ include "action-agent.redisConnectionString" . | quote }}
             {{- range $key, $value := .Values.services.apiGateway.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

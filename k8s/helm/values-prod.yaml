@@ -111,7 +111,7 @@ secrets:
         - envName: "COMPOSIO_API_KEY"
           keyVaultKey: "prod-composio-api-key"
         - envName: "DATABASE_URL"
-          keyVaultKey: "prod-extension-database-url"
+          keyVaultKey: "prod-extension-db-url"
 
 # Service configurations - use Azure Container Registry images with production settings
 services:
@@ -328,21 +328,26 @@ external:
   rabbitmq:
     enabled: true
     url: "${RABBITMQ_URL_PROD}"      # Set via environment variable - e.g., CloudAMQP
-  mongodb:
+  userDatabase:
     enabled: true
-    connectionString: "${MONGODB_CONNECTION_STRING_PROD}"  # Set via environment variable - e.g., MongoDB Atlas
-  postgresql:
+    connectionString: "${USER_DATABASE_CONNECTION_STRING_PROD}"  # Set via environment variable - e.g., MongoDB Atlas
+  extensionDatabase:
     enabled: true
-    connectionString: "${POSTGRES_CONNECTION_STRING_PROD}" # Set via environment variable - e.g., Azure Database for PostgreSQL
+    connectionString: "${EXTENSION_DATABASE_CONNECTION_STRING_PROD}" # Set via environment variable - e.g., MongoDB Atlas
+  aiDatabase:
+    enabled: true
+    connectionString: "${AI_DATABASE_CONNECTION_STRING_PROD}" # Set via environment variable - e.g., Azure Database for PostgreSQL
   redis:
     enabled: true
     connectionString: "${REDIS_CONNECTION_STRING_PROD}"    # Set via environment variable - e.g., Azure Cache for Redis
 
 # Disable local databases since we're using managed services
 databases:
-  postgresql:
+  aiDatabase:
     enabled: false
-  mongodb:
+  userDatabase:
+    enabled: false
+  extensionDatabase:
     enabled: false
   redis:
     enabled: false

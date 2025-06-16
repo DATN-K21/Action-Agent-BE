@@ -1,12 +1,12 @@
-{{- if and .Values.databases.mongodb.enabled (not .Values.external.mongodb.enabled) }}
+{{- if and .Values.databases.userDatabase.enabled (not .Values.external.userDatabase.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "action-agent.fullname" . }}-mongodb
+  name: {{ include "action-agent.fullname" . }}-user-db
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app.kubernetes.io/component: mongodb
+    app.kubernetes.io/component: user-db
 spec:
   replicas: 1
   strategy:
@@ -14,37 +14,37 @@ spec:
   selector:
     matchLabels:
       {{- include "action-agent.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: mongodb
+      app.kubernetes.io/component: user-db
   template:
     metadata:
       labels:
         {{- include "action-agent.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: mongodb
+        app.kubernetes.io/component: user-db
     spec:
       securityContext:
-        {{- toYaml .Values.databases.mongodb.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.databases.userDatabase.podSecurityContext | nindent 8 }}
       containers:
-        - name: mongodb
+        - name: user-db
           securityContext:
-            {{- toYaml .Values.databases.mongodb.securityContext | nindent 12 }}
-          image: "{{ .Values.databases.mongodb.image.repository }}:{{ .Values.databases.mongodb.image.tag }}"
-          imagePullPolicy: {{ .Values.databases.mongodb.image.pullPolicy }}
+            {{- toYaml .Values.databases.userDatabase.securityContext | nindent 12 }}
+          image: "{{ .Values.databases.userDatabase.image.repository }}:{{ .Values.databases.userDatabase.image.tag }}"
+          imagePullPolicy: {{ .Values.databases.userDatabase.image.pullPolicy }}
           ports:
-            - name: mongodb
-              containerPort: {{ .Values.databases.mongodb.service.port }}
+            - name: user-db
+              containerPort: {{ .Values.databases.userDatabase.service.port }}
               protocol: TCP
           env:
             - name: MONGO_INITDB_ROOT_USERNAME
-              value: {{ .Values.databases.mongodb.auth.username | quote }}
+              value: {{ .Values.databases.userDatabase.auth.username | quote }}
             - name: MONGO_INITDB_ROOT_PASSWORD
-              value: {{ .Values.databases.mongodb.auth.password | quote }}
+              value: {{ .Values.databases.userDatabase.auth.password | quote }}
             - name: MONGO_INITDB_DATABASE
-              value: {{ .Values.databases.mongodb.database | quote }}
+              value: {{ .Values.databases.userDatabase.database | quote }}
           resources:
-            {{- toYaml .Values.databases.mongodb.resources | nindent 12 }}
-          {{- if .Values.databases.mongodb.persistence.enabled }}
+            {{- toYaml .Values.databases.userDatabase.resources | nindent 12 }}
+          {{- if .Values.databases.userDatabase.persistence.enabled }}
           volumeMounts:
-            - name: mongodb-data
+            - name: user-db-data
               mountPath: /data/db
           {{- end }}
           livenessProbe:
@@ -67,43 +67,43 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 5
             failureThreshold: 3
-      {{- if .Values.databases.mongodb.persistence.enabled }}
+      {{- if .Values.databases.userDatabase.persistence.enabled }}
       volumes:
-        - name: mongodb-data
+        - name: user-db-data
           persistentVolumeClaim:
-            claimName: {{ include "action-agent.fullname" . }}-mongodb-pvc
+            claimName: {{ include "action-agent.fullname" . }}-user-db-pvc
       {{- end }}
-      {{- with .Values.databases.mongodb.nodeSelector }}
+      {{- with .Values.databases.userDatabase.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.databases.mongodb.affinity }}
+      {{- with .Values.databases.userDatabase.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.databases.mongodb.tolerations }}
+      {{- with .Values.databases.userDatabase.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-{{- if .Values.databases.mongodb.persistence.enabled }}
+{{- if .Values.databases.userDatabase.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "action-agent.fullname" . }}-mongodb-pvc
+  name: {{ include "action-agent.fullname" . }}-user-db-pvc
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app.kubernetes.io/component: mongodb
+    app.kubernetes.io/component: user-db
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.databases.mongodb.persistence.size }}
-  {{- if .Values.databases.mongodb.persistence.storageClass }}
-  storageClassName: {{ .Values.databases.mongodb.persistence.storageClass }}
+      storage: {{ .Values.databases.userDatabase.persistence.size }}
+  {{- if .Values.databases.userDatabase.persistence.storageClass }}
+  storageClassName: {{ .Values.databases.userDatabase.persistence.storageClass }}
   {{- end }}
 {{- end }}
 
@@ -111,19 +111,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "action-agent.fullname" . }}-mongodb
+  name: {{ include "action-agent.fullname" . }}-user-db
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "action-agent.labels" . | nindent 4 }}
-    app.kubernetes.io/component: mongodb
+    app.kubernetes.io/component: user-db
 spec:
   type: ClusterIP
   ports:
-    - name: mongodb
-      port: {{ .Values.databases.mongodb.service.port }}
-      targetPort: mongodb
+    - name: user-db
+      port: {{ .Values.databases.userDatabase.service.port }}
+      targetPort: user-db
       protocol: TCP
   selector:
     {{- include "action-agent.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: mongodb
+    app.kubernetes.io/component: user-db
 {{- end }}

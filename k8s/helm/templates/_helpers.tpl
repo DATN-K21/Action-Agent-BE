@@ -90,24 +90,35 @@ Generate full image name
 {{- end }}
 
 {{/*
-Generate MongoDB connection string
+Generate userDatabase connection string
 */}}
-{{- define "action-agent.mongoConnectionString" -}}
-{{- if .Values.external.mongodb.enabled }}
-{{- .Values.external.mongodb.connectionString }}
+{{- define "action-agent.userDatabaseConnectionString" -}}
+{{- if .Values.external.userDatabase.enabled }}
+{{- .Values.external.userDatabase.connectionString }}
 {{- else }}
-{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=admin" .Values.databases.mongodb.auth.username .Values.databases.mongodb.auth.password (include "action-agent.fullname" .) .Values.databases.mongodb.database }}
+{{- printf "mongodb://%s:%s@%s-user-db:27017/%s?authSource=admin" .Values.databases.userDatabase.auth.username .Values.databases.userDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.userDatabase.database }}
 {{- end }}
 {{- end }}
 
 {{/*
-Generate PostgreSQL connection string
+Generate extensionDatabase connection string
 */}}
-{{- define "action-agent.postgresConnectionString" -}}
-{{- if .Values.external.postgresql.enabled }}
-{{- .Values.external.postgresql.connectionString }}
+{{- define "action-agent.extensionDatabaseConnectionString" -}}
+{{- if .Values.external.extensionDatabase.enabled }}
+{{- .Values.external.extensionDatabase.connectionString }}
 {{- else }}
-{{- printf "postgresql://%s:%s@%s-postgresql:5432/%s" .Values.databases.postgresql.auth.username .Values.databases.postgresql.auth.password (include "action-agent.fullname" .) .Values.databases.postgresql.database }}
+{{- printf "mongodb://%s:%s@%s-extension-db:27017/%s?authSource=admin" .Values.databases.extensionDatabase.auth.username .Values.databases.extensionDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.extensionDatabase.database }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate aiDatabase connection string
+*/}}
+{{- define "action-agent.aiDatabaseConnectionString" -}}
+{{- if .Values.external.aiDatabase.enabled }}
+{{- .Values.external.aiDatabase.connectionString }}
+{{- else }}
+{{- printf "postgresql://%s:%s@%s-ai-db:5432/%s" .Values.databases.aiDatabase.auth.username .Values.databases.aiDatabase.auth.password (include "action-agent.fullname" .) .Values.databases.aiDatabase.database }}
 {{- end }}
 {{- end }}
 

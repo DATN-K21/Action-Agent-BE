@@ -44,9 +44,19 @@ spec:
             - name: NODE_ENV
               value: {{ .Values.global.environment | quote }}
             - name: MONGODB_CONNECTION_STRING
-              value: {{ include "action-agent.mongoConnectionString" . | quote }}
+              value: "mongodb://{{ .Values.databases.userDatabase.auth.username }}:{{ .Values.databases.userDatabase.auth.password }}@{{ include "action-agent.fullname" . }}-user-db:27017/{{ .Values.databases.userDatabase.database }}?authSource=admin"
             - name: API_GATEWAY_URL
               value: "http://{{ include "action-agent.fullname" . }}-api-gateway:{{ .Values.services.apiGateway.service.port }}"
+            - name: AI_SERVICE_URL
+              value: "http://{{ include "action-agent.fullname" . }}-ai-service:{{ .Values.services.aiService.service.port }}"
+            - name: REDIS_HOST
+              value: "{{ include "action-agent.fullname" . }}-redis"
+            - name: REDIS_PORT
+              value: {{ .Values.databases.redis.service.port | quote }}
+            - name: REDIS_USER
+              value: "default"
+            - name: REDIS_PASSWORD
+              value: {{ .Values.databases.redis.auth.password | quote }}
             {{- range $key, $value := .Values.services.userService.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}
