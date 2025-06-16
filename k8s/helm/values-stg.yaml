@@ -117,7 +117,7 @@ secrets:
 services:
   apiGateway:
     enabled: true
-    replicaCount: 2
+    replicaCount: 1
     image:
       repository: "api-gateway"
       tag: "stg"
@@ -167,7 +167,7 @@ services:
 
   userService:
     enabled: true
-    replicaCount: 2
+    replicaCount: 1
     image:
       repository: "user-service"
       tag: "stg"
@@ -213,7 +213,7 @@ services:
 
   aiService:
     enabled: true
-    replicaCount: 2
+    replicaCount: 1
     image:
       repository: "ai-service"
       tag: "stg"
@@ -259,7 +259,7 @@ services:
 
   extensionService:
     enabled: true
-    replicaCount: 2
+    replicaCount: 1
     image:
       repository: "extension-service"
       tag: "stg"
@@ -316,16 +316,16 @@ external:
     url: "${RABBITMQ_URL_STG}"      # Set via environment variable - e.g., CloudAMQP
   userDatabase:
     enabled: true
-    connectionString: "${USER_DATABASE_URL_STG}"  # Set via environment variable - e.g., MongoDB Atlas
+    url: "${USER_DATABASE_URL_STG}"  # Set via environment variable - e.g., MongoDB Atlas
   extensionDatabase:
     enabled: true
-    connectionString: "${EXTENSION_DATABASE_URL_STG}"      # Set via environment variable - e.g., MongoDB Atlas
+    url: "${EXTENSION_DATABASE_URL_STG}"      # Set via environment variable - e.g., MongoDB Atlas
   aiDatabase:
-    enabled: true
-    connectionString: "${AI_DATABASE_URL_STG}" # Set via environment variable - e.g., Azure Database for PostgreSQL
+    enabled: false
+    url: "${AI_DATABASE_URL_STG}" # Set via environment variable - e.g., Azure Database for PostgreSQL
   redis:
     enabled: true
-    connectionString: "${REDIS_CONNECTION_STRING_STG}"    # Set via environment variable - e.g., Azure Cache for Redis
+    url: "${REDIS_CONNECTION_STRING_STG}"    # Set via environment variable - e.g., Azure Cache for Redis
 
 # Disable local databases since we're using managed services
 databases:
@@ -370,7 +370,7 @@ ingress:
 
 # Autoscaling for staging
 autoscaling:
-  enabled: true
+  enabled: false
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70

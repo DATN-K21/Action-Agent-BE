@@ -244,8 +244,8 @@ services:
         failureThreshold: 3
     resources:
       requests:
-        cpu: 1000m
-        memory: 2Gi
+        cpu: 200m
+        memory: 512Mi
       limits:
         cpu: 4000m
         memory: 8Gi
@@ -377,7 +377,7 @@ ingress:
       more_set_headers "X-XSS-Protection: 1; mode=block";
       more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
   hosts:
-    - host: api.action-agent.com
+    - host: api.action-agent.software
       paths:
         - path: /
           pathType: Prefix
@@ -385,9 +385,9 @@ ingress:
             service: api-gateway
             port: 15000
   tls:
-    - secretName: api-action-agent-com-tls
+    - secretName: api-action-agent-tls
       hosts:
-        - api.action-agent.com
+        - api.action-agent.software
 
 # Autoscaling for production - more aggressive scaling
 autoscaling:
@@ -475,7 +475,7 @@ networkPolicy:
 
 # Resource quotas and limits
 resourceQuota:
-  enabled: true
+  enabled: false
   hard:
     requests.cpu: "10"
     requests.memory: "20Gi"
@@ -488,7 +488,7 @@ resourceQuota:
 
 # Security context for all pods
 securityContext:
-  runAsNonRoot: true
+  runAsNonRoot: false
   runAsUser: 1000
   runAsGroup: 3000
   fsGroup: 2000
@@ -500,4 +500,4 @@ podSecurityContext:
   capabilities:
     drop:
     - ALL
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: false
