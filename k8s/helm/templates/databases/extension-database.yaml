@@ -54,8 +54,8 @@ spec:
                 - --quiet
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 15
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 6
           readinessProbe:
@@ -65,8 +65,8 @@ spec:
                 - --quiet
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 15
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
       {{- if .Values.databases.extensionDatabase.persistence.enabled }}

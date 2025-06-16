@@ -19,6 +19,11 @@ export class AppController {
     return 'OK';
   }
 
+  @Get('ping')
+  getPing(): { message: string } {
+    return { message: 'pong' };
+  }
+
   @Post('crawl')
   async crawl(): Promise<{ status: string; message: string, data?: any }> {
     try {

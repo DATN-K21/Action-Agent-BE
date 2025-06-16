@@ -55,8 +55,8 @@ spec:
                 - /bin/sh
                 - -c
                 - exec pg_isready -U "{{ .Values.databases.aiDatabase.auth.username }}" -d "{{ .Values.databases.aiDatabase.database }}" -h 127.0.0.1 -p {{ .Values.databases.aiDatabase.service.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 15
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 6
           readinessProbe:
@@ -66,8 +66,8 @@ spec:
                 - -c
                 - -e
                 - exec pg_isready -U "{{ .Values.databases.aiDatabase.auth.username }}" -d "{{ .Values.databases.aiDatabase.database }}" -h 127.0.0.1 -p {{ .Values.databases.aiDatabase.service.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 15
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
       {{- if .Values.databases.aiDatabase.persistence.enabled }}

@@ -38,6 +38,7 @@ Each service provides a `/ping` endpoint to check its health:
 - **API Gateway**: `https://:15000/ping`
 - **User Service**: `http://:15100/ping` (from inside) or `https://:15000/user/ping`
 - **AI Service**: `http://:15200/ping` (from inside) or `https://:15000/ai/ping`
+- **Extension Service**: `http://:15300/ping` (from inside) or `https://:15000/extension/ping`
 
 ## Running the Services
 

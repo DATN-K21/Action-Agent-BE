@@ -391,8 +391,8 @@ ingress:
 
 # Autoscaling for production - more aggressive scaling
 autoscaling:
-  enabled: true
-  minReplicas: 3
+  enabled: false
+  minReplicas: 1
   maxReplicas: 20
   targetCPUUtilizationPercentage: 60
   targetMemoryUtilizationPercentage: 70
