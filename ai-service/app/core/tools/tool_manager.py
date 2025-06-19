@@ -25,7 +25,7 @@ logger = logging.get_logger(__name__)
 # --- Constants ---
 MAX_PERSONAL_TOOLS_PER_USER = env_settings.MAX_PERSONAL_TOOLS_PER_USER
 MAX_CACHED_USERS = env_settings.MAX_CACHED_USERS
-DEFAULT_TOOLS_PACKAGE_PATH = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_TOOLS_PACKAGE_PATH = "app.core.tools"
 
 
 def _standardize_name_part(text_part: str) -> str:
