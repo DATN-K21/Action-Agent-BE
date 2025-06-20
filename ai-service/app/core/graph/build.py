@@ -890,9 +890,10 @@ async def generator(
         async for event in root.astream_events(state, version="v2", config=config):
             # Check if stop has been requested for this user and thread
             if user_id:
-                from app.core.stream_control import is_stop_requested
+                from app.core.stream_control import ais_stop_requested
 
-                if is_stop_requested(user_id, thread_id):
+                is_stopped = await ais_stop_requested(user_id, thread_id)
+                if is_stopped:
                     # Send a stop message and break the loop
                     response = ChatResponse(
                         type="stop",

@@ -66,7 +66,8 @@ class GraphSkill(BaseModel):
         elif self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
             # First, try to get the tool from cache
             try:
-                return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                tool_info = await tool_manager.aget_personal_tool(self.user_id, self.name)
+                return tool_info.tool
             except Exception:
                 # Tool not in cache, try to load it
                 logger.info(f"Tool '{self.name}' not found in cache for user '{self.user_id}', attempting to load...")
@@ -75,7 +76,8 @@ class GraphSkill(BaseModel):
                 if cache_loaded:
                     # Try again after loading cache
                     try:
-                        return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                        tool_info = await tool_manager.aget_personal_tool(self.user_id, self.name)
+                        return tool_info.tool
                     except Exception:
                         raise ValueError(
                             f"Personal tool '{self.name}' not found in cache for user '{self.user_id}' "
@@ -95,7 +97,8 @@ class GraphSkill(BaseModel):
             return global_tools[self.name].tool
         if self.strategy == StorageStrategy.PERSONAL_TOOL_CACHE:
             try:
-                return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                tool_info = await tool_manager.aget_personal_tool(self.user_id, self.name)
+                return tool_info.tool
             except KeyError:
                 # Attempt to load the tool cache before raising error
                 cache_loaded = await self.aload_tool_cache()
@@ -103,7 +106,8 @@ class GraphSkill(BaseModel):
                 if cache_loaded:
                     # Try one more time after scheduling cache load
                     try:
-                        return tool_manager.get_personal_tool(self.user_id, self.name).tool
+                        tool_info = await tool_manager.aget_personal_tool(self.user_id, self.name)
+                        return tool_info.tool
                     except Exception:
                         # If still not found, provide a helpful error message
                         logger.warning(f"Personal tool '{self.name}' not found in cache for user '{self.user_id}' even after cache loading attempt")

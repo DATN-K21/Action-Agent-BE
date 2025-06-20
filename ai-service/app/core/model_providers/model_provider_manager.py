@@ -56,7 +56,7 @@ class ModelProviderManager:
                 if model["name"] == model_name:
                     return {
                         "provider": key,
-                        "model_name": model,
+                        "model_name": model["name"],
                         "base_url": self.providers[key]["base_url"],
                         "api_key": self.providers[key]["api_key"],
                     }

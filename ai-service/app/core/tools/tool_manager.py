@@ -1,7 +1,7 @@
+import asyncio
 import importlib
 import os
 import re
-import threading
 from collections import OrderedDict
 from typing import Any, Dict
 
@@ -94,7 +94,7 @@ class ToolManager:
         self.tools_package_path = tools_package_path
 
         # Initialize the lock
-        self.cache_lock = threading.Lock()  # For asyncio, this would be asyncio.Lock()
+        self.cache_lock = asyncio.Lock()  # Using asyncio.Lock() for async operations
 
         if MAX_CACHED_USERS <= 0:
             logger.warning("Warning: MAX_CACHED_USERS non-positive. Personal user caching disabled.")
@@ -197,10 +197,9 @@ class ToolManager:
         self._load_hardcoded_external_tools_to_global()
         logger.info(f"Loaded {len(self.global_tools)} global tools.")
 
-    def add_personal_tool(self, user_id: str, tool_key: str, tool_info: ToolInfo):
-        # For asyncio: async def add_personal_tool(self, ...):
-        # For asyncio:     async with self.cache_lock:
-        with self.cache_lock:  # Acquire lock
+    async def aadd_personal_tool(self, user_id: str, tool_key: str, tool_info: ToolInfo):
+        # Using asyncio.Lock() with async with statement
+        async with self.cache_lock:  # Acquire lock
             if MAX_CACHED_USERS <= 0:
                 return
 
@@ -227,10 +226,9 @@ class ToolManager:
                 logger.warning(f"Tool limit ({MAX_PERSONAL_TOOLS_PER_USER}) for '{user_id}' hit. Evicted: '{dropped_tool_key}'.")
         # Lock is released automatically when exiting 'with' block
 
-    def get_personal_tool(self, user_id: str, tool_key: str) -> ToolInfo:
-        # For asyncio: async def get_personal_tool(self, ...):
-        # For asyncio:     async with self.cache_lock:
-        with self.cache_lock:  # Acquire lock
+    async def aget_personal_tool(self, user_id: str, tool_key: str) -> ToolInfo:
+        # Using asyncio.Lock() with async with statement
+        async with self.cache_lock:  # Acquire lock
             if user_id in self.personal_tool_cache:
                 self.personal_tool_cache.move_to_end(user_id)
                 user_specific_cache = self.personal_tool_cache[user_id]
@@ -241,13 +239,13 @@ class ToolManager:
             raise KeyError(f"Personal tool '{tool_key}' for user '{user_id}' not found in cache.")
         # Lock is released
 
-    def get_tools_for_user(self, user_id: str) -> Dict[str, ToolInfo]:
+    async def aget_tools_for_user(self, user_id: str) -> Dict[str, ToolInfo]:
         # This method involves both read (global_tools) and potential read/write (personal_tool_cache)
         available_tools = self.global_tools.copy()  # Read-only access to global_tools after init is safe
         user_personal_tools_snapshot: Dict[str, ToolInfo] = {}
 
-        # For asyncio: async with self.cache_lock:
-        with self.cache_lock:  # Acquire lock for operations on personal_tool_cache
+        # Using asyncio.Lock() with async with statement
+        async with self.cache_lock:  # Acquire lock for operations on personal_tool_cache
             if MAX_CACHED_USERS > 0 and user_id in self.personal_tool_cache:
                 self.personal_tool_cache.move_to_end(user_id)
                 user_lru_cache = self.personal_tool_cache[user_id]
@@ -266,10 +264,9 @@ class ToolManager:
         # Reading global_tools is safe as it's populated at init and then read-only.
         return self.global_tools.copy()
 
-    def clear_personal_tool_cache(self, user_id: str | None = None):
-        # For asyncio: async def clear_personal_tool_cache(self, ...):
-        # For asyncio:     async with self.cache_lock:
-        with self.cache_lock:  # Acquire lock
+    async def aclear_personal_tool_cache(self, user_id: str | None = None):
+        # Using asyncio.Lock() with async with statement
+        async with self.cache_lock:  # Acquire lock
             if user_id:
                 if user_id in self.personal_tool_cache:
                     del self.personal_tool_cache[user_id]

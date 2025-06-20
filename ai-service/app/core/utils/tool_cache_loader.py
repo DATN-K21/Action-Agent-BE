@@ -117,7 +117,7 @@ async def _aload_mcp_tools_to_cache(session, mcp_id: str, member_id: str) -> Non
         matching_tool_info = tool_by_display_name.get(skill.display_name)
         if matching_tool_info:
             # Add tool to cache
-            tool_manager.add_personal_tool(
+            await tool_manager.aadd_personal_tool(
                 user_id=skill.user_id,
                 tool_key=skill.name,
                 tool_info=matching_tool_info,
@@ -178,7 +178,7 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
         matching_tool_info = tool_by_display_name.get(skill.display_name)
         if matching_tool_info:
             # Add tool to cache
-            tool_manager.add_personal_tool(
+            await tool_manager.aadd_personal_tool(
                 user_id=skill.user_id,
                 tool_key=skill.name,
                 tool_info=matching_tool_info,

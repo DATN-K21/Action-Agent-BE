@@ -88,7 +88,7 @@ def create_context_manager_for_model(
     Args:
         model_name: Name of the model
         provider: Model provider (optional)
-        context_ratio: Ratio of total context to use (default 0.6)
+        context_ratio: Ratio of total context to use
 
     Returns:
         Configured ContextManager instance
@@ -160,5 +160,5 @@ def get_optimized_format_messages_for_model(
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO
 
-    context_manager = create_context_manager_for_model(model_name, provider, context_ratio=ratio)
+    context_manager = create_context_manager_for_model(model_name, provider, ratio)
     return context_manager.format_optimized_messages(messages)

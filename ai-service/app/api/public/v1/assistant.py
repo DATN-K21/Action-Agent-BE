@@ -426,7 +426,7 @@ async def _acreate_mcp_member_with_skills(
         await session.flush()
 
         # Add tool to cache
-        tool_manager.add_personal_tool(
+        await tool_manager.aadd_personal_tool(
             user_id=connected_mcp.user_id,
             tool_key=skill_name,
             tool_info=tool_info,
@@ -509,7 +509,7 @@ async def _acreate_extension_member_with_skills(
         await session.flush()
 
         # Add tool to cache
-        tool_manager.add_personal_tool(
+        await tool_manager.aadd_personal_tool(
             user_id=connected_extension.user_id,
             tool_key=skill_name,
             tool_info=tool_info,
@@ -892,7 +892,7 @@ async def _aupdate_mcp_members(
                     await session.flush()
 
                     # Add tool to cache
-                    tool_manager.add_personal_tool(
+                    await tool_manager.aadd_personal_tool(
                         user_id=user_id,
                         tool_key=skill_name,
                         tool_info=tool_info,
@@ -1002,7 +1002,7 @@ async def _aupdate_extension_members(
                     await session.flush()
 
                     # Add tool to cache
-                    tool_manager.add_personal_tool(
+                    await tool_manager.aadd_personal_tool(
                         user_id=user_id,
                         tool_key=skill_name,
                         tool_info=tool_info,

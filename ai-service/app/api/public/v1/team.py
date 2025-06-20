@@ -271,6 +271,7 @@ async def adelete_team(
 
 @router.post("/{team_id}/stream/{thread_id}/stop", response_model=ResponseWrapper[MessageResponse])
 async def stop_stream(
+    session: SessionDep,
     team_id: str,
     thread_id: str,
     x_user_id=Header(None),
@@ -280,13 +281,40 @@ async def stop_stream(
     Stop an active streaming session for a specific team and thread.
     """
     try:
-        from app.core.stream_control import trigger_stop
+        # Get team and join members and skills
+        statement = (
+            select(Team)
+            .options(selectinload(Team.assistant), selectinload(Team.graphs), selectinload(Team.subgraphs), selectinload(Team.members))
+            .where(Team.id == team_id, Team.is_deleted.is_(False))
+        )
+
+        result = await session.execute(statement)
+        team = result.scalar_one_or_none()
+
+        if not team:
+            return ResponseWrapper(status=404, message="Team not found").to_response()
+        if x_user_role not in ["admin", "super admin"] and (team.user_id != x_user_id):
+            return ResponseWrapper(status=403, message="Not enough permissions").to_response()
+
+        # Check if thread belongs to the team
+        statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+        result = await session.execute(statement)
+        thread = result.scalar_one_or_none()
+
+        if not thread:
+            return ResponseWrapper(status=404, message="Thread not found").to_response()
+
+        # Ensure the thread is associated with the requested assistant
+        if thread.assistant_id != team.assistant.id:
+            return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
+
+        from app.core.stream_control import atrigger_stop
 
         if not x_user_id:
             return ResponseWrapper(status=400, message="User ID is required").to_response()
 
         # Trigger stop for the specific user and thread
-        stop_triggered = trigger_stop(x_user_id, thread_id)
+        stop_triggered = await atrigger_stop(x_user_id, thread_id)
 
         if stop_triggered:
             data = MessageResponse(message="Stream stop request sent successfully")
@@ -358,10 +386,10 @@ async def astream(
         for graph in graphs:
             graph.config = graph.config
 
-        from app.core.stream_control import cleanup_connection, create_stop_event
+        from app.core.stream_control import acleanup_connection, acreate_stop_event
 
         # Create a stop event for this streaming session
-        stop_event = create_stop_event(x_user_id, thread_id)
+        await acreate_stop_event(x_user_id, thread_id)
 
         async def controlled_generator():
             try:
@@ -369,7 +397,7 @@ async def astream(
                     yield item
             finally:
                 # Clean up the connection when streaming ends
-                cleanup_connection(x_user_id, thread_id)
+                await acleanup_connection(x_user_id, thread_id)
 
         return StreamingResponse(
             controlled_generator(),
