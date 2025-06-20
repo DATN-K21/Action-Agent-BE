@@ -269,6 +269,37 @@ async def adelete_team(
         return ResponseWrapper(status=500, message="Internal server error").to_response()
 
 
+@router.post("/{team_id}/stream/{thread_id}/stop", response_model=ResponseWrapper[MessageResponse])
+async def stop_stream(
+    team_id: str,
+    thread_id: str,
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+) -> Any:
+    """
+    Stop an active streaming session for a specific team and thread.
+    """
+    try:
+        from app.core.stream_control import trigger_stop
+
+        if not x_user_id:
+            return ResponseWrapper(status=400, message="User ID is required").to_response()
+
+        # Trigger stop for the specific user and thread
+        stop_triggered = trigger_stop(x_user_id, thread_id)
+
+        if stop_triggered:
+            data = MessageResponse(message="Stream stop request sent successfully")
+            return ResponseWrapper(status=200, data=data).to_response()
+        else:
+            data = MessageResponse(message="No active stream found for this thread")
+            return ResponseWrapper(status=404, data=data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error stopping stream: {e}", exc_info=True)
+        return ResponseWrapper(status=500, message="Internal server error").to_response()
+
+
 @router.post("/{team_id}/stream/{thread_id}")
 async def astream(
     session: SessionDep,
@@ -327,8 +358,21 @@ async def astream(
         for graph in graphs:
             graph.config = graph.config
 
+        from app.core.stream_control import cleanup_connection, create_stop_event
+
+        # Create a stop event for this streaming session
+        stop_event = create_stop_event(x_user_id, thread_id)
+
+        async def controlled_generator():
+            try:
+                async for item in generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
+                    yield item
+            finally:
+                # Clean up the connection when streaming ends
+                cleanup_connection(x_user_id, thread_id)
+
         return StreamingResponse(
-            generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt),
+            controlled_generator(),
             media_type="text/event-stream",
         )
     except Exception as e:

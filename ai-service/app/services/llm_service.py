@@ -31,12 +31,12 @@ def _get_openai_model(
 
 
 def get_llm_chat_model(
-        *,
-        provider: LlmProvider = env_settings.LLM_DEFAULT_PROVIDER,
-        model: str = env_settings.LLM_DEFAULT_MODEL,
-        api_key: str = env_settings.LLM_DEFAULT_API_KEY,
-        temperature: float = 0,
-        **kwargs,
+    *,
+    provider: LlmProvider = env_settings.LLM_DEFAULT_PROVIDER,
+    model: str = env_settings.LLM_BASIC_MODEL,
+    api_key: str = env_settings.OPENAI_API_KEY,
+    temperature: float = 0,
+    **kwargs,
 ) -> BaseChatModel:
     """
     Get a chat model based on the provider.

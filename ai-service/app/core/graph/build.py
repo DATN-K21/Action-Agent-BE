@@ -643,6 +643,7 @@ async def generator(
     messages: list[ChatMessage],
     thread_id: str,
     interrupt: Interrupt | None = None,
+    user_id: str | None = None,
 ) -> AsyncGenerator[Any, Any]:
     """Create the graph and stream responses as JSON."""
 
@@ -884,11 +885,25 @@ async def generator(
                     )
 
             else:
-                raise ValueError(
-                    f"Unsupported interrupt type: {interrupt.interaction_type}"
-                )
+                raise ValueError(f"Unsupported interrupt type: {interrupt.interaction_type}")
 
         async for event in root.astream_events(state, version="v2", config=config):
+            # Check if stop has been requested for this user and thread
+            if user_id:
+                from app.core.stream_control import is_stop_requested
+
+                if is_stop_requested(user_id, thread_id):
+                    # Send a stop message and break the loop
+                    response = ChatResponse(
+                        type="stop",
+                        content="Stream stopped by user request",
+                        id=str(uuid4()),
+                        name="system",
+                    )
+                    formatted_output = f"data: {response.model_dump_json()}\n\n"
+                    yield formatted_output
+                    break
+
             # If workflow type and graph_config exists, pass nodes parameter
             nodes = graph_config["nodes"] if team.workflow_type == WorkflowType.WORKFLOW and hasattr(graph_config, "nodes") else None
             response = event_to_response(event, nodes=nodes)
