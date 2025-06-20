@@ -13,7 +13,6 @@ from app.core.state import (
     update_node_outputs,
 )
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
-from app.core.workflow.utils.db_utils import get_model_info
 from app.core.workflow.utils.tools_utils import get_retrieval_tool, get_tool
 
 
@@ -35,7 +34,7 @@ class AgentNode:
         self.system_message = system_message
         self.user_message = user_message
         self.agent_name = agent_name or node_id
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
         self.system_prompt = system_message
         self.user_prompt = user_message
         # Prepare the list of tools

@@ -3,7 +3,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
-from app.core.workflow.utils.db_utils import get_model_info
 
 from ...state import (
     ReturnWorkflowTeamState,
@@ -92,7 +91,7 @@ class ParameterExtractorNode:
         self.node_id = node_id
         self.parameter_schema = self._convert_schema_format(parameter_schema)
         self.input = input
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
         self.instruction = instruction
 
     def _convert_schema_format(self, schema_list: list[dict]) -> dict:

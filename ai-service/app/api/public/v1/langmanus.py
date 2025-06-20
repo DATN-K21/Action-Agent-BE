@@ -31,7 +31,7 @@ from app.core.langmanus.server.rag_request import RAGConfigResponse, RAGResource
 from app.core.langmanus.tools import VolcengineTTS
 from app.core.langmanus.workflow import run_agent_workflow_async
 
-router = APIRouter()
+router = APIRouter(prefix="/langmanus", tags=["LangManus"])
 graph = build_graph_with_memory()
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"

@@ -6,7 +6,6 @@ from langchain_core.runnables import RunnableConfig
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
 from app.core.tools.tool_manager import global_tools
-from app.core.workflow.utils.db_utils import get_model_info
 
 from ...state import (
     ReturnWorkflowTeamState,
@@ -37,7 +36,7 @@ Even though you don't perform tasks by yourself, you have a lot of experience in
         self.process_type = process_type
         self.config = config
 
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
         # Initialize LLM
         self.llm = model_provider_manager.init_crewai_model(
             provider_name=self.model_info["provider_name"],

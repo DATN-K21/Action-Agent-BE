@@ -65,13 +65,22 @@ def get_context_limit_for_model(model_name: str, provider: Optional[LlmProvider]
         limit = MODEL_CONTEXT_LIMITS["default"]
 
     # Use X% of the limit for context to leave room for response
-    return int(limit * env_settings.CONTEXT_RATIO)
+    if model_name == env_settings.LLM_BASIC_MODEL:
+        ratio = env_settings.BASIC_MODEL_RATIO
+    elif model_name == env_settings.LLM_REASONING_MODEL:
+        ratio = env_settings.REASONING_MODEL_RATIO
+    elif model_name == env_settings.LLM_VISION_MODEL:
+        ratio = env_settings.VISION_MODEL_RATIO
+    else:
+        ratio = env_settings.DEFAULT_CONTEXT_RATIO
+
+    return int(limit * ratio)
 
 
 def create_context_manager_for_model(
     model_name: str,
     provider: Optional[LlmProvider] = None,
-    context_ratio: float = env_settings.CONTEXT_RATIO,
+    context_ratio: float = env_settings.DEFAULT_CONTEXT_RATIO,
 ) -> ContextManager:
     """
     Create a context manager optimized for a specific model.
@@ -141,5 +150,15 @@ def get_optimized_format_messages_for_model(
     Returns:
         Optimized formatted message string
     """
-    context_manager = create_context_manager_for_model(model_name, provider)
+
+    if model_name == env_settings.LLM_BASIC_MODEL:
+        ratio = env_settings.BASIC_MODEL_RATIO
+    elif model_name == env_settings.LLM_REASONING_MODEL:
+        ratio = env_settings.REASONING_MODEL_RATIO
+    elif model_name == env_settings.LLM_VISION_MODEL:
+        ratio = env_settings.VISION_MODEL_RATIO
+    else:
+        ratio = env_settings.DEFAULT_CONTEXT_RATIO
+
+    context_manager = create_context_manager_for_model(model_name, provider, context_ratio=ratio)
     return context_manager.format_optimized_messages(messages)

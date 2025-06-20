@@ -398,9 +398,9 @@ async def acreate_hierarchical_graph(
         "FinalAnswer",
         RunnableLambda(
             SummariserNode(
-                provider=teams[leader_name].provider,
-                model=teams[leader_name].model,
-                temperature=teams[leader_name].temperature,
+                provider=env_settings.LLM_DEFAULT_PROVIDER,
+                model=env_settings.LLM_BASIC_MODEL,
+                temperature=env_settings.BASIC_MODEL_TEMPERATURE,
             ).summarise  # type: ignore[arg-type]
         ),
     )

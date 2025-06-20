@@ -80,8 +80,8 @@ class GeneralAssistantHelpers:
         description: Optional[str] = None,
         system_prompt: Optional[str] = None,
         provider: str = env_settings.LLM_DEFAULT_PROVIDER,
-        model_name: str = env_settings.LLM_DEFAULT_MODEL,
-        temperature: float = env_settings.STRICT_TEMPERATURE,
+        model_name: str = env_settings.LLM_BASIC_MODEL,
+        temperature: float = env_settings.BASIC_MODEL_TEMPERATURE,
         support_units: Optional[List[WorkflowType]] = None,
     ) -> Assistant:
         """
@@ -392,8 +392,8 @@ class GeneralAssistantHelpers:
                 description="A helpful general assistant for everyday tasks and conversations.",
                 system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Use your available tools when needed to provide accurate and helpful information.",
                 provider=env_settings.LLM_DEFAULT_PROVIDER,
-                model_name=env_settings.LLM_DEFAULT_MODEL,
-                temperature=env_settings.STRICT_TEMPERATURE,
+                model_name=env_settings.LLM_BASIC_MODEL,
+                temperature=env_settings.BASIC_MODEL_TEMPERATURE,
                 support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             )
 
@@ -491,6 +491,8 @@ class GeneralAssistantHelpers:
             support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             teams=teams_data,
             created_at=assistant.created_at,
+            ask_human=None,
+            interrupt=False,
         )
 
     @staticmethod

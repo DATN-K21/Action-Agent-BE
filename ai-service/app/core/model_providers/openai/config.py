@@ -5,11 +5,12 @@ from pydantic import SecretStr
 from app.core.enums import ModelCategory
 from app.core.settings import env_settings
 
-OPENAI_API_KEY = env_settings.LLM_DEFAULT_API_KEY if env_settings.LLM_DEFAULT_PROVIDER == "openai" else None
+OPENAI_API_KEY = env_settings.OPENAI_API_KEY
+OPENAI_API_BASE_URL = env_settings.OPENAI_API_BASE_URL
 
 PROVIDER_CONFIG = {
     "provider_name": "openai",
-    "base_url": "https://api.openai.com/v1",
+    "base_url": OPENAI_API_BASE_URL,
     "api_key": OPENAI_API_KEY,
     "icon": "openai_icon",
     "description": "OpenAI model",

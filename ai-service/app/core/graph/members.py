@@ -23,7 +23,6 @@ from app.core.state import (
     add_or_replace_messages,
 )
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
-from app.core.workflow.utils.db_utils import get_model_info
 
 
 class GraphTeamState(TypedDict):
@@ -60,12 +59,12 @@ class BaseNode:
         try:
             if provider is None or model is None:
                 provider = env_settings.LLM_DEFAULT_PROVIDER
-                model = env_settings.LLM_DEFAULT_MODEL
+                model = env_settings.LLM_BASIC_MODEL
 
             if temperature is None:
-                temperature = env_settings.STRICT_TEMPERATURE
+                temperature = env_settings.BASIC_MODEL_TEMPERATURE
 
-            self.model_info = get_model_info(model)
+            self.model_info = model_provider_manager.get_model_info(model)
             self.model = model_provider_manager.init_model(
                 provider_name=provider,
                 model=model,
@@ -404,14 +403,24 @@ class LeaderNode(BaseNode):
             | JsonOutputKeyToolsParser(key_name="route", first_tool_only=True)
         )
 
-        # result: dict[str, Any] = await delegate_chain.ainvoke(state, config)
-        result = await self._handle_messages(state, config, delegate_chain)
+        # Use the chain directly since it ends with JsonOutputKeyToolsParser
+        # which should return a dict, not an AIMessage
+        try:
+            result = await delegate_chain.ainvoke(state, config)
+        except Exception:
+            # If the chain fails, return a finish state
+            return {
+                "next": "FINISH",
+                "task": [AIMessage(content="Task completed due to error.", name=team.name)],
+            }
 
-        # Convert the result to dict if it's not already
-        if isinstance(result, dict):
-            result = result
-        else:
-            result = result.model_dump()
+        # Result should already be a dict from JsonOutputKeyToolsParser
+        if not isinstance(result, dict):
+            # Fallback: if it's not a dict, try to convert it
+            if result is not None and hasattr(result, "model_dump"):
+                result = result.model_dump()
+            else:
+                result = None
 
         if not result or result.get("next") is None or result["next"] == "FINISH":
             return {

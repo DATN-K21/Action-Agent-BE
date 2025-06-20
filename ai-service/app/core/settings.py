@@ -26,14 +26,28 @@ class Settings(BaseSettings):
     USER_AGENT: str = "Action-LLM-AI-Service/1.0 (Educational Project)"
 
     # LLM
-    LLM_DEFAULT_API_KEY: str = "<your-api-key>"
     LLM_DEFAULT_PROVIDER: LlmProvider = LlmProvider.OPENAI
-    LLM_DEFAULT_MODEL: str = "gpt-4o-nano"
-    LLM_DEFAULT_BASE_URL: str = "https://api.openai.com/v1/chat/completions"
-    STRICT_TEMPERATURE: float = 0.1
-    CREATIVE_TEMPERATURE: float = 0.5
+
+    LLM_BASIC_MODEL: str = "gpt-4o-mini"
+    BASIC_MODEL_TEMPERATURE: float = 0.5
+    BASIC_MODEL_RATIO: float = 0.2
+
+    LLM_REASONING_MODEL: str = "gpt-4.1-mini"
+    REASONING_MODEL_TEMPERATURE: float = 0
+    REASONING_MODEL_RATIO: float = 0.02
+
+    LLM_VISION_MODEL: str = "gpt-4o-mini"
+    VISION_MODEL_TEMPERATURE: float = 0.5
+    VISION_MODEL_RATIO: float = 0.2
+
+    OPENAI_API_KEY: str = "<YOUR-API-KEY>"
+    OPENAI_API_BASE_URL: str = "https://api.openai.com/v1"
+
+    ANTHROPIC_API_KEY: str = "<YOUR-API-KEY>"
+    ANTHROPIC_API_BASE_URL: str = "https://api.anthropic.com/v1"
+
     DEFAULT_CONTEXT_LIMIT: int = 8000  # Default context limit in tokens
-    CONTEXT_RATIO: float = 0.6  # Ratio of context to response tokens
+    DEFAULT_CONTEXT_RATIO: float = 0.2  # Ratio of context to response tokens
 
     # Embedding
     EMBEDDING_PROVIDER: str = "openai"

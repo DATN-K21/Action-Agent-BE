@@ -3,11 +3,15 @@ from langchain_anthropic import ChatAnthropic
 from pydantic import SecretStr
 
 from app.core.enums import ModelCapability, ModelCategory
+from app.core.settings import env_settings
+
+ANTHROPIC_API_KEY = env_settings.ANTHROPIC_API_KEY
+ANTHROPIC_API_BASE_URL = env_settings.ANTHROPIC_API_BASE_URL
 
 PROVIDER_CONFIG = {
     "provider_name": "anthropic",
-    "base_url": "https://api.anthropic.com",
-    "api_key": "",
+    "base_url": ANTHROPIC_API_BASE_URL,
+    "api_key": ANTHROPIC_API_KEY,
     "icon": "anthropic_icon",
     "description": "Claude models provided by Anthropic",
 }

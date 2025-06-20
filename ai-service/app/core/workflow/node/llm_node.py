@@ -15,7 +15,6 @@ from app.core.state import (
     update_node_outputs,
 )
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
-from app.core.workflow.utils.db_utils import get_model_info
 
 
 class LLMBaseNode:
@@ -31,7 +30,7 @@ class LLMBaseNode:
         self.node_id = node_id
         self.system_prompt = system_prompt
         self.agent_name = agent_name
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
         try:
             self.model = model_provider_manager.init_model(
                 provider_name=self.model_info["provider_name"],

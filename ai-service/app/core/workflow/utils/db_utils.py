@@ -79,22 +79,11 @@ def get_model_info(model_name: str) -> dict[str, str]:
     """
     Get model information from all available models.
     """
-    # with get_db_session() as session:
-    #     # 直接从数据库查询 Models 和关联的 ModelProvider
-    #     model = session.exec(
-    #         select(Models).join(ModelProvider).where(Models.ai_model_name == model_name)
-    #     ).first()
-    #
-    #     if not model:
-    #         raise ValueError(f"Model {model_name} not supported now.")
-    #
-
-    # TODO: Fixed value
     return {
-        "model_name": env_settings.LLM_DEFAULT_MODEL,
+        "model_name": env_settings.LLM_BASIC_MODEL,
         "provider": env_settings.LLM_DEFAULT_PROVIDER,
-        "base_url": env_settings.LLM_DEFAULT_BASE_URL,
-        "api_key": env_settings.LLM_DEFAULT_API_KEY,
+        "base_url": env_settings.OPENAI_API_KEY,
+        "api_key": env_settings.OPENAI_API_BASE_URL,
     }
 
     # def _get_info(session: Session) -> dict[str, str]:
@@ -126,12 +115,6 @@ def get_subgraph_by_id(subgraph_id: str) -> tuple[str, dict[str, Any]]:
     """
     Get subgraph config by ID.
     """
-    # with get_db_session() as session:
-    #     subgraph = session.get(Subgraph, subgraph_id)
-    #     if not subgraph:
-    #         raise ValueError(f"Subgraph {subgraph_id} not found")
-    #     return subgraph.name, subgraph.config
-
     def _get_subgraph(session: Session) -> tuple[str, dict[str, Any]]:
         subgraph = session.get(Subgraph, subgraph_id)
         if not subgraph:

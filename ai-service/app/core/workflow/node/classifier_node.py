@@ -6,7 +6,6 @@ from langchain_core.runnables import RunnableConfig
 
 from app.core import logging
 from app.core.model_providers.model_provider_manager import model_provider_manager
-from app.core.workflow.utils.db_utils import get_model_info
 
 from ...state import (
     ReturnWorkflowTeamState,
@@ -64,7 +63,7 @@ class ClassifierNode:
         self.node_id = node_id
         self.categories = categories
         self.input = input
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
 
     async def work(
             self, state: WorkflowTeamState, config: RunnableConfig

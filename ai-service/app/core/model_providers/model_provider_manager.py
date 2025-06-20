@@ -3,6 +3,8 @@ import os
 from collections.abc import Callable
 from typing import Any
 
+from app.core.settings import env_settings
+
 
 class ModelProviderManager:
     def __init__(self):
@@ -47,6 +49,25 @@ class ModelProviderManager:
 
     def get_all_models(self) -> dict[str, list[dict[str, Any]]]:
         return self.models
+
+    def get_model_info(self, model_name: str | None) -> dict[str, Any]:
+        for key, value in self.models.items():
+            for model in value:
+                if model["name"] == model_name:
+                    return {
+                        "provider": key,
+                        "model_name": model,
+                        "base_url": self.providers[key]["base_url"],
+                        "api_key": self.providers[key]["api_key"],
+                    }
+
+        # If model not found, return an default configuration
+        return {
+            "provider": env_settings.LLM_DEFAULT_PROVIDER,
+            "model_name": env_settings.LLM_BASIC_MODEL,
+            "base_url": env_settings.OPENAI_API_BASE_URL,
+            "api_key": env_settings.OPENAI_API_KEY,
+        }
 
     def init_model(
         self,

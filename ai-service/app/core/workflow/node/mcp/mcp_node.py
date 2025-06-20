@@ -12,7 +12,6 @@ from app.core.state import (
     parse_variables,
     update_node_outputs,
 )
-from app.core.workflow.utils.db_utils import get_model_info
 
 
 class MCPConfigValidator:
@@ -112,7 +111,7 @@ class MCPBaseNode:
         except ValueError as e:
             raise ValueError(f"Invalid MCP config: {str(e)}")
 
-        self.model_info = get_model_info(model_name)
+        self.model_info = model_provider_manager.get_model_info(model_name)
 
         try:
             self.model = model_provider_manager.init_model(
