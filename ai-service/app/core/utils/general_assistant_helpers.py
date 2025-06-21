@@ -121,9 +121,9 @@ class GeneralAssistantHelpers:
             description=description,
             system_prompt=system_prompt,
             assistant_type=AssistantType.GENERAL_ASSISTANT,
-            provider=provider,
-            model_name=model_name,
-            temperature=temperature,
+            provider=provider or env_settings.OPENAI_PROVIDER,
+            model_name=model_name or env_settings.LLM_BASIC_MODEL,
+            temperature=temperature if temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
         )
         session.add(general_assistant)
         await session.flush()
@@ -484,9 +484,9 @@ class GeneralAssistantHelpers:
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or "",
-            model_name=assistant.model_name,
-            temperature=assistant.temperature,
+            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
+            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
+            temperature=assistant.temperature or env_settings.BASIC_MODEL_TEMPERATURE,
             main_unit=WorkflowType.CHATBOT,
             support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             teams=teams_data,
