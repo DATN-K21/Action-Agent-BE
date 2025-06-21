@@ -16,7 +16,6 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # OpenAI Models
     "gpt-4o": 128000,
     "gpt-4o-mini": 128000,
-    "gpt-4.1-mini": 1000000,  # Example of a high-capacity model
     "gpt-4o-nano": 16384,  # Conservative limit for nano model
     "gpt-4": 8192,
     "gpt-4-turbo": 128000,
@@ -66,11 +65,11 @@ def get_context_limit_for_model(model_name: str, provider: Optional[LlmProvider]
 
     # Use X% of the limit for context to leave room for response
     if model_name == env_settings.LLM_BASIC_MODEL:
-        ratio = env_settings.BASIC_MODEL_RATIO
+        ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
     elif model_name == env_settings.LLM_REASONING_MODEL:
-        ratio = env_settings.REASONING_MODEL_RATIO
+        ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
     elif model_name == env_settings.LLM_VISION_MODEL:
-        ratio = env_settings.VISION_MODEL_RATIO
+        ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO
 
@@ -152,11 +151,11 @@ def get_optimized_format_messages_for_model(
     """
 
     if model_name == env_settings.LLM_BASIC_MODEL:
-        ratio = env_settings.BASIC_MODEL_RATIO
+        ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
     elif model_name == env_settings.LLM_REASONING_MODEL:
-        ratio = env_settings.REASONING_MODEL_RATIO
+        ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
     elif model_name == env_settings.LLM_VISION_MODEL:
-        ratio = env_settings.VISION_MODEL_RATIO
+        ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO
 

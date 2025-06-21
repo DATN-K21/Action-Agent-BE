@@ -81,7 +81,7 @@ def get_model_info(model_name: str) -> dict[str, str]:
     """
     return {
         "model_name": env_settings.LLM_BASIC_MODEL,
-        "provider": env_settings.LLM_DEFAULT_PROVIDER,
+        "provider": env_settings.OPENAI_PROVIDER,
         "base_url": env_settings.OPENAI_API_KEY,
         "api_key": env_settings.OPENAI_API_BASE_URL,
     }

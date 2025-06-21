@@ -1,5 +1,6 @@
 from crewai import LLM
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 from app.core.enums import ModelCapability, ModelCategory
@@ -58,7 +59,18 @@ def init_model(model: str, temperature: float, api_key: str, base_url: str, **kw
             model_name=model,
             temperature=temperature,
             api_key=SecretStr(api_key),
+            base_url=base_url,
             **kwargs,
+        ).with_fallbacks(
+            [
+                ChatOpenAI(
+                    model="gpt-4o-mini",  # Fallback to OpenAI's gpt-4o-mini
+                    temperature=temperature,
+                    api_key=SecretStr(env_settings.OPENAI_API_KEY),
+                    base_url=env_settings.OPENAI_API_BASE_URL,
+                    **kwargs,
+                )
+            ]
         )
     else:
         raise ValueError(f"Model {model} is not supported as a chat model.")
