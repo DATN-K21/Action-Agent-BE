@@ -91,3 +91,19 @@ class ConnectionStatus(str, Enum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
+
+
+class DateRangeEnum(str, Enum):
+    DAY = "day"
+    YESTERDAY = "yesterday"
+    WEEK = "week"
+    MONTH = "month"
+    QUARTER = "quarter"
+    YEAR = "year"
+    LAST_7_DAYS = "last_7_days"
+    LAST_30_DAYS = "last_30_days"
+    ALL_TIME = ""
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]

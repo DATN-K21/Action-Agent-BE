@@ -11,6 +11,7 @@ from app.api.public.v1 import (
     langmanus,
     member,
     skill,
+    statistics,
     team,
     test,
     thread,
@@ -58,5 +59,6 @@ router.include_router(team.router, prefix=prefix)
 router.include_router(member.router, prefix=prefix)
 router.include_router(skill.router, prefix=prefix)
 router.include_router(upload.router, prefix=prefix)
+router.include_router(statistics.router, prefix=prefix)
 
 router.include_router(langmanus.router, prefix=prefix)
