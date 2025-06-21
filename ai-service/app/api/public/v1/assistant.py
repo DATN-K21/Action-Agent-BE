@@ -63,12 +63,7 @@ def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
     support_units = []
 
     # Determine main unit based on assistant type
-    if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
-        main_unit = WorkflowType.HIERARCHICAL
-    elif assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
-        main_unit = WorkflowType.CHATBOT
-    else:
-        main_unit = WorkflowType.CHATBOT
+    main_unit = WorkflowType.CHATBOT
 
     # Extract support units from teams (exclude main unit)
     for team in assistant.teams:
@@ -226,7 +221,7 @@ def _format_assistant_response(
             temperature=assistant.temperature if assistant.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=assistant.ask_human,
             interrupt=assistant.interrupt,
-            main_unit=WorkflowType.HIERARCHICAL,
+            main_unit=WorkflowType.CHATBOT,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
             created_at=assistant.created_at,
@@ -254,11 +249,11 @@ def _format_assistant_response(
         )
 
 
-async def _acreate_main_team(
+async def _acreate_hierarchical_team(
     session: AsyncSession, assistant: Assistant, request: CreateAdvancedAssistantRequest, user_id: str
 ) -> Tuple[Team, Member]:
     """
-    Create the main hierarchical team for an advanced assistant.
+    Create a hierarchical team for an advanced assistant support unit.
 
     Args:
         session: Database session
@@ -269,29 +264,29 @@ async def _acreate_main_team(
     Returns:
         Created team object
     """
-    # Create main team
-    main_team_id = str(uuid.uuid4())
-    main_team_name = create_unique_key(id_=main_team_id, name="Hierarchical Unit")
-    main_team = Team(
-        id=main_team_id,
-        name=main_team_name,
-        description="Main unit for advanced assistant, which integrates with mcps and extensions.",
+    # Create hierarchical team
+    hierarchical_team_id = str(uuid.uuid4())
+    hierarchical_team_name = create_unique_key(id_=hierarchical_team_id, name="Hierarchical Unit")
+    hierarchical_team = Team(
+        id=hierarchical_team_id,
+        name=hierarchical_team_name,
+        description="Execute user tasks based on integrated workers' tools.",
         workflow_type=WorkflowType.HIERARCHICAL,
         user_id=user_id,
         assistant_id=assistant.id,
     )
-    session.add(main_team)
+    session.add(hierarchical_team)
     await session.flush()
 
-    # Create root member (leader) for the main team
+    # Create root member (leader) for the hierarchical team
     root_member_id = str(uuid.uuid4())
     root_member_name = create_unique_key(id_=root_member_id, name="Leader")
     root_member = Member(
         id=root_member_id,
         name=root_member_name,
-        team_id=main_team.id,
-        backstory="Leader of the main team for advanced assistant.",
-        role="Gather inputs from your team and answer the question.",
+        team_id=hierarchical_team.id,
+        backstory="Leader of the hierarchical team for advanced assistant.",
+        role="Gather inputs, outputs from your team and answer the question.",
         type="root",
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
@@ -303,38 +298,48 @@ async def _acreate_main_team(
     session.add(root_member)
     await session.flush()
 
-    return main_team, root_member
+    return hierarchical_team, root_member
 
 
-async def _acreate_chatbot_member(
-    session: AsyncSession,
-    team_id: str,
-    root_member_id: str,
-    request: CreateAdvancedAssistantRequest,
-    user_id: str,
-) -> Member:
+async def _acreate_main_team(
+    session: AsyncSession, assistant: Assistant, request: CreateAdvancedAssistantRequest, user_id: str
+) -> Tuple[Team, Member]:
     """
-    Create a chatbot member for the main team.
+    Create the main chatbot team for an advanced assistant.
 
     Args:
         session: Database session
-        team_id: Team ID to add member to
-        root_member_id: Root member ID for source reference
-        request: Request data containing provider/model info
+        assistant: The assistant object
+        request: Request data
+        user_id: User ID
 
     Returns:
-        Created Member object
+        Created team and root member objects
     """
-    chatbot_member_id = str(uuid.uuid4())
-    chatbot_member_name = create_unique_key(id_=chatbot_member_id, name="Chatbot Assistant")
-    chatbot_member = Member(
-        id=chatbot_member_id,
-        name=chatbot_member_name,
-        team_id=team_id,
+    # Create main chatbot team
+    main_team_id = str(uuid.uuid4())
+    main_team_name = create_unique_key(id_=main_team_id, name="Chatbot Unit")
+    main_team = Team(
+        id=main_team_id,
+        name=main_team_name,
+        description="Main chatbot unit for handling small talk and basic user interactions.",
+        workflow_type=WorkflowType.CHATBOT,
+        user_id=user_id,
+        assistant_id=assistant.id,
+    )
+    session.add(main_team)
+    await session.flush()
+
+    # Create root member (chatbot) for the main team
+    root_member_id = str(uuid.uuid4())
+    root_member_name = create_unique_key(id_=root_member_id, name="Chatbot Unit Root")
+    root_member = Member(
+        id=root_member_id,
+        name=root_member_name,
+        team_id=main_team.id,
         backstory="A friendly chatbot assistant specialized in natural conversation and general assistance. Provides helpful responses to greetings, engages in meaningful small talk, and answers user questions using available tools. Focuses on being conversational and supportive without trying to take over the conversation flow.",
         role="Respond naturally to greetings and small talk. Answer user questions directly using available search and knowledge tools when needed. Provide helpful information and maintain a friendly conversational tone. Do not ask users what they want - simply respond to what they've said.",
-        type="worker",
-        source=root_member_id,
+        type="chatbot",
         provider=request.provider or env_settings.OPENAI_PROVIDER,
         model=request.model_name or env_settings.LLM_BASIC_MODEL,
         temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
@@ -343,12 +348,13 @@ async def _acreate_chatbot_member(
         position_y=0.0,
         created_by=SYSTEM,
     )
-    session.add(chatbot_member)
+    session.add(root_member)
     await session.flush()
 
-    await _acreate_search_skills(session, chatbot_member.id, user_id)
+    # Create search skills for the chatbot
+    await _acreate_search_skills(session, root_member.id, user_id)
 
-    return chatbot_member
+    return main_team, root_member
 
 
 async def _acreate_mcp_member_with_skills(
@@ -381,7 +387,7 @@ async def _acreate_mcp_member_with_skills(
         source=root_member_id,
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
-        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=request.interrupt if request.interrupt is not None else False,
         position_x=0.0,
         position_y=0.0,
@@ -464,7 +470,7 @@ async def _acreate_extension_member_with_skills(
         source=root_member_id,
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
-        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=request.interrupt if request.interrupt is not None else False,
         position_x=0.0,
         position_y=0.0,
@@ -539,11 +545,12 @@ async def _acreate_support_team(
     """
     # Create support team
     support_team_id = str(uuid.uuid4())
-    support_team_name = create_unique_key(id_=support_team_id, name=f"{workflow_type} Support Unit")
+    str_workflow_type = workflow_type.value
+    support_team_name = create_unique_key(id_=support_team_id, name=f"{str_workflow_type} Support Unit")
     support_team = Team(
         id=support_team_id,
         name=support_team_name,
-        description=f"Support unit for {workflow_type} in advanced assistant.",
+        description=f"Support unit for {str_workflow_type} in advanced assistant.",
         workflow_type=workflow_type,
         user_id=user_id,
         assistant_id=assistant.id,
@@ -553,14 +560,14 @@ async def _acreate_support_team(
 
     # Create root member for the support team
     support_root_member_id = str(uuid.uuid4())
-    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{workflow_type} Support Root")
+    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type} Support Root")
     support_root_member = Member(
         id=support_root_member_id,
         name=support_root_member_name,
         team_id=support_team.id,
-        backstory=f"Unit for advanced assistant: {workflow_type}.",
+        backstory=f"Unit for advanced assistant: {str_workflow_type}.",
         role="Answer the user's question.",
-        type=f"{workflow_type}",
+        type=f"{str_workflow_type}",
         provider=request.provider or env_settings.OPENAI_PROVIDER,
         model=request.model_name or env_settings.LLM_BASIC_MODEL,
         temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
@@ -739,7 +746,7 @@ async def _ahard_delete_assistant_cascade(session: AsyncSession, assistant_id: s
 
 async def _aget_main_team_for_assistant(session: AsyncSession, assistant_id: str, user_id: str) -> Optional[Team]:
     """
-    Get the main hierarchical team for an assistant.
+    Get the main chatbot team for an assistant.
 
     Args:
         session: Database session
@@ -756,7 +763,7 @@ async def _aget_main_team_for_assistant(session: AsyncSession, assistant_id: str
         .where(
             Team.user_id == user_id,
             Team.assistant_id == assistant_id,
-            Team.workflow_type == WorkflowType.HIERARCHICAL,
+            Team.workflow_type == WorkflowType.CHATBOT,
             Team.is_deleted.is_(False),
         )
     )
@@ -793,22 +800,22 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
 
 async def _aupdate_mcp_members(
     session: AsyncSession,
-    main_team: Team,
+    hierarchical_team: Team,
     request: UpdateAdvancedAssistantRequest,
     user_id: str,
 ) -> None:
     """
-    Update MCP members for the main team by deleting existing ones and creating new ones.
+    Update MCP members for the hierarchical team by deleting existing ones and creating new ones.
 
     Args:
         session: Database session
-        main_team: Main team to update members for
+        hierarchical_team: Hierarchical team to update members for
         request: Update request containing new MCP IDs
         user_id: User ID
     """
     # Only delete existing MCP members if new ones are provided
     if request.mcp_ids is not None:
-        await _adelete_members_with_service_type(session, main_team, ConnectedServiceType.MCP)
+        await _adelete_members_with_service_type(session, hierarchical_team, ConnectedServiceType.MCP)
 
         # If empty list provided, just return after deletion (remove all)
         if len(request.mcp_ids) == 0:
@@ -816,13 +823,13 @@ async def _aupdate_mcp_members(
 
         # Get root member ID for linking new MCP members
         root_member_id = None
-        for member in main_team.members:
+        for member in hierarchical_team.members:
             if member.type == "root":
                 root_member_id = member.id
                 break
 
         if not root_member_id:
-            raise ValueError("Root member not found in main team")
+            raise ValueError("Root member not found in hierarchical team")
 
         # Create new MCP members and their skills
         for mcp_id in request.mcp_ids:
@@ -842,14 +849,14 @@ async def _aupdate_mcp_members(
                 member = Member(
                     id=member_id,
                     name=member_name,
-                    team_id=main_team.id,
+                    team_id=hierarchical_team.id,
                     backstory=connected_mcp.description if connected_mcp.description is not None else None,
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
                     provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
                     model=request.model_name or env_settings.LLM_REASONING_MODEL,
-                    temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+                    temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=request.interrupt if request.interrupt is not None else False,
                     position_x=0.0,
                     position_y=0.0,
@@ -902,22 +909,22 @@ async def _aupdate_mcp_members(
 
 async def _aupdate_extension_members(
     session: AsyncSession,
-    main_team: Team,
+    hierarchical_team: Team,
     request: UpdateAdvancedAssistantRequest,
     user_id: str,
 ) -> None:
     """
-    Update extension members for the main team by deleting existing ones and creating new ones.
+    Update extension members for the hierarchical team by deleting existing ones and creating new ones.
 
     Args:
         session: Database session
-        main_team: Main team to update members for
+        hierarchical_team: Hierarchical team to update members for
         request: Update request containing new extension IDs
         user_id: User ID
     """
     # Only delete existing extension members if new ones are provided
     if request.extension_ids is not None:
-        await _adelete_members_with_service_type(session, main_team, ConnectedServiceType.EXTENSION)
+        await _adelete_members_with_service_type(session, hierarchical_team, ConnectedServiceType.EXTENSION)
 
         # If empty list provided, just return after deletion (remove all)
         if len(request.extension_ids) == 0:
@@ -925,13 +932,13 @@ async def _aupdate_extension_members(
 
         # Get root member ID for linking new extension members
         root_member_id = None
-        for member in main_team.members:
+        for member in hierarchical_team.members:
             if member.type == "root":
                 root_member_id = member.id
                 break
 
         if not root_member_id:
-            raise ValueError("Root member not found in main team")
+            raise ValueError("Root member not found in hierarchical team")
 
         # Create new extension members and their skills
         for extension_id in request.extension_ids:
@@ -950,14 +957,14 @@ async def _aupdate_extension_members(
                 member = Member(
                     id=member_id,
                     name=member_name,
-                    team_id=main_team.id,
+                    team_id=hierarchical_team.id,
                     backstory="",
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
                     provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
                     model=request.model_name or env_settings.LLM_REASONING_MODEL,
-                    temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+                    temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=request.interrupt if request.interrupt is not None else False,
                     position_x=0.0,
                     position_y=0.0,
@@ -1024,16 +1031,17 @@ async def _aupdate_support_units(
         assistant: Assistant to update support units for
         request: Update request containing new support units
         user_id: User ID
-    """
-    # Only update support units if they are provided in the request
+    """  # Only update support units if they are provided in the request
     if request.support_units is not None:
-        # Delete all support teams (non-hierarchical teams)
+        # Delete all support teams (except chatbot team and hierarchical team)
         all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
         all_teams_result = await session.execute(all_teams_statement)
         all_teams = all_teams_result.scalars().all()
 
-        # Find teams to delete (all except the hierarchical/main team)
-        teams_to_delete = [team.id for team in all_teams if team.workflow_type != WorkflowType.HIERARCHICAL]
+        # Find teams to delete (except the chatbot team and hierarchical team)
+        teams_to_delete = [
+            team.id for team in all_teams if team.workflow_type != WorkflowType.CHATBOT and team.workflow_type != WorkflowType.HIERARCHICAL
+        ]
 
         if teams_to_delete:
             # Get member IDs before deleting teams
@@ -1132,7 +1140,7 @@ def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssista
         temperature=request.temperature,
         ask_human=assistant.ask_human,
         interrupt=assistant.interrupt,
-        main_unit=WorkflowType.HIERARCHICAL,
+        main_unit=WorkflowType.CHATBOT,
         support_units=request.support_units or _extract_support_units(assistant),
         mcp_ids=request.mcp_ids,
         extension_ids=request.extension_ids,
@@ -1371,13 +1379,11 @@ async def aget_assistants(
         # Each assistant will return either GetGeneralAssistantResponse or GetAdvancedAssistantResponse
         wrapped_assistants = []
         for assistant in assistants:
-            assistant_teams = _format_team_data(assistant.teams)
-
-            # For advanced assistants, extract MCP and extension IDs from hierarchical team
+            assistant_teams = _format_team_data(assistant.teams)  # For advanced assistants, extract MCP and extension IDs from hierarchical team
             mcp_ids = None
             extension_ids = None
             if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
-                # Find the hierarchical team (main team for advanced assistants)
+                # Find the hierarchical team (support unit containing MCPs and extensions)
                 hierarchical_team = next((team for team in assistant.teams if team.workflow_type == WorkflowType.HIERARCHICAL), None)
                 if hierarchical_team:
                     mcp_ids, extension_ids = await _aextract_service_ids_from_team(session, hierarchical_team)
@@ -1474,10 +1480,11 @@ async def acreate_advanced_assistant(
 
     This function creates:
     1. A new assistant instance
-    2. A main hierarchical team with root member
-    3. MCP members and their skills (if specified)
-    4. Extension members and their skills (if specified)
-    5. Support teams for different workflow types (if specified)
+    2. A main chatbot team with root member
+    3. A hierarchical team with root member (An advanced assistant always has a hierarchical team - support unit)
+    4. MCP members and their skills (if specified)
+    5. Extension members and their skills (if specified)
+    6. Support teams for different workflow types (if specified)
 
     Args:
         session: Database session
@@ -1503,23 +1510,17 @@ async def acreate_advanced_assistant(
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
 
-        # Create the main hierarchical team using helper function
-        main_team, root_member = await _acreate_main_team(session, new_assistant, request, x_user_id)
+        # Create the main chatbot team using helper function
+        await _acreate_main_team(session, new_assistant, request, x_user_id)
 
-        # Get the root member ID for linking MCP/extension members
-        root_member_id = None
-
-        if root_member.type == "root":
-            root_member_id = root_member.id
-
-        if not root_member_id:
-            raise ValueError("Root member not found in main team")
-
-        # Create chatbot member for the main team
-        await _acreate_chatbot_member(session, main_team.id, root_member_id, request, x_user_id)
+        # Create hierarchical team as support unit if MCP or extension IDs provided
+        hierarchical_team = None
+        hierarchical_root_member = None
+        if request.mcp_ids or request.extension_ids:
+            hierarchical_team, hierarchical_root_member = await _acreate_hierarchical_team(session, new_assistant, request, x_user_id)
 
         # Create MCP members and their skills using helper function
-        if request.mcp_ids:
+        if request.mcp_ids and hierarchical_team and hierarchical_root_member:
             for mcp_id in request.mcp_ids:
                 # Load connected MCP
                 mcp_statement = select(ConnectedMcp).where(
@@ -1532,13 +1533,13 @@ async def acreate_advanced_assistant(
                     await _acreate_mcp_member_with_skills(
                         session,
                         connected_mcp,
-                        main_team.id,
-                        root_member_id,
+                        hierarchical_team.id,
+                        hierarchical_root_member.id,
                         request,
                     )
 
         # Create extension members and their skills using helper function
-        if request.extension_ids:
+        if request.extension_ids and hierarchical_team and hierarchical_root_member:
             for extension_id in request.extension_ids:
                 # Load connected extension
                 ext_statement = select(ConnectedExtension).where(
@@ -1553,12 +1554,12 @@ async def acreate_advanced_assistant(
                     await _acreate_extension_member_with_skills(
                         session,
                         connected_extension,
-                        main_team.id,
-                        root_member_id,
+                        hierarchical_team.id,
+                        hierarchical_root_member.id,
                         request,
                     )
 
-        # Create support teams for each workflow type using helper function
+        # Create another support teams for each workflow type using helper function
         if request.support_units:
             for workflow_type in request.support_units:
                 await _acreate_support_team(session, new_assistant, workflow_type, request, x_user_id)
@@ -1587,7 +1588,7 @@ async def acreate_advanced_assistant(
             temperature=request.temperature,
             ask_human=request.ask_human,
             interrupt=request.interrupt,
-            main_unit=WorkflowType.HIERARCHICAL,
+            main_unit=WorkflowType.CHATBOT,
             support_units=request.support_units,
             mcp_ids=request.mcp_ids,
             extension_ids=request.extension_ids,
@@ -1694,22 +1695,86 @@ async def aupdate_advanced_assistant(
         assistant = result.scalar_one_or_none()
 
         if not assistant:
-            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
-
-        # Update the assistant table
+            return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()  # Update the assistant table
         _update_assistant_basic_info(assistant, request)
 
-        # Get main team (main unit)
-        main_team = await _aget_main_team_for_assistant(session, assistant_id, x_user_id)
+        # Handle hierarchical team for MCPs and extensions
+        hierarchical_team = None
+        for team in assistant.teams:
+            if team.workflow_type == WorkflowType.HIERARCHICAL:
+                hierarchical_team = team
+                break
 
-        if not main_team:
-            return ResponseWrapper.wrap(status=404, message="Main team not found").to_response()
+        # Create or update hierarchical team based on MCP/extension IDs
+        if request.mcp_ids or request.extension_ids:
+            # If hierarchical team doesn't exist, create it
+            if not hierarchical_team:
+                hierarchical_team_id = str(uuid.uuid4())
+                hierarchical_team_name = create_unique_key(id_=hierarchical_team_id, name="Hierarchical Unit")
+                hierarchical_team = Team(
+                    id=hierarchical_team_id,
+                    name=hierarchical_team_name,
+                    description="Execute user tasks based on integrated workers' tools.",
+                    workflow_type=WorkflowType.HIERARCHICAL,
+                    user_id=x_user_id,
+                    assistant_id=assistant.id,
+                )
+                session.add(hierarchical_team)
+                await session.flush()
 
-        # Update mcp members of the main team (main unit)
-        await _aupdate_mcp_members(session, main_team, request, x_user_id)
+                # Create root member for the hierarchical team
+                root_member_id = str(uuid.uuid4())
+                root_member_name = create_unique_key(id_=root_member_id, name="Leader")
+                root_member = Member(
+                    id=root_member_id,
+                    name=root_member_name,
+                    team_id=hierarchical_team.id,
+                    backstory="Leader of the hierarchical team for advanced assistant.",
+                    role="Gather inputs from your team and answer the question.",
+                    type="root",
+                    provider=request.provider or assistant.provider or env_settings.ANTHROPIC_PROVIDER,
+                    model=request.model_name or assistant.model_name or env_settings.LLM_REASONING_MODEL,
+                    temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+                    interrupt=False,
+                    position_x=0.0,
+                    position_y=0.0,
+                )
+                session.add(root_member)
+                await session.flush()
 
-        # Update extension members of the main team (main unit)
-        await _aupdate_extension_members(session, main_team, request, x_user_id)
+            # Update mcp members of the hierarchical team
+            await _aupdate_mcp_members(session, hierarchical_team, request, x_user_id)
+
+            # Update extension members of the hierarchical team
+            await _aupdate_extension_members(session, hierarchical_team, request, x_user_id)
+        else:
+            # If no MCPs or extensions, remove hierarchical team if it exists
+            if hierarchical_team:
+                # Delete hierarchical team and all its members
+                member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
+                member_result = await session.execute(member_statement)
+                member_ids = member_result.scalars().all()
+
+                if member_ids:
+                    # Delete skills and links
+                    skills_statement = (
+                        select(Skill.id)
+                        .select_from(Skill)
+                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                        .where(MemberSkillLink.member_id.in_(member_ids))
+                    )
+                    skills_result = await session.execute(skills_statement)
+                    skill_ids = skills_result.scalars().all()
+
+                    await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+                    await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
+
+                    if skill_ids:
+                        await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
+
+                    await session.execute(delete(Member).where(Member.id.in_(member_ids)))
+
+                await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
 
         # Update support units
         await _aupdate_support_units(session, assistant, request, x_user_id)
@@ -1885,9 +1950,9 @@ async def aupdate_assistant_config(
             # Update configuration of existing members without deleting them
             await _aupdate_member_configurations(session, main_team, assistant, request)
 
-            # Update configuration for support teams as well
+            # Update configuration for all support teams (including hierarchical teams)
             for team in assistant.teams:
-                if team.workflow_type != WorkflowType.HIERARCHICAL:
+                if team.workflow_type != WorkflowType.CHATBOT:  # Skip main chatbot team
                     await _aupdate_member_configurations(session, team, assistant, request)
 
         # Commit the transaction

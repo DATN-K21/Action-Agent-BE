@@ -333,7 +333,7 @@ def create_tools_condition(
         tools: list[GraphSkill | GraphUpload],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges
-    The tool node must be in format: '{current_member_name}_tools'
+    The tool node must be in format: '{current_member_name}-tools'
 
     Args:
         current_member_name (str): The name of the member that is calling the tool
@@ -347,9 +347,9 @@ def create_tools_condition(
 
     for tool in tools:
         if tool.name == "ask-human":
-            mapping["call_human"] = f"{current_member_name}_askHuman_tool"
+            mapping["call_human"] = f"{current_member_name}-ask-human-tool"
         else:
-            mapping["call_tools"] = f"{current_member_name}_tools"
+            mapping["call_tools"] = f"{current_member_name}-tools"
     return mapping
 
 
@@ -395,7 +395,7 @@ async def acreate_hierarchical_graph(
         ),
     )
     build.add_node(
-        "FinalAnswer",
+        "final-answer",
         RunnableLambda(
             SummariserNode(
                 provider=env_settings.OPENAI_PROVIDER,
@@ -424,21 +424,21 @@ async def acreate_hierarchical_graph(
                 for tool in member.tools:
                     if tool.name == "ask-human":
                         # Handling Ask-Human tool
-                        interrupt_member_names.append(f"{name}_askHuman_tool")
-                        build.add_node(f"{name}_askHuman_tool", ask_human_node)
-                        build.add_edge(f"{name}_askHuman_tool", name)
+                        interrupt_member_names.append(f"{name}-ask-human-tool")
+                        build.add_node(f"{name}-ask-human-tool", ask_human_node)
+                        build.add_edge(f"{name}-ask-human-tool", name)
                     else:
                         tool_object = await tool.aget_tool()
                         normal_tools.append(tool_object)
 
                 if normal_tools:
                     # Add node for normal tools
-                    build.add_node(f"{name}_tools", ToolNode(normal_tools))
-                    build.add_edge(f"{name}_tools", name)
+                    build.add_node(f"{name}-tools", ToolNode(normal_tools))
+                    build.add_edge(f"{name}-tools", name)
 
                     # Interrupt for normal tools only if member.interrupt is True
                     if member.interrupt:
-                        interrupt_member_names.append(f"{name}_tools")
+                        interrupt_member_names.append(f"{name}-tools")
 
         elif isinstance(member, GraphLeader):
             subgraph = await acreate_hierarchical_graph(teams, leader_name=name, checkpointer=checkpointer)
@@ -461,11 +461,11 @@ async def acreate_hierarchical_graph(
             build.add_edge(name, leader_name)
 
     conditional_mapping: dict[Hashable, str] = {v: v for v in members}
-    conditional_mapping["FINISH"] = "FinalAnswer"
+    conditional_mapping["FINISH"] = "final-answer"
     build.add_conditional_edges(leader_name, router, conditional_mapping)
 
     build.set_entry_point(leader_name)
-    build.set_finish_point("FinalAnswer")
+    build.set_finish_point("final-answer")
     graph = build.compile(checkpointer=checkpointer, interrupt_before=interrupt_member_names, debug=env_settings.DEBUG_AGENT)
 
     return graph
@@ -507,21 +507,21 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
             for tool in member.tools:
                 if tool.name == "ask-human":
                     # Handling Ask-Human tool
-                    interrupt_member_names.append(f"{member.name}_askHuman_tool")
-                    graph.add_node(f"{member.name}_askHuman_tool", ask_human_node)
-                    graph.add_edge(f"{member.name}_askHuman_tool", member.name)
+                    interrupt_member_names.append(f"{member.name}-ask-human-tool")
+                    graph.add_node(f"{member.name}-ask-human-tool", ask_human_node)
+                    graph.add_edge(f"{member.name}-ask-human-tool", member.name)
                 else:
                     tool_object = await tool.aget_tool()
                     normal_tools.append(tool_object)
 
             if normal_tools:
                 # Add node for normal tools
-                graph.add_node(f"{member.name}_tools", ToolNode(normal_tools))
-                graph.add_edge(f"{member.name}_tools", member.name)
+                graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
+                graph.add_edge(f"{member.name}-tools", member.name)
 
                 # Interrupt for normal tools only if member.interrupt is True
                 if member.interrupt:
-                    interrupt_member_names.append(f"{member.name}_tools")
+                    interrupt_member_names.append(f"{member.name}-tools")
         if i > 0:
             previous_member = members[i - 1]
             if previous_member.tools:
@@ -589,21 +589,21 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
         for tool in member.tools:
             if tool.name == "ask-human":
                 # Handling Ask-Human tool
-                interrupt_member_names.append(f"{member.name}_askHuman_tool")
-                graph.add_node(f"{member.name}_askHuman_tool", ask_human_node)
-                graph.add_edge(f"{member.name}_askHuman_tool", member.name)
+                interrupt_member_names.append(f"{member.name}-ask-human-tool")
+                graph.add_node(f"{member.name}-ask-human-tool", ask_human_node)
+                graph.add_edge(f"{member.name}-ask-human-tool", member.name)
             else:
                 tool_object = await tool.aget_tool()
                 normal_tools.append(tool_object)
 
         if normal_tools:
             # Add node for normal tools
-            graph.add_node(f"{member.name}_tools", ToolNode(normal_tools))
-            graph.add_edge(f"{member.name}_tools", member.name)
+            graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
+            graph.add_edge(f"{member.name}-tools", member.name)
 
             # Interrupt for normal tools only if member.interrupt is True
             if member.interrupt:
-                interrupt_member_names.append(f"{member.name}_tools")
+                interrupt_member_names.append(f"{member.name}-tools")
     if len(member.tools) >= 1:
         graph.add_conditional_edges(
             member.name,
