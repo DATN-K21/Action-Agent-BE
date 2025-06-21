@@ -107,3 +107,14 @@ class DateRangeEnum(str, Enum):
     @classmethod
     def supported_values(cls) -> list[str]:
         return [member for member in cls]
+
+
+class StatisticsEntity(str, Enum):
+    USERS = "users"
+    CONNECTED_EXTENSIONS = "connected_extensions"
+    THREADS = "threads"
+    ASSISTANTS = "assistants"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]
