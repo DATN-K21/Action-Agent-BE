@@ -1,13 +1,10 @@
 from sqlalchemy import func, select
 
 from app.api.deps import SessionDep
-from app.core import logging
 from app.core.enums import DateRangeEnum, StatisticsEntity
 from app.core.utils.date_range import get_period_days, get_period_range, get_previous_period_range
 from app.schemas.statistics import OverviewStatisticsResponse
 from app.services.statistics.base import BaseStatisticsService
-
-logger = logging.get_logger(__name__)
 
 
 class OverviewStatisticsService(BaseStatisticsService):

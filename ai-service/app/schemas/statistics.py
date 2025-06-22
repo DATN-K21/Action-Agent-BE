@@ -1,3 +1,4 @@
+
 from pydantic import Field
 
 from app.schemas.base import BaseResponse
@@ -21,10 +22,14 @@ class BaseOverviewStatisticsResponse(BaseResponse):
 
 class RankingStatisticsResponse(BaseResponse):
     id: str = Field(..., description="Entity ID")
-    name: str = Field(..., description="Entity name")
+    score: float = Field(..., description="Score of the entity based on the statistics")
     rank: int = Field(..., description="Rank of the entity based on the statistics")
+    display_info: dict[str, str] = Field(default_factory=dict, description="Additional display information")
 
+class BaseRankingEntityStatisticsResponse(BaseResponse):
+    data: list[RankingStatisticsResponse] = Field(..., description="List of ranking statistics for the entity")
+    weights: dict[str, float] = Field(..., description="Weights for the ranking statistics, used for calculating scores")
 
 class BaseRankingStatisticsResponse(BaseResponse):
-    users: list[RankingStatisticsResponse] = Field(..., description="User ranking statistics")
-    connected_extensions: list[RankingStatisticsResponse] = Field(..., description="Connected extensions ranking statistics")
+    users: BaseRankingEntityStatisticsResponse = Field(..., description="User ranking statistics")
+    # connected_extensions: BaseRankingEntityStatisticsResponse = Field(..., description="Connected extensions ranking statistics")

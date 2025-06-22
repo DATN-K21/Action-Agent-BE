@@ -4,7 +4,11 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import DateRangeEnum, StatisticsEntity
 from app.schemas.base import ResponseWrapper
-from app.schemas.statistics import BaseOverviewStatisticsResponse, BaseRankingStatisticsResponse
+from app.schemas.statistics import (
+    BaseOverviewStatisticsResponse,
+    BaseRankingEntityStatisticsResponse,
+    BaseRankingStatisticsResponse,
+)
 from app.services.statistics.overview import OverviewStatisticsService
 from app.services.statistics.ranking import RankingStatisticsService
 
@@ -80,25 +84,47 @@ async def get_statistics_overview(session: SessionDep, period: DateRangeEnum = D
     return ResponseWrapper.wrap(status=200, data=result, message="Success").to_response()
 
 
-@router.get("/rankings", summary="Get Statistics Rankings.", response_model=dict)
+@router.get("/ranking", summary="Get Statistics Rankings.", response_model=dict)
 async def get_statistics_rankings(session: SessionDep, period: DateRangeEnum = DateRangeEnum.ALL_TIME):
     """
-    Endpoint to retrieve rankings of statistics.
+    Endpoint to retrieve ranking of statistics.
     """
     statistics_data = {}
 
     # TOP USERS STATISTICS
     try:
-        user_statistics = await RankingStatisticsService.get_ranking_statistics(entity=StatisticsEntity.USERS, session=session, period=period)
+        user_statistics, weights = await RankingStatisticsService.get_ranking_statistics(
+            entity=StatisticsEntity.USERS, session=session, period=period
+        )
         if user_statistics is None:
             raise ValueError("Invalid user ranking statistics data")
-        statistics_data["users"] = user_statistics
+        statistics_data["users"] = {
+            "data": user_statistics,
+            "weights": weights,
+        }
     except Exception as e:
         logger.error(f"Error fetching user rankings: {e}")
         return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
 
+    # TOP CONNECTED EXTENSIONS STATISTICS
+    # try:
+    #     extension_statistics, weights = await RankingStatisticsService.get_ranking_statistics(
+    #         entity=StatisticsEntity.CONNECTED_EXTENSIONS, session=session, period=period
+    #     )
+    #     if extension_statistics is None:
+    #         raise ValueError("Invalid extension ranking statistics data")
+    #     statistics_data["connected_extensions"] = {
+    #         "data": extension_statistics,
+    #         "weights": weights,
+    #     }
+    # except Exception as e:
+    #     logger.error(f"Error fetching extension rankings: {e}")
+    #     return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
+
     result = BaseRankingStatisticsResponse(
-        users=statistics_data["users"],
-        connected_extensions=statistics_data["connected_extensions"],
+        users=BaseRankingEntityStatisticsResponse(data=statistics_data["users"]["data"], weights=statistics_data["users"]["weights"]),
+        # connected_extensions=BaseRankingEntityStatisticsResponse(
+        #     data=statistics_data["connected_extensions"]["data"], weights=statistics_data["connected_extensions"]["weights"]
+        # ),
     )
     return ResponseWrapper.wrap(status=200, data=result, message="Success").to_response()
