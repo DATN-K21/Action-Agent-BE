@@ -1,0 +1,80 @@
+# Default values for apigateway.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/apigatewaydev
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "apigatewaydev"
+fullnameOverride: "apigatewaydev"
+
+env:
+  - name: PORT
+    value: "15000"
+
+  - name: HTTPS_PORT
+    value: "15000"
+
+  - name: NODE_ENV
+    value: "dev"
+
+  - name: ELASTICSEARCH_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchurl
+
+  - name: RABBITMQ_URL
+    value: "amqp://rabbitmqdev:5672"
+
+  - name: REDIS_URL
+    value: "redis://redisdev:6379"
+
+  - name: SSL_KEY_CONTENT
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: sslkeycontent
+
+  - name: SSL_CERT_CONTENT
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: sslcertcontent
+
+  - name: USER_SERVICE_URL
+    value: "http://userservicedev:15100"
+
+  - name: AI_SERVICE_URL
+    value: "aiservicedev:15200"
+
+  - name: EXTENSION_SERVICE_URL
+    value: "extensionservicedev:15300"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    spec.ingressClassName: "nginx"
+    nginx.org/websocket-services: "apigatewaydev"
+    nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: api-dev.action-agent.software
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: apigatewaydev
+              port:
+                number: 15000
+  tls:
+    - secretName: actionagent
+      hosts:
+        - api-dev.action-agent.software

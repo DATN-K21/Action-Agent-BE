@@ -8,7 +8,7 @@ const privateEndpointMiddleware = require('../middlewares/privateEndpoint.middle
 const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
     'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
-    'extension:': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
+    'extension': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
 };
 
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
@@ -42,7 +42,7 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
                 } else {
                     resOrSocket.status(err?.status || 500).json({
                         status: err?.status || 500,
-                        error: errorMessage || 'Internal Server Error',
+                        error: err?.message || 'Internal Server Error',
                         code: err?.code,
                     });
                 }

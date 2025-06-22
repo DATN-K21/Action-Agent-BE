@@ -1,7 +1,7 @@
 .PHONY: down restart pull up git-pull
 
 # Default list of services (can be overridden via CLI)
-SERVICES ?= api-gateway ai-service user-service extension-service user-database ai-database
+SERVICES ?= api-gateway ai-service user-service extension-service user-db ai-db extension-db
 
 # Pull latest code from Git
 git-pull:

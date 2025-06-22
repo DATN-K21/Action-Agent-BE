@@ -3,12 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const { createClient } = require('redis');
 
-const REDIS_HOST = process.env.REDIS_HOST || 'redis';
-const REDIS_PORT = process.env.REDIS_PORT || '6379';
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD || 'root';
-const REDIS_USER = process.env.REDIS_USER || 'default';
-
-const redisUrl = `redis://${REDIS_USER}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`;
+const redisUrl = process.env.REDIS_URL || 'redis://default:root@redis:6379';
 const redisClient = createClient({
     url: redisUrl,
 });

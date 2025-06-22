@@ -1,0 +1,82 @@
+# Default values for apigateway.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+revisionHistoryLimit: 0
+
+image:
+  repository: myaagent.azurecr.io/apigateway
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+imagePullSecrets:
+  - name: regcred
+nameOverride: "apigateway"
+fullnameOverride: "apigateway"
+
+env:
+  secrets:
+    name: env-secret
+    secret:
+      appinsightconnection: appinsightconnection
+      elasticsearchurl: elasticsearchurl
+      sslkeycontent: sslkeycontent
+      sslcertcontent: sslcertcontents
+
+service:
+  type: ClusterIP
+  port: 15000
+  targetport: 15000
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    spec.ingressClassName: "nginx"
+    nginx.org/websocket-services: "apigateway"
+    nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+  hosts:
+    - host: dev-api.action-agent.software
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: apigateway
+              port:
+                number: 15000
+  tls:
+    - secretName: actionagent
+      hosts:
+        - dev-api.action-agent.software
+
+resources:
+  requests:
+    cpu: "10m"
+    memory: "100Mi"
+  limits:
+    cpu: "100m"
+    memory: "300Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux

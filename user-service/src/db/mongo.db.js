@@ -8,7 +8,11 @@ const { maxPoolSize: MAX_POOL_SIZE } = mongoConfig;
 const connectString = process.env.MONGODB_CONNECTION_STRING;
 
 const setupMongoDB = async () => {
-    mongoose.connect(connectString, { maxPoolSize: MAX_POOL_SIZE })
+    console.log(connectString);
+    mongoose.connect(connectString, {
+        maxPoolSize: MAX_POOL_SIZE,
+        connectTimeoutMS: 60000
+    })
         .then(async () => {
             await seedRoles(mongoose);
             console.log("Connect to MongoDB successfully");

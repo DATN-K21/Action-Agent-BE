@@ -4,12 +4,12 @@ services:
   ############### Services ###########################
   ####################################################
   api-gateway:
-    image: aagent.azurecr.io/api-gateway:stg
+    image: aagent.azurecr.io/api-gateway:dev
     container_name: api-gateway
     environment:
       HTTPS_PORT: 15000
-      SSL_KEY_PATH: "certs/key.pem"
-      SSL_CERT_PATH: "certs/cert.pem"
+      SSL_KEY_CONTENT: ""
+      SSL_CERT_CONTENT: ""
       USER_SERVICE_URL: http://user-service:15100
       AI_SERVICE_URL: http://ai-service:15200
       ELASTICSEARCH_URL: http://elasticsearch:9200
@@ -19,16 +19,14 @@ services:
     ports:
       - "15000:15000"
     restart: always
-    volumes:
-      - ./api-gateway/certs:/usr/src/app/certs:ro
 
   user-service:
-    image: aagent.azurecr.io/user-service:stg
+    image: aagent.azurecr.io/user-service:dev
     container_name: user-service
     environment:
       NODE_ENV: dev
       PORT: 15100
-      MONGODB_CONNECTION_STRING: "mongodb://root:root@user-database:27017/user-service?authSource=admin"
+      MONGODB_CONNECTION_STRING: "mongodb://root:root@mongo-database:27017/user-service?authSource=admin"
       EMAIL_USERNAME: <EMAIL_USERNAME>
       EMAIL_PASSWORD: <EMAIL_PASSWORD>
       GOOGLE_APP_CLIENT_ID: <YOUR_GOOGLE_CLIENT_ID>
@@ -51,7 +49,7 @@ services:
     restart: always
 
   ai-service:
-    image: aagent.azurecr.io/ai-service:stg
+    image: aagent.azurecr.io/ai-service:dev
     container_name: ai-service
     environment:
       DEBUG_AGENT: False
@@ -61,7 +59,7 @@ services:
       LLM_DEFAULT_PROVIDER: openai
       LLM_DEFAULT_MODEL: gpt-4o-mini
       LLM_DEFAULT_API_KEY: <YOUR_OPENAI_API_KEY>
-      POSTGRES_HOST: ai-database
+      POSTGRES_HOST: ai-db
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
@@ -76,14 +74,14 @@ services:
     restart: always
 
   extension-service:
-    image: aagent.azurecr.io/extension-service:stg
+    image: aagent.azurecr.io/extension-service:dev
     container_name: extension-service
     environment:
       NODE_ENV: dev
       PORT: 15300
       COMPOSIO_API_BASE_URL: https://backend.composio.dev/api
       COMPOSIO_API_KEY: d04n821zcnqtop53g98fx
-      DATABASE_URL: mongodb://root:root@extension-database:27017/datn-extension-database?authSource=admin
+      DATABASE_URL: mongodb://root:root@mongo-database:27017/datn-extension-db?authSource=admin
     ports:
       - "15300:15300"
     restart: always
@@ -91,43 +89,31 @@ services:
   ####################################################
   ################ Databases #########################
   ####################################################
-  ai-database:
+  ai-db:
     image: pgvector/pgvector:pg16
-    container_name: ai-database
+    container_name: ai-db
     environment:
       POSTGRES_DB: ai-database
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
-      POSTGRES_HOST: ai-database
+      POSTGRES_HOST: ai-db
       POSTGRES_PORT: 5432
     ports:
       - "5433:5432"
     volumes:
-      - ai-database:/var/lib/postgresql/data
+      - ai-db:/var/lib/postgresql/data
     restart: always
 
-  user-database:
+  mongo-database:
     image: mongo:latest
-    container_name: user-database
+    container_name: mongo-database
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: root
     ports:
       - "27017:27017"
     volumes:
-      - user-database:/data/db
-    restart: always
-
-  extension-database:
-    image: mongo:latest
-    container_name: extension-database
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root
-    ports:
-      - "27018:27017"
-    volumes:
-      - extension-database:/data/db
+      - mongo-database:/data/db
     restart: always
 
   ####################################################
@@ -192,8 +178,7 @@ services:
 
 volumes:
   es-data:
-  ai-database:
-  user-database:
-  extension-database:
+  ai-db:
+  mongo-database:
   rabbitmq:
   redis:

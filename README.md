@@ -16,13 +16,13 @@ This repository contains the backend code for the Action-Agent system, implement
 ### 2. User Service
 - **Port**: `http://:15100`
 - **Technology**: NestJS
-- **Database**: MongoDB (can be online or offline via `user-database` in `docker-compose`)
+- **Database**: MongoDB (can be online or offline via `user-db` in `docker-compose`)
 - **Description**: Manages user-related operations.
 
 ### 3. AI Service
 - **Port**: `http://:15200`
 - **Technology**: FastAPI
-- **Database**: PostgreSQL (can be online or offline via `ai-database` in `docker-compose`)
+- **Database**: PostgreSQL (can be online or offline via `ai-db` in `docker-compose`)
 - **Description**: Handles AI-related operations.
 
 ## 4. Other services
@@ -38,6 +38,7 @@ Each service provides a `/ping` endpoint to check its health:
 - **API Gateway**: `https://:15000/ping`
 - **User Service**: `http://:15100/ping` (from inside) or `https://:15000/user/ping`
 - **AI Service**: `http://:15200/ping` (from inside) or `https://:15000/ai/ping`
+- **Extension Service**: `http://:15300/ping` (from inside) or `https://:15000/extension/ping`
 
 ## Running the Services
 
@@ -51,12 +52,12 @@ To run all services using Docker Compose:
 2. Copy the `docker-compose.override.yaml` file from NDA (to have the correct environment variables).
 3. Run the following command:
    ```bash
-   docker-compose up --pull always -d api-gateway ai-service user-service ai-database user-database
+   docker-compose up --pull always -d api-gateway ai-service user-service ai-db user-db
    ```
    (Currently we only develop apps with those services)
 4. Whenever there is a new build, you can run:
    ```bash
-   docker-compose up --pull always -d api-gateway ai-service user-service ai-database user-database
+   docker-compose up --pull always -d api-gateway ai-service user-service ai-db user-db
    ```
    to pull the latest images and restart the services.
 
