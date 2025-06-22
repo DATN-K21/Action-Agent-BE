@@ -7,9 +7,9 @@ revisionHistoryLimit: 0
 
 image:
   repository: myaagent.azurecr.io/aiservice
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: BuildID
 
 imagePullSecrets:
   - name: regcred
@@ -56,7 +56,7 @@ resources:
     cpu: "10m"
     memory: "100Mi"
   limits:
-    cpu: "500"
+    cpu: "500m"
     memory: "700Mi"
 
 autoscaling:

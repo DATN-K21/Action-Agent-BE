@@ -4,9 +4,9 @@
 
 image:
   repository: myaagent.azurecr.io/apigatewaydev
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: BuildID
 
 nameOverride: "apigatewaydev"
 fullnameOverride: "apigatewaydev"

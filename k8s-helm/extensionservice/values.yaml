@@ -7,9 +7,9 @@ revisionHistoryLimit: 0
 
 image:
   repository: myaagent.azurecr.io/extensionservice
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: BuildID
 
 imagePullSecrets:
   - name: regcred

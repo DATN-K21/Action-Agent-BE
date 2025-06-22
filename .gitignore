@@ -16,4 +16,4 @@ mock
 docker-compose.override.yaml
 *.local.yaml
 
-/_tests/*.yaml
+*.log
