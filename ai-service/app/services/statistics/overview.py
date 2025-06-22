@@ -4,19 +4,13 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import DateRangeEnum, StatisticsEntity
 from app.core.utils.date_range import get_period_days, get_period_range, get_previous_period_range
-from app.db_models import (
-    Assistant,
-    ConnectedExtension,
-    Thread,
-    User,
-)
-from app.db_models.base_entity import BaseEntity
 from app.schemas.statistics import OverviewStatisticsResponse
+from app.services.statistics.base import BaseStatisticsService
 
 logger = logging.get_logger(__name__)
 
 
-class OverviewStatisticsService:
+class OverviewStatisticsService(BaseStatisticsService):
     """
     Service class to handle overview statistics operations.
     """
@@ -29,30 +23,14 @@ class OverviewStatisticsService:
             return f"{((current - previous) / previous) * 100:.1f}%"
 
     @staticmethod
-    def get_entity_statistics_model(entity: StatisticsEntity) -> type[BaseEntity]:
-        """
-        Get the appropriate statistics database model based on the entity type.
-        """
-        if entity == StatisticsEntity.USERS:
-            return User
-        elif entity == StatisticsEntity.CONNECTED_EXTENSIONS:
-            return ConnectedExtension
-        elif entity == StatisticsEntity.THREADS:
-            return Thread
-        elif entity == StatisticsEntity.ASSISTANTS:
-            return Assistant
-        else:
-            raise ValueError(f"Unsupported entity type: {entity}")
-
-    @staticmethod
     async def get_statistics_response(entity: StatisticsEntity, session: SessionDep, period: DateRangeEnum) -> OverviewStatisticsResponse:
         # Get current period range
         start_date, end_date = get_period_range(period)
-
         # Get actual number of days in the period
         period_days = get_period_days(period)
 
-        EntityModel = OverviewStatisticsService.get_entity_statistics_model(entity)
+        # Get the appropriate model for the entity
+        EntityModel = BaseStatisticsService.get_entity_statistics_model(entity)
 
         if start_date is None or end_date is None:
             # For "all time" period, count all users

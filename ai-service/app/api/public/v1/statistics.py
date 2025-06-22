@@ -4,8 +4,9 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import DateRangeEnum, StatisticsEntity
 from app.schemas.base import ResponseWrapper
-from app.schemas.statistics import BaseStatisticsResponse
-from app.services.statistics import OverviewStatisticsService
+from app.schemas.statistics import BaseOverviewStatisticsResponse, BaseRankingStatisticsResponse
+from app.services.statistics.overview import OverviewStatisticsService
+from app.services.statistics.ranking import RankingStatisticsService
 
 logger = logging.get_logger(__name__)
 
@@ -16,7 +17,6 @@ router = APIRouter(prefix="/statistics", tags=["Statistics"])
 async def get_statistics_overview(session: SessionDep, period: DateRangeEnum = DateRangeEnum.ALL_TIME):
     """
     Endpoint to retrieve an overview of statistics.
-    This is a placeholder implementation.
     """
 
     # The result data for statistics
@@ -71,10 +71,34 @@ async def get_statistics_overview(session: SessionDep, period: DateRangeEnum = D
         return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
 
     # Construct the response object
-    result = BaseStatisticsResponse(
+    result = BaseOverviewStatisticsResponse(
         users=statistics_data["users"],
         connected_extensions=statistics_data["connected_extensions"],
         threads=statistics_data["threads"],
         assistants=statistics_data["assistants"],
+    )
+    return ResponseWrapper.wrap(status=200, data=result, message="Success").to_response()
+
+
+@router.get("/rankings", summary="Get Statistics Rankings.", response_model=dict)
+async def get_statistics_rankings(session: SessionDep, period: DateRangeEnum = DateRangeEnum.ALL_TIME):
+    """
+    Endpoint to retrieve rankings of statistics.
+    """
+    statistics_data = {}
+
+    # TOP USERS STATISTICS
+    try:
+        user_statistics = await RankingStatisticsService.get_ranking_statistics(entity=StatisticsEntity.USERS, session=session, period=period)
+        if user_statistics is None:
+            raise ValueError("Invalid user ranking statistics data")
+        statistics_data["users"] = user_statistics
+    except Exception as e:
+        logger.error(f"Error fetching user rankings: {e}")
+        return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
+
+    result = BaseRankingStatisticsResponse(
+        users=statistics_data["users"],
+        connected_extensions=statistics_data["connected_extensions"],
     )
     return ResponseWrapper.wrap(status=200, data=result, message="Success").to_response()
