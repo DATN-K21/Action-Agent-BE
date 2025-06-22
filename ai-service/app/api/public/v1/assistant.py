@@ -290,7 +290,7 @@ async def _acreate_hierarchical_team(
         type="root",
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
-        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -1503,9 +1503,9 @@ async def acreate_advanced_assistant(
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
-            provider=request.provider,
-            model_name=request.model_name,
-            temperature=request.temperature,
+            provider=request.provider or env_settings.OPENAI_API_BASE_URL,
+            model_name=request.model_name or env_settings.LLM_BASIC_MODEL,
+            temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1518,6 +1518,8 @@ async def acreate_advanced_assistant(
         hierarchical_root_member = None
         if request.mcp_ids or request.extension_ids:
             hierarchical_team, hierarchical_root_member = await _acreate_hierarchical_team(session, new_assistant, request, x_user_id)
+            if not hierarchical_team or not hierarchical_root_member:
+                raise ValueError("Failed to create hierarchical team or root member")
 
         # Create MCP members and their skills using helper function
         if request.mcp_ids and hierarchical_team and hierarchical_root_member:
