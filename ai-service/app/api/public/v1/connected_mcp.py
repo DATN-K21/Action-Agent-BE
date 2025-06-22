@@ -13,6 +13,7 @@ from app.schemas.connected_mcp import (
     CreateConnectedMcpResponse,
     GetConnectedMcpResponse,
     GetConnectedMcpsResponse,
+    GetToolInfosResponse,
     UpdateConnectedMcpRequest,
     UpdateConnectedMcpResponse,
 )
@@ -280,3 +281,75 @@ async def adelete(
         logger.error(f"Error deleting connected mcp: {e}", exc_info=True)
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get("/{connected_mcp_id}/tool-infos", summary="Get list of ToolInfo.", response_model=ResponseWrapper[GetToolInfosResponse])
+async def aget_tool_infos(
+    session: SessionDep,
+    connected_mcp_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
+    try:
+        # Check if the connected MCP exists and user has access
+        if x_user_role in ["admin", "super_admin"]:
+            statement = (
+                select(ConnectedMcp)
+                .where(
+                    ConnectedMcp.id == connected_mcp_id,
+                    ConnectedMcp.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+        else:
+            statement = (
+                select(ConnectedMcp)
+                .where(
+                    ConnectedMcp.user_id == x_user_id,
+                    ConnectedMcp.id == connected_mcp_id,
+                    ConnectedMcp.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+
+        result = await session.execute(statement)
+        connected_mcp = result.scalar_one_or_none()
+
+        if not connected_mcp:
+            return ResponseWrapper.wrap(
+                status=404,
+                message="Connected MCP not found.",
+            ).to_response()
+
+        # Create connections dictionary for MCP service
+        # Format matches what's used successfully elsewhere in the codebase
+        connections = {
+            connected_mcp.mcp_name: {
+                "url": connected_mcp.url,
+                "transport": connected_mcp.transport,
+            }
+        }
+
+        # Import McpService here to avoid potential circular imports
+        from app.services.mcps.mcp_service import McpService
+
+        # Get tool information from MCP service
+        # Note: The MCP service will handle the connection format conversion internally
+        tool_infos = await McpService.aget_mcp_tool_info(connections=connections)  # type: ignore
+
+        response_data = GetToolInfosResponse(tool_infos=tool_infos)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database error when fetching MCP tool infos: {e}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500,
+            message="Database error occurred",
+        ).to_response()
+
+    except Exception as e:
+        logger.error(f"Error fetching MCP tool infos: {e}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500,
+            message="Internal server error",
+        ).to_response()

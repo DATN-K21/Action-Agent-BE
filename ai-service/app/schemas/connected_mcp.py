@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import Field
 
 from app.core.enums import McpTransport
+from app.core.models import ToolInfo
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
@@ -45,3 +46,6 @@ class GetConnectedMcpsResponse(PagingResponse):
 
 class UpdateConnectedMcpResponse(CreateConnectedMcpResponse):
     pass
+
+class GetToolInfosResponse(BaseResponse):
+    tool_infos: list[ToolInfo] = Field(..., title="List of tool infos")
