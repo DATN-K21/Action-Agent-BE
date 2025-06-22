@@ -6,8 +6,8 @@ const PORT = GENERAL_CONFIGS.HTTPS_PORT;
 
 // Load your SSL certs from environment variables
 const options = {
-    key: process.env.SSL_KEY_CONTENT,
-    cert: process.env.SSL_CERT_CONTENT,
+    key: Buffer.from(process.env.SSL_KEY_CONTENT, 'base64').toString(),
+    cert: Buffer.from(process.env.SSL_CERT_CONTENT, 'base64').toString(),
 };
 
 // Create HTTPS server

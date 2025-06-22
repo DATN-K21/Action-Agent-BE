@@ -1,0 +1,358 @@
+Release "apigateway" does not exist. Installing it now.
+NAME: apigateway
+LAST DEPLOYED: Sun Jun 22 04:58:31 2025
+NAMESPACE: dev
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+USER-SUPPLIED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15000"
+- name: HTTPS_PORT
+  value: "15000"
+- name: NODE_ENV
+  value: dev
+- name: ELASTICSEARCH_URL
+  valueFrom:
+    secretKeyRef:
+      key: elasticsearchurl
+      name: env-secret
+- name: RABBITMQ_URL
+  value: amqp://rabbitmqdev:5672
+- name: REDIS_URL
+  value: redis://redisdev:6379
+- name: SSL_KEY_CONTENT
+  valueFrom:
+    secretKeyRef:
+      key: sslkeycontent
+      name: env-secret
+- name: SSL_CERT_CONTENT
+  valueFrom:
+    secretKeyRef:
+      key: sslcertcontent
+      name: env-secret
+- name: USER_SERVICE_URL
+  value: http://userservicedev:15100
+- name: AI_SERVICE_URL
+  value: aiservicedev:15200
+- name: EXTENSION_SERVICE_URL
+  value: extensionservicedev:15300
+fullnameOverride: apigatewaydev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/apigatewaydev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/client-max-body-size: 30m
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.org/websocket-services: apigatewaydev
+    spec.ingressClassName: nginx
+  className: nginx
+  enabled: true
+  hosts:
+  - host: api-dev.action-agent.software
+    paths:
+    - backend:
+        service:
+          name: apigatewaydev
+          port:
+            number: 15000
+      path: /
+      pathType: Prefix
+  tls:
+  - hosts:
+    - api-dev.action-agent.software
+    secretName: actionagent
+nameOverride: apigatewaydev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 100m
+    memory: 300Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15000
+  targetport: 15000
+  type: ClusterIP
+tolerations: []
+
+COMPUTED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15000"
+- name: HTTPS_PORT
+  value: "15000"
+- name: NODE_ENV
+  value: dev
+- name: ELASTICSEARCH_URL
+  valueFrom:
+    secretKeyRef:
+      key: elasticsearchurl
+      name: env-secret
+- name: RABBITMQ_URL
+  value: amqp://rabbitmqdev:5672
+- name: REDIS_URL
+  value: redis://redisdev:6379
+- name: SSL_KEY_CONTENT
+  valueFrom:
+    secretKeyRef:
+      key: sslkeycontent
+      name: env-secret
+- name: SSL_CERT_CONTENT
+  valueFrom:
+    secretKeyRef:
+      key: sslcertcontent
+      name: env-secret
+- name: USER_SERVICE_URL
+  value: http://userservicedev:15100
+- name: AI_SERVICE_URL
+  value: aiservicedev:15200
+- name: EXTENSION_SERVICE_URL
+  value: extensionservicedev:15300
+fullnameOverride: apigatewaydev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/apigatewaydev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/client-max-body-size: 30m
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.org/websocket-services: apigatewaydev
+    spec.ingressClassName: nginx
+  className: nginx
+  enabled: true
+  hosts:
+  - host: api-dev.action-agent.software
+    paths:
+    - backend:
+        service:
+          name: apigatewaydev
+          port:
+            number: 15000
+      path: /
+      pathType: Prefix
+  tls:
+  - hosts:
+    - api-dev.action-agent.software
+    secretName: actionagent
+nameOverride: apigatewaydev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 100m
+    memory: 300Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15000
+  targetport: 15000
+  type: ClusterIP
+tolerations: []
+
+HOOKS:
+MANIFEST:
+---
+# Source: apigateway/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: apigatewaydev
+  labels:
+    helm.sh/chart: apigateway-0.1.0
+    app.kubernetes.io/name: apigatewaydev
+    app.kubernetes.io/instance: apigateway
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 15000
+      targetPort: 15000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: apigatewaydev
+    app.kubernetes.io/instance: apigateway
+---
+# Source: apigateway/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apigatewaydev
+  labels:
+    helm.sh/chart: apigateway-0.1.0
+    app.kubernetes.io/name: apigatewaydev
+    app.kubernetes.io/instance: apigateway
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apigatewaydev
+      app.kubernetes.io/instance: apigateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: apigatewaydev
+        app.kubernetes.io/instance: apigateway
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      securityContext:
+        null
+      containers:
+        - name: apigateway
+          securityContext:
+            null
+          image: "myaagent.azurecr.io/apigatewaydev:BuildID"
+          imagePullPolicy: Always
+          env:
+            - name: PORT
+              value: "15000"
+            - name: HTTPS_PORT
+              value: "15000"
+            - name: NODE_ENV
+              value: dev
+            - name: ELASTICSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  key: elasticsearchurl
+                  name: env-secret
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmqdev:5672
+            - name: REDIS_URL
+              value: redis://redisdev:6379
+            - name: SSL_KEY_CONTENT
+              valueFrom:
+                secretKeyRef:
+                  key: sslkeycontent
+                  name: env-secret
+            - name: SSL_CERT_CONTENT
+              valueFrom:
+                secretKeyRef:
+                  key: sslcertcontent
+                  name: env-secret
+            - name: USER_SERVICE_URL
+              value: http://userservicedev:15100
+            - name: AI_SERVICE_URL
+              value: aiservicedev:15200
+            - name: EXTENSION_SERVICE_URL
+              value: extensionservicedev:15300
+          ports:
+            - name: http
+              containerPort: 15000
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          
+          resources:
+            limits:
+              cpu: 100m
+              memory: 300Mi
+            requests:
+              cpu: 10m
+              memory: 100Mi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+---
+# Source: apigateway/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apigatewaydev
+  labels:
+    helm.sh/chart: apigateway-0.1.0
+    app.kubernetes.io/name: apigatewaydev
+    app.kubernetes.io/instance: apigateway
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    nginx.ingress.kubernetes.io/client-max-body-size: 30m
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.org/websocket-services: apigatewaydev
+    spec.ingressClassName: nginx
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "api-dev.action-agent.software"
+      secretName: actionagent
+  rules:
+    - host: "api-dev.action-agent.software"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: apigatewaydev
+                port:
+                  number: 15000
+
+NOTES:
+1. Get the application URL by running these commands:
+  https://api-dev.action-agent.software/

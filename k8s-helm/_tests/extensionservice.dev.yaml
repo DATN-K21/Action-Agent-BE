@@ -1,0 +1,252 @@
+Release "extensionservice" does not exist. Installing it now.
+NAME: extensionservice
+LAST DEPLOYED: Sun Jun 22 04:58:32 2025
+NAMESPACE: dev
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+USER-SUPPLIED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15300"
+- name: NODE_ENV
+  value: dev
+- name: DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      key: mongodbconnectionstring
+      name: env-secret
+- name: COMPOSIO_API_BASE_URL
+  value: https://backend.composio.dev/api
+- name: COMPOSIO_API_KEY
+  valueFrom:
+    secretKeyRef:
+      key: composioapikey
+      name: env-secret
+fullnameOverride: extensionservicedev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/extensionservicedev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations: {}
+  className: ""
+  enabled: false
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+  tls: []
+nameOverride: extensionservicedev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 200m
+    memory: 500Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15300
+  targetport: 15300
+  type: ClusterIP
+tolerations: []
+
+COMPUTED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15300"
+- name: NODE_ENV
+  value: dev
+- name: DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      key: mongodbconnectionstring
+      name: env-secret
+- name: COMPOSIO_API_BASE_URL
+  value: https://backend.composio.dev/api
+- name: COMPOSIO_API_KEY
+  valueFrom:
+    secretKeyRef:
+      key: composioapikey
+      name: env-secret
+fullnameOverride: extensionservicedev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/extensionservicedev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations: {}
+  className: ""
+  enabled: false
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+  tls: []
+nameOverride: extensionservicedev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 200m
+    memory: 500Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15300
+  targetport: 15300
+  type: ClusterIP
+tolerations: []
+
+HOOKS:
+MANIFEST:
+---
+# Source: extensionservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: extensionservicedev
+  labels:
+    helm.sh/chart: extensionservice-0.1.0
+    app.kubernetes.io/name: extensionservicedev
+    app.kubernetes.io/instance: extensionservice
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 15300
+      targetPort: 15300
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: extensionservicedev
+    app.kubernetes.io/instance: extensionservice
+---
+# Source: extensionservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extensionservicedev
+  labels:
+    helm.sh/chart: extensionservice-0.1.0
+    app.kubernetes.io/name: extensionservicedev
+    app.kubernetes.io/instance: extensionservice
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: extensionservicedev
+      app.kubernetes.io/instance: extensionservice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: extensionservicedev
+        app.kubernetes.io/instance: extensionservice
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      securityContext:
+        null
+      containers:
+        - name: extensionservice
+          securityContext:
+            null
+          image: "myaagent.azurecr.io/extensionservicedev:BuildID"
+          imagePullPolicy: Always
+          env:
+            - name: PORT
+              value: "15300"
+            - name: NODE_ENV
+              value: dev
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: mongodbconnectionstring
+                  name: env-secret
+            - name: COMPOSIO_API_BASE_URL
+              value: https://backend.composio.dev/api
+            - name: COMPOSIO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: composioapikey
+                  name: env-secret
+          ports:
+            - name: http
+              containerPort: 15300
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          
+          resources:
+            limits:
+              cpu: 200m
+              memory: 500Mi
+            requests:
+              cpu: 10m
+              memory: 100Mi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace dev -l "app.kubernetes.io/name=extensionservicedev,app.kubernetes.io/instance=extensionservice" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace dev $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace dev port-forward $POD_NAME 8080:$CONTAINER_PORT

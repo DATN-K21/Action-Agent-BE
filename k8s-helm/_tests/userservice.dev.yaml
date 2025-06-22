@@ -1,0 +1,354 @@
+Release "userservice" does not exist. Installing it now.
+NAME: userservice
+LAST DEPLOYED: Sun Jun 22 04:58:31 2025
+NAMESPACE: dev
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+USER-SUPPLIED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15100"
+- name: NODE_ENV
+  value: dev
+- name: MONGODB_CONNECTION_STRING
+  valueFrom:
+    secretKeyRef:
+      key: mongodbconnectionstring
+      name: env-secret
+- name: JWT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: jwtsecret
+      name: env-secret
+- name: EMAIL_USERNAME
+  valueFrom:
+    secretKeyRef:
+      key: emailusername
+      name: env-secret
+- name: EMAIL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      key: emailpassword
+      name: env-secret
+- name: API_GATEWAY_URL
+  value: http://apigatewaydev:15000
+- name: AI_SERVICE_URL
+  value: http://aiservicedev:15200
+- name: REDIS_URL
+  value: redis://redisdev:6379
+- name: GOOGLE_APP_REDIRECT_URL
+  value: https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+- name: GOOGLE_APP_CLIENT_ID
+  value: 1000000000000-abc123def456.apps.googleusercontent.com
+- name: GOOGLE_APP_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: googleappclientsecret
+      name: env-secret
+- name: FACEBOOK_APP_REDIRECT_URL
+  value: https://apigateway:15000/user/api/v1/access/facebook/verify
+- name: FACEBOOK_APP_CLIENT_ID
+  value: "3105674576249720"
+- name: FACEBOOK_APP_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: facebookappclientsecret
+      name: env-secret
+- name: CLIENT_URL
+  value: https://dev.action-agent.software
+fullnameOverride: userservicedev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/userservicedev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations: {}
+  className: ""
+  enabled: false
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+  tls: []
+nameOverride: userservicedev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 200m
+    memory: 300Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15100
+  targetport: 15100
+  type: ClusterIP
+tolerations: []
+
+COMPUTED VALUES:
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+autoscaling:
+  enabled: false
+  maxReplicas: 1
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+env:
+- name: PORT
+  value: "15100"
+- name: NODE_ENV
+  value: dev
+- name: MONGODB_CONNECTION_STRING
+  valueFrom:
+    secretKeyRef:
+      key: mongodbconnectionstring
+      name: env-secret
+- name: JWT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: jwtsecret
+      name: env-secret
+- name: EMAIL_USERNAME
+  valueFrom:
+    secretKeyRef:
+      key: emailusername
+      name: env-secret
+- name: EMAIL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      key: emailpassword
+      name: env-secret
+- name: API_GATEWAY_URL
+  value: http://apigatewaydev:15000
+- name: AI_SERVICE_URL
+  value: http://aiservicedev:15200
+- name: REDIS_URL
+  value: redis://redisdev:6379
+- name: GOOGLE_APP_REDIRECT_URL
+  value: https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+- name: GOOGLE_APP_CLIENT_ID
+  value: 1000000000000-abc123def456.apps.googleusercontent.com
+- name: GOOGLE_APP_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: googleappclientsecret
+      name: env-secret
+- name: FACEBOOK_APP_REDIRECT_URL
+  value: https://apigateway:15000/user/api/v1/access/facebook/verify
+- name: FACEBOOK_APP_CLIENT_ID
+  value: "3105674576249720"
+- name: FACEBOOK_APP_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      key: facebookappclientsecret
+      name: env-secret
+- name: CLIENT_URL
+  value: https://dev.action-agent.software
+fullnameOverride: userservicedev
+image:
+  pullPolicy: Always
+  repository: myaagent.azurecr.io/userservicedev
+  tag: BuildID
+imagePullSecrets:
+- name: regcred
+ingress:
+  annotations: {}
+  className: ""
+  enabled: false
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+  tls: []
+nameOverride: userservicedev
+nodeSelector: {}
+replicaCount: 1
+resources:
+  limits:
+    cpu: 200m
+    memory: 300Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+revisionHistoryLimit: 0
+service:
+  port: 15100
+  targetport: 15100
+  type: ClusterIP
+tolerations: []
+
+HOOKS:
+MANIFEST:
+---
+# Source: userservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: userservicedev
+  labels:
+    helm.sh/chart: userservice-0.1.0
+    app.kubernetes.io/name: userservicedev
+    app.kubernetes.io/instance: userservice
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 15100
+      targetPort: 15100
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: userservicedev
+    app.kubernetes.io/instance: userservice
+---
+# Source: userservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: userservicedev
+  labels:
+    helm.sh/chart: userservice-0.1.0
+    app.kubernetes.io/name: userservicedev
+    app.kubernetes.io/instance: userservice
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: userservicedev
+      app.kubernetes.io/instance: userservice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: userservicedev
+        app.kubernetes.io/instance: userservice
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      securityContext:
+        null
+      containers:
+        - name: userservice
+          securityContext:
+            null
+          image: "myaagent.azurecr.io/userservicedev:BuildID"
+          imagePullPolicy: Always
+          env:
+            - name: PORT
+              value: "15100"
+            - name: NODE_ENV
+              value: dev
+            - name: MONGODB_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  key: mongodbconnectionstring
+                  name: env-secret
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: jwtsecret
+                  name: env-secret
+            - name: EMAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: emailusername
+                  name: env-secret
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: emailpassword
+                  name: env-secret
+            - name: API_GATEWAY_URL
+              value: http://apigatewaydev:15000
+            - name: AI_SERVICE_URL
+              value: http://aiservicedev:15200
+            - name: REDIS_URL
+              value: redis://redisdev:6379
+            - name: GOOGLE_APP_REDIRECT_URL
+              value: https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback
+            - name: GOOGLE_APP_CLIENT_ID
+              value: 1000000000000-abc123def456.apps.googleusercontent.com
+            - name: GOOGLE_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: googleappclientsecret
+                  name: env-secret
+            - name: FACEBOOK_APP_REDIRECT_URL
+              value: https://apigateway:15000/user/api/v1/access/facebook/verify
+            - name: FACEBOOK_APP_CLIENT_ID
+              value: "3105674576249720"
+            - name: FACEBOOK_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: facebookappclientsecret
+                  name: env-secret
+            - name: CLIENT_URL
+              value: https://dev.action-agent.software
+          ports:
+            - name: http
+              containerPort: 15100
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          
+          resources:
+            limits:
+              cpu: 200m
+              memory: 300Mi
+            requests:
+              cpu: 10m
+              memory: 100Mi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace dev -l "app.kubernetes.io/name=userservicedev,app.kubernetes.io/instance=userservice" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace dev $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace dev port-forward $POD_NAME 8080:$CONTAINER_PORT

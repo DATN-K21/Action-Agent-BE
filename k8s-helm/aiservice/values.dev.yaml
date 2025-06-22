@@ -1,0 +1,86 @@
+# Default values for aiservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/aiservicedev
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest
+
+nameOverride: "aiservicedev"
+fullnameOverride: "aiservicedev"
+
+env:
+  - name: DEBUG_SERVER
+    value: "False"
+  
+  - name: DEBUG_SQLALCHEMY
+    value: "False"
+
+  - name: LOGGING_LOG_LEVEL
+    value: "INFO"
+
+  - name: POSTGRES_HOST
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: posgresqlhost
+  - name: POSTGRES_PORT
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: postgresqlport
+  - name: POSTGRES_USER
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: postgresqluser
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: postgresqlpassword
+  - name: POSTGRES_DB
+    value: "aiservicedev"
+
+  - name: LLM_DEFAULT_PROVIDER
+    value: "openai"
+
+  - name: LLM_DEFAULT_MODEL
+    value: "gpt-4o-mini"
+
+  - name: LLM_DEFAULT_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: openaiapikey
+
+  - name: TOOL_TAVILY_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: taviliapikey
+
+  - name: COMPOSIO_LOGGING_LEVEL
+    value: "debug"
+  - name: COMPOSIO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: composioapikey
+  - name: COMPOSIO_REDIRECT_URL
+    value: "https://api-dev.action-agent.software/ai/api/v1/callback/extension"
+  - name: FRONTEND_REDIRECT_URL
+    value: "https://dev.action-agent.software/callback/extension"
+  
+  - name: ELASTICSEARCH_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchurl
+  - name: REDIS_URL
+    value: "redis://redisdev:6379"
+  
+  - name: RABBITMQ_URL
+    value: "amqp://rabbitmqdev:5672"

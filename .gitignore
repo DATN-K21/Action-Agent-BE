@@ -14,4 +14,6 @@ mock
 /.DS_Store
 
 docker-compose.override.yaml
-k8s/helm/values-dev.yaml
+*.local.yaml
+
+/_tests/*.yaml
