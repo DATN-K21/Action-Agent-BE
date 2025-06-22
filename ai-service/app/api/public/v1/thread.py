@@ -47,13 +47,43 @@ async def aget_all_threads(session: SessionDep, paging: CursorPagingRequest = De
 
         statement = statement.limit(paging.max_per_page)
         result = await session.execute(statement)
-        threads = result.mappings().all()
+        threads = result.scalars().all()
 
         prev_cursor = threads[0].created_at.isoformat() if threads else None
         next_cursor = threads[-1].created_at.isoformat() if threads else None
 
+        # Convert threads to response format with proper assistant serialization
+        thread_responses = []
+        for thread in threads:
+            thread_dict = {
+                "id": thread.id,
+                "user_id": thread.user_id,
+                "title": thread.title,
+                "assistant_id": thread.assistant_id,
+                "created_at": thread.created_at,
+                "assistant": None,
+            }
+
+            # Convert assistant object to dictionary if it exists
+            if thread.assistant:
+                thread_dict["assistant"] = {
+                    "id": thread.assistant.id,
+                    "name": thread.assistant.name,
+                    "description": thread.assistant.description,
+                    "system_prompt": thread.assistant.system_prompt,
+                    "assistant_type": thread.assistant.assistant_type,
+                    "provider": thread.assistant.provider,
+                    "model_name": thread.assistant.model_name,
+                    "temperature": thread.assistant.temperature,
+                    "ask_human": thread.assistant.ask_human,
+                    "interrupt": thread.assistant.interrupt,
+                    "created_at": thread.assistant.created_at,
+                }
+
+            thread_responses.append(GetThreadResponse(**thread_dict))
+
         response_data = GetThreadsResponse(
-            threads=[GetThreadResponse.model_validate(thread) for thread in threads],
+            threads=thread_responses,
             cursor=paging.cursor,
             next_cursor=next_cursor,
             prev_cursor=prev_cursor,
@@ -77,7 +107,7 @@ async def acreate_new_thread(session: SessionDep, request: CreateThreadRequest, 
         await session.commit()
         await session.refresh(thread)
 
-        response_data = CreateThreadResponse.model_validate(thread)
+        response_data = CreateThreadResponse.model_validate(thread, from_attributes=True)
         return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
@@ -101,12 +131,38 @@ async def aget_thread_by_id(session: SessionDep, thread_id: str, x_user_id: str 
         )
 
         result = await session.execute(statement)
-        thread = result.mappings().first()
+        thread = result.scalar_one_or_none()
 
         if not thread:
             return ResponseWrapper.wrap(status=404, message="Thread not found")
 
-        response_data = GetThreadResponse.model_validate(thread)
+        # Create thread dictionary with proper assistant serialization
+        thread_dict = {
+            "id": thread.id,
+            "user_id": thread.user_id,
+            "title": thread.title,
+            "assistant_id": thread.assistant_id,
+            "created_at": thread.created_at,
+            "assistant": None,
+        }
+
+        # Convert assistant object to dictionary if it exists
+        if thread.assistant:
+            thread_dict["assistant"] = {
+                "id": thread.assistant.id,
+                "name": thread.assistant.name,
+                "description": thread.assistant.description,
+                "system_prompt": thread.assistant.system_prompt,
+                "assistant_type": thread.assistant.assistant_type,
+                "provider": thread.assistant.provider,
+                "model_name": thread.assistant.model_name,
+                "temperature": thread.assistant.temperature,
+                "ask_human": thread.assistant.ask_human,
+                "interrupt": thread.assistant.interrupt,
+                "created_at": thread.assistant.created_at,
+            }
+
+        response_data = GetThreadResponse(**thread_dict)
         return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
@@ -117,7 +173,21 @@ async def aget_thread_by_id(session: SessionDep, thread_id: str, x_user_id: str 
 @router.patch("/{thread_id}/update", summary="Update thread information.", response_model=ResponseWrapper[UpdateThreadResponse])
 async def update_thread(session: SessionDep, thread_id: str, request: UpdateThreadRequest, x_user_id: str = Header(None)):
     try:
-        statement = (
+        # First check if thread exists
+        check_statement = select(Thread).where(
+            Thread.user_id == x_user_id,
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
+
+        check_result = await session.execute(check_statement)
+        existing_thread = check_result.scalar_one_or_none()
+
+        if not existing_thread:
+            return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+        # Update the thread
+        update_statement = (
             update(Thread)
             .where(
                 Thread.user_id == x_user_id,
@@ -127,15 +197,18 @@ async def update_thread(session: SessionDep, thread_id: str, request: UpdateThre
             .values(**request.model_dump(exclude_unset=True))
         )
 
-        result = await session.execute(statement)
-        thread = result.scalar_one_or_none()
-        if not thread:
-            return ResponseWrapper.wrap(status=404, message="Thread not found")
+        await session.execute(update_statement)
+        await session.commit()  # Fetch the updated thread
+        updated_statement = select(Thread).where(
+            Thread.user_id == x_user_id,
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
 
-        await session.commit()
-        await session.refresh(thread)
+        updated_result = await session.execute(updated_statement)
+        updated_thread = updated_result.scalar_one()
 
-        response_data = UpdateThreadResponse.model_validate(thread)
+        response_data = UpdateThreadResponse.model_validate(updated_thread, from_attributes=True)
         return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
@@ -175,10 +248,9 @@ async def generate_title(
     thread_id: str,
     x_user_id: str = Header(None),
 ):
-    try:
-        # Check the thread
+    try:  # Check the thread
         statement = (
-            select(Thread.id)
+            select(Thread)
             .where(
                 Thread.user_id == x_user_id,
                 Thread.id == thread_id,
@@ -201,7 +273,23 @@ async def generate_title(
             else []
         )
         if not messages:
-            return ResponseWrapper.wrap(status=404, message="Thread not found")
+            # Let's update the thread title to a default value (New thread)
+            gen_title = "New thread"
+            logger.info(f"No messages found, setting default title: |{gen_title}|")
+            statement = (
+                update(Thread)
+                .where(
+                    Thread.user_id == x_user_id,
+                    Thread.id == thread_id,
+                    Thread.is_deleted.is_(False),
+                )
+                .values(title=gen_title)
+            )
+            await session.execute(statement)
+            await session.commit()
+            await session.refresh(thread)
+            response_data = UpdateThreadResponse.model_validate(thread, from_attributes=True)
+            return ResponseWrapper.wrap(status=200, data=response_data)
 
         thread_messages_str = "".join([f"{message.type}: {message.content}\n" for message in messages])
 
@@ -240,9 +328,18 @@ Given the following content, please generate a suitable title:
 
         await session.execute(statement)
         await session.commit()
-        await session.refresh(thread)
 
-        response_data = UpdateThreadResponse.model_validate(thread)
+        # Fetch the updated thread
+        updated_statement = select(Thread).where(
+            Thread.user_id == x_user_id,
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
+
+        updated_result = await session.execute(updated_statement)
+        updated_thread = updated_result.scalar_one()
+
+        response_data = UpdateThreadResponse.model_validate(updated_thread, from_attributes=True)
         return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
