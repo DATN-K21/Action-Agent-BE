@@ -1,0 +1,38 @@
+# Default values for redis
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "redisprod"
+fullnameOverride: "redisprod"
+
+image:
+  repository: redis
+  tag: 7-alpine
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 6379
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+
+redis:
+  password: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
