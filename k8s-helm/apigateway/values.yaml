@@ -20,10 +20,7 @@ env:
   secrets:
     name: env-secret
     secret:
-      appinsightconnection: appinsightconnection
       elasticsearchurl: elasticsearchurl
-      sslkeycontent: sslkeycontent
-      sslcertcontent: sslcertcontents
 
 service:
   type: ClusterIP
@@ -38,7 +35,7 @@ ingress:
     nginx.org/websocket-services: "apigateway"
     nginx.ingress.kubernetes.io/client-max-body-size: "30m"
   hosts:
-    - host: dev-api.action-agent.software
+    - host: api-dev.action-agent.software
       paths:
         - path: /
           pathType: Prefix
@@ -50,7 +47,7 @@ ingress:
   tls:
     - secretName: actionagent
       hosts:
-        - dev-api.action-agent.software
+        - api-dev.action-agent.software
 
 resources:
   requests:

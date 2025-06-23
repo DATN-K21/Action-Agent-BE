@@ -36,6 +36,8 @@ spec:
           {{- with .Values.env }}
           env:
             {{- toYaml . | nindent 12 }}
+            - name: ENABLE_HTTPS
+              value: "false"
           {{- end }}
           ports:
             - name: http

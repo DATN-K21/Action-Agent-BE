@@ -15,9 +15,6 @@ env:
   - name: PORT
     value: "15000"
 
-  - name: HTTPS_PORT
-    value: "15000"
-
   - name: NODE_ENV
     value: "stg"
 
@@ -32,18 +29,6 @@ env:
 
   - name: REDIS_URL
     value: "redis://redisstg:6379"
-
-  - name: SSL_KEY_CONTENT
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: sslkeycontent
-
-  - name: SSL_CERT_CONTENT
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: sslcertcontent
 
   - name: USER_SERVICE_URL
     value: "http://userservicestg:15100"
