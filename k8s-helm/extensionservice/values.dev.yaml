@@ -1,0 +1,33 @@
+# Default values for extensionservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/extensionservicedev
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "extensionservicedev"
+fullnameOverride: "extensionservicedev"
+
+env:
+  - name: PORT
+    value: "15300"
+
+  - name: NODE_ENV
+    value: "dev"
+  
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: mongodbconnectionstring
+
+  - name: COMPOSIO_API_BASE_URL
+    value: "https://backend.composio.dev/api"
+  - name: COMPOSIO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: composioapikey

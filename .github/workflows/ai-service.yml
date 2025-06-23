@@ -67,7 +67,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:stg'
+          image: 'aagent.azurecr.io/ai-service:stg'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -95,7 +95,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:stg'
+          image: 'aagent.azurecr.io/ai-service:stg'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -124,7 +124,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:prod'
+          image: 'aagent.azurecr.io/ai-service:prod'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -147,7 +147,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'ai-service'
-          image: 'actionagent.azurecr.io/ai-service:prod'
+          image: 'aagent.azurecr.io/ai-service:prod'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}

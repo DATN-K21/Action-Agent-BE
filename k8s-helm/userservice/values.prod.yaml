@@ -1,0 +1,75 @@
+# Default values for userservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/userserviceprod
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "userserviceprod"
+fullnameOverride: "userserviceprod"
+
+env:
+  - name: PORT
+    value: "15100"
+  
+  - name: NODE_ENV
+    value: "prod"
+  
+  - name: MONGODB_CONNECTION_STRING
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: mongodbconnectionstring
+  
+  - name: JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: jwtsecret
+
+  - name: EMAIL_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: emailusername
+
+  - name: EMAIL_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: emailpassword
+
+  - name: API_GATEWAY_URL
+    value: "http://apigatewayprod:15000"
+
+  - name: AI_SERVICE_URL
+    value: "http://aiserviceprod:15200"
+
+  - name: REDIS_URL
+    value: "redis://redisprod:6379"
+
+  - name: GOOGLE_APP_REDIRECT_URL
+    value: "https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback"
+  - name: GOOGLE_APP_CLIENT_ID
+    value: "1000000000000-abc123def456.apps.googleusercontent.com"
+  - name: GOOGLE_APP_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: googleappclientsecret
+
+  - name: FACEBOOK_APP_REDIRECT_URL
+    value: "https://apigateway:15000/user/api/v1/access/facebook/verify"
+  - name: FACEBOOK_APP_CLIENT_ID
+    value: "3105674576249720"
+  - name: FACEBOOK_APP_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: facebookappclientsecret
+    
+  - name: CLIENT_URL
+    value: "https://action-agent.software"

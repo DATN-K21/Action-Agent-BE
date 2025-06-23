@@ -1,0 +1,46 @@
+# Default values for rabbitmq
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "rabbitmqprod"
+fullnameOverride: "rabbitmqprod"
+
+image:
+  repository: rabbitmq
+  tag: 3-management
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  amqpPort: 5672
+  managementPort: 15672
+
+persistence:
+  enabled: false
+  createStorageClass: true
+  storageClass: "azurefile-rabbitmqprod"
+  skuName: "Standard_LRS"
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+rabbitmq:
+  username: "guest"
+  password: "guest"
+  erlangCookie: "SWQOKODSQALRPCLNMEQG"
+
+management:
+  enabled: true
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 500Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

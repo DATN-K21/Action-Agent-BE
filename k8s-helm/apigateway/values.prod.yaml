@@ -1,0 +1,68 @@
+# Default values for apigateway.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/apigatewayprod
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "apigatewayprod"
+fullnameOverride: "apigatewayprod"
+
+env:
+  - name: PORT
+    value: "15000"
+
+  - name: NODE_ENV
+    value: "prod"
+
+  - name: ELASTICSEARCH_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchurl
+
+  - name: RABBITMQ_URL
+    value: "amqp://rabbitmqprod:5672"
+
+  - name: REDIS_URL
+    value: "redis://redisprod:6379"
+
+  - name: USER_SERVICE_URL
+    value: "http://userserviceprod:15100"
+
+  - name: AI_SERVICE_URL
+    value: "http://aiserviceprod:15200"
+
+  - name: EXTENSION_SERVICE_URL
+    value: "http://extensionserviceprod:15300"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    spec.ingressClassName: "nginx"
+    nginx.org/websocket-services: "apigatewayprod"
+    nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: api.action-agent.software
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: apigatewayprod
+              port:
+                number: 15000
+  tls:
+    - secretName: apigateway-prod-tls
+      hosts:
+        - api.action-agent.software

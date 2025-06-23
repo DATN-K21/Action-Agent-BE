@@ -23,10 +23,10 @@ runs:
   steps:
     - name: Login to ACR
       shell: bash
-      run: echo "${{ inputs.acr_password }}" | docker login actionagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
+      run: echo "${{ inputs.acr_password }}" | docker login aagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
 
     - name: Build & Push Docker Image
       shell: bash
       run: |
-        docker build -t actionagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
-        docker push actionagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}
+        docker build -t aagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
+        docker push aagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}

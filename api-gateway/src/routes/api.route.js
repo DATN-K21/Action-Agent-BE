@@ -8,7 +8,17 @@ const privateEndpointMiddleware = require('../middlewares/privateEndpoint.middle
 const serviceRegistry = {
     'user': ENDPOINT_CONFIGS.USER_SERVICE_URL,
     'ai': ENDPOINT_CONFIGS.AI_SERVICE_URL,
+    'extension': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
 };
+
+// Validate that all service URLs are configured
+Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
+    if (!target) {
+        console.error(`ERROR: ${serviceName.toUpperCase()}_SERVICE_URL environment variable is not set!`);
+        process.exit(1);
+    }
+    console.log(`Service '${serviceName}' configured with target: ${target}`);
+});
 
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
     router.use(privateEndpointMiddleware);
@@ -41,7 +51,7 @@ Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
                 } else {
                     resOrSocket.status(err?.status || 500).json({
                         status: err?.status || 500,
-                        error: errorMessage || 'Internal Server Error',
+                        error: err?.message || 'Internal Server Error',
                         code: err?.code,
                     });
                 }

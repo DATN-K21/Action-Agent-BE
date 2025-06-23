@@ -1,0 +1,40 @@
+# Default values for postgresql
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "postgresprod"
+fullnameOverride: "postgresprod"
+
+image:
+  repository: pgvector/pgvector
+  tag: pg16
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5432
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+postgresql:
+  database: "aiserviceprod"
+  username: "postgres"
+  password: "123456"
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 500Mi
+  requests:
+    cpu: 10m
+    memory: 100Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
