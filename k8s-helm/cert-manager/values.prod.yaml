@@ -1,0 +1,10 @@
+# Values for production environment
+letsencrypt:
+  email: "admin@action-agent.software"
+  server: "https://acme-v02.api.letsencrypt.org/directory"
+  privateKeySecretRef: "letsencrypt-prod"
+
+letsencryptStaging:
+  email: "admin@action-agent.software"
+  server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  privateKeySecretRef: "letsencrypt-staging"

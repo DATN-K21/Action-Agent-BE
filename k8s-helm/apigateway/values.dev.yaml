@@ -4,7 +4,7 @@
 
 image:
   repository: myaagent.azurecr.io/apigatewaydev
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: BuildID
 
@@ -49,6 +49,9 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   hosts:
     - host: api-dev.action-agent.software
       paths:
@@ -60,6 +63,6 @@ ingress:
               port:
                 number: 15000
   tls:
-    - secretName: actionagent
+    - secretName: apigateway-dev-tls
       hosts:
         - api-dev.action-agent.software

@@ -29,11 +29,14 @@ service:
 
 ingress:
   enabled: true
-  className: ""
+  className: "nginx"
   annotations:
     spec.ingressClassName: "nginx"
     nginx.org/websocket-services: "apigateway"
     nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   hosts:
     - host: api-dev.action-agent.software
       paths:
@@ -45,7 +48,7 @@ ingress:
               port:
                 number: 15000
   tls:
-    - secretName: actionagent
+    - secretName: apigateway-tls
       hosts:
         - api-dev.action-agent.software
 

@@ -1,6 +1,47 @@
 # Kubernetes + Helm Cheatsheet
 ---
 
+## Prerequisites
+
+1. **Kubernetes cluster** with kubectl configured
+2. **Helm 3.x** installed
+3. **NGINX Ingress Controller** installed in your cluster
+4. **DNS configured** to point your domains to the cluster ingress IP
+
+---
+
+## SSL Certificate Setup with Let's Encrypt
+
+### 1. Install cert-manager and Configure Let's Encrypt
+
+Before deploying any services, install cert-manager for automatic SSL certificate management:
+
+```bash
+# Install cert-manager and Let's Encrypt configuration
+make install-cert-manager ENV=<environment>
+```
+
+This will:
+- Install cert-manager in your cluster
+- Create ClusterIssuers for Let's Encrypt (production and staging)
+- Configure automatic certificate provisioning
+
+### 2. Verify cert-manager Installation
+
+```bash
+# Check cert-manager pods
+kubectl get pods -n cert-manager
+
+# Check ClusterIssuers
+kubectl get clusterissuer
+```
+
+You should see:
+- `letsencrypt-prod` (for production certificates)
+- `letsencrypt-staging` (for testing)
+
+---
+
 ## Create Namespace
 
 ```bash

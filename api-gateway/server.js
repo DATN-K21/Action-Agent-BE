@@ -5,6 +5,12 @@ const GENERAL_CONFIGS = require("./src/configs/general.config");
 const PORT = GENERAL_CONFIGS.PORT;
 
 if (GENERAL_CONFIGS.ENABLE_HTTPS) {
+    // Validate SSL environment variables
+    if (!process.env.SSL_KEY_CONTENT || !process.env.SSL_CERT_CONTENT) {
+        console.error('ERROR: SSL_KEY_CONTENT and SSL_CERT_CONTENT environment variables are required when HTTPS is enabled');
+        process.exit(1);
+    }
+
     // Load your SSL certs from environment variables
     const options = {
         key: Buffer.from(process.env.SSL_KEY_CONTENT, 'base64').toString(),

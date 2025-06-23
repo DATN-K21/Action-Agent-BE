@@ -11,6 +11,15 @@ const serviceRegistry = {
     'extension': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
 };
 
+// Validate that all service URLs are configured
+Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
+    if (!target) {
+        console.error(`ERROR: ${serviceName.toUpperCase()}_SERVICE_URL environment variable is not set!`);
+        process.exit(1);
+    }
+    console.log(`Service '${serviceName}' configured with target: ${target}`);
+});
+
 Object.entries(serviceRegistry).forEach(([serviceName, target]) => {
     router.use(privateEndpointMiddleware);
     router.use(currentUserMiddleware);

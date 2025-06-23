@@ -4,14 +4,14 @@ services:
   ############### Services ###########################
   ####################################################
   api-gateway:
-    image: aagent.azurecr.io/api-gateway:dev
+    image: myaagent.azurecr.io/apigatewaydev
     container_name: api-gateway
     environment:
-      HTTPS_PORT: 15000
-      SSL_KEY_CONTENT: ""
-      SSL_CERT_CONTENT: ""
+      PORT: 15000
+      ENABLE_HTTPS: "false"
       USER_SERVICE_URL: http://user-service:15100
       AI_SERVICE_URL: http://ai-service:15200
+      EXTENSION_SERVICE_URL: http://extension-service:15300
       ELASTICSEARCH_URL: http://elasticsearch:9200
       RABBITMQ_URL: amqp://root:root@rabbitmq:5672
       REDIS_URL: redis://root:root@redis:6379

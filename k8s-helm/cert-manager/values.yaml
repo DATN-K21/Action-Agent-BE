@@ -1,0 +1,17 @@
+# Default values for cert-manager-config.
+# This is a YAML-formatted file.
+
+# Let's Encrypt configuration
+letsencrypt:
+  # Email address for Let's Encrypt notifications
+  email: "admin@action-agent.software"
+  # ACME server URL
+  server: "https://acme-v02.api.letsencrypt.org/directory"
+  # Private key secret name
+  privateKeySecretRef: "letsencrypt-prod"
+
+# Staging configuration for testing
+letsencryptStaging:
+  email: "admin@action-agent.software"
+  server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  privateKeySecretRef: "letsencrypt-staging"
