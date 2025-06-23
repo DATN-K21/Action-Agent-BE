@@ -1,6 +1,9 @@
 .env
 .env.local
 .env.production
+.env.dev
+.env.stg
+.env.prod
 
 /coverage
 node_modules

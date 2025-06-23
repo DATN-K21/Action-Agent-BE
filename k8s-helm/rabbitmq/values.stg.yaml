@@ -16,10 +16,12 @@ service:
   managementPort: 15672
 
 persistence:
-  enabled: true
-  storageClass: ""
+  enabled: false
+  createStorageClass: true
+  storageClass: "azurefile-rabbitmqstg"
+  skuName: "Standard_LRS"
   accessMode: ReadWriteOnce
-  size: 2Gi
+  size: 1Gi
 
 rabbitmq:
   username: "guest"

@@ -16,6 +16,9 @@ spec:
     spec:
       containers:
         - name: rabbitmq
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

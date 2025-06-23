@@ -15,21 +15,22 @@ service:
   port: 6379
 
 persistence:
-  enabled: true
-  storageClass: ""
+  enabled: false
+  storageClass: "azurefile"
+  skuName: "Standard_LRS"
   accessMode: ReadWriteOnce
-  size: 5Gi
+  size: 1Gi
 
 redis:
   password: ""
 
 resources:
   limits:
-    cpu: 500m
-    memory: 1Gi
+    cpu: 300m
+    memory: 500Mi
   requests:
-    cpu: 250m
-    memory: 512Mi
+    cpu: 10m
+    memory: 100Mi
 
 nodeSelector: {}
 

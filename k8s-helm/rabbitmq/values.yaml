@@ -17,7 +17,9 @@ service:
 
 persistence:
   enabled: false
-  storageClass: ""
+  createStorageClass: true
+  storageClass: "azurefile-rabbitmq"
+  skuName: "Standard_LRS"
   accessMode: ReadWriteOnce
   size: 1Gi
 

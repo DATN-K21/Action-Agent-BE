@@ -16,10 +16,12 @@ service:
   managementPort: 15672
 
 persistence:
-  enabled: true
-  storageClass: ""
+  enabled: false
+  createStorageClass: true
+  storageClass: "azurefile-rabbitmqprod"
+  skuName: "Standard_LRS"
   accessMode: ReadWriteOnce
-  size: 5Gi
+  size: 1Gi
 
 rabbitmq:
   username: "guest"
@@ -31,11 +33,11 @@ management:
 
 resources:
   limits:
-    cpu: 1000m
-    memory: 2Gi
+    cpu: 300m
+    memory: 500Mi
   requests:
-    cpu: 500m
-    memory: 1Gi
+    cpu: 10m
+    memory: 100Mi
 
 nodeSelector: {}
 

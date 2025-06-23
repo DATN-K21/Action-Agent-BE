@@ -16,7 +16,8 @@ service:
 
 persistence:
   enabled: false
-  storageClass: ""
+  storageClass: "azurefile"
+  skuName: "Standard_LRS"
   accessMode: ReadWriteOnce
   size: 1Gi
 
