@@ -34,10 +34,10 @@ env:
     value: "http://userservicedev:15100"
 
   - name: AI_SERVICE_URL
-    value: "aiservicedev:15200"
+    value: "http://aiservicedev:15200"
 
   - name: EXTENSION_SERVICE_URL
-    value: "extensionservicedev:15300"
+    value: "http://extensionservicedev:15300"
 
 ingress:
   enabled: true
