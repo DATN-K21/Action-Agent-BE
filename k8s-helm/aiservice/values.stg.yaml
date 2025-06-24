@@ -188,3 +188,31 @@ env:
     value: "prithivida/Splade_PP_en_v1"
   - name: FASTEMBED_CACHE_PATH
     value: "./fastembed_cache"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    spec.ingressClassName: "nginx"
+    nginx.org/websocket-services: "aiservicestg"
+    nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: ai-stg.action-agent.software
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: aiservicestg
+              port:
+                number: 15000
+  tls:
+    - secretName: ai-stg-tls
+      hosts:
+        - ai-stg.action-agent.software
