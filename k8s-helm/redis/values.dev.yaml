@@ -8,7 +8,7 @@ fullnameOverride: "redisdev"
 image:
   repository: redis
   tag: 7-alpine
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP

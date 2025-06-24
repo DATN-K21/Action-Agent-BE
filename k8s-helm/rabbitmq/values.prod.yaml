@@ -8,7 +8,7 @@ fullnameOverride: "rabbitmqprod"
 image:
   repository: rabbitmq
   tag: 3-management
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP
