@@ -1,0 +1,105 @@
+# Default values for fluentd.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+revisionHistoryLimit: 0
+
+image:
+  repository: fluent/fluentd-kubernetes-daemonset
+  tag: v1.14.2-debian-elasticsearch7-1.0
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: regcred
+nameOverride: "fluentd"
+fullnameOverride: "fluentd"
+
+env:
+  - name: ELASTICSEARCH_HOST
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchhost
+  - name: ELASTICSEARCH_USER
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchuser
+  - name: ELASTICSEARCH_PASS
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: elasticsearchpass
+
+service:
+  type: ClusterIP
+  port: 24224
+  targetport: 24224
+
+volumeMounts:
+  - name: varlog
+    mountPath: /var/log
+  - name: varlibdockercontainers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+  - name: config-volume
+    mountPath: /fluentd/etc/fluent.conf
+    subPath: fluent.conf
+
+volumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: config-volume
+    configMap:
+      name: fluentd-config
+
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "100Mi"
+  limits:
+    cpu: "300m"
+    memory: "500Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux

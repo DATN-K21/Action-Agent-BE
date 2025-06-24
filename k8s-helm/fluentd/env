@@ -1,0 +1,3 @@
+elasticsearchhost=__elasticsearchhost__
+elasticsearchuser=__elasticsearchuser__
+elasticsearchpass=__elasticsearchpass__

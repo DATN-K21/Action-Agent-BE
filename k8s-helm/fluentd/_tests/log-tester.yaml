@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: log-tester
+  namespace: prod
+spec:
+  containers:
+    - name: logger
+      image: busybox
+      command: ["/bin/sh", "-c"]
+      args: ["while true; do echo '[prod] Log from $(hostname) at $(date)'; sleep 5; done"]
