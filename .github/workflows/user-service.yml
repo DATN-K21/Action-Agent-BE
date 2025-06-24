@@ -69,7 +69,7 @@ jobs:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'userservicedev'
-          tag: '${{ github.sha }}'
+          tag: 'latest'
           folder: './user-service'
 
       - name: Send notification to Discord (Build Development)
@@ -77,7 +77,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userservicedev:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userservicedev:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -98,14 +98,14 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install userservice ./userservice -f ./userservice/values.dev.yaml --set image.tag=${{ github.sha }}
+          helm upgrade --install userservice ./userservice -f ./userservice/values.dev.yaml -n dev --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Development)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userservicedev:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userservicedev:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -126,7 +126,7 @@ jobs:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'userservicestg'
-          tag: '${{ github.sha }}'
+          tag: 'latest'
           folder: './user-service'
 
       - name: Send notification to Discord (Build Staging)
@@ -134,7 +134,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userservicestg:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userservicestg:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -155,14 +155,14 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install userservice ./userservice -f ./userservice/values.stg.yaml --set image.tag=${{ github.sha }}
+          helm upgrade --install userservice ./userservice -f ./userservice/values.stg.yaml -n stg --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userservicestg:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userservicestg:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -183,7 +183,7 @@ jobs:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'userserviceprod'
-          tag: '${{ github.sha }}'
+          tag: 'latest'
           folder: './user-service'
 
       - name: Send notification to Discord (Build Production)
@@ -191,7 +191,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userserviceprod:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userserviceprod:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -212,14 +212,14 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install userservice ./userservice -f ./userservice/values.prod.yaml --set image.tag=${{ github.sha }}
+          helm upgrade --install userservice ./userservice -f ./userservice/values.prod.yaml -n prod --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'myaagent.azurecr.io/userserviceprod:${{ github.sha }}'
+          image: 'myaagent.azurecr.io/userserviceprod:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
