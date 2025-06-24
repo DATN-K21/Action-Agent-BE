@@ -98,7 +98,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install aiservice ./aiservice -f ./values.dev.yaml --set image.tag=latest
+          helm upgrade --install aiservice ./aiservice -f ./aiservice/values.dev.yaml --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Development)
         uses: ./.github/actions/notify-discord
@@ -155,7 +155,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install aiservice ./aiservice -f ./values.stg.yaml --set image.tag=latest
+          helm upgrade --install aiservice ./aiservice -f ./aiservice/values.stg.yaml --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
@@ -212,7 +212,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install aiservice ./aiservice -f ./values.prod.yaml --set image.tag=latest
+          helm upgrade --install aiservice ./aiservice -f ./aiservice/values.prod.yaml --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
