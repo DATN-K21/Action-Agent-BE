@@ -4,6 +4,16 @@ description: CI/CD pipeline for User Service
 on:
   workflow_dispatch:
     inputs:
+      build_and_push_dev:
+        description: 'Run Build & Push for Development'
+        required: false
+        default: false
+        type: boolean
+      deploy_dev:
+        description: 'Run Deploy for Development'
+        required: false
+        default: false
+        type: boolean
       build_and_push_stg:
         description: 'Run Build & Push for Staging'
         required: false
@@ -45,6 +55,62 @@ jobs:
           echo "$COMMIT_INFO" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+  build_and_push_dev:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_dev == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Build & Push for Development
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'userservicedev'
+          tag: 'latest'
+          folder: './user-service'
+
+      - name: Send notification to Discord (Build Development)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'user-service'
+          image: 'myaagent.azurecr.io/userservicedev:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEV BUILD'
+
+  deploy_dev:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_dev == 'true' }}
+    needs: [setup, build_and_push_dev]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy User Service to Development
+        run: |
+          # Setup kubectl with kubeconfig
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install userservice ./userservice -f ./values.dev.yaml --set image.tag=latest
+
+      - name: Send notification to Discord (Deploy Development)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'user-service'
+          image: 'myaagent.azurecr.io/userservicedev:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEV DEPLOY'
+
   build_and_push_stg:
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
@@ -58,8 +124,8 @@ jobs:
         with:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
-          image_name: 'user-service'
-          tag: 'stg'
+          image_name: 'userservicestg'
+          tag: 'latest'
           folder: './user-service'
 
       - name: Send notification to Discord (Build Staging)
@@ -67,7 +133,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'aagent.azurecr.io/user-service:stg'
+          image: 'myaagent.azurecr.io/userservicestg:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -83,19 +149,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy User Service to Staging
-        uses: ./.github/actions/deploy
-        with:
-          ssh_host: ${{ secrets.STG_SSH_HOST }}
-          ssh_user: ${{ secrets.STG_SSH_USER }}
-          ssh_key: ${{ secrets.STG_SSH_KEY }}
-          service: 'user-service'
+        run: |
+          # Setup kubectl with kubeconfig
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install userservice ./userservice -f ./values.stg.yaml --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'aagent.azurecr.io/user-service:stg'
+          image: 'myaagent.azurecr.io/userservicestg:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -115,8 +180,8 @@ jobs:
         with:
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
-          image_name: 'user-service'
-          tag: 'prod'
+          image_name: 'userserviceprod'
+          tag: 'latest'
           folder: './user-service'
 
       - name: Send notification to Discord (Build Production)
@@ -124,7 +189,7 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'aagent.azurecr.io/user-service:prod'
+          image: 'myaagent.azurecr.io/userserviceprod:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
@@ -139,15 +204,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # - name: Deploy User Service to Production
-      #   uses: ./.github/actions/deploy
+      - name: Deploy User Service to Production
+        run: |
+          # Setup kubectl with kubeconfig
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install userservice ./userservice -f ./values.prod.yaml --set image.tag=latest
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
           service: 'user-service'
-          image: 'aagent.azurecr.io/user-service:prod'
+          image: 'myaagent.azurecr.io/userserviceprod:latest'
           branch: '${{ github.ref_name }}'
           commit_message: '${{ needs.setup.outputs.commit_info }}'
           triggered_by: ${{ github.actor }}
