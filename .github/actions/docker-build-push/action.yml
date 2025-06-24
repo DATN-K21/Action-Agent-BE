@@ -28,5 +28,5 @@ runs:
     - name: Build & Push Docker Image
       shell: bash
       run: |
-        docker build -t aagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
-        docker push aagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}
+        docker build -t myaagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
+        docker push myaagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}
