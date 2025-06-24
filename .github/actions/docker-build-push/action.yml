@@ -23,7 +23,7 @@ runs:
   steps:
     - name: Login to ACR
       shell: bash
-      run: echo "${{ inputs.acr_password }}" | docker login aagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
+      run: echo "${{ inputs.acr_password }}" | docker login myaagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
 
     - name: Build & Push Docker Image
       shell: bash
