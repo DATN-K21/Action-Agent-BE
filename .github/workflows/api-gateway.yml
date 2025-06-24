@@ -95,6 +95,7 @@ jobs:
       - name: Deploy API Gateway to Development
         run: |
           # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
           helm upgrade --install apigateway ./apigateway -f ./values.dev.yaml --set image.tag=latest
@@ -151,6 +152,7 @@ jobs:
       - name: Deploy API Gateway to Staging
         run: |
           # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
           helm upgrade --install apigateway ./apigateway -f ./values.stg.yaml --set image.tag=latest
@@ -207,6 +209,7 @@ jobs:
       - name: Deploy API Gateway to Production
         run: |
           # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
           helm upgrade --install apigateway ./apigateway -f ./values.prod.yaml --set image.tag=latest
