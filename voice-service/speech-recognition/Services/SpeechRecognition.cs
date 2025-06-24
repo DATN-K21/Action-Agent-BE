@@ -1,5 +1,6 @@
 using Google.Cloud.Speech.V1;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using speech_recognition.Exceptions;
 using speech_recognition.Helpers;
 using speech_recognition.Options;
@@ -9,14 +10,21 @@ namespace speech_recognition.Services;
 public class SpeechRecognition : ISpeechRecognition
 {
     private readonly ILogger<SpeechRecognition> _logger;
-
+    
+    private readonly SpeechClient _speechClient;
+    
     public SpeechRecognition(ILogger<SpeechRecognition> logger, IOptions<SpeechOptions> options)
     {
         _logger = logger;
-        var speechOptions = options.Value;
+        var credentialOptions = options.Value.GoogleCredential;
         
-        var fullPath = Path.Combine(Directory.GetCurrentDirectory(), speechOptions.GoogleApplicationCredentials);
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", fullPath);
+        var jsonCredential = JsonConvert.SerializeObject(credentialOptions);
+
+        var clientBuilder = new SpeechClientBuilder
+        {
+            JsonCredentials = jsonCredential
+        };
+        _speechClient = clientBuilder.Build(); 
     }
 
     public async Task<string> FromFile(IFormFile audioFile)
@@ -24,9 +32,6 @@ public class SpeechRecognition : ISpeechRecognition
         const string methodName = $"{nameof(SpeechRecognition)}.{nameof(FromFile)} =>";
         _logger.LogInformation("{Method} Start processing audio file: {FileName}, Size: {FileSize} bytes", methodName, audioFile.FileName, audioFile.Length);
         
-        
-        var speech = await SpeechClient.CreateAsync();
-
         var config = new RecognitionConfig
         {
             Encoding = RecognitionConfig.Types.AudioEncoding.WebmOpus,
@@ -42,7 +47,7 @@ public class SpeechRecognition : ISpeechRecognition
 
         try
         {
-            RecognizeResponse response = await speech.RecognizeAsync(config, audios);
+            RecognizeResponse response = await _speechClient.RecognizeAsync(config, audios);
             if (response.Results.Count != 0)
             {
                 _logger.LogInformation(
@@ -67,6 +72,8 @@ public class SpeechRecognition : ISpeechRecognition
         return string.Empty;
         
     }
+    
+    
 }
 
 

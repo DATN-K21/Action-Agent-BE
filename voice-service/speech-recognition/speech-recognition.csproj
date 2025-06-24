@@ -28,4 +28,8 @@
       <Folder Include="Exceptions\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="GCloudKeys\speech-api-account.json" />
+    </ItemGroup>
+
 </Project>
