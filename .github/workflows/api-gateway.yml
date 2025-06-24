@@ -98,7 +98,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.dev.yaml -n dev --set image.tag=latest
+          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.dev.yaml -n dev --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
 
       - name: Send notification to Discord (Deploy Development)
         uses: ./.github/actions/notify-discord
@@ -155,7 +155,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.stg.yaml -n stg --set image.tag=latest
+          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.stg.yaml -n stg --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
@@ -212,7 +212,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.prod.yaml -n prod --set image.tag=latest
+          helm upgrade --install apigateway ./apigateway -f ./apigateway/values.prod.yaml -n prod --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord
