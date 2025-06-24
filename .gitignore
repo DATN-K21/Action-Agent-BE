@@ -17,4 +17,5 @@ docker-compose.override.yaml
 
 voice-service/speech-recognition/bin
 voice-service/speech-recognition/obj
+voice-service/speech-recognition/appsettings.Development.json
 **/.idea/
