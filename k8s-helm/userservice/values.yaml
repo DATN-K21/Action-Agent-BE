@@ -24,7 +24,9 @@ env:
       jwtsecret: jwtsecret
       emailusername: emailusername
       emailpassword: emailpassword
+      googleappclientid: googleappclientid
       googleappclientsecret: googleappclientsecret
+      facebookappclientid: facebookappclientid
       facebookappclientsecret: facebookappclientsecret
 
 service:

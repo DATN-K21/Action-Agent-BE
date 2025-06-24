@@ -54,7 +54,10 @@ env:
   - name: GOOGLE_APP_REDIRECT_URL
     value: "https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback"
   - name: GOOGLE_APP_CLIENT_ID
-    value: "1000000000000-abc123def456.apps.googleusercontent.com"
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: googleappclientid
   - name: GOOGLE_APP_CLIENT_SECRET
     valueFrom:
       secretKeyRef:
@@ -64,7 +67,10 @@ env:
   - name: FACEBOOK_APP_REDIRECT_URL
     value: "https://apigateway:15000/user/api/v1/access/facebook/verify"
   - name: FACEBOOK_APP_CLIENT_ID
-    value: "3105674576249720"
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: facebookappclientid
   - name: FACEBOOK_APP_CLIENT_SECRET
     valueFrom:
       secretKeyRef:
