@@ -7,7 +7,7 @@ revisionHistoryLimit: 0
 
 image:
   repository: myaagent.azurecr.io/userservice
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: BuildID
 

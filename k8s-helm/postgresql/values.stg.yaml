@@ -8,7 +8,7 @@ fullnameOverride: "postgresstg"
 image:
   repository: pgvector/pgvector
   tag: pg16
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP
