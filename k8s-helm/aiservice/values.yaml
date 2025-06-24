@@ -20,14 +20,25 @@ env:
   secrets:
     name: env-secret
     secret:
+      # Database secrets
       posgresqlhost: posgresqlhost
       postgresqlport: postgresqlport
       postgresqluser: postgresqluser
       postgresqlpassword: postgresqlpassword
+      
+      # API Keys
       openaiapikey: openaiapikey
+      anthropicapikey: anthropicapikey
       taviliapikey: taviliapikey
       composioapikey: composioapikey
-      elasticsearchurl: elasticsearchurl
+      
+      # Security keys
+      modelproviderencryptionkey: modelproviderencryptionkey
+      secretkey: secretkey
+      
+      # Celery settings
+      celerybrokerurl: celerybrokerurl
+      celeryresultbackend: celeryresultbackend
 
 service:
   type: ClusterIP

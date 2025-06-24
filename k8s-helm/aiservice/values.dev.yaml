@@ -12,15 +12,85 @@ nameOverride: "aiservicedev"
 fullnameOverride: "aiservicedev"
 
 env:
+  # Debug modes
+  - name: DEBUG_AGENT
+    value: "False"
   - name: DEBUG_SERVER
     value: "False"
-  
   - name: DEBUG_SQLALCHEMY
     value: "False"
 
+  # Logging
   - name: LOGGING_LOG_LEVEL
     value: "INFO"
 
+  # User Agent for web requests
+  - name: USER_AGENT
+    value: "Action-LLM-AI-Service/1.0 (Educational Project)"
+
+  # Tools
+  - name: TOOL_TAVILY_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: taviliapikey
+
+  # Settings for LLM
+  - name: OPENAI_PROVIDER
+    value: "openai"
+  - name: ANTHROPIC_PROVIDER
+    value: "anthropic"
+
+  - name: LLM_BASIC_MODEL
+    value: "gpt-4o-mini"
+  - name: BASIC_MODEL_TEMPERATURE
+    value: "0.5"
+  - name: BASIC_MODEL_CONTEXT_RATIO
+    value: "0.2"
+
+  - name: LLM_REASONING_MODEL
+    value: "claude-3-5-haiku-20241022"
+  - name: REASONING_MODEL_TEMPERATURE
+    value: "0"
+  - name: REASONING_MODEL_CONTEXT_RATIO
+    value: "0.1"
+
+  - name: LLM_VISION_MODEL
+    value: "gpt-4o-mini"
+  - name: VISION_MODEL_TEMPERATURE
+    value: "0.5"
+  - name: VISION_MODEL_CONTEXT_RATIO
+    value: "0.2"
+
+  # OpenAI API settings
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: openaiapikey
+  - name: OPENAI_API_BASE_URL
+    value: "https://api.openai.com/v1"
+
+  # Anthropic API settings
+  - name: ANTHROPIC_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: anthropicapikey
+  - name: ANTHROPIC_API_BASE_URL
+    value: "https://api.anthropic.com"
+
+  # Default context settings
+  - name: DEFAULT_CONTEXT_LIMIT
+    value: "100000"
+  - name: DEFAULT_CONTEXT_RATIO
+    value: "0.2"
+
+  # Embedding
+  - name: EMBEDDING_PROVIDER
+    value: "openai"
+
+  # Database
   - name: POSTGRES_HOST
     valueFrom:
       secretKeyRef:
@@ -44,24 +114,7 @@ env:
   - name: POSTGRES_DB
     value: "aiservicedev"
 
-  - name: LLM_DEFAULT_PROVIDER
-    value: "openai"
-
-  - name: LLM_DEFAULT_MODEL
-    value: "gpt-4o-mini"
-
-  - name: LLM_DEFAULT_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: openaiapikey
-
-  - name: TOOL_TAVILY_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: taviliapikey
-
+  # Composio
   - name: COMPOSIO_LOGGING_LEVEL
     value: "debug"
   - name: COMPOSIO_API_KEY
@@ -71,16 +124,67 @@ env:
         key: composioapikey
   - name: COMPOSIO_REDIRECT_URL
     value: "https://api-dev.action-agent.software/ai/api/v1/callback/extension"
+
+  # Frontend redirect URL
   - name: FRONTEND_REDIRECT_URL
     value: "https://dev.action-agent.software/callback/extension"
-  
-  - name: ELASTICSEARCH_URL
+
+  # Security keys
+  - name: MODEL_PROVIDER_ENCRYPTION_KEY
     valueFrom:
       secretKeyRef:
         name: env-secret
-        key: elasticsearchurl
-  - name: REDIS_URL
-    value: "redis://redisdev:6379"
-  
-  - name: RABBITMQ_URL
-    value: "amqp://rabbitmqdev:5672"
+        key: modelproviderencryptionkey
+  - name: SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: secretkey
+
+  # VectorStore
+  - name: PGVECTOR_COLLECTION
+    value: "kb_uploads"
+
+  # Graph settings
+  - name: RECURSION_LIMIT
+    value: "25"
+
+  # Cache settings
+  - name: MAX_PERSONAL_TOOLS_PER_USER
+    value: "200"
+  - name: MAX_CACHED_USERS
+    value: "100"
+  - name: MAX_CACHED_TOOL_EXTENSION_SERVICES
+    value: "400"
+  - name: MAX_CACHED_MCP_USERS
+    value: "100"
+  - name: MAX_MCP_CLIENT_INSTANCES_PER_USER
+    value: "20"
+
+  # Upload settings
+  - name: MAX_UPLOAD_SIZE
+    value: "50000000"
+
+  # Sets the number of processors
+  - name: MAX_WORKERS
+    value: "1"
+
+  # Settings for celery
+  - name: CELERY_BROKER_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: celerybrokerurl
+  - name: CELERY_RESULT_BACKEND
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: celeryresultbackend
+
+  # Embedding model
+  - name: DENSE_EMBEDDING_MODEL
+    value: "BAAI/bge-small-en-v1.5"
+  - name: SPARSE_EMBEDDING_MODEL
+    value: "prithivida/Splade_PP_en_v1"
+  - name: FASTEMBED_CACHE_PATH
+    value: "./fastembed_cache"
