@@ -7,7 +7,10 @@ from typing import Any, Dict
 
 from langchain.tools import BaseTool
 from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
+from pydantic import SecretStr
 
 from app.core import logging
 from app.core.models import ToolInfo
@@ -177,10 +180,27 @@ class ToolManager:
         # (Implementation as before)
         external_tools = {
             "duckduckgo-search": ToolInfo(
-                description="Searches web via DuckDuckGo.",
+                description="Searches web via DuckDuckGo - a short, plain-text snippet summarizing the top result .",
                 tool=DuckDuckGoSearchRun(),
                 display_name="DuckDuckGo Search",
                 input_parameters={"query": {"type": "string", "required": True, "description": "Search query."}},
+            ),
+            "tavily-search": ToolInfo(
+                description="Searches web via Tavily - structured, citation-friendly results ideal for RAG and agents.",
+                tool=TavilySearchResults(
+                    max_results=5,
+                    api_wrapper=TavilySearchAPIWrapper(
+                        tavily_api_key=SecretStr(env_settings.TOOL_TAVILY_API_KEY),
+                    ),
+                ),
+                input_parameters={
+                    "query": {
+                        "type": "string",
+                        "required": True,
+                        "description": "The query to search for",
+                    }
+                },
+                credentials={},
             ),
             "wikipedia": ToolInfo(
                 description="Searches Wikipedia.",

@@ -48,6 +48,53 @@ router = APIRouter(prefix="/assistant", tags=["Assistant"])
 # ================================
 
 
+async def _aadd_ask_human_skill_to_worker(
+    session: AsyncSession,
+    member_id: str,
+    user_id: str,
+) -> None:
+    """
+    Add ask_human skill to a worker member.
+
+    This function adds the ask_human tool from global_tools as a skill
+    to the specified worker member, allowing them to ask humans for input.
+
+    Args:
+        session: Database session
+        member_id: ID of the worker member to add the skill to
+        user_id: User ID for the skill record
+    """
+    # Get ask_human tool from global_tools
+    ask_human_tool_info = global_tools.get("ask-human")
+    if not ask_human_tool_info:
+        logger.warning("ask-human tool not found in global_tools")
+        return
+
+    # Create ask_human skill (using original tool name like search skills)
+    ask_human_skill_id = str(uuid.uuid4())
+    ask_human_skill = Skill(
+        id=ask_human_skill_id,
+        name="ask-human",  # Use original tool name, not unique key
+        user_id=user_id,
+        description=ask_human_tool_info.description,
+        icon="",
+        display_name=ask_human_tool_info.display_name,
+        strategy=StorageStrategy.GLOBAL_TOOLS,
+        input_parameters=ask_human_tool_info.input_parameters,
+        reference_type=ConnectedServiceType.NONE,
+    )
+    session.add(ask_human_skill)
+    await session.flush()
+
+    # Link skill to member
+    member_skill_link = MemberSkillLink(
+        member_id=member_id,
+        skill_id=ask_human_skill.id,
+    )
+    session.add(member_skill_link)
+    await session.flush()
+
+
 def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
     """
     Extract support units from the assistant object.
@@ -388,7 +435,7 @@ async def _acreate_mcp_member_with_skills(
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
         temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
-        interrupt=request.interrupt if request.interrupt is not None else False,
+        interrupt=request.interrupt if request.interrupt is not None else True,
         position_x=0.0,
         position_y=0.0,
     )
@@ -439,6 +486,10 @@ async def _acreate_mcp_member_with_skills(
             tool_info=tool_info,
         )
 
+    # Add ask_human skill to worker if ask_human is enabled
+    if request.ask_human:
+        await _aadd_ask_human_skill_to_worker(session, member.id, connected_mcp.user_id)
+
 
 async def _acreate_extension_member_with_skills(
     session: AsyncSession,
@@ -471,7 +522,7 @@ async def _acreate_extension_member_with_skills(
         provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
         model=request.model_name or env_settings.LLM_REASONING_MODEL,
         temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
-        interrupt=request.interrupt if request.interrupt is not None else False,
+        interrupt=request.interrupt if request.interrupt is not None else True,
         position_x=0.0,
         position_y=0.0,
     )
@@ -521,6 +572,10 @@ async def _acreate_extension_member_with_skills(
             tool_key=skill_name,
             tool_info=tool_info,
         )
+
+    # Add ask_human skill to worker if ask_human is enabled
+    if request.ask_human:
+        await _aadd_ask_human_skill_to_worker(session, member.id, connected_extension.user_id)
 
 
 async def _acreate_support_team(
@@ -609,6 +664,32 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
     member_skill_link = MemberSkillLink(
         member_id=member_id,
         skill_id=ddg_skill.id,
+    )
+    session.add(member_skill_link)
+    await session.flush()
+
+    # Tavily search skill
+    tavily_tool_info = global_tools.get("tavily-search")
+    if not tavily_tool_info:
+        raise ValueError("Tavily search tool not found in global tools.")
+    tavily_skill_id = str(uuid.uuid4())
+    tavily_skill = Skill(
+        id=tavily_skill_id,
+        name="tavily-search",
+        user_id=user_id,
+        description=tavily_tool_info.description,
+        icon="",
+        display_name=tavily_tool_info.display_name,
+        strategy=StorageStrategy.GLOBAL_TOOLS,
+        input_parameters=tavily_tool_info.input_parameters,
+        reference_type=ConnectedServiceType.NONE,
+    )
+    session.add(tavily_skill)
+    await session.flush()
+
+    member_skill_link = MemberSkillLink(
+        member_id=member_id,
+        skill_id=tavily_skill.id,
     )
     session.add(member_skill_link)
     await session.flush()
@@ -800,6 +881,7 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
 
 async def _aupdate_mcp_members(
     session: AsyncSession,
+    assistant: Assistant,
     hierarchical_team: Team,
     request: UpdateAdvancedAssistantRequest,
     user_id: str,
@@ -854,10 +936,10 @@ async def _aupdate_mcp_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
-                    model=request.model_name or env_settings.LLM_REASONING_MODEL,
-                    temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
-                    interrupt=request.interrupt if request.interrupt is not None else False,
+                    provider=request.provider or assistant.provider,
+                    model=request.model_name or assistant.model_name,
+                    temperature=request.temperature if request.temperature is not None else assistant.temperature,
+                    interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
                     position_x=0.0,
                     position_y=0.0,
                 )
@@ -906,9 +988,14 @@ async def _aupdate_mcp_members(
                         tool_info=tool_info,
                     )
 
+                # Add ask_human skill to worker if ask_human is enabled
+                if request.ask_human:
+                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+
 
 async def _aupdate_extension_members(
     session: AsyncSession,
+    assistant: Assistant,
     hierarchical_team: Team,
     request: UpdateAdvancedAssistantRequest,
     user_id: str,
@@ -962,10 +1049,10 @@ async def _aupdate_extension_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=request.provider or env_settings.ANTHROPIC_PROVIDER,
-                    model=request.model_name or env_settings.LLM_REASONING_MODEL,
-                    temperature=request.temperature if request.temperature is not None else env_settings.REASONING_MODEL_TEMPERATURE,
-                    interrupt=request.interrupt if request.interrupt is not None else False,
+                    provider=request.provider or assistant.provider,
+                    model=request.model_name or assistant.model_name,
+                    temperature=request.temperature if request.temperature is not None else assistant.temperature,
+                    interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
                     position_x=0.0,
                     position_y=0.0,
                 )
@@ -1016,7 +1103,11 @@ async def _aupdate_extension_members(
                         tool_info=tool_info,
                     )
 
+                # Add ask_human skill to worker if ask_human is enabled
+                if request.ask_human:
+                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
 
+# Not included chatbot and hierarchical team
 async def _aupdate_support_units(
     session: AsyncSession,
     assistant: Assistant,
@@ -1032,6 +1123,9 @@ async def _aupdate_support_units(
         request: Update request containing new support units
         user_id: User ID
     """  # Only update support units if they are provided in the request
+    if request.support_units is None and (request.provider or request.model_name or request.temperature) is None:
+        request.support_units = _extract_support_units(assistant)
+
     if request.support_units is not None:
         # Delete all support teams (except chatbot team and hierarchical team)
         all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
@@ -1101,9 +1195,9 @@ async def _aupdate_support_units(
                     backstory=f"Unit for advanced assistant: {unit}.",
                     role="Answer the user's question.",
                     type=f"{unit}",
-                    provider=request.provider or env_settings.OPENAI_PROVIDER,
-                    model=request.model_name or env_settings.LLM_BASIC_MODEL,
-                    temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
+                    provider=request.provider or assistant.provider,
+                    model=request.model_name or assistant.model_name,
+                    temperature=request.temperature if request.temperature is not None else assistant.temperature,
                     interrupt=False,
                     position_x=0.0,
                     position_y=0.0,
@@ -1295,9 +1389,107 @@ def _update_assistant_config_info(assistant: Assistant, request: UpdateAssistant
         setattr(assistant, "interrupt", request.interrupt)
 
 
+async def _aupdate_ask_human_skills_for_workers(
+    session: AsyncSession,
+    team: Team,
+    ask_human_enabled: bool,
+    user_id: str,
+) -> None:
+    """
+    Add or remove ask_human skills for all worker members in a hierarchical team.
+
+    Args:
+        session: Database session
+        team: Team containing worker members
+        ask_human_enabled: Whether ask_human should be enabled
+        user_id: User ID for skill records
+    """
+    if team.workflow_type != WorkflowType.HIERARCHICAL:
+        return
+
+    for member in team.members:
+        if member.type == "worker":
+            if ask_human_enabled:
+                # Check if member already has ask_human skill
+                existing_skill_statement = (
+                    select(Skill)
+                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                    .where(MemberSkillLink.member_id == member.id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
+                )
+                result = await session.execute(existing_skill_statement)
+                existing_skill = result.scalar_one_or_none()
+
+                if not existing_skill:
+                    # Add ask_human skill to worker
+                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+            else:
+                # Remove ask_human skill from worker
+                await _aremove_ask_human_skill_from_worker(session, member.id)
+
+
+async def _aremove_ask_human_skill_from_worker(
+    session: AsyncSession,
+    member_id: str,
+) -> None:
+    """
+    Remove ask_human skill from a worker member.
+
+    Args:
+        session: Database session
+        member_id: ID of the worker member to remove the skill from
+    """
+    # Find and delete ask_human skills for this member
+    skill_links_statement = (
+        select(MemberSkillLink)
+        .join(Skill, MemberSkillLink.skill_id == Skill.id)
+        .where(MemberSkillLink.member_id == member_id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
+    )
+    result = await session.execute(skill_links_statement)
+    skill_links = result.scalars().all()
+
+    for skill_link in skill_links:
+        # Delete the skill link
+        await session.delete(skill_link)
+
+        # Get and soft delete the skill
+        skill_statement = select(Skill).where(Skill.id == skill_link.skill_id)
+        skill_result = await session.execute(skill_statement)
+        skill = skill_result.scalar_one_or_none()
+
+        if skill:
+            skill.is_deleted = True
+
+    await session.flush()
+
+
+async def _aupdate_interrupt_for_workers(
+    session: AsyncSession,
+    team: Team,
+    interrupt_enabled: bool,
+) -> None:
+    """Update interrupt setting for all worker members in a team.
+    This function updates the interrupt setting for all worker members in the team
+    to the specified value (enabled or disabled).
+    Args:
+        session: Database session
+        team: Team containing worker members
+        interrupt_enabled: Whether to enable or disable interrupt for workers
+    """
+
+    if team.workflow_type != WorkflowType.HIERARCHICAL:
+        return
+
+    for member in team.members:
+        if member.type == "worker":
+            member.interrupt = interrupt_enabled
+            member.updated_at = datetime.now()
+
+    await session.flush()
+
+
 async def _aupdate_member_configurations(
     session: AsyncSession,
-    main_team: Team,
+    team: Team,
     assistant: Assistant,
     request: UpdateAssistantConfigRequest,
 ) -> None:
@@ -1309,7 +1501,7 @@ async def _aupdate_member_configurations(
 
     Args:
         session: Database session
-        main_team: Main team containing members to update
+        team: Main team containing members to update
         assistant: Assistant being updated (contains updated config)
         request: Update request containing configuration changes
     """
@@ -1320,7 +1512,7 @@ async def _aupdate_member_configurations(
     updated_interrupt = request.interrupt if request.interrupt is not None else assistant.interrupt
 
     # Update configuration for all worker members
-    for member in main_team.members:
+    for member in team.members:
         # Update member configuration fields
         if updated_provider:
             member.provider = updated_provider
@@ -1328,7 +1520,7 @@ async def _aupdate_member_configurations(
             member.model = updated_model_name
         if updated_temperature is not None:
             member.temperature = updated_temperature
-        if updated_interrupt is not None:
+        if updated_interrupt is not None and team.workflow_type == WorkflowType.HIERARCHICAL:
             member.interrupt = updated_interrupt
 
         # Mark member as modified
@@ -1506,6 +1698,8 @@ async def acreate_advanced_assistant(
             provider=request.provider or env_settings.OPENAI_API_BASE_URL,
             model_name=request.model_name or env_settings.LLM_BASIC_MODEL,
             temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
+            ask_human=request.ask_human if request.ask_human is not None else True,
+            interrupt=request.interrupt if request.interrupt is not None else True,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1745,10 +1939,10 @@ async def aupdate_advanced_assistant(
                 await session.flush()
 
             # Update mcp members of the hierarchical team
-            await _aupdate_mcp_members(session, hierarchical_team, request, x_user_id)
+            await _aupdate_mcp_members(session, assistant, hierarchical_team, request, x_user_id)
 
             # Update extension members of the hierarchical team
-            await _aupdate_extension_members(session, hierarchical_team, request, x_user_id)
+            await _aupdate_extension_members(session, assistant, hierarchical_team, request, x_user_id)
         else:
             # If no MCPs or extensions, remove hierarchical team if it exists
             if hierarchical_team:
@@ -1777,6 +1971,14 @@ async def aupdate_advanced_assistant(
                     await session.execute(delete(Member).where(Member.id.in_(member_ids)))
 
                 await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+
+        # Update ask-human
+        if request.ask_human is not None and hierarchical_team is not None:
+            await _aupdate_ask_human_skills_for_workers(session, hierarchical_team, request.ask_human, x_user_id)
+
+        # Update interrupt setting for all worker members in the hierarchical team
+        if request.interrupt is not None and hierarchical_team is not None:
+            await _aupdate_interrupt_for_workers(session, hierarchical_team, request.interrupt)
 
         # Update support units
         await _aupdate_support_units(session, assistant, request, x_user_id)
@@ -1942,20 +2144,18 @@ async def aupdate_assistant_config(
         _update_assistant_config_info(assistant, request)
         await session.flush()  # Ensure changes are applied before proceeding
 
-        # Get main team for advanced assistants and update member configurations
-        if assistant.assistant_type == AssistantType.ADVANCED_ASSISTANT:
-            main_team = await _aget_main_team_for_assistant(session, assistant_id, x_user_id)
+        # Update configuration for all teams
+        for team in assistant.teams:
+            await _aupdate_member_configurations(session, team, assistant, request)
 
-            if not main_team:
-                return ResponseWrapper.wrap(status=404, message="Main team not found").to_response()
+            if team.workflow_type == WorkflowType.HIERARCHICAL:
+                # Update ask-human skills for workers in hierarchical team
+                if request.ask_human is not None:
+                    await _aupdate_ask_human_skills_for_workers(session, team, request.ask_human, x_user_id)
 
-            # Update configuration of existing members without deleting them
-            await _aupdate_member_configurations(session, main_team, assistant, request)
-
-            # Update configuration for all support teams (including hierarchical teams)
-            for team in assistant.teams:
-                if team.workflow_type != WorkflowType.CHATBOT:  # Skip main chatbot team
-                    await _aupdate_member_configurations(session, team, assistant, request)
+                # Update interrupt setting for workers in hierarchical team
+                if request.interrupt is not None:
+                    await _aupdate_interrupt_for_workers(session, team, request.interrupt)
 
         # Commit the transaction
         await session.commit()
