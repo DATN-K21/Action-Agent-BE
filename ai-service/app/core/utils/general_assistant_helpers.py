@@ -124,6 +124,8 @@ class GeneralAssistantHelpers:
             provider=provider or env_settings.OPENAI_PROVIDER,
             model_name=model_name or env_settings.LLM_BASIC_MODEL,
             temperature=temperature if temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
+            ask_human=None,
+            interrupt=None,
         )
         session.add(general_assistant)
         await session.flush()
@@ -492,7 +494,7 @@ class GeneralAssistantHelpers:
             teams=teams_data,
             created_at=assistant.created_at,
             ask_human=None,
-            interrupt=False,
+            interrupt=None,
         )
 
     @staticmethod

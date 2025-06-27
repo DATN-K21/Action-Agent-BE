@@ -38,7 +38,7 @@ class HumanNode:
         self.all_messages = state.get("all_messages", [])
 
         # Get the last message
-        self.last_message = state["all_messages"][-1]
+        self.last_message = state["messages"][-1]
 
         # Build interrupt data based on different interaction types
         interrupt_data = {
@@ -188,7 +188,15 @@ class HumanNode:
 
     def _handle_context_input(self, action: str, review_data: Any) -> Command[str]:
         if action == InterruptDecision.CONTINUE:
-            result = HumanMessage(content=review_data, name="user", id=str(uuid4()))
+            if not isinstance(self.last_message, AIMessage) or not hasattr(self.last_message, "tool_calls") or not self.last_message.tool_calls:
+                result = HumanMessage(content=review_data, name="user", id=str(uuid4()))
+            else:
+                # If the last message is an AIMessage with tool calls, we can append the context input
+                result = ToolMessage(
+                    tool_call_id=self.last_message.tool_calls[-1]["id"],
+                    content=review_data,
+                )
+
             next_node = self.routes.get("continue", "call_llm")
             return_state: ReturnWorkflowTeamState = {
                 "history": (self.history or []) + [result],

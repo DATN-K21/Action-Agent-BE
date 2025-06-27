@@ -15,7 +15,7 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 
-from app.core.enums import InterruptDecision, WorkflowType
+from app.core.enums import InterruptDecision, InterruptType, WorkflowType
 from app.core.graph.members import (
     GraphLeader,
     GraphMember,
@@ -31,6 +31,7 @@ from app.core.models import ChatMessage, Interrupt
 from app.core.settings import env_settings
 from app.core.state import GraphSkill, GraphUpload
 from app.core.workflow.build_workflow import initialize_graph
+from app.core.workflow.node.human_node import HumanNode
 from app.db_models import Member, Team
 from app.memory.checkpoint import get_checkpointer
 
@@ -353,8 +354,70 @@ def create_tools_condition(
     return mapping
 
 
+def create_tools_condition_with_human_review(
+    current_member_name: str,
+    next_member_name: str,
+    tools: list[GraphSkill | GraphUpload],
+) -> dict[Hashable, str]:
+    """Creates the mapping for conditional edges with human review capabilities
+    The tool review node must be in format: '{current_member_name}-tool-review'
+    The tool node must be in format: '{current_member_name}-tools'
+
+    Args:
+        current_member_name (str): The name of the member that is calling the tool
+        next_member_name (str): The name of the next member after tool processing. Can be END.
+        tools: List of tools that the agent has.
+    """
+    mapping: dict[Hashable, str] = {
+        # Else continue to the next node
+        "continue": next_member_name,
+    }
+
+    for tool in tools:
+        if tool.name == "ask-human":
+            mapping["call_human"] = f"{current_member_name}-ask-human-tool"
+        else:
+            # Route to human review node for tool approval
+            mapping["call_tools"] = f"{current_member_name}-tool-review"
+    return mapping
+
+
 def ask_human_node(state: GraphTeamState) -> None:
     """Dummy node for ask human tool"""
+
+
+def create_human_review_node(member_name: str, interaction_type: str, routes: dict) -> HumanNode:
+    """Create a HumanNode for tool/output review with proper routing"""
+
+    return HumanNode(
+        node_id=f"{member_name}-human-review",
+        routes=routes,
+        title=f"Review for {member_name}",
+        interaction_type=getattr(InterruptType, interaction_type.upper()),
+    )
+
+
+def create_human_tool_review_node(member_name: str) -> HumanNode:
+    """Create a HumanNode specifically for tool call review"""
+    routes = {
+        "approved": f"{member_name}-tools",
+        "rejected": member_name,
+        "update": f"{member_name}-tools",
+    }
+
+    return create_human_review_node(member_name, "tool_review", routes)
+
+
+def create_human_output_review_node(member_name: str) -> HumanNode:
+    """Create a HumanNode specifically for output review"""
+    routes = {
+        "approved": member_name,  # Continue to member after approval
+        "rejected": member_name,  # Go back to member after rejection with feedback
+        "update": f"{member_name}-tools",  # Update tool parameters and execute
+        "review": member_name,  # Go back to member for revision
+        "continue": member_name,  # Continue with additional context
+    }
+    return create_human_review_node(member_name, "output_review", routes)
 
 
 async def acreate_hierarchical_graph(
@@ -362,10 +425,11 @@ async def acreate_hierarchical_graph(
     leader_name: str,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph:
-    """Create the team's graph.
+    """Create the team's graph with manual interrupt capabilities using HumanNode.
 
-    This function creates a graph representation of the given teams. The graph is represented as a dictionary where each key is a team name,
-    and the value is another dictionary containing the team's members, their roles, and tools.
+    This function creates a graph representation of the given teams with enhanced interrupt capabilities.
+    Instead of using interrupt_before, it uses HumanNode to provide manual interrupts with full control
+    including approved, rejected, update, review, and edit options.
 
     Args:
         teams (dict[str, dict[str, str | dict[str, Member | Leader]]]): A dictionary where each key is a team leader's name and the value is
@@ -377,11 +441,6 @@ async def acreate_hierarchical_graph(
         dict: A dictionary representing the graph of teams.
     """
     build = StateGraph(GraphTeamState)
-
-    # List to store members that require human intervention before tool calling
-    interrupt_member_names = (
-        []
-    )  # List to store members that require human intervention before tool calling
 
     # Add the start and end node
     build.add_node(
@@ -423,9 +482,9 @@ async def acreate_hierarchical_graph(
 
                 for tool in member.tools:
                     if tool.name == "ask-human":
-                        # Handling Ask-Human tool
-                        interrupt_member_names.append(f"{name}-ask-human-tool")
-                        build.add_node(f"{name}-ask-human-tool", ask_human_node)
+                        # Handling Ask-Human tool with HumanNode for context input
+                        human_context_node = create_human_review_node(name, "context_input", {"continue": name})
+                        build.add_node(f"{name}-ask-human-tool", human_context_node.work)
                         build.add_edge(f"{name}-ask-human-tool", name)
                     else:
                         tool_object = await tool.aget_tool()
@@ -434,11 +493,17 @@ async def acreate_hierarchical_graph(
                 if normal_tools:
                     # Add node for normal tools
                     build.add_node(f"{name}-tools", ToolNode(normal_tools))
-                    build.add_edge(f"{name}-tools", name)
 
-                    # Interrupt for normal tools only if member.interrupt is True
+                    # Add HumanNode for tool review if member.interrupt is True
                     if member.interrupt:
-                        interrupt_member_names.append(f"{name}-tools")
+                        human_tool_review_node = create_human_tool_review_node(name)
+                        build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+                        # Route: member -> tool-review -> tools -> member
+                        build.add_edge(f"{name}-tool-review", f"{name}-tools")
+                        build.add_edge(f"{name}-tools", name)
+                    else:
+                        # Direct connection without review
+                        build.add_edge(f"{name}-tools", name)
 
         elif isinstance(member, GraphLeader):
             subgraph = await acreate_hierarchical_graph(teams, leader_name=name, checkpointer=checkpointer)
@@ -450,13 +515,22 @@ async def acreate_hierarchical_graph(
         else:
             continue
 
-        # If member has tools, we create conditional edge to either tool node or back to leader.
+        # Create conditional edges with enhanced routing for HumanNode interrupts
         if isinstance(member, GraphMember) and member.tools:
-            build.add_conditional_edges(
-                name,
-                should_continue,
-                create_tools_condition(name, leader_name, member.tools),
-            )
+            if member.interrupt:
+                # Route to human review node first, then to tools
+                build.add_conditional_edges(
+                    name,
+                    should_continue,
+                    create_tools_condition_with_human_review(name, leader_name, member.tools),
+                )
+            else:
+                # Direct routing without human review
+                build.add_conditional_edges(
+                    name,
+                    should_continue,
+                    create_tools_condition(name, leader_name, member.tools),
+                )
         else:
             build.add_edge(name, leader_name)
 
@@ -466,17 +540,19 @@ async def acreate_hierarchical_graph(
 
     build.set_entry_point(leader_name)
     build.set_finish_point("final-answer")
-    graph = build.compile(checkpointer=checkpointer, interrupt_before=interrupt_member_names, debug=env_settings.DEBUG_AGENT)
+    # Note: No interrupt_before needed since we use HumanNode with interrupt() function
+    graph = build.compile(checkpointer=checkpointer, debug=env_settings.DEBUG_AGENT)
 
     return graph
 
 
 async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
     """
-    Creates a sequential graph from a list of team members.
+    Creates a sequential graph from a list of team members with manual interrupt capabilities.
 
     The graph will have a node for each team member, with edges connecting the nodes in the order the members are provided.
-    The first member's node will be set as the entry point, and the last member's node will be connected to the END node.
+    Instead of using interrupt_before, it uses HumanNode to provide manual interrupts with full control
+    including approved, rejected, update, review, and edit options.
 
     Args:
         team (List[Member]): A list of team members.
@@ -486,8 +562,6 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
         CompiledGraph: The compiled graph representing the sequential workflow.
     """
     graph = StateGraph(GraphTeamState)
-    # List to store members that require human intervention before it is called
-    interrupt_member_names = []
     members = list(team.values())
 
     for i, member in enumerate(members):
@@ -506,9 +580,9 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
 
             for tool in member.tools:
                 if tool.name == "ask-human":
-                    # Handling Ask-Human tool
-                    interrupt_member_names.append(f"{member.name}-ask-human-tool")
-                    graph.add_node(f"{member.name}-ask-human-tool", ask_human_node)
+                    # Handling Ask-Human tool with HumanNode for context input
+                    human_context_node = create_human_review_node(member.name, "context_input", {"continue": member.name})
+                    graph.add_node(f"{member.name}-ask-human-tool", human_context_node.work)
                     graph.add_edge(f"{member.name}-ask-human-tool", member.name)
                 else:
                     tool_object = await tool.aget_tool()
@@ -517,39 +591,62 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
             if normal_tools:
                 # Add node for normal tools
                 graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
-                graph.add_edge(f"{member.name}-tools", member.name)
 
-                # Interrupt for normal tools only if member.interrupt is True
+                # Add HumanNode for tool review if member.interrupt is True
                 if member.interrupt:
-                    interrupt_member_names.append(f"{member.name}-tools")
+                    human_tool_review_node = create_human_tool_review_node(member.name)
+                    graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
+                    # Route: member -> tool-review -> tools -> member
+                    graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                    graph.add_edge(f"{member.name}-tools", member.name)
+                else:
+                    # Direct connection without review
+                    graph.add_edge(f"{member.name}-tools", member.name)
+
         if i > 0:
             previous_member = members[i - 1]
             if previous_member.tools:
-                graph.add_conditional_edges(
-                    previous_member.name,
-                    should_continue,
-                    create_tools_condition(
-                        previous_member.name, member.name, previous_member.tools
-                    ),
-                )
+                if previous_member.interrupt:
+                    # Route with human review
+                    graph.add_conditional_edges(
+                        previous_member.name,
+                        should_continue,
+                        create_tools_condition_with_human_review(previous_member.name, member.name, previous_member.tools),
+                    )
+                else:
+                    # Direct routing without human review
+                    graph.add_conditional_edges(
+                        previous_member.name,
+                        should_continue,
+                        create_tools_condition(previous_member.name, member.name, previous_member.tools),
+                    )
             else:
                 graph.add_edge(previous_member.name, member.name)
 
     # Handle the final member's tools
     final_member = members[-1]
     if final_member.tools:
-        graph.add_conditional_edges(
-            final_member.name,
-            should_continue,
-            create_tools_condition(final_member.name, END, final_member.tools),
-        )
+        if final_member.interrupt:
+            # Route with human review
+            graph.add_conditional_edges(
+                final_member.name,
+                should_continue,
+                create_tools_condition_with_human_review(final_member.name, END, final_member.tools),
+            )
+        else:
+            # Direct routing without human review
+            graph.add_conditional_edges(
+                final_member.name,
+                should_continue,
+                create_tools_condition(final_member.name, END, final_member.tools),
+            )
     else:
         graph.add_edge(final_member.name, END)
 
     graph.set_entry_point(members[0].name)
+    # Note: No interrupt_before needed since we use HumanNode with interrupt() function
     graph = graph.compile(
         checkpointer=checkpointer,
-        interrupt_before=interrupt_member_names,
     )
 
     return graph
@@ -557,7 +654,11 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
 
 async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
     """
-    Creates a simple chatbot graph for a single team member.
+    Creates a simple chatbot graph for a single team member with manual interrupt capabilities.
+
+    Instead of using interrupt_before, it uses HumanNode to provide manual interrupts with full control
+    including approved, rejected, update, review, and edit options.
+
     Args:
         team (Mapping[str, GraphMember]): A mapping of a single team member.
         checkpointer (BaseCheckpointSaver): A checkpointer object.
@@ -569,9 +670,7 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
 
     member = next(iter(team.values()))
     graph = StateGraph(GraphTeamState)
-    # Create a list to store member names that require human intervention before tool calling
 
-    interrupt_member_names = []
     graph.add_node(
         member.name,
         RunnableLambda(
@@ -588,9 +687,9 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
 
         for tool in member.tools:
             if tool.name == "ask-human":
-                # Handling Ask-Human tool
-                interrupt_member_names.append(f"{member.name}-ask-human-tool")
-                graph.add_node(f"{member.name}-ask-human-tool", ask_human_node)
+                # Handling Ask-Human tool with HumanNode for context input
+                human_context_node = create_human_review_node(member.name, "context_input", {"continue": member.name})
+                graph.add_node(f"{member.name}-ask-human-tool", human_context_node.work)
                 graph.add_edge(f"{member.name}-ask-human-tool", member.name)
             else:
                 tool_object = await tool.aget_tool()
@@ -599,24 +698,39 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
         if normal_tools:
             # Add node for normal tools
             graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
-            graph.add_edge(f"{member.name}-tools", member.name)
 
-            # Interrupt for normal tools only if member.interrupt is True
+            # Add HumanNode for tool review if member.interrupt is True
             if member.interrupt:
-                interrupt_member_names.append(f"{member.name}-tools")
+                human_tool_review_node = create_human_tool_review_node(member.name)
+                graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
+                # Route: member -> tool-review -> tools -> member
+                graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                graph.add_edge(f"{member.name}-tools", member.name)
+            else:
+                # Direct connection without review
+                graph.add_edge(f"{member.name}-tools", member.name)
+
     if len(member.tools) >= 1:
-        graph.add_conditional_edges(
-            member.name,
-            should_continue,
-            create_tools_condition(member.name, END, member.tools),
-        )
+        if member.interrupt:
+            # Route with human review
+            graph.add_conditional_edges(
+                member.name,
+                should_continue,
+                create_tools_condition_with_human_review(member.name, END, member.tools),
+            )
+        else:
+            # Direct routing without human review
+            graph.add_conditional_edges(
+                member.name,
+                should_continue,
+                create_tools_condition(member.name, END, member.tools),
+            )
     else:
         graph.add_edge(member.name, END)
-    # graph.add_edge(member.name, END)
+
     graph.set_entry_point(member.name)
-    return graph.compile(
-        checkpointer=checkpointer, interrupt_before=interrupt_member_names
-    )
+    # Note: No interrupt_before needed since we use HumanNode with interrupt() function
+    return graph.compile(checkpointer=checkpointer)
 
 
 def convert_messages_and_tasks_to_dict(data: Any) -> Any:
@@ -829,7 +943,7 @@ async def generator(
                         ]
                     }
         elif interrupt and interrupt.interaction_type is not None:
-            # Add new interrupt handling for tool review related interactions
+            # Enhanced interrupt handling for both custom workflows and traditional workflows with HumanNode
             if interrupt.interaction_type == "tool_review":
                 if interrupt.decision == InterruptDecision.APPROVED:
                     # Tool call approved, continue execution
@@ -919,9 +1033,8 @@ async def generator(
             except Exception:
                 message = snapshot.values["all_messages"][-1]
 
-            # Handle non-workflow type
             # Determine if it should return default or ask-human interrupt based on whether AskHuman tool was called.
-            if team.workflow_type != WorkflowType.WORKFLOW:
+            if team.workflow_type != WorkflowType.WORKFLOW and team.workflow_type != WorkflowType.HIERARCHICAL:
                 if not isinstance(message, AIMessage):
                     return
                 for tool_call in message.tool_calls:
@@ -940,13 +1053,25 @@ async def generator(
                             tool_calls=message.tool_calls,
                             id=str(uuid4()),
                         )
-            # Handle workflow type
+            # Handle workflow type or hierarchical workflow type
             else:
                 next_node = snapshot.next[0]
-                for node in graph_config["nodes"]:
-                    if node["id"] == next_node:
-                        interrupt_name = node["data"]["interaction_type"]
-                        break
+                interrupt_name = None
+
+                if team.workflow_type == WorkflowType.WORKFLOW:
+                    # For custom workflows, get interrupt_name from graph_config
+                    for node in graph_config["nodes"]:
+                        if node["id"] == next_node:
+                            interrupt_name = node["data"]["interaction_type"]
+                            break
+                elif team.workflow_type == WorkflowType.HIERARCHICAL:
+                    # For hierarchical workflows, determine interrupt_name from node name patterns
+                    if next_node.endswith("-ask-human-tool"):
+                        interrupt_name = "context_input"
+                    elif next_node.endswith("-tool-review"):
+                        interrupt_name = "tool_review"
+                    # Note: Regular tool nodes ({member_name}-tools) don't have interrupts
+
                 if interrupt_name == "context_input":
                     response = ChatResponse(
                         type="interrupt",

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -396,8 +397,16 @@ async def astream(
                 async for item in generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
                     yield item
             finally:
-                # Clean up the connection when streaming ends
-                await acleanup_connection(x_user_id, thread_id)
+                # Clean up the connection when streaming ends with timeout protection
+                try:
+                    await asyncio.wait_for(
+                        acleanup_connection(x_user_id, thread_id),
+                        timeout=15.0,  # 15 second timeout to prevent indefinite blocking
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(f"Cleanup connection timeout for user {x_user_id}, thread {thread_id}")
+                except Exception as e:
+                    logger.error(f"Error during cleanup connection: {e}", exc_info=True)
 
         return StreamingResponse(
             controlled_generator(),
