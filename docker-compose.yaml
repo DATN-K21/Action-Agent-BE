@@ -21,7 +21,7 @@ services:
     restart: always
 
   user-service:
-    image: aagent.azurecr.io/user-service:dev
+    image: myaagent.azurecr.io/userservicedev
     container_name: user-service
     environment:
       NODE_ENV: dev
@@ -49,7 +49,7 @@ services:
     restart: always
 
   ai-service:
-    image: aagent.azurecr.io/ai-service:dev
+    image: myaagent.azurecr.io/aiservicedev
     container_name: ai-service
     environment:
       DEBUG_AGENT: False
@@ -74,7 +74,7 @@ services:
     restart: always
 
   extension-service:
-    image: aagent.azurecr.io/extension-service:dev
+    image: myaagent.azurecr.io/extensionservicedev
     container_name: extension-service
     environment:
       NODE_ENV: dev
