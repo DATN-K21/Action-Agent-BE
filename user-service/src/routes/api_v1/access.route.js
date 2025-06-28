@@ -12,7 +12,7 @@ router.post("/login", handleAsync(AccessController.handleLogin));
 router.post("/invoke-new-tokens", handleAsync(AccessController.handleInvokeNewTokens));
 
 //New activate method
-router.post("/activate/send-link", emailRateLimiter, handleAsync(AccessController.handleSendLinkToActivateAccount));
+router.post("/activate/send-link", handleAsync(AccessController.handleSendLinkToActivateAccount));
 router.post("/activate/confirm", handleAsync(AccessController.handleActivateAccount));
 
 router.post('/google/auth', handleAsync(AccessController.handleLoginWithGoogle));
@@ -24,7 +24,7 @@ router.get('/facebook/verify',
     handleAsync(AccessController.handleLoginWithFacebook)
 );
 
-router.post("/reset-password/send-otp", emailRateLimiter, handleAsync(AccessController.handleSendOTPToResetPassword));
+router.post("/reset-password/send-otp", handleAsync(AccessController.handleSendOTPToResetPassword));
 router.post("/reset-password/confirm-otp", handleAsync(AccessController.handleConfirmOTPToResetPassword))
 router.post("/reset-password", handleAsync(AccessController.handleResetPassword));
 
