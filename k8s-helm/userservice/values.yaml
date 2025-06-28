@@ -28,6 +28,7 @@ env:
       googleappclientsecret: googleappclientsecret
       facebookappclientid: facebookappclientid
       facebookappclientsecret: facebookappclientsecret
+      clienturl: clienturl
 
 service:
   type: ClusterIP
