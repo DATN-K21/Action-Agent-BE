@@ -12,6 +12,7 @@ from app.api.public.v1 import (
     member,
     skill,
     statistics,
+    suggestion,
     team,
     test,
     thread,
@@ -62,3 +63,5 @@ router.include_router(upload.router, prefix=prefix)
 router.include_router(statistics.router, prefix=prefix)
 
 router.include_router(langmanus.router, prefix=prefix)
+
+router.include_router(suggestion.router, prefix=prefix)

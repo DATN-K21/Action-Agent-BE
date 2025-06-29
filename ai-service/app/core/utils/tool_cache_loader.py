@@ -152,7 +152,7 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
     logger.info(f"Loading extension tools for '{connected_extension.extension_name}'")
 
     # Get extension service info
-    extension_service_info = extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
+    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
 
     if not extension_service_info or not extension_service_info.service_object:
         raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None")

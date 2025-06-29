@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     VISION_MODEL_TEMPERATURE: float = 0.5
     VISION_MODEL_CONTEXT_RATIO: float = 0.2
 
+    # Suggestion service LLM settings
+    LLM_SUGGESTION_MODEL: str = "gpt-4.1-mini"
+    SUGGESTION_MODEL_TEMPERATURE: float = 0.3
+    SUGGESTION_MODEL_MAX_TOKENS: int = 500
+
     OPENAI_API_KEY: str = "<YOUR-API-KEY>"
     OPENAI_API_BASE_URL: str = "https://api.openai.com/v1"
 
