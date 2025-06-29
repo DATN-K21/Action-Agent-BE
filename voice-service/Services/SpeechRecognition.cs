@@ -68,7 +68,6 @@ public class SpeechRecognition : ISpeechRecognition
             throw new InternalServerException("An unexpected error occurred during speech recognition.", e.Message);
         }
        
-        
         return string.Empty;
         
     }

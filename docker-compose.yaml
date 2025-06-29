@@ -86,6 +86,27 @@ services:
       - "15300:15300"
     restart: always
 
+  voice-service:
+    image: myaagent.azurecr.io/voiceservicedev
+    container_name: voice-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:15400
+      SpeechOptions__GoogleCredential__Type: service_account
+      SpeechOptions__GoogleCredential__ProjectId: your-project-id
+      SpeechOptions__GoogleCredential__PrivateKeyId: your-private-key-id
+      SpeechOptions__GoogleCredential__PrivateKey: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG55b3VyLXByaXZhdGUta2V5LWNvbnRlbnRcbi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS1cbg==
+      SpeechOptions__GoogleCredential__ClientEmail: your-service-account@your-project.iam.gserviceaccount.com
+      SpeechOptions__GoogleCredential__ClientId: your-client-id
+      SpeechOptions__GoogleCredential__AuthUri: https://accounts.google.com/o/oauth2/auth
+      SpeechOptions__GoogleCredential__TokenUri: https://oauth2.googleapis.com/token
+      SpeechOptions__GoogleCredential__AuthProviderX509CertUrl: https://www.googleapis.com/oauth2/v1/certs
+      SpeechOptions__GoogleCredential__ClientX509CertUrl: https://www.googleapis.com/robot/v1/metadata/x509/your-service-account@your-project.iam.gserviceaccount.com
+      SpeechOptions__GoogleCredential__UniverseDomain: googleapis.com
+    ports:
+      - "15400:15400"
+    restart: always
+
   ####################################################
   ################ Databases #########################
   ####################################################

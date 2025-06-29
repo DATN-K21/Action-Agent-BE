@@ -1,4 +1,6 @@
 using Newtonsoft.Json;
+using System;
+using System.Text;
 
 namespace speech_recognition.Options;
 
@@ -20,9 +22,6 @@ public class GoogleCredentialConfig
     [JsonProperty("private_key_id")]
     public string PrivateKeyId { get; set; } = string.Empty;
 
-    [JsonProperty("private_key")]
-    public string PrivateKey { get; set; } = string.Empty;
-
     [JsonProperty("client_email")]
     public string ClientEmail { get; set; } = string.Empty;
 
@@ -43,4 +42,10 @@ public class GoogleCredentialConfig
 
     [JsonProperty("universe_domain")]
     public string UniverseDomain { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public string PrivateKey { get; set; } = string.Empty;
+
+    [JsonProperty("private_key")]
+    public string GetDecodedPrivateKey => Encoding.UTF8.GetString(Convert.FromBase64String(PrivateKey));
 }
