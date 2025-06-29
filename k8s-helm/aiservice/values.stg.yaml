@@ -189,6 +189,9 @@ env:
   - name: FASTEMBED_CACHE_PATH
     value: "./fastembed_cache"
 
+  - name: EXTENSION_SERVICE_URL
+    value: "http://extensionservicestg:15300"
+
 ingress:
   enabled: true
   className: "nginx"

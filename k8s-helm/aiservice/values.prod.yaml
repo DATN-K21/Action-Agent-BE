@@ -188,4 +188,7 @@ env:
     value: "prithivida/Splade_PP_en_v1"
   - name: FASTEMBED_CACHE_PATH
     value: "./fastembed_cache"
+
+  - name: EXTENSION_SERVICE_URL
+    value: "http://extensionserviceprod:15300"
     
