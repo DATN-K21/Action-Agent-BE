@@ -73,3 +73,7 @@ class CursorPagingResponse(BaseResponse):
     cursor: Optional[str] = Field(None, description="Cursor for pagination")
     next_cursor: Optional[str] = Field(None, description="Next cursor for pagination")
     prev_cursor: Optional[str] = Field(None, description="Previous cursor for pagination")
+
+
+class MessageResponse(BaseResponse):
+    message: str

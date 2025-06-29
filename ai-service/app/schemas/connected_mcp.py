@@ -3,6 +3,8 @@ from typing import Optional
 
 from pydantic import Field
 
+from app.core.enums import McpTransport
+from app.core.models import ToolInfo
 from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
@@ -10,17 +12,16 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class CreateConnectedMcpRequest(BaseRequest):
-    id: Optional[str] = Field(None, min_length=3, max_length=50, examples=["id"])
     mcp_name: str = Field(..., min_length=3, max_length=50, examples=["mcpname"])
     url: str = Field(..., min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
-
+    transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
+    description: Optional[str] = Field(None, min_length=3, max_length=1000, examples=["description"])
 
 class UpdateConnectedMcpRequest(BaseRequest):
     mcp_name: Optional[str] = Field(None, min_length=3, max_length=50, examples=["mcpname"])
     url: Optional[str] = Field(None, min_length=3, max_length=200, examples=["url"])
-    connection_type: Optional[str] = Field(None, min_length=3, max_length=50, examples=["streamable_http"])
-
+    transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
+    description: Optional[str] = Field(None, min_length=3, max_length=1000, examples=["description"])
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################
@@ -29,18 +30,14 @@ class CreateConnectedMcpResponse(BaseResponse):
     id: str
     user_id: str
     mcp_name: str
-    connection_type: str
+    transport: McpTransport
     url: str
+    description: Optional[str] = None
     created_at: datetime
 
 
-class GetConnectedMcpResponse(BaseResponse):
-    id: str = Field(..., title="Connected App ID", examples=["id"])
-    user_id: str = Field(..., title="User ID", examples=["userid"])
-    mcp_name: str = Field(..., title="MCP Name", examples=["mcpname"])
-    url: Optional[str] = Field(None, title="Auth Scheme", examples=["Bearer"])
-    connection_type: Optional[str] = Field(None, title="Auth Value", examples=["authvalue"])
-    created_at: Optional[datetime] = Field(None, title="Created At", examples=["2022-01-01T00:00:00Z"])
+class GetConnectedMcpResponse(CreateConnectedMcpResponse):
+    pass
 
 
 class GetConnectedMcpsResponse(PagingResponse):
@@ -50,7 +47,5 @@ class GetConnectedMcpsResponse(PagingResponse):
 class UpdateConnectedMcpResponse(CreateConnectedMcpResponse):
     pass
 
-
-class DeleteConnectedMcpResponse(BaseResponse):
-    id: str
-    user_id: str
+class GetToolInfosResponse(BaseResponse):
+    tool_infos: list[ToolInfo] = Field(..., title="List of tool infos")

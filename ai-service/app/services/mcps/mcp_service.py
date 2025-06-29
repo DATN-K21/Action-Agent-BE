@@ -1,85 +1,37 @@
-from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import Connection, MultiServerMCPClient
 
-from app.core.utils.models import Action
-from app.services.database.connected_mcp_service import ConnectedMcpService
+from langchain_core.tools import BaseTool
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.sessions import Connection
+
+from app.core import logging
+from app.core.models import ToolInfo
+
+logger = logging.get_logger(__name__)
 
 
 class McpService:
     @classmethod
-    async def aget_tools(cls, connections: dict[str, Connection]) -> list[BaseTool]:
+    async def aget_mcp_tool_info(cls, connections: dict[str, Connection]) -> list[ToolInfo]:
         """
-        Get the tools for each connected MCP.
-        :return: list of tools
+        Retrieve information about a specific MCP tool for a user.
+
+        :param connections: A dictionary containing MCP connection details in format:
+                          {"server_name": {"url": "...", "transport": "..."}}
+        :return: List of ToolInfo objects containing details about the MCP tools.
         """
-        mcp_client = MultiServerMCPClient(connections)
-        tools = await mcp_client.get_tools()
-        return tools
 
-    @classmethod
-    async def aget_actions(cls, connections: dict[str, Connection]) -> list[Action]:
-        """
-        Get the actions for each connected MCP.
-        :return: list of actions
-        """
-        mcp_client = MultiServerMCPClient(connections)
-        tools = await mcp_client.get_tools()
+        client = MultiServerMCPClient(connections=connections)
 
-        actions = []
-        for tool in tools:
-            actions.append(Action(name=tool.name, description=tool.description))
+        tools: list[BaseTool] = await client.get_tools()
 
-        return actions
+        tool_infos = [
+            ToolInfo(
+                description=tool.description,
+                tool=tool,
+                display_name=tool.name,
+                input_parameters=tool.get_input_jsonschema(),
+            )
+            for tool in tools
+        ]
 
-
-async def aget_all_mcp_actions(user_id: str, connected_mcp_service: ConnectedMcpService) -> list[Action]:
-    """
-    Get all actions from the MCP client.
-    :return: list of actions
-    """
-    # Assuming `self.client` is an instance of MultiServerMCPClient
-    result = await connected_mcp_service.get_all_connected_mcps(user_id=user_id)
-    if result.data is None or not hasattr(result.data, "connected_mcps"):
-        return []
-    connected_mcps = result.data.connected_mcps
-    connections = {}
-    for connected_mcp in connected_mcps:
-        connections[f"{connected_mcp.mcp_name}"] = {
-            "url": connected_mcp.url,
-            "transport": connected_mcp.connection_type
-        }
-
-    actions = []
-    client = MultiServerMCPClient(connections)
-    tools = await client.get_tools()
-    for tool in tools:
-        actions.append(Action(name=tool.name, description=tool.description))
-
-    return actions
-
-
-async def aget_mcp_actions_in_a_server(
-        user_id: str,
-        connected_mcp_id: str,
-        connected_mcp_service: ConnectedMcpService
-) -> list[Action]:
-    """
-    Get all actions from the MCP client.
-    :return: list of actions
-    """
-    # Assuming `self.client` is an instance of MultiServerMCPClient
-    result = await connected_mcp_service.get_connected_mcp_by_id(user_id=user_id, connected_mcp_id=connected_mcp_id)
-    connected_mcp = result.data
-
-    if connected_mcp is None:
-        return []
-
-    connections = {}
-    connections[f"{connected_mcp.mcp_name}"] = {"url": connected_mcp.url, "transport": connected_mcp.connection_type}
-
-    actions = []
-    client = MultiServerMCPClient(connections)
-    tools = await client.get_tools()
-    for tool in tools:
-        actions.append(Action(name=tool.name, description=tool.description))
-    return actions
+        return tool_infos

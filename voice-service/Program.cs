@@ -25,11 +25,11 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 //Add ping route to check if the service is running
-app.MapGet("/ping", () => "pong")
+app.MapGet("/ping", () => new { message = "pong" })
     .WithName("Ping")
     .WithSummary("Check if the service is running")
-    .WithDescription("Returns 'pong' if the service is up and running.")
-    .Produces<string>(StatusCodes.Status200OK);
+    .WithDescription("Returns object with message 'pong' if the service is up and running.")
+    .Produces<object>(StatusCodes.Status200OK);
 
 app.MapControllers();
 

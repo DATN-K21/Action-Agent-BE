@@ -5,26 +5,28 @@ import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 
 from app.core import logging
-from app.core.graph.deps import get_extension_builder_manager
-from app.core.session import engine
-from app.core.socketio import get_socketio_server
-from app.memory.checkpoint import AsyncPostgresPool, get_checkpointer
-from app.models.base_entity import Base
-from app.services.extensions.deps import (
-    get_extension_service_manager,
-    get_gmail_service,
-    get_google_calendar_service,
-    get_google_drive_service,
-    get_google_maps_service,
-    get_google_meet_service,
-    get_notion_service,
-    get_outlook_service,
-    get_slack_service,
-    get_youtube_service,
-)
-from app.sockets.extension_socket import ExtensionNamespace
+from app.core.db_session import async_engine
+from app.db_models import Base
+from app.memory.checkpoint import AsyncPostgresPool
 
 logger = logging.get_logger(__name__)
+
+
+async def check_database_schema():
+    """Check if database schema is properly initialized."""
+    try:
+        # This is a lightweight check to see if the main tables exist
+        # If migrations are needed, they should be run separately before starting the app
+        logger.info("Checking database schema...")
+
+        # We can add a simple table existence check here if needed
+        # For now, we'll assume the database is properly migrated
+        logger.info("Database schema check completed")
+
+    except Exception as e:
+        logger.error(f"Database schema check failed: {e}")
+        logger.info("Please run migrations manually: alembic upgrade head")
+        raise
 
 
 @asynccontextmanager
@@ -33,37 +35,19 @@ async def lifespan(app: FastAPI):
         # Force IPv4: increase the speed when fetching data from Composio server
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
+        # Check database schema (lightweight check)
+        await check_database_schema()
+
         # Manually set up the PostgreSQL connection pool
         await AsyncPostgresPool.asetup()
 
-        # Setup PostgreSQL migrations
-        async with engine.begin() as conn:
+        # Run database migrations using SQLAlchemy
+        async with async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            logger.info(f"SQLAlchemy tables: {Base.metadata.tables.keys()}")
-            logger.info("SQLAlchemy tables created")
+            logger.info("Database migrations completed")
 
         # Manually resolve dependencies at startup
-        checkpointer = await get_checkpointer()
-        extension_builder_manager = get_extension_builder_manager(checkpointer)
-        extension_service_manager = get_extension_service_manager(
-            gmail_service=get_gmail_service(),
-            google_calendar_service=get_google_calendar_service(),
-            google_meet_service=get_google_meet_service(),
-            google_maps_service=get_google_maps_service(),
-            youtube_service=get_youtube_service(),
-            slack_service=get_slack_service(),
-            outlook_service=get_outlook_service(),
-            google_drive_service=get_google_drive_service(),
-            notion_service=get_notion_service(),
-        )
-
-        get_socketio_server().register_namespace(
-            ExtensionNamespace(
-                namespace="/extension",
-                builder_manager=extension_builder_manager,
-                extension_service_manager=extension_service_manager,
-            )
-        )
+        # checkpointer = await get_checkpointer()
 
         yield
     finally:

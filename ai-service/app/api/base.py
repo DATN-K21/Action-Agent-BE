@@ -2,9 +2,23 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.api.internal import user as internal_user
-from app.api.public.v1 import agent, callback, connected_app, connected_mcp, extension, multi_agent_experimental, test, thread, user
-from app.api.public.v2 import agent as agent_v2
-from app.api.public.v2 import assistant, composio, connected_extension, mcp_agent, multi_agent
+from app.api.public.v1 import (
+    assistant,
+    callback,
+    connected_extension,
+    connected_mcp,
+    extension,
+    langmanus,
+    member,
+    skill,
+    statistics,
+    suggestion,
+    team,
+    test,
+    thread,
+    upload,
+    user,
+)
 
 
 class ValidationErrorResponse(BaseModel):
@@ -34,19 +48,20 @@ prefix = "/api/v1"
 router.include_router(callback.router, prefix=prefix)
 
 router.include_router(thread.router, prefix=prefix)
-router.include_router(connected_app.router, prefix=prefix)
 
-router.include_router(agent.router, prefix=prefix)
-router.include_router(multi_agent_experimental.router, prefix=prefix)
 router.include_router(extension.router, prefix=prefix)
 router.include_router(user.router, prefix=prefix)
 router.include_router(connected_mcp.router, prefix=prefix)
 
-# Public routes v2
-prefix = "/api/v2"
-router.include_router(agent_v2.router, prefix=prefix)
-router.include_router(mcp_agent.router, prefix=prefix)
 router.include_router(assistant.router, prefix=prefix)
-router.include_router(multi_agent.router, prefix=prefix)
 router.include_router(connected_extension.router, prefix=prefix)
-router.include_router(composio.router, prefix=prefix)
+
+router.include_router(team.router, prefix=prefix)
+router.include_router(member.router, prefix=prefix)
+router.include_router(skill.router, prefix=prefix)
+router.include_router(upload.router, prefix=prefix)
+router.include_router(statistics.router, prefix=prefix)
+
+router.include_router(langmanus.router, prefix=prefix)
+
+router.include_router(suggestion.router, prefix=prefix)

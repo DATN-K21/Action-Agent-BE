@@ -12,6 +12,7 @@ services:
       USER_SERVICE_URL: http://user-service:15100
       AI_SERVICE_URL: http://ai-service:15200
       EXTENSION_SERVICE_URL: http://extension-service:15300
+      VOICE_SERVICE_URL: http://voice-service:15400
       ELASTICSEARCH_URL: http://elasticsearch:9200
       RABBITMQ_URL: amqp://root:root@rabbitmq:5672
       REDIS_URL: redis://root:root@redis:6379
@@ -21,7 +22,7 @@ services:
     restart: always
 
   user-service:
-    image: aagent.azurecr.io/user-service:dev
+    image: myaagent.azurecr.io/userservicedev
     container_name: user-service
     environment:
       NODE_ENV: dev
@@ -49,32 +50,64 @@ services:
     restart: always
 
   ai-service:
-    image: aagent.azurecr.io/ai-service:dev
+    image: myaagent.azurecr.io/aiservicedev
     container_name: ai-service
     environment:
       DEBUG_AGENT: False
       DEBUG_SERVER: False
       DEBUG_SQLALCHEMY: False
       LOGGING_LOG_LEVEL: INFO
-      LLM_DEFAULT_PROVIDER: openai
-      LLM_DEFAULT_MODEL: gpt-4o-mini
-      LLM_DEFAULT_API_KEY: <YOUR_OPENAI_API_KEY>
-      POSTGRES_HOST: ai-db
+      USER_AGENT: Action-LLM-AI-Service/1.0 (Educational Project)
+      TOOL_TAVILY_API_KEY: <YOUR_TAVILY_API_KEY>
+      OPENAI_PROVIDER: openai
+      ANTHROPIC_PROVIDER: anthropic
+      LLM_BASIC_MODEL: gpt-4o-mini
+      BASIC_MODEL_TEMPERATURE: 0.5
+      BASIC_MODEL_CONTEXT_RATIO: 0.2
+      LLM_REASONING_MODEL: claude-3-5-haiku-20241022
+      REASONING_MODEL_TEMPERATURE: 0
+      REASONING_MODEL_CONTEXT_RATIO: 0.1
+      LLM_VISION_MODEL: gpt-4o-mini
+      VISION_MODEL_TEMPERATURE: 0.5
+      VISION_MODEL_CONTEXT_RATIO: 0.2
+      OPENAI_API_KEY: <YOUR_OPENAI_API_KEY>
+      OPENAI_API_BASE_URL: https://api.openai.com/v1
+      ANTHROPIC_API_KEY: <YOUR_ANTHROPIC_API_KEY>
+      ANTHROPIC_API_BASE_URL: https://api.anthropic.com
+      DEFAULT_CONTEXT_LIMIT: 100000
+      DEFAULT_CONTEXT_RATIO: 0.2
+      EMBEDDING_PROVIDER: openai
+      POSTGRES_HOST: ai-database
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
       POSTGRES_DB: ai-database
-      TOOL_TAVILY_API_KEY: <YOUR_TAVILY_API_KEY>
       COMPOSIO_LOGGING_LEVEL: debug
-      COMPOSIO_API_KEY: <YOUR_COMPOSIO_API_KEY>
-      COMPOSIO_REDIRECT_URL: https://localhost:15000/ai/api/v1/callback/extension
+      COMPOSIO_API_KEY: <COMPOSIO_API_KEY>
+      COMPOSIO_REDIRECT_URL: http://localhost:15200/api/v1/callback/extension
       FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
+      MODEL_PROVIDER_ENCRYPTION_KEY: <MODEL_PROVIDER_ENCRYPTION_KEY>
+      SECRET_KEY: <SECRET_KEY>
+      PGVECTOR_COLLECTION: kb_uploads
+      RECURSION_LIMIT: 25
+      MAX_PERSONAL_TOOLS_PER_USER: 200
+      MAX_CACHED_USERS: 100
+      MAX_CACHED_TOOL_EXTENSION_SERVICES: 400
+      MAX_CACHED_MCP_USERS: 100
+      MAX_MCP_CLIENT_INSTANCES_PER_USER: 20
+      MAX_UPLOAD_SIZE: 50000000
+      MAX_WORKERS: 1
+      CELERY_BROKER_URL: redis://root:root@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://root:root@localhost:6379/0
+      DENSE_EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
+      SPARSE_EMBEDDING_MODEL: prithivida/Splade_PP_en_v1
+      FASTEMBED_CACHE_PATH: ./fastembed_cache
     ports:
       - "15200:15200"
     restart: always
 
   extension-service:
-    image: aagent.azurecr.io/extension-service:dev
+    image: myaagent.azurecr.io/extensionservicedev
     container_name: extension-service
     environment:
       NODE_ENV: dev
@@ -110,19 +143,19 @@ services:
   ####################################################
   ################ Databases #########################
   ####################################################
-  ai-db:
+  ai-database:
     image: pgvector/pgvector:pg16
-    container_name: ai-db
+    container_name: ai-database
     environment:
       POSTGRES_DB: ai-database
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
-      POSTGRES_HOST: ai-db
+      POSTGRES_HOST: ai-database
       POSTGRES_PORT: 5432
     ports:
       - "5433:5432"
     volumes:
-      - ai-db:/var/lib/postgresql/data
+      - ai-database:/var/lib/postgresql/data
     restart: always
 
   mongo-database:
@@ -199,7 +232,7 @@ services:
 
 volumes:
   es-data:
-  ai-db:
+  ai-database:
   mongo-database:
   rabbitmq:
   redis:

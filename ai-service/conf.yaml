@@ -1,0 +1,21 @@
+# Configuration file for LangManus LLM models
+BASIC_MODEL:
+  provider: openai
+  model: gpt-4o-mini
+  api_key: $LLM_DEFAULT_API_KEY
+  temperature: 0.1
+  max_tokens: 8000
+
+REASONING_MODEL:
+  provider: anthropic
+  model: claude-3-5-haiku-20241022
+  api_key: $LLM_DEFAULT_API_KEY
+  temperature: 0.1
+  max_tokens: 8000
+
+VISION_MODEL:
+  provider: anthropic
+  model: claude-3-5-haiku-20241022
+  api_key: $LLM_DEFAULT_API_KEY
+  temperature: 0.1
+  max_tokens: 8000

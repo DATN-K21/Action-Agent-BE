@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bullseye AS final
+FROM python:3.11-slim-bookworm AS final
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -14,4 +14,4 @@ RUN uv sync --frozen --no-cache
 COPY . .
 
 EXPOSE 15200
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "15200"]
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "15200", "--reload"]
