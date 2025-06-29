@@ -78,4 +78,7 @@ env:
         key: facebookappclientsecret
     
   - name: CLIENT_URL
-    value: "https://stg.action-agent.software"
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: clienturl
