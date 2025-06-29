@@ -1,0 +1,64 @@
+# Default values for voiceservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/voiceservicedev
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "voiceservicedev"
+fullnameOverride: "voiceservicedev"
+
+env:
+  - name: SpeechOptions__GoogleCredential__Type
+    value: "service_account"
+
+  - name: SpeechOptions__GoogleCredential__ProjectId
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredetialprojectid
+  
+  - name: SpeechOptions__GoogleCredential__PrivateKeyId
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredentialprivatekeyid
+
+  - name: SpeechOptions__GoogleCredential__PrivateKey
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredentialprivatekey
+
+  - name: SpeechOptions__GoogleCredential__ClientEmail
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredentialclientemail
+  
+  - name: SpeechOptions__GoogleCredential__ClientId
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredentialclientid
+
+  - name: SpeechOptions__GoogleCredential__ClientX509CertUrl
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: voicegooglecredentialclientx509certurl
+
+  - name: SpeechOptions__GoogleCredential__AuthUri
+    value: "https://accounts.google.com/o/oauth2/auth"
+
+  - name: SpeechOptions__GoogleCredential__TokenUri
+    value: "https://oauth2.googleapis.com/token"
+
+  - name: SpeechOptions__GoogleCredential__AuthProviderX509CertUrl
+    value: "https://www.googleapis.com/oauth2/v1/certs"
+
+  - name: SpeechOptions__GoogleCredential__UniverseDomain
+    value: "googleapis.com"

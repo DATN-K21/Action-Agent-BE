@@ -1,0 +1,21 @@
+apiVersion: v2
+name: voiceservice
+description: A Helm chart for Action-Agent Backend microservices
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - microservices
+  - backend
+  - api
+  - ai
+
+maintainers:
+  - name: Action-Agent Team
+    email: nguyendinhanhvlqt@gmail.com
+
+dependencies: []
+
+annotations:
+  category: Application
