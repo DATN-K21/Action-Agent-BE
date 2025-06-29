@@ -1,4 +1,4 @@
-import threading
+import asyncio
 from collections import OrderedDict
 from typing import Dict, Optional
 from typing import OrderedDict as OrderedDictType
@@ -16,54 +16,31 @@ MAX_CACHED_EXTENSION_SERVICES = env_settings.MAX_CACHED_EXTENSION_SERVICES
 class ExtensionServiceManager:
     """
     Manages and provides access to various extension services.
-    It maintains a list of all available services and an LRU cache for frequently used active services.
+    It maintains an LRU cache for frequently used services and fetches services
+    on-demand from the extension service when not cached.
     """
 
     def __init__(self):
         """
         Initializes the ExtensionServiceManager.
-        - Loads all defined extension services.
-        - Initializes an LRU cache for active services.
-        - Sets up a lock for thread-safe operations.
+        - Initializes an LRU cache for services.
+        - Sets up a lock for async-safe operations.
         """
-        # Stores all services that are defined and can be potentially used.
+        # LRU Cache for services.
         # Key: service_enum (str), Value: ExtensionServiceInfo
-        self.all_defined_services: Dict[str, ExtensionServiceInfo] = {}
+        self.service_cache: OrderedDictType[str, ExtensionServiceInfo] = OrderedDict()
 
-        # LRU Cache for active/frequently used services.
-        # Key: service_enum (str), Value: ExtensionServiceInfo
-        self.active_service_cache: OrderedDictType[str, ExtensionServiceInfo] = OrderedDict()
-
-        # Lock for ensuring thread-safety when accessing/modifying the active_service_cache.
-        self.cache_lock = threading.Lock()
+        # Lock for ensuring async-safety when accessing/modifying the service_cache.
+        self.cache_lock = asyncio.Lock()
 
         if MAX_CACHED_EXTENSION_SERVICES <= 0:
-            logger.info(
-                "MAX_CACHED_SERVICES is non-positive. Active service caching will be disabled. Services will be fetched from all_defined_services directly.")
+            logger.warning("MAX_CACHED_EXTENSION_SERVICES is non-positive. Cache will be disabled.")
 
-        self._load_all_defined_services()  # Load all ~300 services
-
-    def _load_all_defined_services(self):
-        """
-        Loads all available extension services into `self.all_defined_services`.
-        This method should be implemented to discover and register all your ~300 services.
-        For example, services could be defined in a configuration file, database,
-        or discovered by scanning specific modules/packages.
-
-        For demonstration purposes, a few dummy services are loaded here.
-        """
-        pass
-
-    def reload_all_defined_services(self):
-        self._load_all_defined_services()
-
-    def get_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
+    async def aget_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
         """
         Retrieves an extension service.
-        If the service is in the active_service_cache, it's returned and marked as recently used.
-        If not in the cache but available in all_defined_services, it's added to the cache
-        (evicting the oldest if the cache is full and caching is enabled) and then returned.
-        If caching is disabled (MAX_CACHED_SERVICES <= 0), it's fetched directly from all_defined_services.
+        First checks the cache, if not found, fetches from extension service and adds to cache.
+        Uses LRU eviction when cache is full.
 
         Args:
             service_enum: The unique enum of the service to retrieve.
@@ -71,80 +48,142 @@ class ExtensionServiceManager:
         Returns:
             An ExtensionServiceInfo object if the service is found, otherwise None.
         """
-        with self.cache_lock:  # Ensure thread-safe access to the cache
+        service_enum = service_enum.lower()  # Normalize service_enum to lowercase for consistency
+
+        async with self.cache_lock:  # Ensure async-safe access to the cache
             # 1. Handle disabled cache scenario
             if MAX_CACHED_EXTENSION_SERVICES <= 0:
-                if service_enum in self.all_defined_services:
-                    logger.debug(f"Service caching disabled. Returning '{service_enum}' directly from defined services.")
-                    # Return a copy to prevent external modification of the master record if service_object is mutable
-                    # For this example, we assume ExtensionServiceInfo is mostly immutable or service_object is robust
-                    return self.all_defined_services[service_enum]
-                else:
-                    logger.warning(f"Service '{service_enum}' not found in defined services.")
+                logger.debug(f"Service caching disabled. Fetching '{service_enum}' directly from extension service.")
+                try:
+                    from app.services.extensions.extension_client import extension_client
+
+                    return await extension_client.aget_extension_service_info(service_enum)
+                except Exception as e:
+                    logger.error(f"Failed to fetch service '{service_enum}': {str(e)}")
                     return None
 
-            # 2. Caching is enabled: Check active_service_cache first
-            if service_enum in self.active_service_cache:
-                self.active_service_cache.move_to_end(service_enum)  # Mark as recently used
-                logger.debug(f"Service '{service_enum}' found in active cache. Marked as recently used.")
-                return self.active_service_cache[service_enum]
+            # 2. Check cache first
+            if service_enum in self.service_cache:
+                self.service_cache.move_to_end(service_enum)  # Mark as recently used
+                logger.debug(f"Service '{service_enum}' found in cache. Marked as recently used.")
+                return self.service_cache[service_enum]
 
-            # 3. Service not in active cache, check all_defined_services
-            if service_enum in self.all_defined_services:
-                # Check if cache is full before adding
-                if len(self.active_service_cache) >= MAX_CACHED_EXTENSION_SERVICES:
+            # 3. Service not in cache, fetch from extension service
+            try:
+                from app.services.extensions.extension_client import extension_client
+
+                logger.debug(f"Service '{service_enum}' not in cache. Fetching from extension service.")
+                service_info = await extension_client.aget_extension_service_info(service_enum)
+
+                if not service_info:
+                    logger.warning(f"Service '{service_enum}' not found in extension service.")
+                    return None
+
+                # 4. Add to cache with LRU eviction if needed
+                if len(self.service_cache) >= MAX_CACHED_EXTENSION_SERVICES:
                     # Evict the least recently used service (oldest item)
-                    evicted_service_enum, _ = self.active_service_cache.popitem(last=False)
+                    evicted_service_enum, _ = self.service_cache.popitem(last=False)
                     logger.info(
-                        f"Active service cache limit ({MAX_CACHED_EXTENSION_SERVICES}) reached. "
+                        f"Service cache limit ({MAX_CACHED_EXTENSION_SERVICES}) reached. "
                         f"Evicted '{evicted_service_enum}' to make space for '{service_enum}'."
                     )
 
-                # Add the new service to the active cache
-                service_to_cache = self.all_defined_services[service_enum]
-                # Potentially, this is where you might instantiate or prepare the service_object
-                # if `all_defined_services` only holds metadata or factories.
-                # For example, if service_to_cache.service_object is a factory function:
-                # actual_instance = service_to_cache.service_object()
-                # service_instance_for_cache = service_to_cache.copy(update={'service_object': actual_instance})
-                # self.active_service_cache[service_enum] = service_instance_for_cache
-                self.active_service_cache[service_enum] = service_to_cache
-                logger.info(f"Service '{service_enum}' loaded from defined services into active cache.")
-                return service_to_cache
+                # Add the new service to the cache
+                self.service_cache[service_enum] = service_info
+                logger.info(f"Service '{service_enum}' fetched and added to cache.")
+                return service_info
 
-            # 4. Service not found anywhere
-            logger.warning(f"Service '{service_enum}' not found in defined services or active cache.")
+            except Exception as e:
+                logger.error(f"Failed to fetch service '{service_enum}' from extension service: {str(e)}")
+                return None
+
+    async def get_fresh_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
+        """
+        Get fresh service information directly from the extension service,
+        and update the cache with the fresh info.
+
+        Args:
+            service_enum: The unique enum of the service to retrieve.
+
+        Returns:
+            An ExtensionServiceInfo object if the service is found, otherwise None.
+        """
+        service_enum = service_enum.lower()
+
+        try:
+            from app.services.extensions.extension_client import extension_client
+
+            logger.debug(f"Fetching fresh service info for '{service_enum}' from extension service")
+            fresh_service_info = await extension_client.aget_extension_service_info(service_enum)
+
+            if fresh_service_info:
+                logger.debug(f"Successfully retrieved fresh service info for '{service_enum}'")
+                # Update the cache with fresh info
+                async with self.cache_lock:
+                    if service_enum in self.service_cache:
+                        self.service_cache[service_enum] = fresh_service_info
+                        self.service_cache.move_to_end(service_enum)  # Mark as recently used
+                        logger.debug(f"Updated cached service info for '{service_enum}'")
+            else:
+                logger.warning(f"Fresh service info not found for '{service_enum}'")
+
+            return fresh_service_info
+
+        except Exception as e:
+            logger.error(f"Failed to get fresh service info for '{service_enum}': {str(e)}")
             return None
 
-    def get_all_available_services_info(self) -> Dict[str, ExtensionServiceInfo]:
+    async def get_cached_services_info(self) -> Dict[str, ExtensionServiceInfo]:
         """
-        Returns information about all defined extension services.
-        This provides a snapshot of all services the manager knows about, not just active ones.
+        Returns information about all currently cached extension services.
 
         Returns:
-            A dictionary copy of all defined services.
+            A dictionary copy of the service cache.
         """
-        # `all_defined_services` is populated at init and then typically read-only.
-        # Returning a copy is good practice if there's any chance of modification.
-        return self.all_defined_services.copy()
+        async with self.cache_lock:
+            return self.service_cache.copy()
 
-    def get_active_cached_services_info(self) -> Dict[str, ExtensionServiceInfo]:
+    async def clear_service_cache(self):
         """
-        Returns information about all currently active and cached extension services.
+        Clears all services from the service cache.
+        """
+        async with self.cache_lock:
+            self.service_cache.clear()
+            logger.info("Service cache has been cleared.")
+
+    async def remove_service_from_cache(self, service_enum: str) -> bool:
+        """
+        Removes a specific service from the cache.
+
+        Args:
+            service_enum: The unique enum of the service to remove.
 
         Returns:
-            A dictionary copy of the active service cache.
+            True if the service was removed, False if it wasn't in the cache.
         """
-        with self.cache_lock:
-            return self.active_service_cache.copy()
+        service_enum = service_enum.lower()
 
-    def clear_active_service_cache(self):
+        async with self.cache_lock:
+            if service_enum in self.service_cache:
+                del self.service_cache[service_enum]
+                logger.info(f"Service '{service_enum}' removed from cache.")
+                return True
+            else:
+                logger.debug(f"Service '{service_enum}' not found in cache.")
+                return False
+
+    def get_cache_stats(self) -> Dict[str, int]:
         """
-        Clears all services from the active service cache.
+        Get cache statistics.
+
+        Returns:
+            Dictionary with cache statistics.
         """
-        with self.cache_lock:
-            self.active_service_cache.clear()
-            logger.info("Active service cache has been cleared.")
+        return {
+            "cached_services_count": len(self.service_cache),
+            "max_cached_services": MAX_CACHED_EXTENSION_SERVICES,
+            "cache_enabled": MAX_CACHED_EXTENSION_SERVICES > 0,
+        }
 
 
 extension_service_manager = ExtensionServiceManager()

@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     SPARSE_EMBEDDING_MODEL: str = "prithivida/Splade_PP_en_v1"
     FASTEMBED_CACHE_PATH: str = "./fastembed_cache"
 
+    # Extension service settings
+    EXTENSION_SERVICE_URL: str = "http://localhost:15300"
+
     # Protected names
     PROTECTED_NAMES: list[str] = ["user", "ignore", "error"]
 
