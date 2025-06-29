@@ -29,8 +29,8 @@ env:
 
 service:
   type: ClusterIP
-  port: 15300
-  targetport: 15300
+  port: 15400
+  targetport: 15400
 
 ingress:
   enabled: false
