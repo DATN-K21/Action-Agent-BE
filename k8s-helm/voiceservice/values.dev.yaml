@@ -12,6 +12,9 @@ nameOverride: "voiceservicedev"
 fullnameOverride: "voiceservicedev"
 
 env:
+  - name: ASPNETCORE_HTTP_PORTS
+    value: "15400"
+
   - name: SpeechOptions__GoogleCredential__Type
     value: "service_account"
 
