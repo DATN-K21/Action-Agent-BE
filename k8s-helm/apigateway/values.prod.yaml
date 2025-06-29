@@ -39,6 +39,9 @@ env:
   - name: EXTENSION_SERVICE_URL
     value: "http://extensionserviceprod:15300"
 
+  - name: VOICE_SERVICE_URL
+    value: "http://voiceserviceprod:15400"
+
 ingress:
   enabled: true
   className: "nginx"
