@@ -1,74 +1,55 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import os
-from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Union
 
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
-from app.core.langmanus.config import load_yaml_config
 from app.core.langmanus.config.agents import LLMType
+from app.core.settings import env_settings
 
 # Cache for LLM instances
 _llm_cache: dict[LLMType, Union[ChatOpenAI, ChatAnthropic]] = {}
 
 
-def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
+def _create_llm_from_settings(llm_type: LLMType) -> Union[ChatOpenAI, ChatAnthropic]:
     """
-    Get LLM configuration from environment variables.
-    Environment variables should follow the format: {LLM_TYPE}__{KEY}
-    e.g., BASIC_MODEL__api_key, BASIC_MODEL__base_url
+    Create LLM instance based on settings configuration for the given type.
     """
-    prefix = f"{llm_type.upper()}_MODEL__"
-    conf = {}
-    for key, value in os.environ.items():
-        if key.startswith(prefix):
-            conf_key = key[len(prefix) :].lower()
-            conf[conf_key] = value
-    return conf
+    # Map LLM types to their corresponding settings
+    if llm_type == "basic":
+        model_name = env_settings.LLM_BASIC_MODEL
+        temperature = env_settings.BASIC_MODEL_TEMPERATURE
+    elif llm_type == "reasoning":
+        model_name = env_settings.LLM_REASONING_MODEL
+        temperature = env_settings.REASONING_MODEL_TEMPERATURE
+    elif llm_type == "vision":
+        model_name = env_settings.LLM_VISION_MODEL
+        temperature = env_settings.VISION_MODEL_TEMPERATURE
+    else:
+        raise ValueError(f"Unknown LLM type: {llm_type}")
 
-
-def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> Union[ChatOpenAI, ChatAnthropic]:
-    llm_type_map = {
-        "reasoning": conf.get("REASONING_MODEL", {}),
-        "basic": conf.get("BASIC_MODEL", {}),
-        "vision": conf.get("VISION_MODEL", {}),
-    }
-    llm_conf = llm_type_map.get(llm_type)
-    if not isinstance(llm_conf, dict):
-        raise ValueError(f"Invalid LLM Conf: {llm_type}")
-    # Get configuration from environment variables
-    env_conf = _get_env_llm_conf(llm_type)
-
-    # Merge configurations, with environment variables taking precedence
-    merged_conf = {**llm_conf, **env_conf}
-
-    if not merged_conf:
-        raise ValueError(f"Unknown LLM Conf: {llm_type}")
-
-    # Determine provider and create appropriate LLM instance
-    provider = merged_conf.get("provider", "openai").lower()
-
-    if provider == "anthropic":
-        # Convert OpenAI-style parameters to Anthropic equivalents
-        anthropic_conf = {}
-        if "api_key" in merged_conf:
-            anthropic_conf["api_key"] = merged_conf["api_key"]
-        if "model_name" in merged_conf:
-            anthropic_conf["model"] = merged_conf["model_name"]
-        elif "model" in merged_conf:
-            anthropic_conf["model"] = merged_conf["model"]
-        if "temperature" in merged_conf:
-            anthropic_conf["temperature"] = merged_conf["temperature"]
-        if "max_tokens" in merged_conf:
-            anthropic_conf["max_tokens"] = merged_conf["max_tokens"]
-
-        return ChatAnthropic(**anthropic_conf)
+    # Determine provider based on model name
+    if model_name.startswith("claude") or model_name.startswith("anthropic"):
+        # Anthropic model
+        return ChatAnthropic(
+            api_key=SecretStr(env_settings.ANTHROPIC_API_KEY),
+            model_name=model_name,
+            temperature=temperature,
+            base_url=env_settings.ANTHROPIC_API_BASE_URL,
+            timeout=60.0,  # Default timeout
+            stop=None,  # Default stop sequences
+        )
     else:
         # Default to OpenAI
-        return ChatOpenAI(**merged_conf)
+        return ChatOpenAI(
+            api_key=SecretStr(env_settings.OPENAI_API_KEY),
+            model=model_name,
+            temperature=temperature,
+            base_url=env_settings.OPENAI_API_BASE_URL,
+        )
 
 
 def get_llm_by_type(
@@ -80,24 +61,6 @@ def get_llm_by_type(
     if llm_type in _llm_cache:
         return _llm_cache[llm_type]
 
-    conf = load_yaml_config(
-        os.getenv(
-            "FLOCK_CONFIG_PATH",
-            str(Path(__file__).resolve().parents[4] / "conf.yaml"),
-        )
-    )
-
-    llm = _create_llm_use_conf(llm_type, conf)
+    llm = _create_llm_from_settings(llm_type)
     _llm_cache[llm_type] = llm
     return llm
-
-
-# In the future, we will use reasoning_llm and vl_llm for different purposes
-# reasoning_llm = get_llm_by_type("reasoning")
-# vl_llm = get_llm_by_type("vision")
-
-
-if __name__ == "__main__":
-    # Initialize LLMs for different purposes - now these will be cached
-    basic_llm = get_llm_by_type("basic")
-    print(basic_llm.invoke("Hello"))
