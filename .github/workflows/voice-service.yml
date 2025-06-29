@@ -1,0 +1,227 @@
+name: Voice Service CI/CD
+description: CI/CD pipeline for Voice Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_and_push_dev:
+        description: 'Run Build & Push for Development'
+        required: false
+        default: false
+        type: boolean
+      deploy_dev:
+        description: 'Run Deploy for Development'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_stg:
+        description: 'Run Build & Push for Staging'
+        required: false
+        default: false
+        type: boolean
+      deploy_stg:
+        description: 'Run Deploy for Staging'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_prod:
+        description: 'Run Build & Push for Production'
+        required: false
+        default: false
+        type: boolean
+      deploy_prod:
+        description: 'Run Deploy for Production'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_info: ${{ steps.set_commit_info.outputs.commit_info }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set commit message and hash
+        id: set_commit_info
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_INFO="$COMMIT_HASH - $COMMIT_MSG"
+
+          echo "commit_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_INFO" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build_and_push_dev:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_dev == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Build & Push for Development
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'voiceservicedev'
+          tag: 'latest'
+          folder: './voice-service'
+
+      - name: Send notification to Discord (Build Development)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceservicedev:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEV BUILD'
+
+  deploy_dev:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_dev == 'true' }}
+    needs: [setup, build_and_push_dev]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy Voice Service to Development
+        run: |
+          # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install voiceservice ./voiceservice -f ./voiceservice/values.dev.yaml -n dev --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+
+      - name: Send notification to Discord (Deploy Development)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceservicedev:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'DEV DEPLOY'
+
+  build_and_push_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_stg == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Build & Push for Staging
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'voiceservicestg'
+          tag: 'latest'
+          folder: './voice-service'
+
+      - name: Send notification to Discord (Build Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceservicestg:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'STG BUILD'
+
+  deploy_stg:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_stg == 'true' }}
+    needs: [setup, build_and_push_stg]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy Voice Service to Staging
+        run: |
+          # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install voiceservice ./voiceservice -f ./voiceservice/values.stg.yaml -n stg --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+
+      - name: Send notification to Discord (Deploy Staging)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceservicestg:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'STG DEPLOY'
+
+  build_and_push_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.build_and_push_prod == 'true' }}
+    needs: setup
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+  
+      - name: Docker Build & Push for Production
+        uses: ./.github/actions/docker-build-push
+        with:
+          acr_username: ${{ secrets.ACR_USERNAME }}
+          acr_password: ${{ secrets.ACR_PASSWORD }}
+          image_name: 'voiceserviceprod'
+          tag: 'latest'
+          folder: './voice-service'
+
+      - name: Send notification to Discord (Build Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceserviceprod:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'PROD BUILD'
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy_prod == 'true' }}
+    needs: [setup, build_and_push_prod]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy Voice Service to Production
+        run: |
+          # Setup kubectl with kubeconfig
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
+          cd k8s-helm
+          helm upgrade --install voiceservice ./voiceservice -f ./voiceservice/values.prod.yaml -n prod --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+
+      - name: Send notification to Discord (Deploy Production)
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          service: 'voice-service'
+          image: 'myaagent.azurecr.io/voiceserviceprod:latest'
+          branch: '${{ github.ref_name }}'
+          commit_message: '${{ needs.setup.outputs.commit_info }}'
+          triggered_by: ${{ github.actor }}
+          time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          action: 'PROD DEPLOY'
