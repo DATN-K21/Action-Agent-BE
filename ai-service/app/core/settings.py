@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     VISION_MODEL_TEMPERATURE: float = 0.5
     VISION_MODEL_CONTEXT_RATIO: float = 0.2
 
+    # Suggestion service LLM settings
+    LLM_SUGGESTION_MODEL: str = "gpt-4.1-mini"
+    SUGGESTION_MODEL_TEMPERATURE: float = 0.3
+    SUGGESTION_MODEL_MAX_TOKENS: int = 500
+
     OPENAI_API_KEY: str = "<YOUR-API-KEY>"
     OPENAI_API_BASE_URL: str = "https://api.openai.com/v1"
 
@@ -100,6 +105,9 @@ class Settings(BaseSettings):
     DENSE_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     SPARSE_EMBEDDING_MODEL: str = "prithivida/Splade_PP_en_v1"
     FASTEMBED_CACHE_PATH: str = "./fastembed_cache"
+
+    # Extension service settings
+    EXTENSION_SERVICE_URL: str = "http://localhost:15300"
 
     # Protected names
     PROTECTED_NAMES: list[str] = ["user", "ignore", "error"]

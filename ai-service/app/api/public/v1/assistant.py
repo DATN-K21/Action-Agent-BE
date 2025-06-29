@@ -530,7 +530,7 @@ async def _acreate_extension_member_with_skills(
     await session.flush()
 
     # Load extension tools and create skills
-    extension_service_info = extension_service_manager.get_service_info(service_enum=connected_extension.extension_enum)
+    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
 
     if not extension_service_info or not extension_service_info.service_object:
         raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
@@ -1060,7 +1060,7 @@ async def _aupdate_extension_members(
                 await session.flush()
 
                 # Create extension skills
-                extension_service_info = extension_service_manager.get_service_info(service_enum=connected_extension.extension_enum)
+                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
 
                 if not extension_service_info or not extension_service_info.service_object:
                     raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
@@ -1861,7 +1861,7 @@ async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id
 
 
 @router.patch(
-    "{assistant_id}/update-advanced-assistant",
+    "/{assistant_id}/update-advanced-assistant",
     summary="Update advanced assistant information.",
     response_model=ResponseWrapper[UpdateAdvancedAssistantResponse],
 )

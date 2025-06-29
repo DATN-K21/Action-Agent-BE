@@ -94,7 +94,7 @@ async def aload_skills(member_id: str, mcp: str | ConnectedMcp | None, extension
                         raise ValueError(f"Extension with ID {extension} not found or is deleted.")
 
                 # Now, extension is an instance of ConnectedExtension. Let us proceed to load skills.
-                extension_service_info = extension_service_manager.get_service_info(service_enum=str(extension.extension_enum))
+                extension_service_info = extension_service_manager.aget_service_info(service_enum=str(extension.extension_enum))
 
                 if not extension_service_info or not extension_service_info.service_object:
                     raise ValueError(f"Extension service info for {extension.extension_enum} not found or service object is None.")

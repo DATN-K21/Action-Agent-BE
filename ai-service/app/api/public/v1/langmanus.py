@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from app.core import logging
 from app.core.langmanus.config.tools import SELECTED_RAG_PROVIDER
 from app.core.langmanus.graph.builder import build_graph_with_memory
 from app.core.langmanus.podcast.graph.builder import build_graph as build_podcast_graph
@@ -30,6 +31,8 @@ from app.core.langmanus.server.mcp_utils import load_mcp_tools
 from app.core.langmanus.server.rag_request import RAGConfigResponse, RAGResourceRequest, RAGResourcesResponse
 from app.core.langmanus.tools import VolcengineTTS
 from app.core.langmanus.workflow import run_agent_workflow_async
+
+logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/langmanus", tags=["LangManus"])
 graph = build_graph_with_memory()
@@ -57,6 +60,7 @@ async def ask_question(request: QuestionRequest):
         )
         return {"status": "success", "response": response}
     except Exception as e:
+        logger.exception("Error processing question: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -208,7 +212,8 @@ async def text_to_speech(request: TTSRequest):
             media_type=f"audio/{request.encoding}",
             headers={"Content-Disposition": (f"attachment; filename=tts_output.{request.encoding}")},
         )
-    except Exception:
+    except Exception as e:
+        logger.exception("Error processing question: %s", e)
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
@@ -220,7 +225,8 @@ async def generate_podcast(request: GeneratePodcastRequest):
         final_state = workflow.invoke({"input": report_content})
         audio_bytes = final_state["output"]
         return Response(content=audio_bytes, media_type="audio/mp3")
-    except Exception:
+    except Exception as e:
+        logger.exception("Error processing question: %s", e)
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
@@ -237,7 +243,8 @@ async def generate_ppt(request: GeneratePPTRequest):
             content=ppt_bytes,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
-    except Exception:
+    except Exception as e:
+        logger.exception("Error processing question: %s", e)
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
@@ -258,7 +265,8 @@ async def generate_prose(request: GenerateProseRequest):
             (f"data: {event[0].content}\n\n" async for _, event in events),  # type: ignore
             media_type="text/event-stream",
         )
-    except Exception:
+    except Exception as e:
+        logger.exception("Error processing question: %s", e)
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
@@ -286,6 +294,7 @@ async def mcp_server_metadata(request: MCPServerMetadataRequest):
         )
         return response
     except Exception as e:
+        logger.exception("Error processing question: %s", e)
         if not isinstance(e, HTTPException):
             raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
         raise
