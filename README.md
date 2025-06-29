@@ -25,7 +25,17 @@ This repository contains the backend code for the Action-Agent system, implement
 - **Database**: PostgreSQL (can be online or offline via `ai-db` in `docker-compose`)
 - **Description**: Handles AI-related operations.
 
-## 4. Other services
+### 4. Extension Service
+- **Port**: `http://:15300`
+- **Technology**: NestJS
+- **Description**: Manages browser extension operations and web crawling functionality.
+
+### 5. Voice Service
+- **Port**: `http://:15400`
+- **Technology**: .NET Core (C#)
+- **Description**: Handles speech recognition and voice-related operations.
+
+## 6. Other services
 The following services are planned or required for the system:
 - **RabbitMQ**: A message broker required for asynchronous communication between services (required to turn on).
 - **Redis**: A key-value store required for caching and session management (required to turn on).
@@ -52,12 +62,12 @@ To run all services using Docker Compose:
 2. Copy the `docker-compose.override.yaml` file from NDA (to have the correct environment variables).
 3. Run the following command:
    ```bash
-   docker-compose up --pull always -d api-gateway ai-service user-service ai-db user-db
+   docker-compose up --pull always -d api-gateway ai-service user-service extension-service voice-service ai-db user-db
    ```
-   (Currently we only develop apps with those services)
+   (Currently we develop with these core services)
 4. Whenever there is a new build, you can run:
    ```bash
-   docker-compose up --pull always -d api-gateway ai-service user-service ai-db user-db
+   docker-compose up --pull always -d api-gateway ai-service user-service extension-service voice-service ai-db user-db
    ```
    to pull the latest images and restart the services.
 
@@ -71,8 +81,59 @@ In the production environment:
 1. Whenever code is updated on the `dev` branch, a pipeline is triggered.
 2. The pipeline builds new Docker images and pushes them to the production environment.
 
-### Kubernetes
-Kubernetes manifests for the services live in the `k8s/` folder. To deploy them run:
+### Kubernetes with Helm Charts
+The project includes Helm charts for deploying services to Kubernetes across different environments. Charts are located in the `k8s-helm/` directory.
+
+#### Available Services
+- `aiservice/`: AI Service Helm chart
+- `apigateway/`: API Gateway Helm chart  
+- `extensionservice/`: Extension Service Helm chart
+- `userservice/`: User Service Helm chart
+- `voiceservice/`: Voice Service Helm chart
+- `postgresql/`: PostgreSQL database Helm chart
+- `rabbitmq/`: RabbitMQ message broker Helm chart
+- `redis/`: Redis cache Helm chart
+- `cert-manager/`: Certificate manager for SSL/TLS
+
+#### Environment-specific Values
+Each service has environment-specific configuration files:
+- `values.dev.yaml`: Development environment
+- `values.stg.yaml`: Staging environment  
+- `values.prod.yaml`: Production environment
+- `values.yaml`: Default values
+
+#### Deployment Commands
+To deploy to different environments:
+
+**Development:**
+```bash
+cd k8s-helm
+make install-dev
+```
+
+**Staging:**
+```bash
+cd k8s-helm
+make install-stg
+```
+
+**Production:**
+```bash
+cd k8s-helm
+make install-prod
+```
+
+**Individual service deployment:**
+```bash
+# Install a specific service for development
+helm install ai-service ./aiservice -f ./aiservice/values.dev.yaml
+
+# Upgrade a service
+helm upgrade ai-service ./aiservice -f ./aiservice/values.dev.yaml
+```
+
+### Kubernetes (Legacy)
+Legacy Kubernetes manifests for the services live in the `k8s/` folder. To deploy them run:
 
 ```bash
 kubectl apply -f k8s/
