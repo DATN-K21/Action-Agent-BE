@@ -6,7 +6,7 @@ from langgraph.graph import MessagesState
 
 
 class PPTState(MessagesState):
-    """State for the ppt generation."""
+    """State for the PPT generation."""
 
     # Input
     input: str
@@ -17,3 +17,7 @@ class PPTState(MessagesState):
     # Assets
     ppt_content: str
     ppt_file_path: str
+
+    # Session management
+    session_temp_dir: str
+    session_id: str
