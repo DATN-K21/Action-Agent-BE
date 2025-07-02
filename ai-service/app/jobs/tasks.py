@@ -1,5 +1,3 @@
-import os
-
 from sqlalchemy import select
 
 from app.core import logging
@@ -13,57 +11,30 @@ logger = logging.get_logger(__name__)
 
 
 @celery_app.task
-def add_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, chunk_overlap: int) -> None:
+def add_upload(blob_url: str, upload_id: str, user_id: str, chunk_size: int, chunk_overlap: int) -> None:
+    logger.info(f"Starting add_upload for upload_id: {upload_id}, user_id: {user_id}, blob_url: {blob_url}")
     with SyncSessionLocal() as session:
         statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
-
         result = session.execute(statement)
         upload = result.scalar_one_or_none()
 
         if not upload:
             raise ValueError("Upload not found")
         try:
-            PGVectorWrapper().add(file_path, upload_id, user_id, chunk_size, chunk_overlap)
+            PGVectorWrapper().add(blob_url, upload_id, user_id, chunk_size, chunk_overlap)
             setattr(upload, "status", UploadStatus.COMPLETED)
-            session.add(upload)
-            session.commit()
+
             logger.info(f"Upload {upload_id} completed successfully")
         except Exception as e:
             logger.error(f"add_upload failed: {e}", exc_info=True)
             setattr(upload, "status", UploadStatus.FAILED)
-            session.add(upload)
-            session.commit()
-        finally:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+
+        session.add(upload)
+        session.commit()
 
 
 @celery_app.task
-def edit_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, chunk_overlap: int) -> None:
-    with SyncSessionLocal() as session:
-        upload = session.get(Upload, upload_id)
-        if not upload:
-            raise ValueError("Upload not found")
-        try:
-            pgvector_store = PGVectorWrapper()
-            logger.info("PGVectorWrapper initialized successfully")
-            pgvector_store.update(file_path, upload_id, user_id, chunk_size, chunk_overlap)
-            setattr(upload, "status", UploadStatus.COMPLETED)
-            session.add(upload)
-            session.commit()
-            logger.info(f"Upload {upload_id} updated successfully")
-        except Exception as e:
-            logger.error(f"Error in edit_upload task: {e}", exc_info=True)
-            setattr(upload, "status", UploadStatus.FAILED)
-            session.add(upload)
-            session.commit()
-        finally:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-
-@celery_app.task
-def remove_upload(upload_id: int, user_id: int) -> None:
+def remove_upload(upload_id: str, user_id: str) -> None:
     with SyncSessionLocal() as session:
         upload = session.get(Upload, upload_id)
         if not upload:

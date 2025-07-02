@@ -1,14 +1,9 @@
 import logging
-import os
-import shutil
-import uuid
-from datetime import datetime
 from tempfile import NamedTemporaryFile
 from typing import IO, Annotated, Any
 
-import aiofiles
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, UploadFile
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import selectinload
 from starlette import status
@@ -23,9 +18,10 @@ from app.db_models.team import Team
 from app.db_models.thread import Thread
 from app.db_models.upload import Upload
 from app.db_models.upload_thread_link import UploadThreadLink
-from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
-from app.schemas.base import MessageResponse, ResponseWrapper
-from app.schemas.upload import CreateUploadRequest, UploadResponse, UploadsResponse
+from app.jobs.tasks import add_upload, perform_search, remove_upload
+from app.schemas.base import MessageResponse, PagingRequest, ResponseWrapper
+from app.schemas.upload import UploadResponse, UploadsResponse
+from app.services import get_blob_storage_service
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
@@ -137,44 +133,26 @@ def _save_file_if_within_size_limit(file: UploadFile, file_size: int) -> IO[byte
     for chunk in file.file:
         real_file_size += len(chunk)
         if real_file_size > file_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large"
-            )
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large")
         temp.write(chunk)
     temp.close()
     return temp
-
-
-def _move_upload_to_shared_folder(filename: str, temp_file_dir: str) -> str:
-    """
-    Move an uploaded file to a shared folder with a unique name and set its permissions.
-
-    Args:
-        filename (str): The original name of the uploaded file.
-        temp_file_dir (str): The directory of the temporary file.
-
-    Returns:
-        str: The new file path in the shared folder.
-    """
-    file_name = f"{uuid.uuid4()}-{filename}"
-    file_path = f"./app/shared_folder/{file_name}"
-    shutil.move(temp_file_dir, file_path)
-    os.chmod(file_path, 0o775)
-    return file_path
 
 
 @router.get("/", response_model=ResponseWrapper[UploadsResponse])
 async def aread_uploads(
     session: SessionDep,
     status: UploadStatus | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    paging: PagingRequest = Depends(),
     x_user_id: str = Header(None),
     x_user_role: str = Header(None),
 ) -> Any:
     """
     Retrieve uploads.
     """
+    page_number = paging.page_number
+    max_per_page = paging.max_per_page
+
     filters = []
     if status:
         filters.append(Upload.status == status)
@@ -186,10 +164,10 @@ async def aread_uploads(
     if filters:
         filter_conditions = and_(*filters)
         count_statement = select(func.count()).select_from(Upload).where(filter_conditions)
-        statement = select(Upload).where(filter_conditions).offset(skip).limit(limit)
+        statement = select(Upload).where(filter_conditions).offset((page_number - 1) * max_per_page).limit(max_per_page)
     else:
         count_statement = select(func.count()).select_from(Upload).where(Upload.is_deleted.is_(False))
-        statement = select(Upload).where(Upload.is_deleted.is_(False)).offset(skip).limit(limit)
+        statement = select(Upload).where(Upload.is_deleted.is_(False)).offset((page_number - 1) * max_per_page).limit(max_per_page)
 
     result = await session.execute(count_statement)
     count = result.scalar_one()
@@ -269,24 +247,13 @@ async def acreate_upload(
         else:
             actual_file_type = "web"
 
-        upload_request = CreateUploadRequest(
+        upload = Upload(
             name=name,
             description=description,
             file_type=actual_file_type,
             web_url=web_url if web_url else "",
-            thread_id=thread_id,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-        )
-
-        upload = Upload(
-            name=upload_request.name,
-            description=upload_request.description,
-            file_type=upload_request.file_type,
-            web_url=upload_request.web_url,
-            thread_id=upload_request.thread_id,
-            chunk_size=upload_request.chunk_size,
-            chunk_overlap=upload_request.chunk_overlap,
             user_id=x_user_id,
             status=UploadStatus.IN_PROGRESS,
         )
@@ -298,28 +265,25 @@ async def acreate_upload(
         if upload.id is None:
             raise HTTPException(status_code=500, detail="Failed to create upload")
 
+        # Associate upload with thread if thread_id is provided
         if thread_id is not None:
-            # Associate upload with thread if thread_id is provided
-            from app.db_models.thread import Thread
-
             # Check if thread exists
             thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
-
             thread_result = await session.execute(thread_statement)
             thread = thread_result.scalar_one_or_none()
-
             if not thread:
                 raise HTTPException(status_code=404, detail="Thread not found")
 
             # Create link between upload and thread
             link = UploadThreadLink(upload_id=upload.id, thread_id=thread_id)
             session.add(link)
-            await session.commit()
+            await session.flush()
             await session.refresh(link)
 
             # Link upload to appropriate assistant members based on assistant type
             await _alink_upload_to_assistant_members(session, upload.id, thread_id, x_user_id)
 
+        await session.commit()
         if file_type == "web":
             # Handle web upload
             add_upload.delay(web_url, upload.id, x_user_id, chunk_size, chunk_overlap)
@@ -328,8 +292,9 @@ async def acreate_upload(
             if not file or not file.filename:
                 raise HTTPException(status_code=400, detail="File is required")
 
-            file_path = await save_upload_file(file)
-            add_upload.delay(file_path, upload.id, x_user_id, chunk_size, chunk_overlap)
+            blob_service = get_blob_storage_service()
+            blob_url = await blob_service.upload_uploadfile(file)
+            add_upload.delay(blob_url, upload.id, x_user_id, chunk_size, chunk_overlap)
 
         logger.info(f"Upload created successfully: id={upload.id}")
         response_data = UploadResponse.model_validate(upload)
@@ -341,117 +306,6 @@ async def acreate_upload(
             await session.delete(upload)
             await session.commit()
         return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
-
-
-async def save_upload_file(file: UploadFile) -> str:
-    file_name = f"{uuid.uuid4()}-{file.filename}"
-    file_path = f"./app/{file_name}"
-
-    async with aiofiles.open(file_path, "wb") as out_file:
-        content = await file.read()
-        await out_file.write(content)
-
-    os.chmod(file_path, 0o775)
-    return file_path
-
-
-@router.put("/{upload_id}", response_model=ResponseWrapper[UploadResponse])
-async def aupdate_upload(
-    session: SessionDep,
-    upload_id: str,
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    file_type: str | None = Form(None),
-    chunk_size: Annotated[int, Form(ge=0)] | None = Form(None),
-    chunk_overlap: Annotated[int, Form(ge=0)] | None = Form(None),
-    web_url: str | None = Form(None),
-    file: UploadFile | None = File(None),
-    file_size: int = Depends(_valid_content_length),
-    x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
-) -> Any:
-    """Update upload"""
-    statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
-
-    result = await session.execute(statement)
-    upload = result.scalar_one_or_none()
-
-    if not upload:
-        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
-        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
-
-    update_data: dict[str, Any] = {}
-    if name is not None:
-        update_data["name"] = name
-    if description is not None:
-        update_data["description"] = description
-    if file_type is not None:
-        update_data["file_type"] = file_type
-    if web_url is not None:
-        update_data["web_url"] = web_url
-    if chunk_size is not None:
-        update_data["chunk_size"] = chunk_size
-    if chunk_overlap is not None:
-        update_data["chunk_overlap"] = chunk_overlap
-
-    if update_data:
-        update_data["last_modified"] = datetime.now()
-        for key, value in update_data.items():
-            setattr(upload, key, value)
-        session.add(upload)
-        await session.commit()
-
-    if file_type == "web" and web_url:
-        # Handle web update
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
-        session.add(upload)
-        await session.commit()
-        edit_upload.delay(
-            web_url,
-            upload_id,
-            upload.user_id,
-            chunk_size or upload.chunk_size,
-            chunk_overlap or upload.chunk_overlap,
-        )
-    elif file:
-        # Handle file update
-        if file.content_type not in [
-            "application/pdf",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "text/plain",
-            "text/html",
-            "text/markdown",
-        ]:
-            return ResponseWrapper.wrap(status=400, message="Invalid file type. Supported types: pdf, docx, pptx, xlsx, txt, html, md").to_response()
-
-        temp_file = _save_file_if_within_size_limit(file, file_size)
-        if upload.user_id is None:
-            return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
-
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
-        session.add(upload)
-        await session.commit()
-
-        if not file.filename or not isinstance(temp_file.name, str):
-            raise HTTPException(status_code=500, detail="Failed to upload file")
-
-        file_path = _move_upload_to_shared_folder(file.filename, temp_file.name)
-        edit_upload.delay(
-            file_path,
-            upload_id,
-            upload.user_id,
-            chunk_size or upload.chunk_size,
-            chunk_overlap or upload.chunk_overlap,
-        )
-
-    await session.commit()
-    await session.refresh(upload)
-
-    response_data = UploadResponse.model_validate(upload)
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
 @router.delete("/{upload_id}", response_model=ResponseWrapper[MessageResponse])

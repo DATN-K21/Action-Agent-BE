@@ -38,15 +38,14 @@ class UpdateUploadRequest(UploadBase, BaseRequest):
 
 
 class UploadResponse(UploadBase, BaseResponse):
-    id: int
+    id: str
     name: str
     description: str
     last_modified: datetime
     status: UploadStatus
-    user_id: int | None
+    user_id: str | None
     file_type: str
     web_url: str | None
-    thread_id: str | None
     chunk_size: int
     chunk_overlap: int
 

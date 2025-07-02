@@ -20,8 +20,7 @@ class PGVectorWrapper:
     def __init__(self) -> None:
         self.collection_name = env_settings.PGVECTOR_COLLECTION  # Reusing the collection name setting
         self.connection_string = f"postgresql+psycopg2://{env_settings.POSTGRES_URL_PATH}"
-        self.embedding_model = get_embedding_model(env_settings.EMBEDDING_PROVIDER)
-
+        self.embedding_model = get_embedding_model()
         logger.debug(f"Initializing PGVector with connection: {self.connection_string}")
 
         # Create synchronous engine for initialization

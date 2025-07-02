@@ -7,7 +7,7 @@ from app.core.rag.pgvector import PGVectorWrapper
 
 # Initialize PGVectorWrapper and embedding model
 pgvector_store = PGVectorWrapper()
-embedding_model = get_embedding_model("zhipuai")
+embedding_model = get_embedding_model()
 
 # Define query text
 query_text = "Automatic Control Technology Co., Ltd."
