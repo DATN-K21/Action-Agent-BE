@@ -20,6 +20,7 @@ from app.core.settings import env_settings
 from app.db_models.assistant import Assistant
 from app.db_models.member_upload_link import MemberUploadLink
 from app.db_models.team import Team
+from app.db_models.thread import Thread
 from app.db_models.upload import Upload
 from app.db_models.upload_thread_link import UploadThreadLink
 from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
@@ -51,12 +52,13 @@ async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str
     """
     try:
         # Get thread with assistant
-        from app.db_models.thread import Thread
-
         thread_statement = (
             select(Thread)
             .options(selectinload(Thread.assistant).selectinload(Assistant.teams).selectinload(Team.members))
-            .where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+            .where(
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
         )
 
         thread_result = await session.execute(thread_statement)
@@ -330,7 +332,8 @@ async def acreate_upload(
             add_upload.delay(file_path, upload.id, x_user_id, chunk_size, chunk_overlap)
 
         logger.info(f"Upload created successfully: id={upload.id}")
-        return upload
+        response_data = UploadResponse.model_validate(upload)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
     except Exception as e:
         logger.error(f"Error processing upload: {str(e)}", exc_info=True)
@@ -406,7 +409,7 @@ async def aupdate_upload(
         await session.commit()
         edit_upload.delay(
             web_url,
-            id,
+            upload_id,
             upload.user_id,
             chunk_size or upload.chunk_size,
             chunk_overlap or upload.chunk_overlap,
@@ -438,7 +441,7 @@ async def aupdate_upload(
         file_path = _move_upload_to_shared_folder(file.filename, temp_file.name)
         edit_upload.delay(
             file_path,
-            id,
+            upload_id,
             upload.user_id,
             chunk_size or upload.chunk_size,
             chunk_overlap or upload.chunk_overlap,
@@ -474,7 +477,7 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
         if upload.user_id is None:
             raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
 
-        remove_upload.delay(id, upload.user_id)
+        remove_upload.delay(upload_id, upload.user_id)
     except Exception as e:
         logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
         await session.rollback()
