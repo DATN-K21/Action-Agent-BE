@@ -235,21 +235,42 @@ async def generate_podcast(request: GeneratePodcastRequest):
 
 @app.post("/api/ppt/generate")
 async def generate_ppt(request: GeneratePPTRequest):
+    """Generate PowerPoint presentation from content using Marp."""
+    temp_dir = None
     try:
         report_content = request.content
-        print(report_content)
+        logger.info("Starting PPT generation process")
         workflow = build_ppt_graph()
         final_state = workflow.invoke({"input": report_content})
+
         generated_file_path = final_state["generated_file_path"]
+        temp_dir = final_state.get("session_temp_dir")
+        session_id = final_state.get("session_id", "unknown")
+
+        # Load PPT file into memory
         with open(generated_file_path, "rb") as f:
             ppt_bytes = f.read()
+
+        logger.info(f"PPT generated successfully for session {session_id}, size: {len(ppt_bytes)} bytes")
+
+        # Return the PPT file as response
         return Response(
             content=ppt_bytes,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename=presentation_{session_id}.pptx"},
         )
     except Exception as e:
-        logger.exception(f"Error occurred during ppt generation: {str(e)}")
+        logger.exception(f"Error occurred during PPT generation: {str(e)}")
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+    finally:
+        # Clean up temporary files
+        if temp_dir:
+            try:
+                from app.core.langmanus.ppt.graph.ppt_generator_node import cleanup_ppt_session
+
+                cleanup_ppt_session(temp_dir)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup temporary files: {cleanup_error}")
 
 
 @app.post("/api/prose/generate")

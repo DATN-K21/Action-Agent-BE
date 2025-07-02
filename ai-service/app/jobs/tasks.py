@@ -13,7 +13,7 @@ logger = logging.get_logger(__name__)
 
 
 @celery_app.task
-def add_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, chunk_overlap: int) -> None:
+def add_upload(file_path: str, upload_id: str, user_id: str, chunk_size: int, chunk_overlap: int) -> None:
     with SyncSessionLocal() as session:
         statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
 
@@ -39,7 +39,7 @@ def add_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, ch
 
 
 @celery_app.task
-def edit_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, chunk_overlap: int) -> None:
+def edit_upload(file_path: str, upload_id: str, user_id: str, chunk_size: int, chunk_overlap: int) -> None:
     with SyncSessionLocal() as session:
         upload = session.get(Upload, upload_id)
         if not upload:
@@ -63,7 +63,7 @@ def edit_upload(file_path: str, upload_id: int, user_id: int, chunk_size: int, c
 
 
 @celery_app.task
-def remove_upload(upload_id: int, user_id: int) -> None:
+def remove_upload(upload_id: str, user_id: str) -> None:
     with SyncSessionLocal() as session:
         upload = session.get(Upload, upload_id)
         if not upload:
