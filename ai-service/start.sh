@@ -2,7 +2,6 @@
 set -e
 
 # Production startup script for AI Service
-# This script ensures migrations are run before starting the application
 
 echo "=== AI Service Startup Script ==="
 echo "Starting at: $(date)"
@@ -23,15 +22,10 @@ fi
 
 echo "Database is ready ✓"
 
-# Run database migrations
-echo "Running database migrations..."
-alembic upgrade head
-echo "Migrations completed ✓"
-
 # Start the application
 echo "Starting FastAPI application..."
-echo "Access the API at: http://localhost:15001"
+echo "Access the API at: http://localhost:15200"
 echo "Press Ctrl+C to stop the server"
 echo "=========================="
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 15001 --reload
+exec uvicorn app.main:app --host 0.0.0.0 --port 15200 --reload

@@ -89,8 +89,8 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
     if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
         return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
     try:
-        # Set upload status to in progress
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
+        # Set upload status to ingesting
+        setattr(upload, "status", UploadStatus.INGESTING)
         session.add(upload)
         await session.commit()
 
@@ -169,11 +169,12 @@ async def ainitiate_upload(
 
     This endpoint:
     1. Validates the file size against limits
-    2. Creates an Upload record in the database
+    2. Creates an Upload record in the database with status "Uploading"
     3. Generates an append-blob SAS URL for direct client upload
     4. Returns upload instructions and metadata
 
     The client should then upload directly to Azure using the returned SAS URL.
+    After upload completes, call /uploads/{upload_id}/process to trigger processing.
     """
     try:
         # Validate file size before creating any resources
@@ -219,7 +220,7 @@ async def ainitiate_upload(
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
             user_id=x_user_id,
-            status=UploadStatus.IN_PROGRESS,  # Set to in progress, will monitor via status endpoint
+            status=UploadStatus.UPLOADING,  # Set to uploading - file is being uploaded to Azure
         )
 
         session.add(upload)
@@ -262,6 +263,7 @@ async def ainitiate_upload(
                 },
                 "note": f"Upload directly to upload_url (max {upload_info['max_file_size_mb']}MB), then call /uploads/{upload.id}/process to trigger processing",
                 "size_validation": "Server will verify upload completion when you call the process endpoint.",
+                "status_flow": "Uploading -> Ingesting -> Completed/Failed",
             },
         )
 
@@ -379,10 +381,10 @@ async def aprocess_upload(
     1. Verifies the Upload record exists and belongs to the user
     2. Checks that the blob was successfully uploaded to Azure
     3. Validates the blob size is within limits
-    4. Triggers the Celery processing job
+    4. Updates status to "Ingesting" and triggers the Celery processing job
     5. Returns the updated upload record
 
-    The client should call this after completing the Azure upload.
+    Status flow: Uploading -> Ingesting -> Completed/Failed
     """
     try:
         # Get upload record from database
@@ -404,6 +406,9 @@ async def aprocess_upload(
         # Check if already processing or completed
         if upload.status == UploadStatus.COMPLETED:
             return ResponseWrapper.wrap(status=400, message="Upload has already been processed").to_response()
+
+        if upload.status == UploadStatus.INGESTING:
+            return ResponseWrapper.wrap(status=400, message="Upload is already being processed").to_response()
 
         # Verify blob exists and is valid
         if not upload.web_url:
@@ -432,10 +437,14 @@ async def aprocess_upload(
 
         # All validations passed - trigger processing
         if upload.user_id:
+            # Update status to ingesting before triggering Celery job
+            upload.status = UploadStatus.INGESTING
+            session.add(upload)
+            await session.commit()
+
             # Trigger Celery processing job
             add_upload.delay(upload.web_url, upload.id, upload.user_id, upload.chunk_size, upload.chunk_overlap)
 
-            # Keep status as IN_PROGRESS (Celery job will update to COMPLETED when done)
             logger.info(f"Processing triggered for upload {upload_id}: blob_size={blob_status.get('size_bytes', 0)} bytes")
         else:
             return ResponseWrapper.wrap(status=500, message="Upload missing user ID").to_response()
@@ -448,6 +457,92 @@ async def aprocess_upload(
     except Exception as e:
         logger.error(f"Error processing upload: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
+
+
+@router.post("/{upload_id}/re-initiate", response_model=ResponseWrapper[UploadInitiateResponse])
+async def are_initiate_upload(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Re-initiate an existing upload by generating a new SAS URL.
+
+    This endpoint is useful when:
+    - The original SAS URL expired
+    - Frontend lost the SAS URL
+    - Need to resume an interrupted upload
+
+    Only works for uploads in "Uploading" status.
+    """
+    try:
+        # Get upload record from database
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Only allow re-initiation for uploads in "Uploading" status
+        if upload.status != UploadStatus.UPLOADING:
+            return ResponseWrapper.wrap(
+                status=400, message=f"Cannot re-initiate upload with status '{upload.status}'. Only uploads in 'Uploading' status are eligible."
+            ).to_response()
+
+        # Extract filename from the existing blob URL for regeneration
+        if not upload.web_url:
+            return ResponseWrapper.wrap(status=500, message="Upload record missing blob URL").to_response()
+
+        # Get the blob name from the existing URL to maintain consistency
+        blob_name = upload.web_url.split("/")[-1]
+
+        # Generate new SAS URL
+        blob_service = get_blob_storage_service()
+        upload_info = await blob_service.generate_append_blob_sas(blob_name, expiry_hours=1, max_file_size_mb=100)
+
+        # Prepare response (same format as initiate endpoint)
+        response_data = UploadInitiateResponse(
+            upload_id=upload.id,
+            upload_url=str(upload_info["upload_url"]),
+            blob_url=str(upload_info["blob_url"]),
+            blob_name=str(upload_info["blob_name"]),
+            expires_at=str(upload_info["expires_at"]),
+            max_file_size_mb=int(upload_info["max_file_size_mb"]),
+            max_file_size_bytes=int(upload_info["max_file_size_bytes"]),
+            instructions={
+                "method": "PUT",
+                "headers": {
+                    "x-ms-blob-type": "AppendBlob",
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": "REQUIRED - Must be set by client to actual file size",
+                },
+                "append_blob_instructions": {
+                    "step1": "Create the append blob: PUT to upload_url with x-ms-blob-type: AppendBlob and Content-Length: 0",
+                    "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
+                    "note": "Or use a single PUT with the entire file content if under 4MB per block",
+                },
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_mb']}MB), then call /uploads/{upload.id}/process to trigger processing",
+                "size_validation": "Server will verify upload completion when you call the process endpoint.",
+                "status_flow": "Uploading -> Ingesting -> Completed/Failed",
+            },
+        )
+
+        logger.info(f"Re-initiated upload for user {x_user_id}: id={upload_id}")
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error re-initiating upload: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message=f"Failed to re-initiate upload: {str(e)}").to_response()
 
 
 # =============================================================================
