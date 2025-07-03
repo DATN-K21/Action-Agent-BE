@@ -83,7 +83,7 @@ async def aget_all(
     except SQLAlchemyError as e:
         # Handle database-specific errors
         logger.error("Database error: %s", str(e), exc_info=True)
-        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response
+        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response()
 
     except Exception as e:
         # Handle any other exceptions
@@ -127,7 +127,7 @@ async def aget_detail(
     except SQLAlchemyError as e:
         # Handle database-specific errors
         logger.error("Database error: %s", str(e), exc_info=True)
-        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response
+        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response()
 
     except Exception as e:
         logger.exception("Has error: %s", str(e))
