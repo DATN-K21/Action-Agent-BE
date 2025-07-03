@@ -57,7 +57,6 @@ class TestUserApiEndpoints:
 
         return [row]
 
-    @pytest.mark.asyncio
     async def test_get_api_keys_success_with_keys(self, client: TestClient, mock_session: AsyncMock, mock_db_records_with_keys: list[Row]):
         """Test successful retrieval of API keys when user has keys."""
         # Setup mock result
@@ -65,8 +64,8 @@ class TestUserApiEndpoints:
         mock_result.mappings.return_value.all.return_value = mock_db_records_with_keys
         mock_session.execute.return_value = mock_result
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.get("/user/key/get-all", headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.get("/api/v1/user/key/get-all", headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -78,7 +77,6 @@ class TestUserApiEndpoints:
         assert data["data"]["api_keys"][0]["provider"] == LlmProvider.OPENAI
         assert data["data"]["api_keys"][1]["provider"] == LlmProvider.ANTHROPIC
 
-    @pytest.mark.asyncio
     async def test_get_api_keys_success_without_keys(self, client: TestClient, mock_session: AsyncMock, mock_db_records_without_keys: list[Row]):
         """Test successful retrieval when user has no API keys."""
         # Setup mock result
@@ -86,8 +84,8 @@ class TestUserApiEndpoints:
         mock_result.mappings.return_value.all.return_value = mock_db_records_without_keys
         mock_session.execute.return_value = mock_result
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.get("/user/key/get-all", headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.get("/api/v1/user/key/get-all", headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -97,7 +95,6 @@ class TestUserApiEndpoints:
         assert data["data"]["remain_trial_tokens"] == 1000
         assert len(data["data"]["api_keys"]) == 0
 
-    @pytest.mark.asyncio
     async def test_get_api_keys_user_not_found(self, client: TestClient, mock_session: AsyncMock):
         """Test get API keys when user is not found."""
         # Setup mock result for empty records
@@ -105,29 +102,27 @@ class TestUserApiEndpoints:
         mock_result.mappings.return_value.all.return_value = []
         mock_session.execute.return_value = mock_result
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.get("/user/key/get-all", headers={"x-user-id": "non-existent-user"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.get("/api/v1/user/key/get-all", headers={"x-user-id": "non-existent-user"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == 404
         assert data["message"] == "User not found"
 
-    @pytest.mark.asyncio
     async def test_get_api_keys_database_error(self, client: TestClient, mock_session: AsyncMock):
         """Test get API keys when database error occurs."""
         # Setup mock to raise exception
         mock_session.execute.side_effect = Exception("Database connection failed")
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.get("/user/key/get-all", headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.get("/api/v1/user/key/get-all", headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == 500
         assert data["message"] == "Internal server error"
 
-    @pytest.mark.asyncio
     async def test_set_default_api_key_success_with_provider(self, client: TestClient, mock_session: AsyncMock):
         """Test successful setting of default API key with provider."""
         # Mock API key lookup
@@ -140,17 +135,16 @@ class TestUserApiEndpoints:
 
         mock_session.execute.side_effect = [api_key_result, update_result]
 
-        request_data = {"provider": LlmProvider.OPENAI.value}
+        request_data = {"user_id": "user-123", "provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.post("/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.post("/api/v1/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == 200
         mock_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_set_default_api_key_success_with_null_provider(self, client: TestClient, mock_session: AsyncMock):
         """Test successful unsetting of default API key with null provider."""
         # Mock user update
@@ -159,17 +153,16 @@ class TestUserApiEndpoints:
 
         mock_session.execute.return_value = update_result
 
-        request_data = {"provider": None}
+        request_data = {"user_id": "user-123", "provider": None}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.post("/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.post("/api/v1/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == 200
         mock_session.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_set_default_api_key_not_found(self, client: TestClient, mock_session: AsyncMock):
         """Test set default API key when API key is not found."""
         # Mock API key lookup returning None
@@ -178,17 +171,16 @@ class TestUserApiEndpoints:
 
         mock_session.execute.return_value = api_key_result
 
-        request_data = {"provider": LlmProvider.OPENAI.value}
+        request_data = {"user_id": "user-123", "provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.post("/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.post("/api/v1/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == 404
         assert data["message"] == "API key not found"
 
-    @pytest.mark.asyncio
     async def test_set_default_api_key_user_not_found(self, client: TestClient, mock_session: AsyncMock):
         """Test set default API key when user is not found."""
         # Mock API key lookup
@@ -201,10 +193,10 @@ class TestUserApiEndpoints:
 
         mock_session.execute.side_effect = [api_key_result, update_result]
 
-        request_data = {"provider": LlmProvider.OPENAI.value}
+        request_data = {"user_id": "non-existent-user", "provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.post("/user/key/set-default", json=request_data, headers={"x-user-id": "non-existent-user"})
+        with patch("app.core.db_session.get_async_session", return_value=mock_session):
+            response = client.post("/api/v1/user/key/set-default", json=request_data, headers={"x-user-id": "non-existent-user"})
 
         assert response.status_code == 200
         data = response.json()
@@ -212,16 +204,15 @@ class TestUserApiEndpoints:
         assert data["message"] == "User not found"
         mock_session.rollback.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_set_default_api_key_database_error(self, client: TestClient, mock_session: AsyncMock):
         """Test set default API key when database error occurs."""
         # Setup mock to raise exception
         mock_session.execute.side_effect = Exception("Database connection failed")
 
-        request_data = {"provider": LlmProvider.OPENAI.value}
+        request_data = {"user_id": "user-123", "provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.post("/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.core.db_session.get_async_session", return_value=mock_session):
+            response = client.post("/api/v1/user/key/set-default", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -229,7 +220,6 @@ class TestUserApiEndpoints:
         assert data["message"] == "Internal server error"
         mock_session.rollback.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_upsert_api_key_update_existing(self, client: TestClient, mock_session: AsyncMock):
         """Test successful update of existing API key."""
         # Mock existing API key lookup
@@ -246,10 +236,10 @@ class TestUserApiEndpoints:
 
         mock_session.execute.side_effect = [existing_key_result, update_result]
 
-        request_data = {"provider": LlmProvider.OPENAI.value, "encrypted_value": "new_encrypted_value"}
+        request_data = {"user_id": "user-123", "provider": LlmProvider.OPENAI.value, "encrypted_value": "new_encrypted_value"}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.core.db_session.get_async_session", return_value=mock_session):
+            response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -278,11 +268,11 @@ class TestUserApiEndpoints:
             is_deleted=False,
         )
 
-        request_data = {"provider": LlmProvider.ANTHROPIC.value, "encrypted_value": "encrypted_value"}
+        request_data = {"user_id": "user-123", "provider": LlmProvider.ANTHROPIC.value, "encrypted_value": "encrypted_value"}
 
         with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
             with patch("app.api.public.v1.user.UserApiKey", return_value=new_api_key):
-                response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+                response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -307,7 +297,7 @@ class TestUserApiEndpoints:
         request_data = {"provider": LlmProvider.OPENAI.value, "encrypted_value": "new_encrypted_value"}
 
         with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+            response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -323,7 +313,7 @@ class TestUserApiEndpoints:
         request_data = {"provider": LlmProvider.OPENAI.value, "encrypted_value": "encrypted_value"}
 
         with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+            response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -342,8 +332,8 @@ class TestUserApiEndpoints:
 
         request_data = {"provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.request("DELETE", "/user/user-123/key/delete", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.request("DELETE", "/api/v1/user/key/delete", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -361,8 +351,8 @@ class TestUserApiEndpoints:
 
         request_data = {"provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.request("DELETE", "/user/user-123/key/delete", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.request("DELETE", "/api/v1/user/key/delete", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -377,8 +367,8 @@ class TestUserApiEndpoints:
 
         request_data = {"provider": LlmProvider.OPENAI.value}
 
-        with patch("app.api.public.v1.user.SessionDep", return_value=mock_session):
-            response = client.request("DELETE", "/user/user-123/key/delete", json=request_data, headers={"x-user-id": "user-123"})
+        with patch("app.api.deps.get_async_session", return_value=mock_session):
+            response = client.request("DELETE", "/api/v1/user/key/delete", json=request_data, headers={"x-user-id": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -390,7 +380,7 @@ class TestUserApiEndpoints:
         """Test validation of invalid provider in requests."""
         request_data = {"provider": "invalid_provider", "encrypted_value": "encrypted_value"}
 
-        response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+        response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         # Should return validation error for invalid provider
         assert response.status_code == 422
@@ -402,7 +392,7 @@ class TestUserApiEndpoints:
             # encrypted_value is missing
         }
 
-        response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+        response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         # Should return validation error for missing encrypted_value
         assert response.status_code == 422
@@ -411,7 +401,7 @@ class TestUserApiEndpoints:
         """Test validation when encrypted_value is empty."""
         request_data = {"provider": LlmProvider.OPENAI.value, "encrypted_value": ""}
 
-        response = client.put("/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
+        response = client.put("/api/v1/user/key/upsert", json=request_data, headers={"x-user-id": "user-123"})
 
         # Should return validation error for empty encrypted_value
         assert response.status_code == 422

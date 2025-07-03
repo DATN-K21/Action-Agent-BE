@@ -18,7 +18,7 @@ def register_exception_handlers(app: FastAPI):
         message = first_error["msg"]
         formatted_message = f'Validation error - "{field}": {message}'
         logger.error(f"Validation error in {request.method} {request.url.path}", errors=exc.errors())
-        return ResponseWrapper.wrap(status=400, message=formatted_message, data=None).to_response()
+        return ResponseWrapper.wrap(status=422, message=formatted_message, data=None).to_response()
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
