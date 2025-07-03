@@ -95,8 +95,8 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
 
     # Azure Blob Storage
-    AZURE_BLOB_CONNECTION_STRING: str | None = None
-    AZURE_BLOB_CONTAINER_NAME: str | None = None
+    AZURE_BLOB_CONNECTION_STRING: str = "<your-connection-string>"
+    AZURE_BLOB_CONTAINER_NAME: str = "<your-container-name>"
 
     # Sets the number of processors
     MAX_WORKERS: int = 1
