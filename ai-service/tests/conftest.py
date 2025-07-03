@@ -62,7 +62,7 @@ async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture
 def client() -> TestClient:
     """Create test client for FastAPI app."""
-    return TestClient(app)
+    return TestClient(app, follow_redirects=False)
 
 
 @pytest.fixture
