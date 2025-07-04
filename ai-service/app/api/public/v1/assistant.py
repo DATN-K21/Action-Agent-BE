@@ -1540,7 +1540,7 @@ async def aget_assistants(
     session: SessionDep,
     assistant_type: AssistantType | None = None,
     paging: PagingRequest = Depends(),
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
     x_user_role: str = Header(None),
 ):
     """
@@ -1601,7 +1601,7 @@ async def aget_assistants(
 )
 async def aget_or_create_general_assistant(
     session: SessionDep,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Get or create a general assistant for the user.
@@ -1665,7 +1665,7 @@ async def aget_or_create_general_assistant(
 async def acreate_advanced_assistant(
     session: SessionDep,
     request: CreateAdvancedAssistantRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Create an advanced assistant with hierarchical workflow using helper functions.
@@ -1805,7 +1805,12 @@ async def acreate_advanced_assistant(
     summary="Get assistant details.",
     response_model=ResponseWrapper[GetGeneralAssistantResponse | GetAdvancedAssistantResponse],
 )
-async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+async def aget_assistant_by_id(
+    session: SessionDep,
+    assistant_id: str,
+    x_user_id: str = Header(),
+    x_user_role: str = Header(None),
+):
     """
     Get details of an assistant by its ID using helper functions.
 
@@ -1869,7 +1874,7 @@ async def aupdate_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAdvancedAssistantRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Update an assistant's information.
@@ -2004,7 +2009,7 @@ async def aupdate_advanced_assistant(
 async def ahard_delete_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Delete an advanced assistant and all related entities using helper functions.
@@ -2053,7 +2058,7 @@ async def ahard_delete_advanced_assistant(
 async def asoft_delete_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Soft delete an advanced assistant and all related entities by setting is_deleted=True.
@@ -2105,7 +2110,7 @@ async def aupdate_assistant_config(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAssistantConfigRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """Update the configuration of an assistant.
 

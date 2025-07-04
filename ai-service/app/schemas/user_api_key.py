@@ -11,7 +11,6 @@ from app.schemas.base import BaseRequest, BaseResponse
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class SetDefaultApiKeyRequest(BaseRequest):
-    user_id: str = Field(..., min_length=1, max_length=100)
     provider: Optional[LlmProvider] = Field(...)
 
     @field_validator("provider")
@@ -22,7 +21,6 @@ class SetDefaultApiKeyRequest(BaseRequest):
 
 
 class UpsertApiKeyRequest(BaseRequest):
-    user_id: str = Field(..., min_length=1, max_length=100)
     encrypted_value: str = Field(..., min_length=1, max_length=1000)
     provider: LlmProvider = Field(...)
 
@@ -40,7 +38,6 @@ class UpsertApiKeyRequest(BaseRequest):
 
 
 class DeleteApiKeyRequest(BaseRequest):
-    user_id: str = Field(..., min_length=1, max_length=100)
     provider: LlmProvider = Field(...)
 
     @field_validator("provider")
@@ -72,9 +69,8 @@ class SetDefaultApiKeyResponse(BaseResponse):
 
 class UpsertApiKeyResponse(BaseResponse):
     id: str
-    user_id: str
     provider: LlmProvider
-    is_default: bool
+    created_at: datetime
 
 
 class DeleteApiKeyResponse(BaseResponse):

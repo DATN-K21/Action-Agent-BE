@@ -210,12 +210,31 @@ async def aupdate(
             )
 
         result = await session.execute(statement)
-        connecte_mcp = result.scalar_one_or_none()
-        if not connecte_mcp:
-            return ResponseWrapper.wrap(status=404, message="Thread not found")
+
+        # Check if any rows were affected by the update
+        if result.rowcount == 0:
+            return ResponseWrapper.wrap(status=404, message="Connected MCP not found").to_response()
 
         await session.commit()
-        await session.refresh(connecte_mcp)
+
+        # Fetch the updated record
+        if x_user_role in ["admin", "super_admin"]:
+            fetch_statement = select(ConnectedMcp).where(
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
+            )
+        else:
+            fetch_statement = select(ConnectedMcp).where(
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
+            )
+
+        fetch_result = await session.execute(fetch_statement)
+        connecte_mcp = fetch_result.scalar_one_or_none()
+
+        if not connecte_mcp:
+            return ResponseWrapper.wrap(status=404, message="Connected MCP not found").to_response()
 
         response_data = UpdateConnectedMcpResponse.model_validate(connecte_mcp)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()
