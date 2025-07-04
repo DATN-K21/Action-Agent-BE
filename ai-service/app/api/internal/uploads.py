@@ -15,7 +15,7 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 @router.patch("/{upload_id}/status", summary="Update upload status")
 async def update_upload_status(
     upload_id: str,
-    status: UploadStatus,
+    status: str,
     session: SessionDep,
 ):
     """Internal API endpoint for updating upload status from ingest-service."""
@@ -29,11 +29,13 @@ async def update_upload_status(
         if not upload:
             return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
 
-        # Validate status directly using the enum
-        if status not in UploadStatus:
+        # Try to convert string to enum
+        try:
+            upload_status = UploadStatus(status)
+        except ValueError:
             return ResponseWrapper.wrap(status=400, message=f"Invalid status: {status}").to_response()
 
-        upload.status = status
+        upload.status = upload_status
         await session.commit()
 
         logger.info(f"Successfully updated upload {upload_id} status to {status}")

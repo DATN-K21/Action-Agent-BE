@@ -113,6 +113,8 @@ env:
         key: postgresqlpassword
   - name: POSTGRES_DB
     value: "aiservicestg"
+  - name: POSTGRES_SCHEMA
+    value: "aiservice"
 
   # Composio
   - name: COMPOSIO_LOGGING_LEVEL

@@ -97,7 +97,7 @@ class Settings(BaseSettings):
 
     # Azure Blob Storage
     AZURE_BLOB_CONNECTION_STRING: str = "<your-connection-string>"
-    AZURE_BLOB_CONTAINER_NAME: str = "<your-container-name>"
+    AZURE_BLOB_CONTAINER_NAME: str = "uploadingdev"
 
     # Sets the number of processors
     MAX_WORKERS: int = 1

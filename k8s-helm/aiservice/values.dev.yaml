@@ -113,6 +113,8 @@ env:
         key: postgresqlpassword
   - name: POSTGRES_DB
     value: "aiservicedev"
+  - name: POSTGRES_SCHEMA
+    value: "aiservice"
 
   # Composio
   - name: COMPOSIO_LOGGING_LEVEL
@@ -169,17 +171,19 @@ env:
   - name: MAX_WORKERS
     value: "1"
 
-  # Settings for celery
-  - name: CELERY_BROKER_URL
+  # RabbitMQ settings
+  - name: RABBITMQ_URL
     valueFrom:
       secretKeyRef:
         name: env-secret
-        key: celerybrokerurl
-  - name: CELERY_RESULT_BACKEND
+        key: rabbitmqurl
+
+  # Redis settings
+  - name: REDIS_URL
     valueFrom:
       secretKeyRef:
         name: env-secret
-        key: celeryresultbackend
+        key: redisurl
 
   # Embedding model
   - name: DENSE_EMBEDDING_MODEL

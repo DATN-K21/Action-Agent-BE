@@ -82,6 +82,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
       POSTGRES_DB: ai-database
+      POSTGRES_SCHEMA: aiservice
       COMPOSIO_LOGGING_LEVEL: debug
       COMPOSIO_API_KEY: <COMPOSIO_API_KEY>
       COMPOSIO_REDIRECT_URL: http://localhost:15200/api/v1/callback/extension
@@ -138,6 +139,42 @@ services:
       SpeechOptions__GoogleCredential__UniverseDomain: googleapis.com
     ports:
       - "15400:15400"
+    restart: always
+
+  ingest-service:
+    image: myaagent.azurecr.io/ingestservicedev
+    container_name: ingest-service
+    environment:
+      DEBUG_SERVER: False
+      LOGGING_LOG_LEVEL: INFO
+      PGVECTOR_HOST: ai-database
+      PGVECTOR_PORT: 5432
+      PGVECTOR_USER: postgres
+      PGVECTOR_PASSWORD: 123456
+      PGVECTOR_DB: ai-database
+      PGVECTOR_SCHEMA: ingestservice
+      PGVECTOR_COLLECTION: kb_uploads
+      CELERY_BROKER_URL: redis://root:root@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://root:root@redis:6379/0
+      AZURE_STORAGE_CONNECTION_STRING: <AZURE_STORAGE_CONNECTION_STRING>
+      AZURE_CONTAINER_NAME: <AZURE_CONTAINER_NAME>
+      AI_SERVICE_URL: http://ai-service:15200
+      DENSE_EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
+      SPARSE_EMBEDDING_MODEL: prithivida/Splade_PP_en_v1
+      FASTEMBED_CACHE_PATH: ./fastembed_cache
+    ports:
+      - "15500:15500"
+    restart: always
+
+  flower:
+    image: mher/flower:latest
+    container_name: flower
+    environment:
+      CELERY_BROKER_URL: redis://root:root@redis:6379/0
+      FLOWER_PORT: 15501
+    ports:
+      - "15501:15501"
+    command: celery flower --broker=redis://root:root@redis:6379/0 --port=15501
     restart: always
 
   ####################################################
