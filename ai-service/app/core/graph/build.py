@@ -1041,7 +1041,7 @@ async def generator(
                     if tool_call["name"] == "ask-human":
                         response = ChatResponse(
                             type="interrupt",
-                            name="human",
+                            name="ask-human",
                             tool_calls=message.tool_calls,
                             id=str(uuid4()),
                         )
@@ -1076,7 +1076,8 @@ async def generator(
                     response = ChatResponse(
                         type="interrupt",
                         name=interrupt_name,
-                        content=f"LLM output is as follows:\n\n{message.content}\n\nPlease enter your additional information.",
+                        content=f"{message.content}",
+                        tool_calls=message.tool_calls,
                         id=str(uuid4()),
                     )
                 elif interrupt_name == "tool_review":
