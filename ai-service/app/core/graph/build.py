@@ -303,6 +303,9 @@ def enter_chain(state: GraphTeamState, team: GraphTeam) -> dict[str, Any]:
         "main_task": task,
         "team": team,
         "team_members": team.members,
+        "history": state.get("history", []),
+        "all_messages": state.get("all_messages", []),
+        "messages": [],
     }
     return results
 
@@ -310,9 +313,30 @@ def enter_chain(state: GraphTeamState, team: GraphTeam) -> dict[str, Any]:
 def exit_chain(state: GraphTeamState) -> dict[str, list[AnyMessage]]:
     """
     Pass the final response back to the top-level graph's state.
+    This function now preserves the complete conversation history from the subgraph,
+    not just the final answer, to ensure full history is maintained in hierarchical workflows.
     """
-    answer = state["history"][-1]
-    return {"history": [answer], "all_messages": state["all_messages"]}
+    # Return the complete history from the subgraph instead of just the final answer
+    complete_history = state.get("history", [])
+    all_messages = state.get("all_messages", [])
+
+    # If history is empty, fall back to the last message if available
+    if not complete_history and "messages" in state and state["messages"]:
+        complete_history = [state["messages"][-1]]
+
+    # Ensure all_messages includes the complete history as well
+    # This is crucial for hierarchical workflows to maintain full conversation context
+    if complete_history and all_messages:
+        # Merge and deduplicate messages
+        combined_messages = list(all_messages)
+        for msg in complete_history:
+            if msg not in combined_messages:
+                combined_messages.append(msg)
+        all_messages = combined_messages
+    elif complete_history and not all_messages:
+        all_messages = complete_history
+
+    return {"history": complete_history, "all_messages": all_messages}
 
 
 def should_continue(state: GraphTeamState) -> str:
@@ -1041,7 +1065,7 @@ async def generator(
                     if tool_call["name"] == "ask-human":
                         response = ChatResponse(
                             type="interrupt",
-                            name="ask-human",
+                            name="context_input",
                             tool_calls=message.tool_calls,
                             id=str(uuid4()),
                         )
