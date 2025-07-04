@@ -196,9 +196,9 @@ class RankingStatisticsService(BaseStatisticsService):
                     display_info={
                         "username": row.username,
                         "email": row.email,
-                        "upload_count": str(row.upload_count),
-                        "thread_count": str(row.thread_count),
-                        "assistant_count": str(row.assistant_count),
+                        "upload_count": row.upload_count,
+                        "thread_count": row.thread_count,
+                        "assistant_count": row.assistant_count,
                     },
                 )
             )
@@ -258,7 +258,7 @@ class RankingStatisticsService(BaseStatisticsService):
                     display_info={
                         "extension_name": row.extension_name or f"Extension {row.id[:8]}",
                         "connection_status": row.connection_status,
-                        "skill_count": str(row.skill_count),
+                        "skill_count": row.skill_count,
                     },
                 )
             )
