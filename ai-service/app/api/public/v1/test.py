@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
+from app.celery import celery_app
 from app.core.enums import ChatMessageType
 from app.core.graph.build import acreate_hierarchical_graph, convert_hierarchical_team_to_dict
 from app.core.models import ChatMessage
@@ -21,6 +22,17 @@ router = APIRouter(prefix="", tags=["Tests"], responses={})
 @router.get("/ping", summary="Endpoint to check server.", response_model=dict)
 async def check():
     return {"message": "pong"}
+
+
+@router.post("/ping_queue", summary="Endpoint to trigger ping task in queue.", response_model=dict)
+async def ping_queue():
+    """Send ping task to queue for fanout testing."""
+    try:
+        # Send ping task to ping queue
+        task = celery_app.send_task("ping", queue="ping")
+        return {"message": "Ping task sent to queue", "task_id": task.id, "queue": "ping"}
+    except Exception as e:
+        return {"error": f"Failed to send ping task: {str(e)}", "queue": "ping"}
 
 
 @router.get("/error", summary="Endpoint to check error handlers.", response_model=ResponseWrapper)

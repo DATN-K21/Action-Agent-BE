@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "ai-database"
+    POSTGRES_SCHEMA: str = "aiservice"
 
     # Tool
     TOOL_TAVILY_API_KEY: str = "<your-api-key>"
@@ -92,7 +93,7 @@ class Settings(BaseSettings):
     MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
 
     # Upload settings
-    MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
+    MAX_UPLOAD_SIZE_MB: int = 100 * 1024 * 1024  # 100 MB
 
     # Azure Blob Storage
     AZURE_BLOB_CONNECTION_STRING: str = "<your-connection-string>"
@@ -101,9 +102,21 @@ class Settings(BaseSettings):
     # Sets the number of processors
     MAX_WORKERS: int = 1
 
-    # Celery settings
-    CELERY_BROKER_URL: str = ""
-    CELERY_RESULT_BACKEND: str = ""
+    # Celery settings - RabbitMQ configuration
+    RABBITMQ_HOST: str = "localhost"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_USER: str = "guest"
+    RABBITMQ_PASSWORD: str = "guest"
+    RABBITMQ_VHOST: str = "/"
+    RABBITMQ_SSL: bool = False
+
+    # Redis configuration
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_USER: str = "default"
+    REDIS_PASSWORD: str = "default"
+    REDIS_SSL: bool = False
 
     # Embedding model. See the list of supported models: https://qdrant.github.io/fastembed/examples/Supported_Models/
     DENSE_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
@@ -118,8 +131,25 @@ class Settings(BaseSettings):
 
     @property
     def POSTGRES_URL_PATH(self) -> str:
+        """Construct PostgreSQL URL path for SQLAlchemy."""
         return f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
+    @property
+    def POSTGRES_URL_PATH_WITH_SCHEMA(self) -> str:
+        """Construct PostgreSQL URL path with schema for SQLAlchemy."""
+        return f"{self.POSTGRES_URL_PATH}?options=-csearch_path%3D{self.POSTGRES_SCHEMA}"
+
+    @property
+    def RABBITMQ_URL(self) -> str:
+        """Construct RabbitMQ URL for Celery broker."""
+        schema = "amqps" if self.RABBITMQ_SSL else "amqp"
+        return f"{schema}://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/{self.RABBITMQ_VHOST}"
+
+    @property
+    def REDIS_URL(self) -> str:
+        """Construct Redis URL"""
+        schema = "rediss" if self.REDIS_SSL else "redis"
+        return f"{schema}://{self.REDIS_USER}:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
 @lru_cache()
 def get_settings():

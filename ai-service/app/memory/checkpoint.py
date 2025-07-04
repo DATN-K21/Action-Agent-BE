@@ -25,7 +25,12 @@ class AsyncPostgresPool:
             try:
                 cls._async_pool = AsyncConnectionPool(
                     conninfo=f"postgresql://{env_settings.POSTGRES_URL_PATH}",
-                    kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+                    kwargs={
+                        "autocommit": True,
+                        "prepare_threshold": 0,
+                        "row_factory": dict_row,
+                        "options": f"-csearch_path={env_settings.POSTGRES_SCHEMA}",
+                    },
                     open=False,
                     timeout=5,
                 )

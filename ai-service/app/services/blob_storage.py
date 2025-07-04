@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timedelta
 from functools import lru_cache
 
@@ -109,7 +108,12 @@ class BlobStorageService:
             logger.error(f"Failed to delete blob {blob_url}: {exc}", exc_info=True)
             return False
 
-    async def generate_append_blob_sas(self, filename: str, expiry_hours: int = 1, max_file_size_mb: int = 100) -> dict[str, str | int]:
+    async def generate_append_blob_sas(
+        self,
+        blob_name: str,
+        expiry_hours: int = 1,
+        max_file_size_mb: int = 100,
+    ) -> dict[str, str | int]:
         """
         Generate a SAS URL for direct client upload to an append blob using account key authentication.
         This allows streaming uploads and better handling of large files.
@@ -128,7 +132,6 @@ class BlobStorageService:
         """
         try:
             # Generate unique blob name
-            blob_name = f"{uuid.uuid4()}-{filename}"
             blob_client = self._container_client.get_blob_client(blob_name)
 
             # Parse connection string to get account name and key
@@ -156,22 +159,25 @@ class BlobStorageService:
             blob_url = blob_client.url  # Public URL without SAS
             max_size_bytes = max_file_size_mb * 1024 * 1024  # Convert MB to bytes
 
-            logger.info(f"Generated append blob SAS for {filename} -> {blob_name}, expires in {expiry_hours} hours, max size: {max_file_size_mb}MB")
+            logger.info(f"Generated append blob SAS for {blob_name}, expires in {expiry_hours} hours, max size: {max_file_size_mb}MB")
 
             return {
                 "upload_url": upload_url,  # Frontend uses this for append operations
                 "blob_url": blob_url,  # Store this in DB for future reference
                 "blob_name": blob_name,  # Optional: for tracking
                 "expires_at": expiry_time.isoformat(),
-                "max_file_size_mb": max_file_size_mb,
                 "max_file_size_bytes": max_size_bytes,
             }
 
         except Exception as exc:
-            logger.error(f"Failed to generate append blob SAS for {filename}: {exc}", exc_info=True)
+            logger.error(f"Failed to generate append blob SAS for {blob_name}: {exc}", exc_info=True)
             raise
 
-    async def check_blob_status(self, blob_url: str, max_file_size_mb: int = 100) -> dict[str, str | int | bool | float]:
+    async def check_blob_status(
+        self,
+        blob_url: str,
+        max_file_size_mb: int = 100,
+    ) -> dict[str, str | int | bool | float]:
         """
         Check the status of a blob - whether it exists, its size, and if it's complete.
 
@@ -206,7 +212,6 @@ class BlobStorageService:
                     "size_mb": size_mb,
                     "within_limits": within_limits,
                     "complete": complete,
-                    "max_size_mb": max_file_size_mb,
                     "max_size_bytes": max_size_bytes,
                 }
             else:
@@ -217,7 +222,6 @@ class BlobStorageService:
                     "size_mb": 0,
                     "within_limits": True,
                     "complete": False,
-                    "max_size_mb": max_file_size_mb,
                     "max_size_bytes": max_size_bytes,
                 }
 
@@ -230,7 +234,6 @@ class BlobStorageService:
                 "within_limits": False,
                 "complete": False,
                 "error": str(exc),
-                "max_size_mb": max_file_size_mb,
                 "max_size_bytes": max_size_bytes,
             }
 

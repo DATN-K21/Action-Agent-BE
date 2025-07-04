@@ -59,7 +59,6 @@ class UploadInitiateResponse(BaseResponse):
     blob_url: str = Field(..., description="Final blob URL")
     blob_name: str = Field(..., description="Generated blob name")
     expires_at: str = Field(..., description="ISO timestamp when the SAS URL expires")
-    max_file_size_mb: int = Field(..., description="Maximum allowed file size in MB")
     max_file_size_bytes: int = Field(..., description="Maximum allowed file size in bytes")
     instructions: dict = Field(..., description="Upload instructions for the frontend")
 
@@ -74,7 +73,6 @@ class UploadStatusResponse(BaseResponse):
     blob_size_mb: float = Field(..., description="Current blob size in MB")
     within_size_limits: bool = Field(..., description="Whether blob is within size limits")
     upload_complete: bool = Field(..., description="Whether upload appears complete")
-    max_file_size_mb: int = Field(..., description="Maximum allowed file size in MB")
     max_file_size_bytes: int = Field(..., description="Maximum allowed file size in bytes")
     created_at: datetime = Field(..., description="When the upload record was created")
     last_modified: datetime = Field(..., description="When the upload was last modified")

@@ -58,7 +58,6 @@ class ExtensionClient:
 
         # Remove trailing slash if present
         self.base_url = self.base_url.rstrip("/")
-        logger.info(f"ExtensionClient initialized with base URL: {self.base_url}")
 
     async def _amake_request(self, method: str, endpoint: str, **kwargs) -> Dict:
         """

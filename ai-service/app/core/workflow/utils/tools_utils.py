@@ -3,7 +3,7 @@ from functools import cache
 from langchain.tools import BaseTool
 from langchain.tools.retriever import create_retriever_tool
 
-from app.core.rag.pgvector import PGVectorWrapper
+from app.core.search_client import SearchAPIWrapper
 from app.core.tools import global_tools
 
 
@@ -17,5 +17,5 @@ def get_tool(tool_name: str) -> BaseTool:
 
 @cache
 def get_retrieval_tool(tool_name: str, description: str, user_id: str, kb_id: str):
-    retriever = PGVectorWrapper().retriever(user_id, kb_id)
+    retriever = SearchAPIWrapper().retriever(user_id, kb_id)
     return create_retriever_tool(retriever, name=tool_name, description=description)

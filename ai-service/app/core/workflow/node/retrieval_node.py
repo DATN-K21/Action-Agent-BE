@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core import logging
-from app.core.rag.pgvector import PGVectorWrapper
+from app.core.search_client import SearchAPIWrapper
 from app.core.state import (
     ReturnWorkflowTeamState,
     WorkflowTeamState,
@@ -20,7 +20,7 @@ class RetrievalNode:
     def __init__(self, node_id: str, query: str, user_id: str, kb_id: str):
         self.node_id = node_id
         self.query = query
-        self.pgvector_store = PGVectorWrapper()
+        self.search_client = SearchAPIWrapper()
         self.user_id = user_id
         self.kb_id = kb_id
 
@@ -58,8 +58,7 @@ class RetrievalNode:
         return return_state
 
     def _retrieval_work(self, qry):
-
-        retriever = self.pgvector_store.retriever(self.user_id, self.kb_id)
+        retriever = self.search_client.retriever(self.user_id, self.kb_id)
 
         retriever_tool = create_retriever_tool_custom_modified(retriever)
 

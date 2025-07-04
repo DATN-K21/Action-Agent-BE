@@ -17,11 +17,13 @@ async_engine = create_async_engine(
     ASYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"server_settings": {"search_path": env_settings.POSTGRES_SCHEMA}},
 )
 sync_engine = create_engine(
     SYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"options": f"-csearch_path={env_settings.POSTGRES_SCHEMA}"},
 )
 
 AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, autoflush=False, autocommit=False)

@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Any
 
 from celery.result import AsyncResult
@@ -7,16 +8,17 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
+from app.celery import celery_app
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, UploadStatus, WorkflowType
+from app.core.settings import env_settings
 from app.db_models.assistant import Assistant
 from app.db_models.member_upload_link import MemberUploadLink
 from app.db_models.team import Team
 from app.db_models.thread import Thread
 from app.db_models.upload import Upload
 from app.db_models.upload_thread_link import UploadThreadLink
-from app.jobs.tasks import add_upload, perform_search, remove_upload
-from app.schemas.base import MessageResponse, PagingRequest, ResponseWrapper
+from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.upload import (
     UploadInitiateRequest,
     UploadInitiateResponse,
@@ -34,6 +36,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # API Endpoints
 # =============================================================================
+
 
 @router.get("/", response_model=ResponseWrapper[UploadsResponse])
 async def aread_uploads(
@@ -74,8 +77,13 @@ async def aread_uploads(
     ).to_response()
 
 
-@router.delete("/{upload_id}", response_model=ResponseWrapper[MessageResponse])
-async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+@router.delete("/{upload_id}", response_model=ResponseWrapper)
+async def adelete_upload(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
     statement = select(Upload).where(
         Upload.id == upload_id,
         Upload.is_deleted.is_(False),
@@ -88,23 +96,27 @@ async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = H
         return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
     if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
         return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+    if upload.status not in [UploadStatus.COMPLETED, UploadStatus.FAILED]:
+        return ResponseWrapper.wrap(status=400, message="Upload must be completed or failed before deletion").to_response()
+
     try:
-        # Set upload status to ingesting
-        setattr(upload, "status", UploadStatus.INGESTING)
+        # Soft-delete upload record
+        upload.is_deleted = True
         session.add(upload)
         await session.commit()
 
-        if upload.user_id is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
+        # Enqueue upload removal task to ingest-service
+        celery_app.send_task(
+            "ingest.document.remove",
+            args=[upload_id, upload.user_id],
+            queue="document.processing",
+        )
 
-        remove_upload.delay(upload_id, upload.user_id)
+        return ResponseWrapper.wrap(status=202, data=None).to_response()
     except Exception as e:
         logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message=f"Failed to delete upload: {str(e)}").to_response()
-
-    response_data = MessageResponse(message="Upload deletion initiated successfully")
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
 
 
 @router.post("/{upload_id}/search")
@@ -134,13 +146,18 @@ async def asearch_upload(
     if search_type not in ["vector", "fulltext", "hybrid"]:
         return ResponseWrapper.wrap(status=400, message="Invalid search type. Supported types: vector, fulltext, hybrid").to_response()
 
-    task = perform_search.delay(
-        x_user_id,
-        upload_id,
-        search_params["query"],
-        search_type,
-        search_params.get("top_k", 5),
-        search_params.get("score_threshold", 0.5),
+    # Enqueue search task to ingest-service
+    task = celery_app.send_task(
+        "ingest.document.search",
+        args=[
+            str(x_user_id),
+            str(upload_id),
+            search_params["query"],
+            search_type,
+            search_params.get("top_k", 5),
+            search_params.get("score_threshold", 0.5),
+        ],
+        queue="document.search",
     )
 
     return {"task_id": task.id}
@@ -178,9 +195,8 @@ async def ainitiate_upload(
     """
     try:
         # Validate file size before creating any resources
-        max_file_size_mb = 100
+        max_file_size_mb = env_settings.MAX_UPLOAD_SIZE_MB
         max_file_size_bytes = max_file_size_mb * 1024 * 1024
-
         if request.file_size_bytes > max_file_size_bytes:
             return ResponseWrapper.wrap(
                 status=400, message=f"File size ({request.file_size_bytes} bytes) exceeds maximum limit of {max_file_size_mb}MB"
@@ -204,15 +220,22 @@ async def ainitiate_upload(
                 message="Chunk size must be greater than 0 and chunk overlap must be non-negative",
             ).to_response()
 
+        unique_id = uuid.uuid4()
+
         # Generate append-blob SAS URL
         blob_service = get_blob_storage_service()
-        upload_info = await blob_service.generate_append_blob_sas(request.filename, expiry_hours=1, max_file_size_mb=max_file_size_mb)
+        upload_info = await blob_service.generate_append_blob_sas(
+            f"{unique_id}-{request.filename}",
+            expiry_hours=1,
+            max_file_size_mb=max_file_size_mb,
+        )
 
         # Debug: Log the upload_info to see what's being returned
         logger.info(f"Upload info from blob service: {upload_info}")
 
         # Create Upload record in database
         upload = Upload(
+            id=str(unique_id),
             name=request.name,
             description=request.description,
             file_type=actual_file_type,
@@ -247,7 +270,6 @@ async def ainitiate_upload(
             blob_url=str(upload_info["blob_url"]),
             blob_name=str(upload_info["blob_name"]),
             expires_at=str(upload_info["expires_at"]),
-            max_file_size_mb=int(upload_info["max_file_size_mb"]),
             max_file_size_bytes=int(upload_info["max_file_size_bytes"]),
             instructions={
                 "method": "PUT",
@@ -261,7 +283,7 @@ async def ainitiate_upload(
                     "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
                     "note": "Or use a single PUT with the entire file content if under 4MB per block",
                 },
-                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_mb']}MB), then call /uploads/{upload.id}/process to trigger processing",
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
                 "size_validation": "Server will verify upload completion when you call the process endpoint.",
                 "status_flow": "Uploading -> Ingesting -> Completed/Failed",
             },
@@ -269,7 +291,7 @@ async def ainitiate_upload(
 
         # Debug: Log the response data
         logger.info(
-            f"Response data created: upload_id={upload.id}, expires_at={upload_info.get('expires_at')}, max_size={upload_info.get('max_file_size_mb')}"
+            f"Response data created: upload_id={upload.id}, expires_at={upload_info.get('expires_at')}, max_size={upload_info.get('max_file_size_bytes', 0)}B"
         )
 
         logger.info(f"Initiated upload for user {x_user_id}: id={upload.id}, filename={request.filename}")
@@ -351,7 +373,6 @@ async def aget_upload_status(
             blob_size_mb=float(blob_status.get("size_mb", 0.0)),
             within_size_limits=bool(blob_status.get("within_limits", True)),
             upload_complete=bool(blob_status.get("complete", False)),
-            max_file_size_mb=int(blob_status.get("max_size_mb", 100)),
             max_file_size_bytes=int(blob_status.get("max_size_bytes", 100 * 1024 * 1024)),
             created_at=upload.created_at,
             last_modified=upload.last_modified,
@@ -436,18 +457,19 @@ async def aprocess_upload(
             ).to_response()
 
         # All validations passed - trigger processing
-        if upload.user_id:
-            # Update status to ingesting before triggering Celery job
-            upload.status = UploadStatus.INGESTING
-            session.add(upload)
-            await session.commit()
+        # Update status to ingesting before triggering Celery job
+        upload.status = UploadStatus.INGESTING
+        session.add(upload)
+        await session.commit()
 
-            # Trigger Celery processing job
-            add_upload.delay(upload.web_url, upload.id, upload.user_id, upload.chunk_size, upload.chunk_overlap)
+        # Enqueue upload processing task to ingest-service
+        celery_app.send_task(
+            "ingest.document.add",
+            args=[upload.web_url, upload.id, upload.user_id, upload.chunk_size, upload.chunk_overlap],
+            queue="document.processing",
+        )
 
-            logger.info(f"Processing triggered for upload {upload_id}: blob_size={blob_status.get('size_bytes', 0)} bytes")
-        else:
-            return ResponseWrapper.wrap(status=500, message="Upload missing user ID").to_response()
+        logger.info(f"Processing triggered for upload {upload_id}: blob_size={blob_status.get('size_bytes', 0)} bytes")
 
         # Return updated upload record
         await session.refresh(upload)
@@ -517,7 +539,6 @@ async def are_initiate_upload(
             blob_url=str(upload_info["blob_url"]),
             blob_name=str(upload_info["blob_name"]),
             expires_at=str(upload_info["expires_at"]),
-            max_file_size_mb=int(upload_info["max_file_size_mb"]),
             max_file_size_bytes=int(upload_info["max_file_size_bytes"]),
             instructions={
                 "method": "PUT",
@@ -531,7 +552,7 @@ async def are_initiate_upload(
                     "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
                     "note": "Or use a single PUT with the entire file content if under 4MB per block",
                 },
-                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_mb']}MB), then call /uploads/{upload.id}/process to trigger processing",
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_in_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
                 "size_validation": "Server will verify upload completion when you call the process endpoint.",
                 "status_flow": "Uploading -> Ingesting -> Completed/Failed",
             },
