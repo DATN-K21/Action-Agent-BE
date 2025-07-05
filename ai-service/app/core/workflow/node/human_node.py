@@ -109,27 +109,25 @@ class HumanNode:
                 return Command(goto=next_node)
 
             case InterruptDecision.REJECTED:
-                # Reject tool call, add rejection message
+                # Reject tool call and terminate execution
                 result: List[AnyMessage] = [
                     ToolMessage(
                         tool_call_id=tool_call["id"],
-                        content="Rejected by user. Continue assisting.",
+                        content="Tool call rejected by user. Execution terminated.",
                     )
                 ]
                 if review_data:
                     result.append(
                         HumanMessage(content=review_data, name="user", id=str(uuid4())),
                     )
-                result.append(
-                    AIMessage(content="I understand your concern. Let's try again.")
-                )
+                result.append(AIMessage(content="Tool call has been rejected. Execution stopped."))
 
                 return_state: ReturnWorkflowTeamState = {
                     "history": (self.history or []) + result,
                     "messages": result,
                     "all_messages": (self.all_messages or []) + result,
                 }
-                next_node = self.routes.get("rejected", "call_llm")
+                next_node = self.routes.get("rejected", "__end__")
                 return Command(goto=next_node, update=return_state)
 
             case InterruptDecision.UPDATE:

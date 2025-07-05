@@ -401,7 +401,7 @@ def create_human_tool_review_node(member_name: str) -> HumanNode:
     """Create a HumanNode specifically for tool call review"""
     routes = {
         "approved": f"{member_name}-tools",
-        "rejected": member_name,
+        "rejected": "__end__",  # Use LangGraph's internal END
         "update": f"{member_name}-tools",
     }
 
@@ -498,8 +498,7 @@ async def acreate_hierarchical_graph(
                     if member.interrupt:
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
-                        # Route: member -> tool-review -> tools -> member
-                        build.add_edge(f"{name}-tool-review", f"{name}-tools")
+                        # No direct edge - HumanNode uses Command(goto=...) for routing
                         build.add_edge(f"{name}-tools", name)
                     else:
                         # Direct connection without review
@@ -596,8 +595,7 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                 if member.interrupt:
                     human_tool_review_node = create_human_tool_review_node(member.name)
                     graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
-                    # Route: member -> tool-review -> tools -> member
-                    graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                    # No direct edge - HumanNode uses Command(goto=...) for routing
                     graph.add_edge(f"{member.name}-tools", member.name)
                 else:
                     # Direct connection without review
@@ -703,8 +701,7 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
             if member.interrupt:
                 human_tool_review_node = create_human_tool_review_node(member.name)
                 graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
-                # Route: member -> tool-review -> tools -> member
-                graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                # No direct edge - HumanNode uses Command(goto=...) for routing
                 graph.add_edge(f"{member.name}-tools", member.name)
             else:
                 # Direct connection without review
