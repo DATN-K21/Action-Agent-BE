@@ -217,12 +217,12 @@ class WorkerNode(BaseNode):
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
         if result.tool_calls:
-            return {"messages": [result], "all_messages": [result]}
+            return {"messages": [result]}
         else:
             return {
                 "history": [result],
                 "messages": [],
-                "all_messages": state.get("all_messages", []) + [result],
+                "all_messages": state["messages"] + [result],
             }
 
 
@@ -287,14 +287,14 @@ class SequentialWorkerNode(WorkerNode):
         next: str | None
         if result.tool_calls:
             next = name
-            return {"messages": [result], "next": next, "all_messages": [result]}
+            return {"messages": [result], "next": next}
         else:
             next = self.get_next_member_in_sequence(team.members, name)
             return {
                 "history": [result],
                 "messages": [],
                 "next": next,
-                "all_messages": state.get("all_messages", []) + [result],
+                "all_messages": state["messages"] + [result],
             }
 
 
@@ -429,7 +429,7 @@ class LeaderNode(BaseNode):
         else:
             task_content: str = str(result.get("task", state["main_task"][0].content))
             tasks = [AIMessage(content=task_content, name=extract_name(team.name))]
-            return {"next": result["next"], "task": tasks, "all_messages": state.get("all_messages", []) + tasks}  # type: ignore
+            return {"next": result["next"], "task": tasks, "all_messages": tasks}  # type: ignore
 
     async def work(
             self, state: GraphTeamState, config: RunnableConfig
@@ -476,7 +476,7 @@ class SummariserNode(BaseNode):
             | RunnableLambda(self.tag_with_name).bind(name="final-answer")  # type: ignore[arg-type]
         )
         result = await summarise_chain.ainvoke(state, config)
-        return {"history": [result], "all_messages": state.get("all_messages", []) + [result]}
+        return {"history": [result], "all_messages": [result]}
 
 
 class ChatBotNode(BaseNode):
@@ -528,12 +528,12 @@ class ChatBotNode(BaseNode):
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
         if result.tool_calls:
-            return {"messages": [result], "all_messages": [result]}
+            return {"messages": [result]}
         else:
             return {
                 "history": [result],
                 "messages": [],
-                "all_messages": state.get("all_messages", []) + [result],
+                "all_messages": state["messages"] + [result],
             }
 
 
@@ -589,10 +589,10 @@ class RAGBotNode(BaseNode):
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
         if result.tool_calls:
-            return {"messages": [result], "all_messages": [result]}
+            return {"messages": [result]}
         else:
             return {
                 "history": [result],
                 "messages": [],
-                "all_messages": state.get("all_messages", []) + [result],
+                "all_messages": state["messages"] + [result],
             }
