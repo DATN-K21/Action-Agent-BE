@@ -10,32 +10,6 @@ from app.core.graph.messages import ChatResponse
 from app.memory.checkpoint import get_checkpointer
 
 
-async def get_subgraph_checkpoints(checkpoint: dict[str, Any]) -> list[dict[str, Any]]:
-    """
-    Extract checkpoints from subgraphs in hierarchical workflows.
-
-    Args:
-        checkpoint (dict): The parent checkpoint containing possible subgraphs.
-
-    Returns:
-        list[dict]: A list of subgraph checkpoints.
-    """
-    subgraph_checkpoints = []
-
-    # Look for subgraph states in the checkpoint
-    subgraphs = checkpoint.get("subgraphs", {})
-    if isinstance(subgraphs, dict):
-        for subgraph_name, subgraph_data in subgraphs.items():
-            if isinstance(subgraph_data, dict) and "checkpoint" in subgraph_data:
-                subgraph_checkpoints.append(subgraph_data["checkpoint"])
-
-                # Recursively check if this subgraph has nested subgraphs
-                nested_checkpoints = await get_subgraph_checkpoints(subgraph_data["checkpoint"])
-                subgraph_checkpoints.extend(nested_checkpoints)
-
-    return subgraph_checkpoints
-
-
 def convert_checkpoint_tuple_to_messages(checkpoint_tuple: CheckpointTuple, recursive: bool = True) -> list[ChatResponse]:
     """
     Convert a checkpoint tuple to a list of ChatResponse messages.
@@ -49,50 +23,25 @@ def convert_checkpoint_tuple_to_messages(checkpoint_tuple: CheckpointTuple, recu
     """
     checkpoint = checkpoint_tuple.checkpoint
 
-    # Safe access to channel_values and its sub-keys
-    channel_values = checkpoint.get("channel_values", {})
-    all_messages: list[AnyMessage] = channel_values.get("all_messages", []) + channel_values.get("messages", [])
+    # Collect messages from all relevant channels
+    all_messages: list[AnyMessage] = []
 
-    # Also check for messages in other possible locations
-    node_values = checkpoint.get("node_values", {})
-    for node_name, node_data in node_values.items():
-        if isinstance(node_data, dict):
-            node_messages = node_data.get("messages", [])
-            if node_messages:
-                all_messages.extend(node_messages)
+    # Add messages from primary channels
+    all_messages: list[AnyMessage] = checkpoint["channel_values"]["all_messages"] + checkpoint["channel_values"]["messages"]
 
-    # Check for messages in thread history if it exists
-    thread_history = checkpoint.get("thread_history", [])
-    if thread_history and isinstance(thread_history, list):
-        all_messages.extend(thread_history)
+    # Ensure each message is unique using id
+    seen_ids = set()
+    unique_messages = []
+    for message in all_messages:
+        message_id = getattr(message, "id", None)
+        if message_id is not None and message_id not in seen_ids:
+            seen_ids.add(message_id)
+            unique_messages.append(message)
+        elif message_id is None:
+            # Keep messages without id as they might be unique
+            unique_messages.append(message)
 
-    # Extract messages from subgraphs in hierarchical workflows if recursive is enabled
-    if recursive:
-        # Look for subgraph states in the checkpoint - try multiple possible keys
-        subgraph_keys = ["subgraphs", "checkpoint_ns", "nested_checkpoints"]
-        for subgraph_key in subgraph_keys:
-            subgraphs = checkpoint.get(subgraph_key, {})
-            if isinstance(subgraphs, dict):
-                for subgraph_name, subgraph_data in subgraphs.items():
-                    if isinstance(subgraph_data, dict):
-                        # Try different ways to access subgraph checkpoint data
-                        subgraph_checkpoint = subgraph_data
-                        if "checkpoint" in subgraph_data:
-                            subgraph_checkpoint = subgraph_data["checkpoint"]
-
-                        # Extract messages from subgraph channel_values
-                        subgraph_channel_values = subgraph_checkpoint.get("channel_values", {})
-                        if subgraph_channel_values:
-                            subgraph_messages = subgraph_channel_values.get("all_messages", []) + subgraph_channel_values.get("messages", [])
-                            all_messages.extend(subgraph_messages)
-
-                        # Also check subgraph node_values
-                        subgraph_node_values = subgraph_checkpoint.get("node_values", {})
-                        for sub_node_name, sub_node_data in subgraph_node_values.items():
-                            if isinstance(sub_node_data, dict):
-                                sub_node_messages = sub_node_data.get("messages", [])
-                                if sub_node_messages:
-                                    all_messages.extend(sub_node_messages)
+    all_messages = unique_messages
 
     formatted_messages: list[ChatResponse] = []
 
@@ -130,6 +79,17 @@ def convert_checkpoint_tuple_to_messages(checkpoint_tuple: CheckpointTuple, recu
                         name=message.name or "",
                         tool_calls=getattr(message, "tool_calls", None),
                         content=message.content,
+                    )
+                )
+            else:
+                # Handle non-string content gracefully
+                formatted_messages.append(
+                    ChatResponse(
+                        type="ai",
+                        id=message.id if message.id is not None else str(uuid4()),
+                        name=message.name or "",
+                        tool_calls=getattr(message, "tool_calls", None),
+                        content=json.dumps(message.content) if message.content else "",
                     )
                 )
         elif isinstance(message, ToolMessage) and message.name:
@@ -209,6 +169,113 @@ async def get_checkpoint_tuples(thread_id: str) -> CheckpointTuple | None:
         checkpoint_tuple = await checkpointer.aget_tuple({"configurable": {"thread_id": thread_id}})
         return checkpoint_tuple
     except Exception:
-        # Log the error if needed
-        # logger.error(f"Error retrieving checkpoint for thread {thread_id}")
         return None
+
+
+def beautify_checkpoint_tuple(checkpoint_tuple: CheckpointTuple) -> str:
+    """
+    Beautify a CheckpointTuple for better readability.
+
+    Args:
+        checkpoint_tuple (CheckpointTuple): The checkpoint tuple to beautify.
+
+    Returns:
+        str: A formatted string representation of the checkpoint tuple.
+    """
+    if not checkpoint_tuple:
+        return "No checkpoint data available"
+
+    # Extract key information
+    config = checkpoint_tuple.config
+    checkpoint = checkpoint_tuple.checkpoint
+
+    formatted_output = []
+    formatted_output.append("=" * 80)
+    formatted_output.append("CHECKPOINT TUPLE SUMMARY")
+    formatted_output.append("=" * 80)
+
+    # Config section
+    formatted_output.append("\n📋 CONFIG:")
+    formatted_output.append(f"  Thread ID: {config.get('configurable', {}).get('thread_id', 'N/A')}")
+    formatted_output.append(f"  Checkpoint NS: {config.get('configurable', {}).get('checkpoint_ns', 'N/A')}")
+    formatted_output.append(f"  Checkpoint ID: {config.get('configurable', {}).get('checkpoint_id', 'N/A')}")
+
+    # Checkpoint metadata
+    formatted_output.append("\n⏱️  CHECKPOINT METADATA:")
+    formatted_output.append(f"  Version: {checkpoint.get('v', 'N/A')}")
+    formatted_output.append(f"  ID: {checkpoint.get('id', 'N/A')}")
+    formatted_output.append(f"  Timestamp: {checkpoint.get('ts', 'N/A')}")
+    formatted_output.append(f"  Step: {checkpoint.get('metadata', {}).get('step', 'N/A')}")
+    formatted_output.append(f"  Source: {checkpoint.get('metadata', {}).get('source', 'N/A')}")
+
+    # Channel values summary
+    channel_values = checkpoint.get("channel_values", {})
+    formatted_output.append("\n🔗 CHANNEL VALUES SUMMARY:")
+
+    # Messages count
+    all_messages = channel_values.get("all_messages", [])
+    messages = channel_values.get("messages", [])
+    history = channel_values.get("history", [])
+
+    formatted_output.append(f"  All Messages: {len(all_messages)} items")
+    formatted_output.append(f"  Messages: {len(messages)} items")
+    formatted_output.append(f"  History: {len(history)} items")
+    formatted_output.append(f"  Next Action: {channel_values.get('next', 'N/A')}")
+
+    # Show all channels with their content types and message counts
+    formatted_output.append("\n📂 ALL CHANNELS:")
+    for key, value in channel_values.items():
+        if key in ["team"]:  # Skip team as it's handled separately
+            continue
+
+        if isinstance(value, list):
+            message_count = sum(1 for item in value if isinstance(item, (HumanMessage, AIMessage, ToolMessage)))
+            if message_count > 0:
+                formatted_output.append(f"  {key}: {len(value)} items ({message_count} messages)")
+            else:
+                formatted_output.append(f"  {key}: {len(value)} items")
+        elif isinstance(value, (HumanMessage, AIMessage, ToolMessage)):
+            formatted_output.append(f"  {key}: 1 message ({type(value).__name__})")
+        else:
+            formatted_output.append(f"  {key}: {type(value).__name__}")
+
+    # Team information
+    team = channel_values.get("team")
+    if team:
+        formatted_output.append("\n👥 TEAM INFO:")
+        formatted_output.append(f"  Name: {getattr(team, 'name', 'N/A')}")
+        formatted_output.append(f"  Role: {getattr(team, 'role', 'N/A')}")
+        formatted_output.append(f"  Provider: {getattr(team, 'provider', 'N/A')}")
+        formatted_output.append(f"  Model: {getattr(team, 'model', 'N/A')}")
+
+        members = getattr(team, "members", {})
+        if members:
+            formatted_output.append(f"  Members: {len(members)} total")
+            for member_id, member in members.items():
+                tools_count = len(getattr(member, "tools", []))
+                formatted_output.append(f"    - {getattr(member, 'name', member_id)}: {tools_count} tools")
+
+    # Recent messages
+    if all_messages:
+        formatted_output.append(f"\n💬 RECENT MESSAGES ({min(3, len(all_messages))} of {len(all_messages)}):")
+        for i, msg in enumerate(all_messages[-3:], 1):
+            msg_type = type(msg).__name__
+            content = getattr(msg, "content", "")
+            if isinstance(content, list):
+                content = f"[Complex content with {len(content)} parts]"
+            elif len(str(content)) > 100:
+                content = str(content)[:100] + "..."
+
+            formatted_output.append(f"  {i}. {msg_type}: {content}")
+
+    # Pending writes
+    pending_writes = getattr(checkpoint_tuple, "pending_writes", [])
+    if pending_writes:
+        formatted_output.append(f"\n📝 PENDING WRITES: {len(pending_writes)} items")
+        for i, write in enumerate(pending_writes[:3], 1):
+            if len(write) >= 3:
+                formatted_output.append(f"  {i}. {write[1]} - {type(write[2]).__name__}")
+
+    formatted_output.append("\n" + "=" * 80)
+
+    return "\n".join(formatted_output)
