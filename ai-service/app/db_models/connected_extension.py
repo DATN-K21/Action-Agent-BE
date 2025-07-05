@@ -13,7 +13,7 @@ class ConnectedExtension(BaseEntity):
     __tablename__ = "connected_extensions"
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    extension_enum: Mapped[str] = mapped_column(nullable=False, unique=True)
+    extension_enum: Mapped[str] = mapped_column(nullable=False)
     extension_name: Mapped[str] = mapped_column(nullable=False)
     connection_status: Mapped[ConnectionStatus] = mapped_column(Enum(ConnectionStatus), nullable=False, default=ConnectionStatus.PENDING)
     connected_account_id: Mapped[str | None] = mapped_column(nullable=True)
