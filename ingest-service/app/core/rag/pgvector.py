@@ -38,7 +38,7 @@ class PGVectorWrapper:
             self.vector_store = PGVector(
                 embeddings=self.embedding_model,
                 collection_name=self.collection_name,
-                connection=env_settings.PGVECTOR_POSTGRES_URL_PATH_WITH_SCHEMA,
+                connection=f"postgresql+psycopg2://{env_settings.PGVECTOR_POSTGRES_URL_PATH_WITH_SCHEMA}",
                 use_jsonb=True,
             )
 

@@ -126,6 +126,9 @@ class Settings(BaseSettings):
     # Extension service settings
     EXTENSION_SERVICE_URL: str = "http://localhost:15300"
 
+    # RAG service settings
+    RAG_SERVICE_URL: str = "http://localhost:15500"
+
     # Protected names
     PROTECTED_NAMES: list[str] = ["user", "ignore", "error"]
 

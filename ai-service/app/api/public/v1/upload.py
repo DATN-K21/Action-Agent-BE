@@ -552,7 +552,7 @@ async def are_initiate_upload(
                     "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
                     "note": "Or use a single PUT with the entire file content if under 4MB per block",
                 },
-                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_in_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
                 "size_validation": "Server will verify upload completion when you call the process endpoint.",
                 "status_flow": "Uploading -> Ingesting -> Completed/Failed",
             },

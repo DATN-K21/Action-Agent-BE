@@ -6,6 +6,7 @@ from app.core import logging
 from app.core.enums import UploadStatus
 from app.db_models.upload import Upload
 from app.schemas.base import ResponseWrapper
+from app.schemas.upload import UpdateUploadStatusRequest
 
 logger = logging.get_logger(__name__)
 
@@ -15,11 +16,11 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 @router.patch("/{upload_id}/status", summary="Update upload status")
 async def update_upload_status(
     upload_id: str,
-    status: str,
+    request: UpdateUploadStatusRequest,
     session: SessionDep,
 ):
     """Internal API endpoint for updating upload status from ingest-service."""
-    logger.info(f"Updating upload {upload_id} status to {status}")
+    logger.info(f"Updating upload {upload_id} status to {request.status}")
 
     try:
         statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
@@ -31,14 +32,14 @@ async def update_upload_status(
 
         # Try to convert string to enum
         try:
-            upload_status = UploadStatus(status)
+            upload_status = UploadStatus(request.status)
         except ValueError:
-            return ResponseWrapper.wrap(status=400, message=f"Invalid status: {status}").to_response()
+            return ResponseWrapper.wrap(status=400, message=f"Invalid status: {request.status}").to_response()
 
         upload.status = upload_status
         await session.commit()
 
-        logger.info(f"Successfully updated upload {upload_id} status to {status}")
+        logger.info(f"Successfully updated upload {upload_id} status to {request.status}")
         return ResponseWrapper.wrap(status=200, data=None).to_response()
 
     except Exception as e:

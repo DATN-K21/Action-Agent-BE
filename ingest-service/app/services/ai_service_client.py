@@ -24,7 +24,7 @@ class AIServiceClient:
                 payload = {"status": status, "error_message": error_message}
 
                 response = await client.patch(
-                    f"{self.base_url}/internal/uploads/{upload_id}/status", json=payload, headers=self._get_headers()
+                    f"{self.base_url}/private/uploads/{upload_id}/status", json=payload, headers=self._get_headers()
                 )
 
                 if response.status_code == 200:
@@ -51,7 +51,7 @@ class AIServiceClient:
                 payload = {"status": status, "error_message": error_message}
 
                 response = client.patch(
-                    f"{self.base_url}/internal/uploads/{upload_id}/status", json=payload, headers=self._get_headers()
+                    f"{self.base_url}/private/uploads/{upload_id}/status", json=payload, headers=self._get_headers()
                 )
 
                 if response.status_code == 200:
@@ -75,7 +75,7 @@ class AIServiceClient:
         """Delete upload record via AI service internal API."""
         try:
             with httpx.Client(timeout=self.timeout) as client:
-                response = client.delete(f"{self.base_url}/internal/uploads/{upload_id}", headers=self._get_headers())
+                response = client.delete(f"{self.base_url}/private/uploads/{upload_id}", headers=self._get_headers())
 
                 if response.status_code == 200:
                     logger.info(f"Successfully deleted upload record {upload_id}")

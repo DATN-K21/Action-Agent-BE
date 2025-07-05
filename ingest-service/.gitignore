@@ -1,0 +1,48 @@
+.idea
+.vscode
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+.virtualenv/
+.Python
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.development
+.env.production
+
+# database
+data/
+
+# private
+private/
+
+# log
+app.log
+
+# cert
+localhost.pem
+localhost-key.pem

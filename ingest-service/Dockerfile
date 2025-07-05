@@ -26,4 +26,4 @@ RUN chown -R ingest:ingest /app
 USER ingest
 
 # Command to start Celery worker
-CMD ["celery", "--app=app.main", "worker", "--loglevel=info", "-Q", "document.processing,document.search,ping"]
+CMD [ "celery", "--app=app.main", "worker" ]

@@ -17,6 +17,13 @@ class UploadBase(BaseModel):
 ########### REQUEST SCHEMAS ######################
 ##################################################
 
+class UpdateUploadStatusRequest(BaseModel):
+    """Request schema for updating upload status from ingest-service."""
+
+    status: str = Field(..., description="New upload status")
+    error_message: str | None = Field(None, description="Error message if status is failed")
+
+
 class UploadInitiateRequest(BaseModel):
     """Request to initiate a new upload."""
 

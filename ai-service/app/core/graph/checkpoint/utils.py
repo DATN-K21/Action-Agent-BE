@@ -74,8 +74,8 @@ def convert_checkpoint_tuple_to_messages(
                 for doc in docs:
                     documents.append(
                         {
-                            "score": doc.metadata["score"],
-                            "content": doc.page_content,
+                            "score": getattr(doc, "metadata", {}).get("score", 0),
+                            "content": getattr(doc, "page_content", ""),
                         }
                     )
             formatted_messages.append(
