@@ -88,6 +88,23 @@ def create_unique_key(id_: str, name: str | None) -> str:
     return f"{standardized_id}-{standardized_name}"
 
 
+# Extract name
+def extract_name(full_name: str) -> str:
+    """
+    Extract name from format: uuid-name or just name
+    Examples:
+    - "7dcabe5f-a120-4c75-981b-fcb742c5a245-chatbot-assistant" -> "chatbot-assistant"
+    - "chatbot-assistant" -> "chatbot-assistant"
+    """
+    parts = full_name.split("-")
+    if len(parts) >= 6:  # UUID has 5 hyphens, so at least 6 parts
+        # Check if first part looks like UUID (8 hex chars)
+        if len(parts[0]) == 8 and all(c in "0123456789abcdefABCDEF" for c in parts[0]):
+            # Join everything after the UUID (skip first 5 parts of UUID)
+            return "-".join(parts[5:])
+    return full_name
+
+
 class ToolManager:
     def __init__(self, tools_package_path: str = DEFAULT_TOOLS_PACKAGE_PATH):
         # tool_key -> ToolInfo

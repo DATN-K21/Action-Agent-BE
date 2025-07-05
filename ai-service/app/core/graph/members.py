@@ -23,6 +23,7 @@ from app.core.state import (
     add_or_replace_messages,
 )
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
+from app.core.tools.tool_manager import extract_name
 
 
 class GraphTeamState(TypedDict):
@@ -186,9 +187,7 @@ class WorkerNode(BaseNode):
         output = agent_output["output"]
         return AIMessage(content=output)
 
-    async def work(
-            self, state: GraphTeamState, config: RunnableConfig
-    ) -> ReturnGraphTeamState:
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
         name = state["next"]
         member = state["team"].members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
@@ -209,11 +208,11 @@ class WorkerNode(BaseNode):
             chain = prompt | self.model.bind_tools(tools)
         else:
             chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
-                    prompt | self.model
+                prompt | self.model
             )
         work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
             self.tag_with_name  # type: ignore[arg-type]
-        ).bind(name=member.name)
+        ).bind(name=extract_name(member.name))
 
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
@@ -281,7 +280,7 @@ class SequentialWorkerNode(WorkerNode):
             )
         work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
             self.tag_with_name  # type: ignore[arg-type]
-        ).bind(name=member.name)
+        ).bind(name=extract_name(member.name))
 
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
@@ -411,7 +410,7 @@ class LeaderNode(BaseNode):
             # If the chain fails, return a finish state
             return {
                 "next": "FINISH",
-                "task": [AIMessage(content="Task completed due to error.", name=team.name)],
+                "task": [AIMessage(content="Task completed due to error.", name=extract_name(team.name))],
             }
 
         # Result should already be a dict from JsonOutputKeyToolsParser
@@ -425,11 +424,11 @@ class LeaderNode(BaseNode):
         if not result or result.get("next") is None or result["next"] == "FINISH":
             return {
                 "next": "FINISH",
-                "task": [AIMessage(content="Task completed.", name=team.name)],
+                "task": [AIMessage(content="Task completed.", name=extract_name(team.name))],
             }
         else:
             task_content: str = str(result.get("task", state["main_task"][0].content))
-            tasks = [AIMessage(content=task_content, name=team.name)]
+            tasks = [AIMessage(content=task_content, name=extract_name(team.name))]
             return {"next": result["next"], "task": tasks, "all_messages": tasks}  # type: ignore
 
     async def work(
@@ -524,7 +523,7 @@ class ChatBotNode(BaseNode):
             )
         work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
             self.tag_with_name  # type: ignore[arg-type]
-        ).bind(name=member.name)
+        ).bind(name=extract_name(member.name))
 
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 
@@ -585,7 +584,7 @@ class RAGBotNode(BaseNode):
             )
         work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
             self.tag_with_name  # type: ignore[arg-type]
-        ).bind(name=member.name)
+        ).bind(name=extract_name(member.name))
 
         result: AIMessage = await self._handle_messages(state, config, work_chain)
 

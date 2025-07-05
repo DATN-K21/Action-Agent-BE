@@ -28,7 +28,7 @@ async def async_validate_name_on_create(session: SessionDep, team_in: CreateTeam
         raise HTTPException(status_code=400, detail="Team name already exists")
 
 
-async def async_validate_name_on_update(session: SessionDep, team_in: UpdateTeamRequest, id_team: int) -> None:
+async def async_validate_name_on_update(session: SessionDep, team_in: UpdateTeamRequest, id_team: str) -> None:
     """Validate that team name is unique"""
     statement = select(Team).where(Team.name == team_in.name, Team.id != id_team, Team.is_deleted.is_(False))
     result = await session.execute(statement)

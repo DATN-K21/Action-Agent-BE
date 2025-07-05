@@ -14,6 +14,8 @@ from langchain_core.messages import (
 from langchain_core.runnables.schema import StreamEvent
 from pydantic import BaseModel
 
+from app.core.tools.tool_manager import extract_name
+
 
 def get_node_label(node_id: str, nodes: list[Dict[str, Any]] | None = None) -> str:
     """Get node label from node id"""
@@ -80,9 +82,7 @@ def event_to_response(
             content = message_chunk.content
         tool_calls = message_chunk.tool_calls
         if content and type:
-            return ChatResponse(
-                type=type, id=id, name=name, content=content, tool_calls=tool_calls
-            )
+            return ChatResponse(type=type, id=id, name=extract_name(name), content=content, tool_calls=tool_calls)
     elif kind == "on_chat_model_end":
         if "output" not in event.get("data", {}):
             return None
@@ -98,7 +98,7 @@ def event_to_response(
             return ChatResponse(
                 type="tool",
                 id=id,
-                name=name,
+                name=extract_name(name),
                 tool_calls=tool_calls,
             )
 
@@ -119,7 +119,7 @@ def event_to_response(
             return ChatResponse(
                 type="tool",
                 id=id,
-                name=tool_name,
+                name=extract_name(tool_name),
                 tool_output=json.dumps(tool_output.content),
                 documents=json.dumps(documents),
             )
@@ -150,7 +150,7 @@ def event_to_response(
                         return ChatResponse(
                             type="ai",
                             id=id,
-                            name=name,
+                            name=extract_name(name),
                             content=content,
                         )
             elif isinstance(output, AIMessage):
@@ -167,7 +167,7 @@ def event_to_response(
                 return ChatResponse(
                     type="ai",
                     id=id,
-                    name=name,
+                    name=extract_name(name),
                     content=content,
                 )
     elif kind == "on_chain_stream":
@@ -185,7 +185,7 @@ def event_to_response(
                         return ChatResponse(
                             type="tool",
                             id=id,
-                            name=name,
+                            name=extract_name(name),
                             tool_output=json.dumps(
                                 last_message.content,
                             ),
@@ -204,7 +204,7 @@ def event_to_response(
                 return ChatResponse(
                     type="tool",
                     id=id,
-                    name=name,
+                    name=extract_name(name),
                     content=content,
                 )
         elif node_id and node_id.startswith("crewai"):
@@ -225,7 +225,7 @@ def event_to_response(
                         return ChatResponse(
                             type="ai",
                             id=id,
-                            name=name,
+                            name=extract_name(name),
                             content=content,
                         )
             elif isinstance(output, AIMessage):
@@ -242,7 +242,7 @@ def event_to_response(
                 return ChatResponse(
                     type="ai",
                     id=id,
-                    name=name,
+                    name=extract_name(name),
                     content=content,
                 )
         elif (
@@ -257,7 +257,7 @@ def event_to_response(
                     return ChatResponse(
                         type="ai",
                         id=id,
-                        name=name,
+                        name=extract_name(name),
                         content=f"用户意图：{res}",
                     )
         elif node_id and node_id.startswith("code"):
@@ -268,7 +268,7 @@ def event_to_response(
                         return ChatResponse(
                             type="tool",
                             id=id,
-                            name=name,
+                            name=extract_name(name),
                             tool_output=json.dumps(
                                 last_message.content,
                             ),
@@ -287,7 +287,7 @@ def event_to_response(
                 return ChatResponse(
                     type="tool",
                     id=id,
-                    name=name,
+                    name=extract_name(name),
                     content=content,
                 )
 
