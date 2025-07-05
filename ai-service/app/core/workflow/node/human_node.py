@@ -112,6 +112,7 @@ class HumanNode:
                 # Reject tool call and terminate execution
                 result: List[AnyMessage] = [
                     ToolMessage(
+                        name=tool_call["name"],
                         tool_call_id=tool_call["id"],
                         content="Tool call rejected by user. Execution terminated.",
                     )
@@ -120,7 +121,7 @@ class HumanNode:
                     result.append(
                         HumanMessage(content=review_data, name="user", id=str(uuid4())),
                     )
-                result.append(AIMessage(content="Tool call has been rejected. Execution stopped."))
+                result.append(AIMessage(name=self.last_message.name, content="Tool call has been rejected. Execution stopped."))
 
                 return_state: ReturnWorkflowTeamState = {
                     "history": (self.history or []) + result,
@@ -143,6 +144,7 @@ class HumanNode:
                 sanitized_args = sanitize_tool_args(args)
 
                 updated_message = AIMessage(
+                    name=self.last_message.name,
                     content=self.last_message.content,
                     tool_calls=[
                         {
@@ -155,9 +157,7 @@ class HumanNode:
                 )
 
                 return_state: ReturnWorkflowTeamState = {
-                    "history": (self.history or []) + [updated_message],
                     "messages": [updated_message],
-                    "all_messages": (self.all_messages or []) + [updated_message],
                 }
                 next_node = self.routes.get("update", "run_tool")
                 return Command(goto=next_node, update=return_state)
