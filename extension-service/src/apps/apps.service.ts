@@ -9,15 +9,32 @@ export interface GetAllAppsParams {
 	limit?: number;
 	category?: string,
 	sortBy?: string,
-	sortOrder?: string,
+	sortOrder?: 'asc' | 'desc',
 	search?: string,
 	userId?: string, // Optional, can be used to filter apps by user
+	connected?: boolean, // Optional, can be used to filter connected apps
+}
+
+export interface UserSpecifiedApp {
+	id: string;
+	key: string;
+	name: string;
+	displayName: string;
+	description: string;
+	logo: string;
+	categories: string[];
+	tags: string[];
+	enabled: boolean;
+	noAuth: boolean;
+	connected?: boolean; // Optional, indicates if the app is connected for a specific user
 }
 
 export interface CursorPaginationResponse {
-	result: App[];
+	result: UserSpecifiedApp[];
 	meta: {
+		count: number,
 		limit: number,
+		all: number,
 		nextCursor: string | null,
 		hasMore: boolean,
 	};
@@ -28,7 +45,7 @@ export interface ConnectedAppResponse {
 	userId: string;
 	extensionEnum: string;
 	extensionName: string;
-	connectionStatus: 'PENDING' | 'CONNECTED' | 'FAILED';
+	connectionStatus: 'pending' | 'success' | 'failed';
 	connectedAccountId: string;
 	authScheme: string;
 	authValue: string;
@@ -41,18 +58,17 @@ export class AppsService {
     @InjectModel(App.name) private readonly appsModel: Model<App>,
 	) {}
 
-	async getAllApps(params: GetAllAppsParams): Promise<CursorPaginationResponse> {
+	populateFilters = (params: GetAllAppsParams, keys: string[]): FilterQuery<AppDocument> => {
 		const filter: FilterQuery<AppDocument> = {};
 		const {
 			cursor,
-			limit = 12, // Default limit if not provided
 			category,
-			sortBy,
-			sortOrder,
 			search,
+			connected,
 			userId,
 		} = params;
-    if (cursor) {
+
+		if (cursor) {
 			if (Types.ObjectId.isValid(cursor) === false) {
 				throw new BadRequestException('Invalid cursor');
       }
@@ -68,19 +84,57 @@ export class AppsService {
 				{ key: searchRegex },
 			];
 		}
+		if (userId) {
+			if (connected === true) {
+				filter.key = { $in: keys };
+			} else if (connected === false) {
+				filter.key = { $nin: keys };
+			}
+		}
+		return filter;
+	}
+
+	sanitizeApps(
+		apps: AppDocument[],
+		keys: string[] = [], 
+		userId?: string,
+	): UserSpecifiedApp[] {
+		const userSpecifiedApps: UserSpecifiedApp[] = apps.map(app => {
+			const appObj = app.toObject();
+			return {
+				id: appObj._id.toString(),
+				key: appObj.key,
+				name: appObj.name,
+				displayName: appObj.displayName,
+				description: appObj.description,
+				logo: appObj.logo,
+				categories: appObj.categories,
+				tags: appObj.tags,
+				enabled: appObj.enabled,
+				noAuth: appObj.noAuth,
+				connected: userId ? keys.includes(appObj.key) : false,
+			};
+		});
+		return userSpecifiedApps;
+	}
+
+	async getAllApps(params: GetAllAppsParams): Promise<CursorPaginationResponse> {
+		let connectedAppKeys: string[] = [];
+		const totalAppNumber = await this.appsModel.countDocuments().exec();
+		
+		const { limit, userId, sortBy, sortOrder } = params;
+		if (userId) {
+			const connectedExtensions = await this.getConnectedApps(userId);
+			connectedAppKeys = connectedExtensions.map(app => app.extensionName);
+		}
+		const filter: FilterQuery<AppDocument> = this.populateFilters(params, connectedAppKeys);
+		
 		const sortOptions: Record<string, 1 | -1> = {};
 		if (sortBy) {
 			sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 		} else {
 			sortOptions.key = 1; // Default sort by key ascending
 		}
-		if (userId) {
-			const connectedExtensions = await this.getConnectedApps(userId);
-			const connectedAppKeys = connectedExtensions.map(app => app.extensionEnum);
-			// Filter apps based on connected app keys
-			filter.key = { $in: connectedAppKeys };
-		}
-
 
 		const apps: AppDocument[] = await this.appsModel.find(filter)
 		.sort(sortOptions)
@@ -98,10 +152,13 @@ export class AppsService {
 				: null;
     }
 
+		const userSpecifiedApps = this.sanitizeApps(apps, connectedAppKeys, userId);
 		return {
-			result: apps,
+			result: userSpecifiedApps,
 			meta: {
+				count: userSpecifiedApps.length,
 				limit,
+				all: totalAppNumber,
 				nextCursor,
 				hasMore,
 			},
@@ -113,14 +170,16 @@ export class AppsService {
 			throw new BadRequestException('User ID is required');
 		}
 		try {
-			const connectedApps = await AiServiceAxiosInstance.get(`connected-extension/get-all?maxPerPage=100`, {
+			const connectedApps = await AiServiceAxiosInstance.get(`/connected-extension/get-all?maxPerPage=100`, {
 				headers: {
 					'X-User-Id': userId,
 					'X-User-Role': 'User',
 				}
 			});
 			
-			return connectedApps?.data?.connectedExtensions as ConnectedAppResponse[];
+			return connectedApps?.data?.connectedExtensions?.filter(
+				(app: ConnectedAppResponse) => app.connectionStatus === 'success'
+			) as ConnectedAppResponse[];
 		} catch (error) {
 			console.error('Error fetching connected apps:', error);
 			throw new InternalServerErrorException('Failed to fetch connected apps');
