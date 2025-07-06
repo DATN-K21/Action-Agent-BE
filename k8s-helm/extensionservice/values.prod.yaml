@@ -18,6 +18,9 @@ env:
   - name: NODE_ENV
     value: "prod"
   
+  - name: AI_SERVICE_URL
+    value: "http://aiserviceprod:15200/api/v1"
+  
   - name: DATABASE_URL
     valueFrom:
       secretKeyRef:
