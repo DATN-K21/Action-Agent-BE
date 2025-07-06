@@ -1,13 +1,13 @@
-import logging
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import and_, exists, or_, select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.celery import celery_app
+from app.core import logging
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, UploadStatus, WorkflowType
 from app.core.search_client import SearchAPIRetriever
@@ -30,7 +30,7 @@ from app.services import get_blob_storage_service
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 # =============================================================================
@@ -624,12 +624,8 @@ async def atry_search_thread(
         # Get all completed uploads linked to this thread + global uploads (uploads without any thread link)
         uploads_statement = (
             select(Upload)
-            .outerjoin(UploadThreadLink, Upload.id == UploadThreadLink.upload_id)
+            .join(UploadThreadLink, Upload.id == UploadThreadLink.upload_id)
             .where(
-                or_(
-                    UploadThreadLink.thread_id == thread_id,  # Private uploads linked to this thread
-                    ~exists(select(1).select_from(UploadThreadLink).where(UploadThreadLink.upload_id == Upload.id)),
-                ),
                 Upload.status == UploadStatus.COMPLETED,
                 Upload.is_deleted.is_(False),
             )
@@ -672,16 +668,15 @@ async def atry_search_thread(
         except Exception as e:
             logger.warning(f"Failed to search upload: {str(e)}")
 
-        response_data = {
-            "query": query,
-            "thread": thread.id,
-            "total_results_count": len(all_results),
-        }
-
         logger.info(
             f"Thread search completed for thread {thread_id} with query '{query}': {len(all_results)} total results from {len(uploads)} uploads"
         )
-        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+        return ResponseWrapper.wrap(
+            status=200,
+            data={
+                "count": len(all_results),
+            },
+        ).to_response()
 
     except Exception as e:
         logger.error(f"Error searching thread {thread_id}: {str(e)}", exc_info=True)

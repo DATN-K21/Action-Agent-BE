@@ -57,3 +57,8 @@ dependencies = [
 lint = [
     "ruff>=0.9.7",
 ]
+
+[tool.uv]
+dev-dependencies = [
+    "grpcio-tools>=1.66.0",
+]

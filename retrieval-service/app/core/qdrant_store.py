@@ -15,7 +15,6 @@ import json
 import logging
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain_core.documents import Document
@@ -53,9 +52,25 @@ async def _embed_batch(texts: Sequence[str]) -> list[list[float]]:
     return await loop.run_in_executor(_pool, lambda: _emb.embed_documents(list(texts)))
 
 
-@lru_cache(maxsize=EMB_CACHE)
+# Cache for embeddings - store the actual results, not coroutines
+_embedding_cache = {}
+
+
 async def _embed_cached(text: str) -> list[float]:
-    return (await _embed_batch([text]))[0]
+    if text in _embedding_cache:
+        return _embedding_cache[text]
+
+    result = (await _embed_batch([text]))[0]
+    _embedding_cache[text] = result
+
+    # Keep cache size reasonable
+    if len(_embedding_cache) > EMB_CACHE:
+        # Remove oldest entries
+        keys_to_remove = list(_embedding_cache.keys())[: -EMB_CACHE // 2]
+        for key in keys_to_remove:
+            del _embedding_cache[key]
+
+    return result
 
 
 # ─────────────────────────── LLM helpers ───────────────────────────────
@@ -152,15 +167,11 @@ class QdrantStore:
     ) -> list[Document]:
         vec = await _embed_cached(query)
 
-        # 1. Qdrant hybrid search — dense + sparse RRF (all server-side) :contentReference[oaicite:0]{index=0}
-        pts = await self.cli.query_points(
+        # 1. Qdrant dense vector search with filtering
+        pts = await self.cli.search(
             collection_name=self.col,
-            prefetch=[
-                rest.Prefetch(query=query, using="sparse", limit=max(32, top_k * 4)),
-                rest.Prefetch(query=vec, using="dense", limit=max(32, top_k * 4)),
-            ],
-            query=rest.FusionQuery(fusion=rest.Fusion.RRF),
-            filter=self._flt(user_id, upload_ids),
+            query_vector=vec,
+            query_filter=self._flt(user_id, upload_ids),
             limit=max(32, top_k * 4),
             with_payload=True,
         )
@@ -172,7 +183,7 @@ class QdrantStore:
 
         # 3. contextual compression (optional)
         if compress:
-            docs = await _compressor.acompress_documents(documents=docs, query=query)
+            docs = await _compressor.acompress_documents(docs, query=query)
 
         return list(docs)[:top_k]
 

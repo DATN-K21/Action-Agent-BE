@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
     # Retrieval service
-    RETRIEVAL_SERVICE_GRPC_URL: str = "retrieval-service:15601"
+    RETRIEVAL_SERVICE_GRPC_URL: str = "localhost:15600"
 
     # Security keys
     SECRET_KEY: str = "<secret-key>"
