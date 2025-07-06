@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     # Frontend service
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
+    # Retrieval service
+    RETRIEVAL_SERVICE_GRPC_URL: str = "retrieval-service:15601"
+
     # Security keys
     SECRET_KEY: str = "<secret-key>"
     MODEL_PROVIDER_ENCRYPTION_KEY: str = "<encryption-key>"

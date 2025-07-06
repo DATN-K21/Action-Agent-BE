@@ -20,6 +20,7 @@ dependencies = [
     "duckduckgo-search>=8.0.2",
     "fastapi[standard]>=0.115.8",
     "google-auth-oauthlib>=1.2.1",
+    "grpcio>=1.66.0",
     "httpx>=0.27.0",
     "inquirerpy>=0.3.4",
     "kombu>=5.5.4",

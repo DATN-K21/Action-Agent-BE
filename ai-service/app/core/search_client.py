@@ -1,69 +1,258 @@
 """
-Search client for ai-service to replace direct vector store access.
-Uses the search API to communicate with ingest-service.
+Search client for ai-service to communicate with retrieval-service via gRPC.
 """
 
 import asyncio
-from typing import Any, List
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Optional
 
+import grpc
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
 
-from app.celery import celery_app
 from app.core import logging
+from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
 
 
+class SearchError(Exception):
+    """Custom exception for search-related errors."""
+
+    pass
+
+
+class SearchTimeoutError(SearchError):
+    """Raised when search operation times out."""
+
+    pass
+
+
+class SearchConnectionError(SearchError):
+    """Raised when gRPC connection fails."""
+
+    pass
+
+
 class SearchAPIRetriever(BaseRetriever):
-    """Retriever that uses the search API instead of direct vector store access."""
+    """Enhanced retriever that uses the search API with support for multiple uploads."""
 
     user_id: str = Field(description="User ID for the search")
-    upload_id: str = Field(description="Upload ID for the search")
+    upload_id: str = Field(description="Upload ID for the search (use upload_ids for multiple)")
+    upload_ids: List[str] = Field(default_factory=list, description="List of upload IDs for batch search")
     search_type: str = Field(default="vector", description="Type of search to perform")
     top_k: int = Field(default=5, description="Number of results to return")
     score_threshold: float = Field(default=0.5, description="Minimum score threshold")
+    timeout: float = Field(default=30.0, description="gRPC call timeout in seconds")
+    max_workers: int = Field(default=5, description="Max concurrent workers for batch search")
 
-    def _get_relevant_documents(self, query: str, **kwargs: Any) -> List[Document]:
-        """Retrieve documents using the search API."""
-        try:
-            # Send search task to ingest-service
-            task = celery_app.send_task(
-                "ingest.document.search",
-                args=[self.user_id, self.upload_id, query, self.search_type, self.top_k, self.score_threshold],
-                queue="document.search",
-            )
+    def __init__(self, **data):
+        """Initialize retriever with validation."""
+        super().__init__(**data)
 
-            # Wait for result with timeout
-            result = task.get(timeout=30)
+        # If upload_ids not provided but upload_id is, use upload_id
+        if not self.upload_ids and self.upload_id:
+            self.upload_ids = [self.upload_id]
+        elif not self.upload_ids and not self.upload_id:
+            raise ValueError("Either upload_id or upload_ids must be provided")
 
-            # Convert result to Document objects
-            documents = []
-            if isinstance(result, list):
-                for item in result:
-                    if isinstance(item, dict):
-                        content = item.get("content", str(item))
-                        metadata = item.get("metadata", {})
-                        documents.append(Document(page_content=content, metadata=metadata))
-                    else:
-                        documents.append(Document(page_content=str(item)))
+        # Validate search parameters
+        if self.top_k < 1:
+            raise ValueError("top_k must be at least 1")
+        if not 0.0 <= self.score_threshold <= 1.0:
+            raise ValueError("score_threshold must be between 0.0 and 1.0")
+        if self.search_type not in ["vector", "fulltext", "hybrid"]:
+            raise ValueError("search_type must be one of: vector, fulltext, hybrid")
 
-            logger.info(f"Retrieved {len(documents)} documents for query: {query[:50]}...")
-            return documents
-
-        except Exception as e:
-            logger.error(f"Search failed: {e}")
+    def _get_relevant_documents(self, query: str, **kwargs) -> List[Document]:
+        """Retrieve documents using the retrieval service gRPC API."""
+        if not query.strip():
+            logger.warning("Empty query provided")
             return []
 
-    async def _aget_relevant_documents(self, query: str, **kwargs: Any) -> List[Document]:
-        """Async version - runs sync version in thread pool."""
+        # If single upload, use direct search
+        if len(self.upload_ids) == 1:
+            return self._search_single_upload(query, self.upload_ids[0])
+
+        # If multiple uploads, use batch search
+        return self._search_multiple_uploads(query)
+
+    def _search_single_upload(self, query: str, upload_id: str) -> List[Document]:
+        """Search a single upload via gRPC."""
+        try:
+            start_time = time.time()
+
+            # Import gRPC generated files
+            from app.grpc import retrieval_pb2, retrieval_pb2_grpc
+
+            # Create gRPC channel with timeout
+            channel_options = [
+                ("grpc.keepalive_time_ms", 30000),
+                ("grpc.keepalive_timeout_ms", 5000),
+                ("grpc.keepalive_permit_without_calls", True),
+                ("grpc.http2.max_pings_without_data", 0),
+                ("grpc.http2.min_time_between_pings_ms", 10000),
+                ("grpc.http2.min_ping_interval_without_data_ms", 300000),
+            ]
+
+            with grpc.insecure_channel(env_settings.RETRIEVAL_SERVICE_GRPC_URL, options=channel_options) as channel:
+                stub = retrieval_pb2_grpc.RetrievalServiceStub(channel)
+
+                # Create request
+                request = retrieval_pb2.SearchRequest(
+                    user_id=self.user_id,
+                    upload_id=upload_id,
+                    query=query,
+                    search_type=self.search_type,
+                    top_k=self.top_k,
+                    score_threshold=self.score_threshold,
+                )
+
+                # Make gRPC call with timeout
+                try:
+                    response = stub.Search(request, timeout=self.timeout)
+                except grpc.RpcError as e:
+                    if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                        raise SearchTimeoutError(f"Search timeout after {self.timeout}s")
+                    elif e.code() == grpc.StatusCode.UNAVAILABLE:
+                        raise SearchConnectionError(f"Retrieval service unavailable: {e.details()}")
+                    else:
+                        raise SearchError(f"gRPC error: {e.code()} - {e.details()}")
+
+            # Convert gRPC response to Document objects
+            documents = []
+            for result in response.results:
+                metadata = dict(result.metadata)
+                metadata["score"] = result.score
+                metadata["upload_id"] = upload_id  # Ensure upload_id is in metadata
+                documents.append(Document(page_content=result.content, metadata=metadata))
+
+            elapsed_time = time.time() - start_time
+            logger.info(f"Retrieved {len(documents)} documents for upload {upload_id} in {elapsed_time:.2f}s (query: {query[:50]}...)")
+            return documents
+
+        except (SearchError, SearchTimeoutError, SearchConnectionError):
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in gRPC search for upload {upload_id}: {e}", exc_info=True)
+            raise SearchError(f"Search failed for upload {upload_id}: {str(e)}")
+
+    def _search_multiple_uploads(self, query: str) -> List[Document]:
+        """Search multiple uploads concurrently and aggregate results."""
+        all_documents = []
+        failed_uploads = []
+
+        try:
+            # Use ThreadPoolExecutor for concurrent searches
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # Submit all search tasks
+                future_to_upload = {executor.submit(self._search_single_upload, query, upload_id): upload_id for upload_id in self.upload_ids}
+
+                # Collect results as they complete
+                for future in as_completed(future_to_upload):
+                    upload_id = future_to_upload[future]
+                    try:
+                        documents = future.result()
+                        all_documents.extend(documents)
+                    except Exception as e:
+                        failed_uploads.append(upload_id)
+                        logger.warning(f"Search failed for upload {upload_id}: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error in batch search: {str(e)}", exc_info=True)
+            raise SearchError(f"Batch search failed: {str(e)}")
+
+        # Log summary
+        total_uploads = len(self.upload_ids)
+        successful_uploads = total_uploads - len(failed_uploads)
+
+        logger.info(f"Batch search completed: {len(all_documents)} documents from {successful_uploads}/{total_uploads} uploads")
+
+        if failed_uploads:
+            logger.warning(f"Failed uploads: {failed_uploads}")
+
+        # Sort by score (highest first) and apply top_k limit across all results
+        all_documents.sort(key=lambda doc: doc.metadata.get("score", 0.0), reverse=True)
+        return all_documents[: self.top_k]
+
+    async def _aget_relevant_documents(self, query: str, **kwargs) -> List[Document]:
+        """Async version with proper async gRPC implementation."""
+        if not query.strip():
+            logger.warning("Empty query provided")
+            return []
+
+        # For now, run in thread pool - could be enhanced with async gRPC later
         return await asyncio.get_event_loop().run_in_executor(None, self._get_relevant_documents, query, **kwargs)
 
 
 class SearchAPIWrapper:
-    """Wrapper that provides similar interface to PGVectorWrapper but uses search API."""
+    """Enhanced wrapper that provides improved interface to retrieval service via gRPC."""
 
-    def retriever(self, user_id: str, upload_id: str, **kwargs) -> SearchAPIRetriever:
-        """Create a retriever for the given user and upload."""
-        return SearchAPIRetriever(user_id=user_id, upload_id=upload_id, **kwargs)
+    def __init__(self, timeout: float = 30.0, max_workers: int = 5):
+        """Initialize wrapper with configuration."""
+        self.timeout = timeout
+        self.max_workers = max_workers
+
+    def retriever(self, user_id: str, upload_id: Optional[str] = None, upload_ids: Optional[List[str]] = None, **kwargs) -> SearchAPIRetriever:
+        """Create a retriever for single or multiple uploads.
+
+        Args:
+            user_id: User ID for the search
+            upload_id: Single upload ID (for backward compatibility)
+            upload_ids: List of upload IDs for batch search
+            **kwargs: Additional search parameters
+
+        Returns:
+            SearchAPIRetriever instance
+        """
+        # Handle backward compatibility
+        if upload_id and not upload_ids:
+            upload_ids = [upload_id]
+        elif upload_ids and not upload_id:
+            upload_id = upload_ids[0] if upload_ids else ""
+        elif not upload_id and not upload_ids:
+            raise ValueError("Either upload_id or upload_ids must be provided")
+
+        return SearchAPIRetriever(
+            user_id=user_id, upload_id=upload_id, upload_ids=upload_ids, timeout=self.timeout, max_workers=self.max_workers, **kwargs
+        )
+
+    def search(
+        self, user_id: str, upload_ids: List[str], query: str, search_type: str = "vector", top_k: int = 5, score_threshold: float = 0.5
+    ) -> List[Document]:
+        """Direct search method for convenience.
+
+        Args:
+            user_id: User ID for the search
+            upload_ids: List of upload IDs to search
+            query: Search query
+            search_type: Type of search (vector, fulltext, hybrid)
+            top_k: Number of results to return
+            score_threshold: Minimum score threshold
+
+        Returns:
+            List of Document objects
+        """
+        retriever = self.retriever(user_id=user_id, upload_ids=upload_ids, search_type=search_type, top_k=top_k, score_threshold=score_threshold)
+        return retriever._get_relevant_documents(query)
+
+    async def asearch(
+        self, user_id: str, upload_ids: List[str], query: str, search_type: str = "vector", top_k: int = 5, score_threshold: float = 0.5
+    ) -> List[Document]:
+        """Async direct search method for convenience.
+
+        Args:
+            user_id: User ID for the search
+            upload_ids: List of upload IDs to search
+            query: Search query
+            search_type: Type of search (vector, fulltext, hybrid)
+            top_k: Number of results to return
+            score_threshold: Minimum score threshold
+
+        Returns:
+            List of Document objects
+        """
+        retriever = self.retriever(user_id=user_id, upload_ids=upload_ids, search_type=search_type, top_k=top_k, score_threshold=score_threshold)
+        return await retriever._aget_relevant_documents(query)

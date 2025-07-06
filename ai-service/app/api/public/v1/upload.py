@@ -2,15 +2,15 @@ import logging
 import uuid
 from typing import Any
 
-from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.celery import celery_app
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, UploadStatus, WorkflowType
+from app.core.search_client import SearchAPIRetriever
 from app.core.settings import env_settings
 from app.db_models.assistant import Assistant
 from app.db_models.member_upload_link import MemberUploadLink
@@ -117,62 +117,6 @@ async def adelete_upload(
         logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message=f"Failed to delete upload: {str(e)}").to_response()
-
-
-@router.post("/{upload_id}/search")
-async def asearch_upload(
-    session: SessionDep,
-    upload_id: str,
-    search_params: dict[str, Any],
-    x_user_id: str = Header(None),
-):
-    """
-    Initiate an asynchronous search within a specific upload.
-    """
-    statement = select(Upload).where(
-        Upload.id == upload_id,
-        Upload.is_deleted.is_(False),
-    )
-
-    result = await session.execute(statement)
-    upload = result.scalar_one_or_none()
-
-    if not upload:
-        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_id not in ["admin", "super admin"] and upload.user_id != x_user_id:
-        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
-
-    search_type = search_params.get("search_type", "vector")
-    if search_type not in ["vector", "fulltext", "hybrid"]:
-        return ResponseWrapper.wrap(status=400, message="Invalid search type. Supported types: vector, fulltext, hybrid").to_response()
-
-    # Enqueue search task to ingest-service
-    task = celery_app.send_task(
-        "ingest.document.search",
-        args=[
-            str(x_user_id),
-            str(upload_id),
-            search_params["query"],
-            search_type,
-            search_params.get("top_k", 5),
-            search_params.get("score_threshold", 0.5),
-        ],
-        queue="document.search",
-    )
-
-    return {"task_id": task.id}
-
-
-@router.get("/{upload_id}/search/{task_id}")
-async def aget_search_results(task_id: str):
-    """
-    Retrieve the results of an asynchronous search task.
-    """
-    task_result = AsyncResult(task_id)
-    if task_result.ready():
-        return {"status": "completed", "results": task_result.result}
-    else:
-        return {"status": "pending"}
 
 
 @router.post("/initiate", response_model=ResponseWrapper[UploadInitiateResponse])
@@ -564,6 +508,216 @@ async def are_initiate_upload(
     except Exception as e:
         logger.error(f"Error re-initiating upload: {str(e)}", exc_info=True)
         return ResponseWrapper.wrap(status=500, message=f"Failed to re-initiate upload: {str(e)}").to_response()
+
+
+@router.get("/try-search/{upload_id}", response_model=ResponseWrapper)
+async def atry_search_upload(
+    session: SessionDep,
+    upload_id: str,
+    query: str = "What is this document about?",
+    search_type: str = "vector",
+    top_k: int = 3,
+    score_threshold: float = 0.5,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Test search endpoint for a specific upload using gRPC retrieval service.
+
+    Args:
+        upload_id: ID of the upload to search
+        query: Search query string (default: "What is this document about?")
+        search_type: Type of search - vector, fulltext, or hybrid (default: vector)
+        top_k: Number of results to return (default: 3)
+        score_threshold: Minimum relevance score (default: 0.5)
+    """
+    try:
+        # Get the specific upload
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.status == UploadStatus.COMPLETED,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found or not completed").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Create search retriever
+        retriever = SearchAPIRetriever(
+            user_id=upload.user_id, upload_id=upload.id, search_type=search_type, top_k=top_k, score_threshold=score_threshold
+        )
+
+        # Perform search
+        documents = retriever._get_relevant_documents(query)
+
+        # Format results
+        search_results = []
+        for doc in documents:
+            search_results.append({"content": doc.page_content, "metadata": doc.metadata, "score": doc.metadata.get("score", 0.0)})
+
+        response_data = {
+            "query": query,
+            "search_params": {"search_type": search_type, "top_k": top_k, "score_threshold": score_threshold},
+            "upload": {"id": upload.id, "name": upload.name, "file_type": upload.file_type, "description": upload.description},
+            "results_count": len(search_results),
+            "results": search_results,
+            "grpc_status": "success",
+        }
+
+        logger.info(f"Search completed for upload {upload.id} with query '{query}': {len(search_results)} results")
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error searching upload {upload_id}: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500, message=f"Search failed: {str(e)}", data={"grpc_status": "error", "error_details": str(e)}
+        ).to_response()
+
+
+@router.get("/try-search/thread/{thread_id}", response_model=ResponseWrapper)
+async def atry_search_thread(
+    session: SessionDep,
+    thread_id: str,
+    query: str = "What is this conversation about?",
+    search_type: str = "vector",
+    top_k: int = 5,
+    score_threshold: float = 0.5,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Test search endpoint for all uploads in a thread using gRPC retrieval service.
+
+    This searches across ALL documents uploaded to a specific conversation thread,
+    which is more realistic for RAG scenarios.
+
+    Args:
+        thread_id: ID of the thread to search all uploads from
+        query: Search query string (default: "What is this conversation about?")
+        search_type: Type of search - vector, fulltext, or hybrid (default: vector)
+        top_k: Number of results to return (default: 5)
+        score_threshold: Minimum relevance score (default: 0.5)
+    """
+    try:
+        # Get the thread and verify access
+        thread_statement = select(Thread).where(
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
+
+        thread_result = await session.execute(thread_statement)
+        thread = thread_result.scalar_one_or_none()
+
+        if not thread:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        # Check permissions (thread should belong to user)
+        if x_user_role not in ["admin", "super_admin"] and thread.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Get all completed uploads linked to this thread + global uploads (uploads without any thread link)
+        uploads_statement = (
+            select(Upload)
+            .outerjoin(UploadThreadLink, Upload.id == UploadThreadLink.upload_id)
+            .where(
+                or_(
+                    UploadThreadLink.thread_id == thread_id,  # Private uploads linked to this thread
+                    ~exists(select(1).select_from(UploadThreadLink).where(UploadThreadLink.upload_id == Upload.id)),
+                ),
+                Upload.status == UploadStatus.COMPLETED,
+                Upload.is_deleted.is_(False),
+            )
+        )
+
+        uploads_result = await session.execute(uploads_statement)
+        uploads = uploads_result.scalars().all()
+
+        if not uploads:
+            return ResponseWrapper.wrap(status=404, message="No completed uploads found in this thread").to_response()
+
+        # Search across all uploads in the thread
+        all_results = []
+        upload_results = {}
+
+        for upload in uploads:
+            try:
+                # Create search retriever for this upload
+                retriever = SearchAPIRetriever(
+                    user_id=upload.user_id,
+                    upload_id=upload.id,
+                    search_type=search_type,
+                    top_k=top_k,
+                    score_threshold=score_threshold,
+                )
+
+                # Perform search
+                documents = retriever._get_relevant_documents(query)
+
+                # Format results for this upload
+                upload_search_results = []
+                for doc in documents:
+                    result = {
+                        "content": doc.page_content,
+                        "metadata": doc.metadata,
+                        "score": doc.metadata.get("score", 0.0),
+                        "upload_id": upload.id,
+                        "upload_name": upload.name,
+                        "file_type": upload.file_type,
+                    }
+                    upload_search_results.append(result)
+                    all_results.append(result)
+
+                upload_results[upload.id] = {
+                    "upload_name": upload.name,
+                    "file_type": upload.file_type,
+                    "results_count": len(upload_search_results),
+                    "results": upload_search_results,
+                }
+
+            except Exception as e:
+                logger.warning(f"Failed to search upload {upload.id}: {str(e)}")
+                upload_results[upload.id] = {
+                    "upload_name": upload.name,
+                    "file_type": upload.file_type,
+                    "results_count": 0,
+                    "results": [],
+                    "error": str(e),
+                }
+
+        # Sort all results by score (highest first)
+        all_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+
+        # Limit to top_k results across all uploads
+        top_results = all_results[:top_k]
+
+        response_data = {
+            "query": query,
+            "search_params": {"search_type": search_type, "top_k": top_k, "score_threshold": score_threshold},
+            "thread": {"id": thread.id, "name": getattr(thread, "name", "Unnamed Thread"), "uploads_searched": len(uploads)},
+            "total_results_count": len(all_results),
+            "top_results_count": len(top_results),
+            "top_results": top_results,
+            "results_by_upload": upload_results,
+            "grpc_status": "success",
+        }
+
+        logger.info(
+            f"Thread search completed for thread {thread_id} with query '{query}': {len(all_results)} total results from {len(uploads)} uploads"
+        )
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error searching thread {thread_id}: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500, message=f"Thread search failed: {str(e)}", data={"grpc_status": "error", "error_details": str(e)}
+        ).to_response()
 
 
 # =============================================================================

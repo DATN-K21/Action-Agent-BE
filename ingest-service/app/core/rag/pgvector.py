@@ -1,7 +1,6 @@
 import logging
 from collections.abc import Callable
 
-from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import PGVector
@@ -139,35 +138,3 @@ class PGVectorWrapper:
         except Exception as e:
             logger.error(f"Error counting documents: {str(e)}", exc_info=True)
             return 0
-
-    def vector_search(
-        self, user_id: str, upload_ids: list[str], query: str, top_k: int = 4, score_threshold: float = 0.0
-    ) -> list[Document]:
-        try:
-            # Create filter for metadata
-            filter_dict = {"user_id": user_id, "upload_id": {"$in": upload_ids}}
-
-            # Perform similarity search with filter
-            documents = self.vector_store.similarity_search(query=query, k=top_k, filter=filter_dict)
-
-            # Filter by score threshold if needed
-            if score_threshold > 0.0:
-                documents = [doc for doc in documents if doc.metadata.get("score", 1.0) >= score_threshold]
-
-            return documents
-
-        except Exception as e:
-            logger.error(f"Error in vector_search: {str(e)}", exc_info=True)
-            return []
-
-    def fulltext_search(
-        self, user_id: str, upload_ids: list[str], query: str, top_k: int = 4, score_threshold: float = 0.0
-    ) -> list[Document]:
-        # For now, fallback to vector search - can be enhanced with proper fulltext search
-        return self.vector_search(user_id, upload_ids, query, top_k, score_threshold)
-
-    def hybrid_search(
-        self, user_id: str, upload_ids: list[str], query: str, top_k: int = 4, score_threshold: float = 0.0
-    ) -> list[Document]:
-        # For now, fallback to vector search - can be enhanced with proper hybrid search
-        return self.vector_search(user_id, upload_ids, query, top_k, score_threshold)

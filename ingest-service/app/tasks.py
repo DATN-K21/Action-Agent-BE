@@ -50,34 +50,3 @@ def ingest_remove_upload(upload_id: str, user_id: str) -> None:
             f"remove_upload failed for upload_id: {upload_id}, user_id: {user_id}. Error: {str(e)}", exc_info=True
         )
         raise
-
-
-@celery_app.task(name="ingest.document.search")
-def ingest_perform_search(
-    user_id: str,
-    upload_id: str,
-    query: str,
-    search_type: str,
-    top_k: int,
-    score_threshold: float,
-):
-    logger.info(f"Starting search for user_id: {user_id}, upload_id: {upload_id}, query: {query[:50]}...")
-
-    try:
-        pgvector_store = PGVectorWrapper()
-
-        if search_type.lower() == "vector":
-            results = pgvector_store.vector_search(user_id, [upload_id], query, top_k, score_threshold)
-        elif search_type.lower() == "fulltext":
-            results = pgvector_store.fulltext_search(user_id, [upload_id], query, top_k, score_threshold)
-        elif search_type.lower() == "hybrid":
-            results = pgvector_store.hybrid_search(user_id, [upload_id], query, top_k, score_threshold)
-        else:
-            raise ValueError(f"Invalid search type: {search_type}")
-
-        logger.info(f"Search completed with {len(results)} results")
-        return [{"content": doc.page_content, "score": doc.metadata.get("score", 0)} for doc in results]
-
-    except Exception as e:
-        logger.error(f"Search failed: {e}", exc_info=True)
-        raise

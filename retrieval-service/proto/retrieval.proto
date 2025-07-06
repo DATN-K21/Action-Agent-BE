@@ -1,0 +1,40 @@
+syntax = "proto3";
+package retrieval;
+
+// --------------------------------------------------
+//  Retrieval service
+// --------------------------------------------------
+service RetrievalService {
+  rpc Search (SearchRequest) returns (SearchResponse);
+}
+
+// --------------------------------------------------
+//  Messages
+// --------------------------------------------------
+message SearchRequest  {
+  string user_id       = 1;
+  repeated string upload_ids = 2;
+  string query         = 3;
+
+  // leave empty → let retrieval-service choose
+  string search_type   = 4;   // "", "vector", "fulltext", "hybrid"
+
+  // free-form hint from chat-service (optional)
+  string routing_hint  = 5;
+
+  int32  top_k         = 6;
+  float  score_threshold = 7;
+}
+
+message SearchResult {
+  string content              = 1;
+  map<string,string> metadata = 2;
+  float score                 = 3;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+  int32  total                  = 2;
+  string query                  = 3;
+  string search_type            = 4;   // mode actually used
+}

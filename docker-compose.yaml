@@ -87,6 +87,7 @@ services:
       COMPOSIO_API_KEY: <COMPOSIO_API_KEY>
       COMPOSIO_REDIRECT_URL: http://localhost:15200/api/v1/callback/extension
       FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
+      RETRIEVAL_SERVICE_GRPC_URL: retrieval-service:15601
       MODEL_PROVIDER_ENCRYPTION_KEY: <MODEL_PROVIDER_ENCRYPTION_KEY>
       SECRET_KEY: <SECRET_KEY>
       PGVECTOR_COLLECTION: kb_uploads
@@ -164,6 +165,20 @@ services:
       FASTEMBED_CACHE_PATH: ./fastembed_cache
     ports:
       - "15500:15500"
+    restart: always
+
+  retrieval-service:
+    image: myaagent.azurecr.io/retrievalservicedev
+    container_name: retrieval-service
+    environment:
+      DEBUG_SERVER: False
+      LOGGING_LOG_LEVEL: INFO
+      OPENAI_API_KEY: <YOUR_OPENAI_API_KEY>
+      PGVECTOR_POSTGRES_URL_PATH: postgres:123456@ai-database:5432/ai-database
+      PGVECTOR_POSTGRES_SCHEMA: ingestservice
+      PGVECTOR_COLLECTION: kb_uploads
+    ports:
+      - "15601:15601"  # gRPC API
     restart: always
 
   flower:

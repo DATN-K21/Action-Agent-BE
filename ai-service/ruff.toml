@@ -1,3 +1,9 @@
 line-length = 150
 indent-width = 4
 
+# Exclude generated protobuf files
+exclude = [
+    "app/grpc/*_pb2.py",
+    "app/grpc/*_pb2_grpc.py",
+]
+
