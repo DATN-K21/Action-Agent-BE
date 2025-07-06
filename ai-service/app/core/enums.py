@@ -118,3 +118,24 @@ class StatisticsEntity(str, Enum):
     @classmethod
     def supported_values(cls) -> list[str]:
         return [member for member in cls]
+
+
+class SuggestionContextType(str, Enum):
+    PROMPT = "prompt"
+    TOOL_CALL = "tool_call"
+    ARGUMENT = "argument"
+    GENERAL = "general"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]
+
+
+class GenerationType(str, Enum):
+    PROMPT = "prompt"
+    TOOL_USAGE = "tool_usage"
+    GENERAL = "general"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]

@@ -327,7 +327,7 @@ async def _acreate_hierarchical_team(
 
     # Create root member (leader) for the hierarchical team
     root_member_id = str(uuid.uuid4())
-    root_member_name = create_unique_key(id_=root_member_id, name="Leader")
+    root_member_name = create_unique_key(id_=root_member_id, name="Hierarchical-Leader")
     root_member = Member(
         id=root_member_id,
         name=root_member_name,
@@ -379,7 +379,7 @@ async def _acreate_main_team(
 
     # Create root member (chatbot) for the main team
     root_member_id = str(uuid.uuid4())
-    root_member_name = create_unique_key(id_=root_member_id, name="Chatbot Unit Root")
+    root_member_name = create_unique_key(id_=root_member_id, name="Chatbot")
     root_member = Member(
         id=root_member_id,
         name=root_member_name,
@@ -423,7 +423,7 @@ async def _acreate_mcp_member_with_skills(
     """
     # Create member
     member_id = str(uuid.uuid4())
-    member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
+    member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
     member = Member(
         id=member_id,
         name=member_name,
@@ -510,7 +510,7 @@ async def _acreate_extension_member_with_skills(
     """
     # Create member
     member_id = str(uuid.uuid4())
-    member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
+    member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
     member = Member(
         id=member_id,
         name=member_name,
@@ -615,7 +615,7 @@ async def _acreate_support_team(
 
     # Create root member for the support team
     support_root_member_id = str(uuid.uuid4())
-    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type} Support Root")
+    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type}")
     support_root_member = Member(
         id=support_root_member_id,
         name=support_root_member_name,
@@ -927,7 +927,7 @@ async def _aupdate_mcp_members(
             if connected_mcp:
                 # Create member
                 member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
+                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
                 member = Member(
                     id=member_id,
                     name=member_name,
@@ -1040,7 +1040,7 @@ async def _aupdate_extension_members(
             if connected_extension:
                 # Create member
                 member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
+                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
                 member = Member(
                     id=member_id,
                     name=member_name,
@@ -1187,7 +1187,7 @@ async def _aupdate_support_units(
 
                 # Create root member for the support team
                 support_root_member_id = str(uuid.uuid4())
-                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit} Support Root")
+                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit}")
                 support_root_member = Member(
                     id=support_root_member_id,
                     name=support_root_member_name,
@@ -1925,7 +1925,7 @@ async def aupdate_advanced_assistant(
 
                 # Create root member for the hierarchical team
                 root_member_id = str(uuid.uuid4())
-                root_member_name = create_unique_key(id_=root_member_id, name="Leader")
+                root_member_name = create_unique_key(id_=root_member_id, name="Hierarchical-Leader")
                 root_member = Member(
                     id=root_member_id,
                     name=root_member_name,

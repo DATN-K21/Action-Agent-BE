@@ -190,7 +190,7 @@ class GeneralAssistantHelpers:
             Created chatbot member
         """
         chatbot_member_id = str(uuid.uuid4())
-        chatbot_member_name = create_unique_key(id_=chatbot_member_id, name="General Assistant Chatbot")
+        chatbot_member_name = create_unique_key(id_=chatbot_member_id, name="Chatbot")
         chatbot_member = Member(
             id=chatbot_member_id,
             name=chatbot_member_name,
@@ -247,7 +247,7 @@ class GeneralAssistantHelpers:
 
         # Create support team member
         support_member_id = str(uuid.uuid4())
-        support_member_name = create_unique_key(id_=support_member_id, name=f"{workflow_type.title()} Assistant")
+        support_member_name = create_unique_key(id_=support_member_id, name=f"{workflow_type.title()}")
 
         # Set backstory and role based on workflow type
         if workflow_type == WorkflowType.RAGBOT:
