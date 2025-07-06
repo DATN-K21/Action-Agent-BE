@@ -9,7 +9,7 @@ export interface GetAllAppsParams {
 	limit?: number;
 	category?: string,
 	sortBy?: string,
-	sortOrder?: string,
+	sortOrder?: 'asc' | 'desc',
 	search?: string,
 	userId?: string, // Optional, can be used to filter apps by user
 	connected?: boolean, // Optional, can be used to filter connected apps
@@ -58,22 +58,17 @@ export class AppsService {
     @InjectModel(App.name) private readonly appsModel: Model<App>,
 	) {}
 
-	async getAllApps(params: GetAllAppsParams): Promise<CursorPaginationResponse> {
+	populateFilters = (params: GetAllAppsParams, keys: string[]): FilterQuery<AppDocument> => {
 		const filter: FilterQuery<AppDocument> = {};
-		let connectedAppKeys: string[] = [];
-		const totalAppNumber = await this.appsModel.countDocuments().exec();
-
 		const {
 			cursor,
-			limit,
 			category,
-			sortBy,
-			sortOrder,
 			search,
 			connected,
 			userId,
 		} = params;
-    if (cursor) {
+
+		if (cursor) {
 			if (Types.ObjectId.isValid(cursor) === false) {
 				throw new BadRequestException('Invalid cursor');
       }
@@ -89,20 +84,56 @@ export class AppsService {
 				{ key: searchRegex },
 			];
 		}
+		if (userId) {
+			if (connected === true) {
+				filter.key = { $in: keys };
+			} else if (connected === false) {
+				filter.key = { $nin: keys };
+			}
+		}
+		return filter;
+	}
+
+	sanitizeApps(
+		apps: AppDocument[],
+		keys: string[] = [], 
+		userId?: string,
+	): UserSpecifiedApp[] {
+		const userSpecifiedApps: UserSpecifiedApp[] = apps.map(app => {
+			const appObj = app.toObject();
+			return {
+				id: appObj._id.toString(),
+				key: appObj.key,
+				name: appObj.name,
+				displayName: appObj.displayName,
+				description: appObj.description,
+				logo: appObj.logo,
+				categories: appObj.categories,
+				tags: appObj.tags,
+				enabled: appObj.enabled,
+				noAuth: appObj.noAuth,
+				connected: userId ? keys.includes(appObj.key) : false,
+			};
+		});
+		return userSpecifiedApps;
+	}
+
+	async getAllApps(params: GetAllAppsParams): Promise<CursorPaginationResponse> {
+		let connectedAppKeys: string[] = [];
+		const totalAppNumber = await this.appsModel.countDocuments().exec();
+		
+		const { limit, userId, sortBy, sortOrder } = params;
+		if (userId) {
+			const connectedExtensions = await this.getConnectedApps(userId);
+			connectedAppKeys = connectedExtensions.map(app => app.extensionName);
+		}
+		const filter: FilterQuery<AppDocument> = this.populateFilters(params, connectedAppKeys);
+		
 		const sortOptions: Record<string, 1 | -1> = {};
 		if (sortBy) {
 			sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 		} else {
 			sortOptions.key = 1; // Default sort by key ascending
-		}
-		if (userId) {
-			const connectedExtensions = await this.getConnectedApps(userId);
-			connectedAppKeys = connectedExtensions.map(app => app.extensionName);
-			if (connected === true) {
-				filter.key = { $in: connectedAppKeys };
-			} else if (connected === false) {
-				filter.key = { $nin: connectedAppKeys };
-			}
 		}
 
 		const apps: AppDocument[] = await this.appsModel.find(filter)
@@ -121,23 +152,7 @@ export class AppsService {
 				: null;
     }
 
-		const userSpecifiedApps: UserSpecifiedApp[] = apps.map(app => {
-			const appObj = app.toObject();
-			return {
-				id: appObj._id.toString(),
-				key: appObj.key,
-				name: appObj.name,
-				displayName: appObj.displayName,
-				description: appObj.description,
-				logo: appObj.logo,
-				categories: appObj.categories,
-				tags: appObj.tags,
-				enabled: appObj.enabled,
-				noAuth: appObj.noAuth,
-				connected: userId ? connectedAppKeys.includes(appObj.key) : false,
-			};
-		});
-
+		const userSpecifiedApps = this.sanitizeApps(apps, connectedAppKeys, userId);
 		return {
 			result: userSpecifiedApps,
 			meta: {
