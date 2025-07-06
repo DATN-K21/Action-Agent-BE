@@ -1,11 +1,11 @@
 import uuid
-from typing import Dict, List
+from typing import List
 
 from fastapi import APIRouter, HTTPException, status
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.core import logging
-from app.core.enums import LlmProvider
+from app.core.enums import LlmProvider, SuggestionContextType
 from app.core.settings import env_settings
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.suggestion import (
@@ -13,7 +13,6 @@ from app.schemas.suggestion import (
     ChatGenerationResponse,
     InlineSuggestionRequest,
     InlineSuggestionResponse,
-    SuggestionFeedbackRequest,
     SuggestionItem,
 )
 from app.services.llm_service import get_llm_chat_model
@@ -27,7 +26,6 @@ class SuggestionService:
     """Service for handling suggestion generation using OpenAI GPT-4.1-mini"""
 
     def __init__(self):
-        self.suggestion_cache: Dict[str, Dict] = {}  # Simple in-memory cache
         self._llm_model = None
 
     def _get_llm_model(self):
@@ -47,21 +45,15 @@ class SuggestionService:
         context = request.context
         context_id = str(uuid.uuid4())
 
-        # Cache the context for feedback
-        self.suggestion_cache[context_id] = {
-            "request": request.model_dump(),
-            "timestamp": None,  # Could add timestamp for cleanup
-        }
-
         suggestions = []
 
         try:
             # Generate suggestions based on context type
-            if context.context_type == "prompt":
+            if context.context_type == SuggestionContextType.PROMPT:
                 suggestions = await self._generate_prompt_suggestions(context, request.max_suggestions)
-            elif context.context_type == "tool_call":
+            elif context.context_type == SuggestionContextType.TOOL_CALL:
                 suggestions = await self._generate_tool_suggestions(context, request.max_suggestions)
-            elif context.context_type == "argument":
+            elif context.context_type == SuggestionContextType.ARGUMENT:
                 suggestions = await self._generate_argument_suggestions(context, request.max_suggestions)
             else:
                 suggestions = await self._generate_general_suggestions(context, request.max_suggestions)
@@ -79,12 +71,18 @@ class SuggestionService:
             if request.generation_type == "prompt":
                 generated_text = await self._generate_prompt_assistance(request)
             elif request.generation_type == "tool_usage":
-                generated_text = await self._generate_tool_usage_help(request)
+                generated_text = await self._generate_tool_usage_assistance(request)
             else:
                 generated_text = await self._generate_general_assistance(request)
 
             return ChatGenerationResponse(
-                generated_text=generated_text, generation_type=request.generation_type, metadata={"prompt_length": len(request.prompt)}
+                generated_text=generated_text,
+                generation_type=request.generation_type,
+                metadata={
+                    "prompt_length": len(request.prompt),
+                    "has_context": request.context is not None,
+                    "context_length": len(request.context) if request.context else 0,
+                },
             )
 
         except Exception as e:
@@ -102,21 +100,26 @@ class SuggestionService:
 
         # Create prompt for GPT-4.1-mini
         system_prompt = """You are an AI assistant that helps users write better prompts for action execution and tool usage. 
-        Given the current text and cursor position, suggest completions that would make the prompt more effective.
+        Given the current text and cursor position, suggest ONLY the completion text that should be added after the cursor.
         Focus on:
         - Clear action instructions
         - Proper tool usage syntax
         - Parameter specifications
         - Context clarity
         
-        Return only the suggested completions, one per line, without explanations."""
+        IMPORTANT: 
+        1. Respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
+        2. Return ONLY the text that should be added after the cursor position, NOT the full sentence.
+        3. Do NOT repeat the text before cursor in your suggestions.
+        4. One suggestion per line, without explanations."""
 
         user_prompt = f"""Current text: "{current_text}"
         Cursor position: {cursor_pos}
         Text before cursor: "{text_before}"
         Text after cursor: "{text_after}"
         
-        Suggest {max_suggestions} completions for this prompt that would improve clarity and effectiveness."""
+        Please suggest {max_suggestions} completion texts that should be added RIGHT AFTER the cursor position to improve this prompt.
+        Do NOT include the text before cursor in your suggestions - only provide the continuation text."""
 
         try:
             llm = self._get_llm_model()
@@ -134,10 +137,19 @@ class SuggestionService:
             suggestions = []
             for i, suggestion_text in enumerate(suggestion_lines[:max_suggestions]):
                 confidence = 0.9 - (i * 0.1)  # Decreasing confidence
+
+                # Ensure proper spacing between text_before and suggestion_text
+                if text_before and not text_before.endswith(" ") and not suggestion_text.startswith(" "):
+                    full_text = f"{text_before} {suggestion_text}"
+                    completion_text = f" {suggestion_text}"
+                else:
+                    full_text = f"{text_before}{suggestion_text}"
+                    completion_text = suggestion_text
+
                 suggestions.append(
                     SuggestionItem(
-                        text=f"{text_before}{suggestion_text}",
-                        completion_text=suggestion_text,
+                        text=full_text,
+                        completion_text=completion_text,
                         confidence=confidence,
                         suggestion_type="prompt",
                         metadata={"generated_by": "gpt-4.1-mini", "context_type": "prompt_completion"},
@@ -157,6 +169,7 @@ class SuggestionService:
         cursor_pos = context.cursor_position
         text_before = current_text[:cursor_pos]
 
+        # Choose templates based on detected language
         prompt_templates = [
             "Please help me to",
             "Can you assist with",
@@ -168,10 +181,19 @@ class SuggestionService:
         suggestions = []
         for i, template in enumerate(prompt_templates[:max_suggestions]):
             confidence = 0.7 - (i * 0.1)  # Lower confidence for fallback
+
+            # Ensure proper spacing between text_before and template
+            if text_before and not text_before.endswith(" ") and not template.startswith(" "):
+                full_text = f"{text_before} {template}"
+                completion_text = f" {template}"
+            else:
+                full_text = f"{text_before}{template}"
+                completion_text = template
+
             suggestions.append(
                 SuggestionItem(
-                    text=f"{text_before}{template}",
-                    completion_text=template,
+                    text=full_text,
+                    completion_text=completion_text,
                     confidence=confidence,
                     suggestion_type="prompt",
                     metadata={"template": template, "fallback": True},
@@ -186,20 +208,24 @@ class SuggestionService:
         cursor_pos = context.cursor_position
 
         system_prompt = """You are an AI assistant that helps users select and use appropriate tools for their tasks.
-        Given the current context, suggest tool usage patterns that would be most effective.
+        Given the current context, suggest ONLY the completion text that should be added after the cursor.
         Focus on:
         - Appropriate tool selection
         - Proper tool invocation syntax
         - Common tool usage patterns
         - Tool parameter suggestions
         
-        Return only the suggested tool usages, one per line, without explanations."""
+        IMPORTANT: 
+        1. Respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
+        2. Return ONLY the text that should be added after the cursor position.
+        3. One suggestion per line, without explanations."""
 
         user_prompt = f"""Current text: "{current_text}"
         Cursor position: {cursor_pos}
         Context type: tool_call
         
-        Suggest {max_suggestions} tool usage completions that would be appropriate for this context."""
+        Please suggest {max_suggestions} completion texts that should be added RIGHT AFTER the cursor position for tool usage.
+        Do NOT include the existing text in your suggestions - only provide the continuation text."""
 
         try:
             llm = self._get_llm_model()
@@ -216,10 +242,20 @@ class SuggestionService:
             suggestions = []
             for i, suggestion_text in enumerate(suggestion_lines[:max_suggestions]):
                 confidence = 0.85 - (i * 0.1)
+
+                text_before = current_text[:cursor_pos]
+                # Ensure proper spacing
+                if text_before and not text_before.endswith(" ") and not suggestion_text.startswith(" "):
+                    full_text = f"{text_before} {suggestion_text}"
+                    completion_text = f" {suggestion_text}"
+                else:
+                    full_text = f"{text_before}{suggestion_text}"
+                    completion_text = suggestion_text
+
                 suggestions.append(
                     SuggestionItem(
-                        text=suggestion_text,
-                        completion_text=suggestion_text,
+                        text=full_text,
+                        completion_text=completion_text,
                         confidence=confidence,
                         suggestion_type="tool_call",
                         metadata={"generated_by": "gpt-4.1-mini", "context_type": "tool_usage"},
@@ -234,6 +270,7 @@ class SuggestionService:
 
     async def _generate_fallback_tool_suggestions(self, context, max_suggestions: int) -> List[SuggestionItem]:
         """Fallback method for tool suggestions"""
+        # Choose suggestions based on detected language
         tool_suggestions = [
             "use the search tool to",
             "call the file manager to",
@@ -245,10 +282,20 @@ class SuggestionService:
         suggestions = []
         for i, suggestion in enumerate(tool_suggestions[:max_suggestions]):
             confidence = 0.7 - (i * 0.1)  # Lower confidence for fallback
+
+            text_before = context.current_text[: context.cursor_position]
+            # Ensure proper spacing
+            if text_before and not text_before.endswith(" ") and not suggestion.startswith(" "):
+                full_text = f"{text_before} {suggestion}"
+                completion_text = f" {suggestion}"
+            else:
+                full_text = f"{text_before}{suggestion}"
+                completion_text = suggestion
+
             suggestions.append(
                 SuggestionItem(
-                    text=suggestion,
-                    completion_text=suggestion,
+                    text=full_text,
+                    completion_text=completion_text,
                     confidence=confidence,
                     suggestion_type="tool_call",
                     metadata={"tool_category": "general", "fallback": True},
@@ -270,13 +317,17 @@ class SuggestionService:
         - Valid parameter values
         - JSON structure when needed
         
-        Return only the suggested argument values, one per line, without explanations."""
+        IMPORTANT: 
+        1. Respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
+        2. Return ONLY the argument values that should be added after the cursor position.
+        3. One suggestion per line, without explanations."""
 
         user_prompt = f"""Current text: "{current_text}"
         Cursor position: {cursor_pos}
         Context type: argument
         
-        Suggest {max_suggestions} argument values that would be appropriate for this context."""
+        Please suggest {max_suggestions} argument values that should be added RIGHT AFTER the cursor position.
+        Do NOT include the existing text in your suggestions - only provide the argument values."""
 
         try:
             llm = self._get_llm_model()
@@ -293,10 +344,21 @@ class SuggestionService:
             suggestions = []
             for i, suggestion_text in enumerate(suggestion_lines[:max_suggestions]):
                 confidence = 0.8 - (i * 0.1)
+
+                text_before = current_text[:cursor_pos]
+                # For arguments, usually no space is needed (e.g., function(arg) or "key":value)
+                # But check if space is needed based on context
+                if text_before and not text_before.endswith((" ", "(", ":", "[", "{")) and not suggestion_text.startswith((" ", ")", ":", "]", "}")):
+                    full_text = f"{text_before} {suggestion_text}"
+                    completion_text = f" {suggestion_text}"
+                else:
+                    full_text = f"{text_before}{suggestion_text}"
+                    completion_text = suggestion_text
+
                 suggestions.append(
                     SuggestionItem(
-                        text=suggestion_text,
-                        completion_text=suggestion_text,
+                        text=full_text,
+                        completion_text=completion_text,
                         confidence=confidence,
                         suggestion_type="argument",
                         metadata={"generated_by": "gpt-4.1-mini", "context_type": "argument_value"},
@@ -322,10 +384,20 @@ class SuggestionService:
         suggestions = []
         for i, suggestion in enumerate(arg_suggestions[:max_suggestions]):
             confidence = 0.6 - (i * 0.1)  # Lower confidence for fallback
+
+            text_before = context.current_text[: context.cursor_position]
+            # For arguments, check if we need spacing
+            if text_before and not text_before.endswith((" ", "(", ":", "[", "{")) and not suggestion.startswith((" ", ")", ":", "]", "}")):
+                full_text = f"{text_before} {suggestion}"
+                completion_text = f" {suggestion}"
+            else:
+                full_text = f"{text_before}{suggestion}"
+                completion_text = suggestion
+
             suggestions.append(
                 SuggestionItem(
-                    text=suggestion,
-                    completion_text=suggestion,
+                    text=full_text,
+                    completion_text=completion_text,
                     confidence=confidence,
                     suggestion_type="argument",
                     metadata={"argument_type": "auto_detected", "fallback": True},
@@ -347,13 +419,17 @@ class SuggestionService:
         - Actionable suggestions
         - Clear and concise text
         
-        Return only the suggested completions, one per line, without explanations."""
+        IMPORTANT: 
+        1. Respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
+        2. Return ONLY the text that should be added after the cursor position.
+        3. One suggestion per line, without explanations."""
 
         user_prompt = f"""Current text: "{current_text}"
         Cursor position: {cursor_pos}
         Context type: general
         
-        Suggest {max_suggestions} general completions that would be appropriate for this context."""
+        Please suggest {max_suggestions} completion texts that should be added RIGHT AFTER the cursor position.
+        Do NOT include the existing text in your suggestions - only provide the continuation text."""
 
         try:
             llm = self._get_llm_model()
@@ -370,10 +446,20 @@ class SuggestionService:
             suggestions = []
             for i, suggestion_text in enumerate(suggestion_lines[:max_suggestions]):
                 confidence = 0.7 - (i * 0.1)
+
+                text_before = current_text[:cursor_pos]
+                # Ensure proper spacing
+                if text_before and not text_before.endswith(" ") and not suggestion_text.startswith(" "):
+                    full_text = f"{text_before} {suggestion_text}"
+                    completion_text = f" {suggestion_text}"
+                else:
+                    full_text = f"{text_before}{suggestion_text}"
+                    completion_text = suggestion_text
+
                 suggestions.append(
                     SuggestionItem(
-                        text=suggestion_text,
-                        completion_text=suggestion_text,
+                        text=full_text,
+                        completion_text=completion_text,
                         confidence=confidence,
                         suggestion_type="general",
                         metadata={"generated_by": "gpt-4.1-mini", "context_type": "general_completion"},
@@ -399,10 +485,20 @@ class SuggestionService:
         suggestions = []
         for i, suggestion in enumerate(general_suggestions[:max_suggestions]):
             confidence = 0.5 - (i * 0.1)  # Lower confidence for fallback
+
+            text_before = context.current_text[: context.cursor_position]
+            # Ensure proper spacing
+            if text_before and not text_before.endswith(" ") and not suggestion.startswith(" "):
+                full_text = f"{text_before} {suggestion}"
+                completion_text = f" {suggestion}"
+            else:
+                full_text = f"{text_before}{suggestion}"
+                completion_text = suggestion
+
             suggestions.append(
                 SuggestionItem(
-                    text=suggestion,
-                    completion_text=suggestion,
+                    text=full_text,
+                    completion_text=completion_text,
                     confidence=confidence,
                     suggestion_type="general",
                     metadata={"fallback": True},
@@ -422,10 +518,16 @@ class SuggestionService:
         - Expected outcome specification
         - Tool integration suggestions
         
+        IMPORTANT: Always respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English. Match the user's language exactly.
         Be concise but comprehensive in your response."""
 
-        user_prompt = f"""User's current prompt: "{request.prompt}"
-        
+        # Build user prompt with context if provided
+        user_prompt = f"""User's current prompt: "{request.prompt}" """
+        if request.context:
+            user_prompt += f"""
+        Additional context: "{request.context}" """
+
+        user_prompt += """
         Please provide specific suggestions on how to improve this prompt for better action execution and tool usage."""
 
         try:
@@ -443,7 +545,7 @@ class SuggestionService:
             logger.error(f"Error generating prompt assistance with GPT-4.1-mini: {str(e)}")
             return "Here are some suggestions for your prompt: Consider being more specific about the action you want to perform, include relevant context, and specify the expected outcome."
 
-    async def _generate_tool_usage_help(self, request: ChatGenerationRequest) -> str:
+    async def _generate_tool_usage_assistance(self, request: ChatGenerationRequest) -> str:
         """Generate help for tool usage using GPT-4.1-mini"""
         system_prompt = """You are an AI assistant specialized in helping users with tool selection and usage.
         Provide practical guidance on choosing the right tools and using them effectively.
@@ -454,10 +556,16 @@ class SuggestionService:
         - Error handling
         - Best practices
         
+        IMPORTANT: Always respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English. Match the user's language exactly.
         Be specific and actionable in your advice."""
 
-        user_prompt = f"""User's request: "{request.prompt}"
-        
+        # Build user prompt with context if provided
+        user_prompt = f"""User's request: "{request.prompt}" """
+        if request.context:
+            user_prompt += f"""
+        Additional context: "{request.context}" """
+
+        user_prompt += """
         Please provide guidance on tool selection and usage for this specific request."""
 
         try:
@@ -485,10 +593,16 @@ class SuggestionService:
         - Suggesting best practices
         - Offering practical solutions
         
+        IMPORTANT: Always respond in the same language as the user's input. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English. Match the user's language exactly.
         Be helpful, clear, and concise in your response."""
 
-        user_prompt = f"""User's request: "{request.prompt}"
-        
+        # Build user prompt with context if provided
+        user_prompt = f"""User's request: "{request.prompt}" """
+        if request.context:
+            user_prompt += f"""
+        Additional context: "{request.context}" """
+
+        user_prompt += """
         Please provide helpful assistance for this request."""
 
         try:
@@ -547,37 +661,6 @@ async def generate_chat_response(request: ChatGenerationRequest) -> ResponseWrap
     except Exception as e:
         logger.error(f"Error in generate_chat_response: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate response: {str(e)}")
-
-
-@router.post(
-    "/feedback",
-    response_model=ResponseWrapper[MessageResponse],
-    summary="Provide suggestion feedback",
-    description="Submit feedback on suggestion quality and user actions",
-)
-async def submit_suggestion_feedback(request: SuggestionFeedbackRequest) -> ResponseWrapper[MessageResponse]:
-    """
-    Submit feedback on suggestions to improve future recommendations.
-    This helps the system learn from user interactions.
-    """
-    try:
-        # Store feedback for learning/improvement
-        # In a real implementation, this would be saved to database
-        # and used to improve suggestion quality
-
-        context_data = suggestion_service.suggestion_cache.get(request.context_id)
-        if not context_data:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion context not found")
-
-        logger.info(f"Received feedback for context {request.context_id}: {request.feedback_type}")
-
-        return ResponseWrapper(status=200, message="Feedback submitted successfully", data=MessageResponse(message="Thank you for your feedback!"))
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in submit_suggestion_feedback: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to submit feedback: {str(e)}")
 
 
 @router.get(

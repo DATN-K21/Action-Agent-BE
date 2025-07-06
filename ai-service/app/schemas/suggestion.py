@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
+from app.core.enums import GenerationType, SuggestionContextType
 from app.schemas.base import BaseRequest, BaseResponse
 
 
@@ -10,7 +11,7 @@ class SuggestionContext(BaseRequest):
 
     current_text: str = Field(..., description="Current text content")
     cursor_position: int = Field(..., description="Current cursor position in the text")
-    context_type: str = Field(..., description="Type of context (prompt, tool_call, argument, etc.)")
+    context_type: SuggestionContextType = Field(..., description="Type of context (prompt, tool_call, argument, etc.)")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context metadata")
 
 
@@ -19,7 +20,6 @@ class InlineSuggestionRequest(BaseRequest):
 
     context: SuggestionContext = Field(..., description="Context for generating suggestions")
     max_suggestions: int = Field(3, ge=1, le=10, description="Maximum number of suggestions to return")
-    suggestion_type: str = Field("auto", description="Type of suggestion: auto, prompt, tool, argument")
 
 
 class SuggestionItem(BaseResponse):
@@ -43,8 +43,8 @@ class ChatGenerationRequest(BaseRequest):
     """Request for chat-based text generation"""
 
     prompt: str = Field(..., description="User prompt for text generation")
-    context: Optional[SuggestionContext] = Field(None, description="Optional context information")
-    generation_type: str = Field("general", description="Type of generation: general, prompt, tool_usage, etc.")
+    context: Optional[str] = Field(None, description="Optional context information as a simple string")
+    generation_type: GenerationType = Field(GenerationType.GENERAL, description="Type of generation: general, prompt, tool_usage, etc.")
     max_length: int = Field(500, ge=1, le=2000, description="Maximum length of generated text")
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="Generation temperature")
 
@@ -53,7 +53,7 @@ class ChatGenerationResponse(BaseResponse):
     """Response containing generated text"""
 
     generated_text: str = Field(..., description="Generated text content")
-    generation_type: str = Field(..., description="Type of generation performed")
+    generation_type: GenerationType = Field(..., description="Type of generation performed")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional generation metadata")
 
 
