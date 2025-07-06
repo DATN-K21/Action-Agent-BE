@@ -222,6 +222,20 @@ services:
       - mongo-database:/data/db
     restart: always
 
+    qdrant-database:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-database
+    environment:
+      QDRANT_LOG_LEVEL: info
+      QDRANT_ENABLE_AUTH: "false"
+      # QDRANT_API_KEY: <YOUR_QDRANT_API_KEY>
+    ports:
+      - "6333:6333"
+      - "6334:6334"  # gRPC API
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: always
+
   ####################################################
   ############### Extensions #########################
   ####################################################
@@ -288,3 +302,4 @@ volumes:
   mongo-database:
   rabbitmq:
   redis:
+  qdrant-data:

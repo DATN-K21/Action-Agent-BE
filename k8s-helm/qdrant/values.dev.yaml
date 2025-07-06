@@ -1,0 +1,32 @@
+# Default values for qdrant
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "qdrantdev"
+fullnameOverride: "qdrantdev"
+
+image:
+  repository: "qdrant/qdrant"
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 6333
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 2Gi
+
+qdrant:
+  enableAuth: false
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
