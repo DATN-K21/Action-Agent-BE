@@ -1,9 +1,15 @@
 """
-Minimal async gRPC server using QdrantStore.
+retrieval-service  –  minimal async gRPC server with Qdrant backend
+───────────────────────────────────────────────────────────────────
+• RPC     : RetrievalService/Search
+• Health  : grpc.health.v1.Health/Check
 """
+
+from __future__ import annotations
 
 import asyncio
 import re
+import signal
 from collections.abc import Iterable
 
 from grpc import aio
@@ -14,11 +20,12 @@ from app.core.qdrant_store import QdrantStore
 from app.core.settings import env_settings
 from generated import retrieval_pb2, retrieval_pb2_grpc
 
+# ─────────── setup logging & store ───────────────────────────────────────────
 logging.configure_logging()
 log = logging.get_logger(__name__)
 _store = QdrantStore()
 
-# ---------------- routing heuristic ------------------------------------------
+# ─────────── simple routing heuristic ───────────────────────────────────────
 _KEYWORDY = re.compile(r"\b(sec|§|error)\b|\d{4,}", re.I)
 
 
@@ -30,7 +37,7 @@ def _decide(query: str) -> str:
     return "vector"
 
 
-# ---------------- gRPC servicer ----------------------------------------------
+# ─────────── gRPC servicer ───────────────────────────────────────────────────
 class RetrievalServicer(retrieval_pb2_grpc.RetrievalServiceServicer):
     async def Search(self, request, context):
         mode = request.search_type or _decide(request.query)
@@ -43,15 +50,15 @@ class RetrievalServicer(retrieval_pb2_grpc.RetrievalServiceServicer):
             mode,
         )
 
-        results: Iterable[retrieval_pb2.SearchResult] = (  # type: ignore
-            retrieval_pb2.SearchResult(  # type: ignore
-                content=d.page_content,
-                metadata={k: str(v) for k, v in d.metadata.items()},
-                score=float(d.metadata.get("score", 0.0)),
+        results: Iterable[retrieval_pb2.SearchResult] = (
+            retrieval_pb2.SearchResult(
+                content=d["content"],
+                metadata={k: str(v) for k, v in d["metadata"].items()},
+                score=float(d["metadata"].get("score", 0.0)),
             )
             for d in docs
         )
-        return retrieval_pb2.SearchResponse(  # type: ignore
+        return retrieval_pb2.SearchResponse(
             results=list(results),
             total=len(docs),
             query=request.query,
@@ -59,11 +66,12 @@ class RetrievalServicer(retrieval_pb2_grpc.RetrievalServiceServicer):
         )
 
 
-# ---------------- server bootstrap -------------------------------------------
-async def serve():
+# ─────────── server bootstrap ────────────────────────────────────────────────
+async def serve() -> None:
     server = aio.server()
     retrieval_pb2_grpc.add_RetrievalServiceServicer_to_server(RetrievalServicer(), server)
 
+    # health
     hs = health.HealthServicer()
     hs.set("", health_pb2.HealthCheckResponse.SERVING)
     hs.set("retrieval.RetrievalService", health_pb2.HealthCheckResponse.SERVING)
@@ -73,12 +81,17 @@ async def serve():
     server.add_insecure_port(addr)
     log.info("gRPC listening at %s", addr)
 
-    try:
-        await server.start()
-        await server.wait_for_termination()
-    finally:
-        await _store.close()
-        log.info("Service stopped")
+    # graceful shutdown on SIGINT / SIGTERM
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop_event.set)
+
+    await server.start()
+    await stop_event.wait()  # block until signal arrives
+    await server.stop(grace=5)  # allow in-flight RPCs
+    await _store.close()
+    log.info("Service stopped")
 
 
 if __name__ == "__main__":

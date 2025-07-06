@@ -3,7 +3,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import retrieval_pb2 as retrieval__pb2
+from . import retrieval_pb2 as retrieval__pb2
 
 GRPC_GENERATED_VERSION = '1.73.1'
 GRPC_VERSION = grpc.__version__
