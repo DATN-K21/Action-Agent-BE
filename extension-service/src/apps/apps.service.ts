@@ -22,6 +22,7 @@ export interface UserSpecifiedApp {
 	displayName: string;
 	description: string;
 	logo: string;
+	actionsCount: number;
 	categories: string[];
 	tags: string[];
 	enabled: boolean;
@@ -72,7 +73,7 @@ export class AppsService {
 			if (Types.ObjectId.isValid(cursor) === false) {
 				throw new BadRequestException('Invalid cursor');
       }
-      filter._id = { $ne: null, $gt: new Types.ObjectId(cursor) };
+      filter._id = { $gt: new Types.ObjectId(cursor) };
     }
 		if (category) {
 			filter.categories = { $in: [category] };
@@ -108,12 +109,13 @@ export class AppsService {
 				displayName: appObj.displayName,
 				description: appObj.description,
 				logo: appObj.logo,
+				actionsCount: appObj.actionsCount || 0,
 				categories: appObj.categories,
 				tags: appObj.tags,
 				enabled: appObj.enabled,
 				noAuth: appObj.noAuth,
 				connected: userId ? keys.includes(appObj.key) : false,
-			};
+			} as UserSpecifiedApp;
 		});
 		return userSpecifiedApps;
 	}
@@ -132,9 +134,8 @@ export class AppsService {
 		const sortOptions: Record<string, 1 | -1> = {};
 		if (sortBy) {
 			sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-		} else {
-			sortOptions.key = 1; // Default sort by key ascending
 		}
+		sortOptions._id = 1;
 
 		const apps: AppDocument[] = await this.appsModel.find(filter)
 		.sort(sortOptions)
