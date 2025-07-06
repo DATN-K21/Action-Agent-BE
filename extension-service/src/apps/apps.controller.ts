@@ -1,5 +1,5 @@
 import { AppsService } from '@/apps/apps.service';
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 
 @Controller('apps')
 export class AppsController {
@@ -15,33 +15,34 @@ export class AppsController {
 		@Query('sortOrder') sortOrder?: 'asc' | 'desc', // Optional, can be used for sorting order
 		@Query('search') search?: string, // Optional, can be used for searching apps by name or key
 		@Query('limit') limit?: number, // Optional, can be used to set a custom limit
-		@Query('userId') userId?: string, // Optional, can be used to filter apps by user
+		@Query('connected') connected?: string, // Optional, can be used to filter connected apps
+		@Headers('X-User-Id') userId?: string, // Optional, can be used to filter apps by user ID
 ): Promise<{ status: string; message: string; data?: any; metadata?: any }> {
-		try {
-			const { result, meta } = await this.appsService.getAllApps({
-				cursor: cursor,
-				limit: +limit, // Default limit, can be adjusted or made dynamic
-				category: category, // Optional category filter
-				sortBy: sortBy, // Optional sorting field
-				sortOrder: sortOrder, // Optional sorting order
-				search: search, // Optional search term
-				userId: userId, // Optional user ID for filtering apps
-			});
-			return {
-				status: 'success',
-				message: 'Apps fetched successfully.',
-				data: result,
-				metadata: meta,
-			}
-		} catch (error) {
-			console.error('Error fetching apps:', error);
-			return {
-				status: 'error',
-				message: `Failed to fetch apps: ${error.message}`,
-			}
+	try {
+		const { result, meta } = await this.appsService.getAllApps({
+			cursor: cursor,
+			limit: limit ? parseInt(limit.toString(), 10) : 24, // Default limit, can be adjusted or made dynamic
+			category: category, // Optional category filter
+			sortBy: sortBy, // Optional sorting field
+			sortOrder: sortOrder, // Optional sorting order
+			search: search, // Optional search term
+			userId: userId, // Optional user ID for filtering apps
+			connected: connected === "true" ? true : false, // Optional filter for connected apps
+		});
+		return {
+			status: 'success',
+			message: 'Apps fetched successfully.',
+			data: result,
+			metadata: meta,
 		}
-
+	} catch (error) {
+		console.error('Error fetching apps:', error);
+		return {
+			status: 'error',
+			message: `Failed to fetch apps: ${error.message}`,
+		}
 	}
+}
 
 	// Get detail of a specific app by key
 	@Get(':key')
