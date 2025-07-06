@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # OpenAI for embeddings
     OPENAI_API_KEY: str = "<YOUR-API-KEY>"
+    OPENAI_EMBED_MODEL: str = "text-embedding-3-small"
+    OPENAI_LLM_MODEL: str = "gpt-4o-mini"
 
     # PGVector settings
     QDRANT_URL: str = "http://localhost:6333"

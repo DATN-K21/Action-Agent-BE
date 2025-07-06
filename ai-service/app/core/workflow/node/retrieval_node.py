@@ -58,7 +58,7 @@ class RetrievalNode:
         return return_state
 
     def _retrieval_work(self, qry):
-        retriever = self.search_client.retriever(self.user_id, self.kb_id)
+        retriever = self.search_client.retriever(self.user_id, [self.kb_id])
 
         retriever_tool = create_retriever_tool_custom_modified(retriever)
 

@@ -7,8 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.73.1",
     "grpcio-health-checking>=1.73.1",
+    "langchain>=0.3.26",
     "langchain-openai>=0.3.27",
-    "langchain-qdrant>=0.2.0",
     "protobuf>=6.31.1",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",

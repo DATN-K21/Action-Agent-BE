@@ -586,7 +586,6 @@ async def atry_search_thread(
     session: SessionDep,
     thread_id: str,
     query: str = "What is this conversation about?",
-    search_type: str = "vector",
     top_k: int = 5,
     score_threshold: float = 0.5,
     x_user_id: str = Header(None),
@@ -642,70 +641,41 @@ async def atry_search_thread(
         if not uploads:
             return ResponseWrapper.wrap(status=404, message="No completed uploads found in this thread").to_response()
 
+        logger.info(f"Found completed uploads in thread {thread_id} for search. List of uploads: {[upload.id for upload in uploads]}")
+
         # Search across all uploads in the thread
         all_results = []
-        upload_results = {}
 
-        for upload in uploads:
-            try:
-                # Create search retriever for this upload
-                retriever = SearchAPIRetriever(
-                    user_id=upload.user_id,
-                    upload_id=upload.id,
-                    search_type=search_type,
-                    top_k=top_k,
-                    score_threshold=score_threshold,
-                )
+        try:
+            # Create search retriever for this upload
+            retriever = SearchAPIRetriever(
+                user_id=x_user_id,
+                upload_ids=[upload.id for upload in uploads],
+                top_k=top_k,
+                score_threshold=score_threshold,
+            )
 
-                # Perform search
-                documents = retriever._get_relevant_documents(query)
+            # Perform search
+            documents = await retriever._aget_relevant_documents(query)
 
-                # Format results for this upload
-                upload_search_results = []
-                for doc in documents:
-                    result = {
-                        "content": doc.page_content,
-                        "metadata": doc.metadata,
-                        "score": doc.metadata.get("score", 0.0),
-                        "upload_id": upload.id,
-                        "upload_name": upload.name,
-                        "file_type": upload.file_type,
-                    }
-                    upload_search_results.append(result)
-                    all_results.append(result)
-
-                upload_results[upload.id] = {
-                    "upload_name": upload.name,
-                    "file_type": upload.file_type,
-                    "results_count": len(upload_search_results),
-                    "results": upload_search_results,
+            # Format results
+            upload_search_results = []
+            for doc in documents:
+                result = {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": doc.metadata.get("score", 0.0),
                 }
+                upload_search_results.append(result)
+                all_results.append(result)
 
-            except Exception as e:
-                logger.warning(f"Failed to search upload {upload.id}: {str(e)}")
-                upload_results[upload.id] = {
-                    "upload_name": upload.name,
-                    "file_type": upload.file_type,
-                    "results_count": 0,
-                    "results": [],
-                    "error": str(e),
-                }
-
-        # Sort all results by score (highest first)
-        all_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
-
-        # Limit to top_k results across all uploads
-        top_results = all_results[:top_k]
+        except Exception as e:
+            logger.warning(f"Failed to search upload: {str(e)}")
 
         response_data = {
             "query": query,
-            "search_params": {"search_type": search_type, "top_k": top_k, "score_threshold": score_threshold},
-            "thread": {"id": thread.id, "name": getattr(thread, "name", "Unnamed Thread"), "uploads_searched": len(uploads)},
+            "thread": thread.id,
             "total_results_count": len(all_results),
-            "top_results_count": len(top_results),
-            "top_results": top_results,
-            "results_by_upload": upload_results,
-            "grpc_status": "success",
         }
 
         logger.info(

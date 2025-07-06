@@ -1,14 +1,12 @@
-"""
-retrieval-service  –  minimal async gRPC server with Qdrant backend
-───────────────────────────────────────────────────────────────────
-• RPC     : RetrievalService/Search
-• Health  : grpc.health.v1.Health/Check
-"""
+# main.py  –  minimal async gRPC retrieval-service
+# ────────────────────────────────────────────────
+# RPC    : retrieval.RetrievalService/Search
+# Health : grpc.health.v1.Health/Check
+# ────────────────────────────────────────────────
 
 from __future__ import annotations
 
 import asyncio
-import re
 import signal
 from collections.abc import Iterable
 
@@ -20,58 +18,51 @@ from app.core.qdrant_store import QdrantStore
 from app.core.settings import env_settings
 from generated import retrieval_pb2, retrieval_pb2_grpc
 
-# ─────────── setup logging & store ───────────────────────────────────────────
+# ─────────── log & misc ─────────────────────────
 logging.configure_logging()
-log = logging.get_logger(__name__)
-_store = QdrantStore()
-
-# ─────────── simple routing heuristic ───────────────────────────────────────
-_KEYWORDY = re.compile(r"\b(sec|§|error)\b|\d{4,}", re.I)
+logger = logging.get_logger(__name__)
 
 
-def _decide(query: str) -> str:
-    if _KEYWORDY.search(query):
-        return "fulltext"
-    if len(query.split()) <= 3:
-        return "hybrid"
-    return "vector"
-
-
-# ─────────── gRPC servicer ───────────────────────────────────────────────────
+# ─────────── gRPC servicer ──────────────────────
 class RetrievalServicer(retrieval_pb2_grpc.RetrievalServiceServicer):
+    def __init__(self, store: QdrantStore):
+        self.store = store  # inject retriever instance
+
     async def Search(self, request, context):
-        mode = request.search_type or _decide(request.query)
-        docs = await _store.search(
-            request.user_id,
-            list(request.upload_ids),
-            request.query,
-            max(1, request.top_k or 4),
-            request.score_threshold,
-            mode,
+        # 1. call QdrantStore.retrieve -----------------------------
+        docs = await self.store.retrieve(
+            query=request.query,
+            user_id=request.user_id,
+            upload_ids=list(request.upload_ids),
+            top_k=max(1, request.top_k or 4),
+            rerank=True,  # or False if you want pure DB scores
+            compress=True,
         )
 
-        results: Iterable[retrieval_pb2.SearchResult] = (
-            retrieval_pb2.SearchResult(
-                content=d["content"],
-                metadata={k: str(v) for k, v in d["metadata"].items()},
-                score=float(d["metadata"].get("score", 0.0)),
+        # 2. marshal docs → protobuf -------------------------------
+        results: Iterable[retrieval_pb2.SearchResult] = (  # type: ignore
+            retrieval_pb2.SearchResult(  # type: ignore
+                content=d.page_content,
+                metadata={k: str(v) for k, v in d.metadata.items()},
+                score=float(d.metadata.get("score", 0.0)),  # may be missing
             )
             for d in docs
         )
-        return retrieval_pb2.SearchResponse(
+
+        return retrieval_pb2.SearchResponse(  # type: ignore
             results=list(results),
             total=len(docs),
             query=request.query,
-            search_type=mode,
         )
 
 
-# ─────────── server bootstrap ────────────────────────────────────────────────
+# ─────────── server bootstrap / graceful shutdown ────────────────────
 async def serve() -> None:
+    store = QdrantStore()  # create once
     server = aio.server()
-    retrieval_pb2_grpc.add_RetrievalServiceServicer_to_server(RetrievalServicer(), server)
+    retrieval_pb2_grpc.add_RetrievalServiceServicer_to_server(RetrievalServicer(store), server)
 
-    # health
+    # Health service
     hs = health.HealthServicer()
     hs.set("", health_pb2.HealthCheckResponse.SERVING)
     hs.set("retrieval.RetrievalService", health_pb2.HealthCheckResponse.SERVING)
@@ -79,19 +70,19 @@ async def serve() -> None:
 
     addr = f"0.0.0.0:{env_settings.GRPC_PORT}"
     server.add_insecure_port(addr)
-    log.info("gRPC listening at %s", addr)
+    logger.info("gRPC listening at %s", addr)
 
-    # graceful shutdown on SIGINT / SIGTERM
+    # graceful-shutdown on SIGINT/SIGTERM
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop_event.set)
 
     await server.start()
-    await stop_event.wait()  # block until signal arrives
-    await server.stop(grace=5)  # allow in-flight RPCs
-    await _store.close()
-    log.info("Service stopped")
+    await stop_event.wait()  # block until we get ^C / docker stop
+    await server.stop(grace=5)
+    await store.aclose()  # close Qdrant client + thread-pool
+    logger.info("Service stopped")
 
 
 if __name__ == "__main__":

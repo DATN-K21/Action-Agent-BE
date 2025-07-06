@@ -17,5 +17,5 @@ def get_tool(tool_name: str) -> BaseTool:
 
 @cache
 def get_retrieval_tool(tool_name: str, description: str, user_id: str, kb_id: str):
-    retriever = SearchAPIWrapper().retriever(user_id, kb_id)
+    retriever = SearchAPIWrapper().retriever(user_id, [kb_id])
     return create_retriever_tool(retriever, name=tool_name, description=description)

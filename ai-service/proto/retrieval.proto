@@ -1,34 +1,32 @@
 syntax = "proto3";
-
 package retrieval;
 
-// The retrieval service definition
+// --------------------------------------------------
+//  Retrieval service
+// --------------------------------------------------
 service RetrievalService {
-  // Search for documents
-  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Search (SearchRequest) returns (SearchResponse);
 }
 
-// The request message for search
-message SearchRequest {
-  string user_id = 1;
-  string upload_id = 2;
-  string query = 3;
-  string search_type = 4;  // vector, fulltext, hybrid
-  int32 top_k = 5;
-  float score_threshold = 6;
+// --------------------------------------------------
+//  Messages
+// --------------------------------------------------
+message SearchRequest  {
+  string user_id       = 1;
+  repeated string upload_ids = 2;
+  string query         = 3;
+  int32  top_k         = 4;
+  float  score_threshold = 5;
 }
 
-// Individual search result
 message SearchResult {
-  string content = 1;
-  map<string, string> metadata = 2;
-  float score = 3;
+  string content              = 1;
+  map<string,string> metadata = 2;
+  float score                 = 3;
 }
 
-// The response message for search
 message SearchResponse {
   repeated SearchResult results = 1;
-  int32 total = 2;
-  string query = 3;
-  string search_type = 4;
+  int32  total                  = 2;
+  string query                  = 3;
 }

@@ -222,7 +222,7 @@ services:
       - mongo-database:/data/db
     restart: always
 
-    qdrant-database:
+  qdrant-database:
     image: qdrant/qdrant:latest
     container_name: qdrant-database
     environment:

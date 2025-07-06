@@ -134,7 +134,7 @@ class GraphUpload(BaseModel):
     upload_id: str = Field(description="Id of the upload")
 
     async def aget_tool(self) -> BaseTool:
-        retriever = SearchAPIWrapper().retriever(self.user_id, self.upload_id)
+        retriever = SearchAPIWrapper().retriever(self.user_id, [self.upload_id])
         return create_retriever_tool_custom_modified(retriever)
 
 

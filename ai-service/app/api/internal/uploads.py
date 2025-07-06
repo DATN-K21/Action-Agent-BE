@@ -39,7 +39,10 @@ async def update_upload_status(
         upload.status = upload_status
         await session.commit()
 
-        logger.info(f"Successfully updated upload {upload_id} status to {request.status}")
+        if upload_status == UploadStatus.FAILED:
+            logger.warning(f"Upload {upload_id} failed. Error message = {request.error_message}")
+        else:
+            logger.info(f"Upload {upload_id} status updated to {upload_status}")
         return ResponseWrapper.wrap(status=200, data=None).to_response()
 
     except Exception as e:
