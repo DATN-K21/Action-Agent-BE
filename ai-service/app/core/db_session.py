@@ -17,11 +17,19 @@ async_engine = create_async_engine(
     ASYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    pool_size=10,  # Limit connection pool size
+    max_overflow=20,  # Maximum overflow connections
+    pool_recycle=3600,  # Recycle connections every hour
+    pool_timeout=30,  # Connection timeout
 )
 sync_engine = create_engine(
     SYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    pool_size=5,  # Smaller pool for sync operations
+    max_overflow=10,
+    pool_recycle=3600,
+    pool_timeout=30,
 )
 
 AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, autoflush=False, autocommit=False)
@@ -39,6 +47,9 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             logger.exception("Async DB error")
             await db.rollback()
             raise
+        finally:
+            # Explicitly close the session to ensure cleanup
+            await db.close()
 
 
 def get_sync_session() -> Generator[Session, None, None]:
