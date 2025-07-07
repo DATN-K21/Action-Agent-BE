@@ -69,7 +69,7 @@ def convert_checkpoint_tuple_to_messages(
             )
         elif isinstance(message, ToolMessage) and message.name:
             documents: list[dict[str, Any]] = []
-            if message.name == "KnowledgeBase":
+            if message.name == "KnowledgeBase" and message.artifact is not None:
                 docs: list[Document] = message.artifact
                 for doc in docs:
                     documents.append(
