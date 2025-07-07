@@ -5,6 +5,7 @@ import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
 
 from app.core import logging
+from app.core.cache.memory_cache_manager import global_cache_manager
 from app.core.db_session import async_engine
 from app.db_models import Base
 from app.memory.checkpoint import AsyncPostgresPool
@@ -51,4 +52,9 @@ async def lifespan(app: FastAPI):
 
         yield
     finally:
+        # Shutdown cache manager first to cleanup all caches
+        await global_cache_manager.shutdown()
+        logger.info("Cache manager shutdown completed")
+
+        # Then shutdown database connections
         await AsyncPostgresPool.atear_down()

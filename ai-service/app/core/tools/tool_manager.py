@@ -12,7 +12,8 @@ from pydantic import SecretStr
 
 from app.core import logging
 from app.core.cache import CacheConfig, EvictionPolicy, global_cache_manager
-from app.core.settings import env_settings, MAX_CACHED_USERS, MAX_PERSONAL_TOOLS_PER_USER
+from app.core.models import ToolInfo
+from app.core.settings import env_settings
 
 # Set USER_AGENT environment variable early to prevent warnings from libraries
 # The warning you're seeing is coming from the duckduckgo-search

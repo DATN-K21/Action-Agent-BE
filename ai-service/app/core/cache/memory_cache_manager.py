@@ -9,6 +9,7 @@ import asyncio
 import gc
 import sys
 import time
+import weakref
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
@@ -17,6 +18,7 @@ from typing import Any, Dict, Optional, TypeVar
 import psutil
 
 from app.core import logging
+from app.core.cache.memory_monitor import global_memory_monitor
 from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
@@ -45,6 +47,8 @@ class CacheEntry:
     created_at: float = 0.0
     last_accessed: float = 0.0
     ttl_seconds: Optional[float] = None
+    _weak_ref: Optional[Any] = None  # Store weak reference if enabled
+    _is_large_object: bool = False  # Flag for large objects that need special handling
 
     def __post_init__(self):
         """Initialize timestamps after creation."""
@@ -53,6 +57,9 @@ class CacheEntry:
             self.created_at = current_time
         if self.last_accessed == 0.0:
             self.last_accessed = current_time
+
+        # Mark as large object if size exceeds threshold (10MB)
+        self._is_large_object = self.size_bytes > 10 * 1024 * 1024
 
     def is_expired(self) -> bool:
         """Check if the cache entry has expired."""
@@ -65,6 +72,41 @@ class CacheEntry:
         self.access_count += 1
         self.last_accessed = time.time()
 
+    def create_weak_ref(self, callback=None):
+        """Create a weak reference to the cached value if possible."""
+        try:
+            if hasattr(self.value, "__weakref__"):
+                self._weak_ref = weakref.ref(self.value, callback)
+                return True
+        except TypeError:
+            # Some objects don't support weak references
+            pass
+        return False
+
+    def get_value(self):
+        """Get the cached value, checking weak reference first if available."""
+        if self._weak_ref is not None:
+            weak_value = self._weak_ref()
+            if weak_value is None:
+                # Object was garbage collected
+                return None
+            return weak_value
+        return self.value
+
+    def cleanup(self):
+        """Explicit cleanup of the cache entry."""
+        if self._weak_ref is not None:
+            self._weak_ref = None
+
+        # Clear large objects explicitly
+        if self._is_large_object and hasattr(self.value, "clear"):
+            try:
+                self.value.clear()
+            except (AttributeError, TypeError):
+                pass
+
+        self.value = None
+
 
 @dataclass
 class CacheConfig:
@@ -72,13 +114,16 @@ class CacheConfig:
 
     max_entries: int = 1000
     max_memory_mb: float = 512.0  # Maximum memory usage in MB
+    max_entry_size_mb: float = 50.0  # Maximum size per cache entry in MB
     ttl_seconds: Optional[float] = 3600.0  # Default TTL: 1 hour
     eviction_policy: EvictionPolicy = EvictionPolicy.MEMORY_PRESSURE
     memory_check_interval: float = 30.0  # Check memory every 30 seconds
     memory_threshold: float = 0.8  # Trigger cleanup at 80% of max memory
     cleanup_ratio: float = 0.3  # Remove 30% of entries during cleanup
     enable_size_tracking: bool = True
-    enable_weak_references: bool = False
+    enable_weak_references: bool = True  # Enable weak references by default
+    aggressive_gc: bool = True  # Enable aggressive garbage collection
+    max_object_depth: int = 3  # Maximum depth for size calculation to prevent infinite recursion
 
 
 class MemoryCacheManager:
@@ -115,19 +160,35 @@ class MemoryCacheManager:
 
         # Startup grace period to avoid immediate cleanup
         self.startup_time = time.time()
-        self.startup_grace_period = env_settings.CACHE_STARTUP_GRACE_PERIOD  # Use configurable grace period
+        self.startup_grace_period = env_settings.CACHE_STARTUP_GRACE_PERIOD
 
-        # Statistics
-        self.stats = {"hits": 0, "misses": 0, "evictions": 0, "cleanups": 0, "memory_pressure_events": 0, "expired_entries": 0}
+        # Statistics with additional memory tracking
+        self.stats = {
+            "hits": 0,
+            "misses": 0,
+            "evictions": 0,
+            "cleanups": 0,
+            "memory_pressure_events": 0,
+            "expired_entries": 0,
+            "large_objects_rejected": 0,
+            "weak_ref_failures": 0,
+            "gc_collections": 0,
+        }
 
         # Background cleanup task
         self.cleanup_task: Optional[asyncio.Task] = None
         self._should_stop = False
+        self._finalized = False  # Flag to prevent use after finalization
+
+        # Weak reference callbacks for automatic cleanup
+        self._weak_ref_callbacks = weakref.WeakSet()
 
         logger.info(
             f"Initialized MemoryCacheManager '{self.name}' with config: "
             f"max_entries={config.max_entries}, max_memory_mb={config.max_memory_mb}, "
-            f"ttl_seconds={config.ttl_seconds}, eviction_policy={config.eviction_policy.value}"
+            f"max_entry_size_mb={config.max_entry_size_mb}, "
+            f"ttl_seconds={config.ttl_seconds}, eviction_policy={config.eviction_policy.value}, "
+            f"weak_references={config.enable_weak_references}"
         )
 
     async def start_background_cleanup(self) -> None:
@@ -165,12 +226,14 @@ class MemoryCacheManager:
                 logger.error(f"Error in background cleanup for cache '{self.name}': {e}")
                 await asyncio.sleep(5.0)  # Wait before retrying
 
-    def _calculate_object_size(self, obj: Any) -> int:
+    def _calculate_object_size(self, obj: Any, visited: Optional[set] = None, depth: int = 0) -> int:
         """
-        Calculate the approximate size of an object in bytes.
+        Calculate the approximate size of an object in bytes with circular reference protection.
 
         Args:
             obj: Object to measure
+            visited: Set of already visited object IDs to prevent circular references
+            depth: Current recursion depth
 
         Returns:
             Size in bytes
@@ -178,23 +241,45 @@ class MemoryCacheManager:
         if not self.config.enable_size_tracking:
             return 0
 
+        # Initialize visited set on first call
+        if visited is None:
+            visited = set()
+
+        # Prevent infinite recursion
+        if depth > self.config.max_object_depth:
+            return 0
+
+        # Check for circular references
+        obj_id = id(obj)
+        if obj_id in visited:
+            return 0
+        visited.add(obj_id)
+
         try:
-            # Use sys.getsizeof for basic size, with recursion for containers
+            # Use sys.getsizeof for basic size
             size = sys.getsizeof(obj)
 
             # Add size of referenced objects for common container types
-            if isinstance(obj, dict):
-                size += sum(sys.getsizeof(k) + sys.getsizeof(v) for k, v in obj.items())
-            elif isinstance(obj, (list, tuple, set)):
-                size += sum(sys.getsizeof(item) for item in obj)
-            elif hasattr(obj, "__dict__"):
+            if isinstance(obj, dict) and depth < self.config.max_object_depth:
+                for k, v in obj.items():
+                    size += self._calculate_object_size(k, visited, depth + 1)
+                    size += self._calculate_object_size(v, visited, depth + 1)
+            elif isinstance(obj, (list, tuple, set)) and depth < self.config.max_object_depth:
+                for item in obj:
+                    size += self._calculate_object_size(item, visited, depth + 1)
+            elif hasattr(obj, "__dict__") and depth < self.config.max_object_depth:
                 size += sys.getsizeof(obj.__dict__)
-                size += sum(sys.getsizeof(k) + sys.getsizeof(v) for k, v in obj.__dict__.items())
+                for k, v in obj.__dict__.items():
+                    size += self._calculate_object_size(k, visited, depth + 1)
+                    size += self._calculate_object_size(v, visited, depth + 1)
 
             return size
         except Exception as e:
             logger.warning(f"Failed to calculate object size in cache '{self.name}': {e}")
-            return 0
+            return sys.getsizeof(obj)  # Fallback to basic size
+        finally:
+            # Remove from visited set when exiting this level
+            visited.discard(obj_id)
 
     def _get_current_memory_usage_mb(self) -> float:
         """Get current memory usage of the process in MB."""
@@ -226,31 +311,14 @@ class MemoryCacheManager:
         cache_memory_mb = self._get_cache_memory_usage_mb()
         process_memory_mb = self._get_current_memory_usage_mb()
 
-        # Get system memory info
-        system_memory = None
-        try:
-            system_memory = psutil.virtual_memory()
-        except Exception as e:
-            logger.warning(f"Failed to get system memory info: {e}")
-
-        # Log detailed memory usage information
-        log_msg = (
-            f"Memory check for cache '{self.name}': "
-            f"cache_entries={len(self.cache)}, "
-            f"cache_memory={cache_memory_mb:.2f}MB/{self.config.max_memory_mb:.2f}MB "
-            f"({(cache_memory_mb / self.config.max_memory_mb * 100):.1f}%), "
-            f"process_memory={process_memory_mb:.2f}MB"
+        # Use memory monitor for logging and tracking
+        await global_memory_monitor.log_memory_check(
+            cache_name=self.name,
+            cache_entries=len(self.cache),
+            cache_memory_mb=cache_memory_mb,
+            max_cache_memory_mb=self.config.max_memory_mb,
+            process_memory_mb=process_memory_mb,
         )
-
-        if system_memory:
-            log_msg += (
-                f", system_memory={system_memory.percent:.1f}% "
-                f"({system_memory.used / 1024 / 1024 / 1024:.2f}GB/{system_memory.total / 1024 / 1024 / 1024:.2f}GB)"
-            )
-
-        # Only log if memory logging is enabled in settings
-        if env_settings.CACHE_ENABLE_MEMORY_LOGGING:
-            logger.info(log_msg)
 
         # Check cache memory usage
         cache_threshold_mb = self.config.max_memory_mb * self.config.memory_threshold
@@ -259,11 +327,75 @@ class MemoryCacheManager:
             return True
 
         # Check system memory usage
-        if system_memory and system_memory.percent > env_settings.SYSTEM_MEMORY_THRESHOLD:
-            logger.warning(f"System memory usage is high: {system_memory.percent:.1f}%")
-            return True
+        try:
+            system_memory = psutil.virtual_memory()
+            if system_memory.percent > env_settings.SYSTEM_MEMORY_THRESHOLD:
+                logger.warning(f"System memory usage is high: {system_memory.percent:.1f}%")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to get system memory info: {e}")
 
         return False
+
+    def _weak_ref_callback(self, weak_ref):
+        """Callback for when a weakly referenced object is garbage collected."""
+
+        async def cleanup():
+            async with self.lock:
+                # Find and remove the cache entry with the dead weak reference
+                keys_to_remove = []
+                for key, entry in self.cache.items():
+                    if entry._weak_ref == weak_ref:
+                        keys_to_remove.append(key)
+
+                for key in keys_to_remove:
+                    if key in self.cache:
+                        del self.cache[key]
+                        logger.debug(f"Removed cache entry '{key}' due to weak reference cleanup in cache '{self.name}'")
+
+        # Schedule the cleanup task
+        try:
+            asyncio.create_task(cleanup())
+        except RuntimeError:
+            # Event loop might be closed
+            pass
+
+    async def _perform_aggressive_cleanup(self) -> None:
+        """Perform aggressive cleanup including garbage collection."""
+        if self.config.aggressive_gc:
+            # Force multiple garbage collection cycles
+            for _ in range(3):
+                collected = gc.collect()
+                if collected == 0:
+                    break
+
+            self.stats["gc_collections"] += 1
+            logger.debug(f"Performed aggressive garbage collection for cache '{self.name}'")
+
+    async def _validate_cache_integrity(self) -> int:
+        """Validate cache integrity and remove entries with dead weak references."""
+        invalid_keys = []
+
+        for key, entry in list(self.cache.items()):
+            # Check if weak reference is dead
+            if entry._weak_ref is not None:
+                if entry._weak_ref() is None:
+                    invalid_keys.append(key)
+                    continue
+
+            # Check if regular value is None (shouldn't happen normally)
+            if entry.value is None and entry._weak_ref is None:
+                invalid_keys.append(key)
+
+        # Remove invalid entries
+        for key in invalid_keys:
+            if key in self.cache:
+                del self.cache[key]
+
+        if invalid_keys:
+            logger.info(f"Removed {len(invalid_keys)} invalid entries from cache '{self.name}'")
+
+        return len(invalid_keys)
 
     async def _evict_entries(self, count: int) -> int:
         """
@@ -302,37 +434,56 @@ class MemoryCacheManager:
             entries_to_remove = [key for key, _ in sorted_entries[:count]]
 
         else:  # MEMORY_PRESSURE - hybrid approach
-            # First evict expired entries, then LRU
+            # First evict expired entries, then large objects, then LRU
             expired_keys = [key for key, entry in self.cache.items() if entry.is_expired()]
+            large_object_keys = [key for key, entry in self.cache.items() if entry._is_large_object and key not in expired_keys]
 
             entries_to_remove.extend(expired_keys[:count])
             remaining_count = count - len(entries_to_remove)
 
             if remaining_count > 0:
+                # Add large objects
+                entries_to_remove.extend(large_object_keys[:remaining_count])
+                remaining_count = count - len(entries_to_remove)
+
+            if remaining_count > 0:
                 # Then evict LRU entries
-                non_expired = {k: v for k, v in self.cache.items() if k not in expired_keys}
-                sorted_entries = sorted(non_expired.items(), key=lambda x: x[1].last_accessed)
+                non_removed = {k: v for k, v in self.cache.items() if k not in entries_to_remove}
+                sorted_entries = sorted(non_removed.items(), key=lambda x: x[1].last_accessed)
                 entries_to_remove.extend([key for key, _ in sorted_entries[:remaining_count]])
 
-        # Remove selected entries
+        # Remove selected entries with proper cleanup
         for key in entries_to_remove:
             if key in self.cache:
                 entry = self.cache[key]
+
+                # Perform explicit cleanup
+                entry.cleanup()
+
                 del self.cache[key]
                 evicted += 1
                 logger.debug(
-                    f"Evicted entry '{key}' from cache '{self.name}' (size: {entry.size_bytes} bytes, age: {time.time() - entry.created_at:.1f}s)"
+                    f"Evicted entry '{key}' from cache '{self.name}' "
+                    f"(size: {entry.size_bytes} bytes, age: {time.time() - entry.created_at:.1f}s, "
+                    f"large_object: {entry._is_large_object})"
                 )
 
         if evicted > 0:
             self.stats["evictions"] += evicted
             logger.info(f"Evicted {evicted} entries from cache '{self.name}'")
 
+            # Perform aggressive cleanup after eviction
+            await self._perform_aggressive_cleanup()
+
         return evicted
 
     async def _check_and_cleanup(self) -> None:
         """Check cache state and perform cleanup if necessary."""
         async with self.lock:
+            # First validate cache integrity and remove dead references
+            await self._validate_cache_integrity()
+
+            # Remove expired entries
             await self._remove_expired_entries()
 
             # Check if cleanup is needed
@@ -353,8 +504,8 @@ class MemoryCacheManager:
 
                 await self._evict_entries(evict_count)
 
-                # Force garbage collection after cleanup
-                gc.collect()
+                # Force aggressive cleanup after eviction
+                await self._perform_aggressive_cleanup()
 
                 # Log cleanup results
                 cache_memory_mb = self._get_cache_memory_usage_mb()
@@ -386,6 +537,10 @@ class MemoryCacheManager:
         Returns:
             Cached value or None if not found
         """
+        if self._finalized:
+            logger.warning(f"Attempt to use finalized cache '{self.name}'")
+            return None
+
         async with self.lock:
             if key not in self.cache:
                 self.stats["misses"] += 1
@@ -395,9 +550,19 @@ class MemoryCacheManager:
 
             # Check if expired
             if entry.is_expired():
+                entry.cleanup()
                 del self.cache[key]
                 self.stats["misses"] += 1
                 self.stats["expired_entries"] += 1
+                return None
+
+            # Get value (handles weak references)
+            value = entry.get_value()
+            if value is None:
+                # Weak reference was garbage collected
+                entry.cleanup()
+                del self.cache[key]
+                self.stats["misses"] += 1
                 return None
 
             # Update access metadata
@@ -407,7 +572,7 @@ class MemoryCacheManager:
             self.cache.move_to_end(key)
 
             self.stats["hits"] += 1
-            return entry.value
+            return value
 
     async def put(self, key: str, value: Any, ttl_seconds: Optional[float] = None) -> None:
         """
@@ -418,9 +583,23 @@ class MemoryCacheManager:
             value: Value to cache
             ttl_seconds: Time to live in seconds (overrides default)
         """
+        if self._finalized:
+            logger.warning(f"Attempt to use finalized cache '{self.name}'")
+            return
+
         async with self.lock:
             # Calculate object size
             size_bytes = self._calculate_object_size(value)
+
+            # Check if object is too large
+            max_size_bytes = self.config.max_entry_size_mb * 1024 * 1024
+            if size_bytes > max_size_bytes:
+                self.stats["large_objects_rejected"] += 1
+                logger.warning(
+                    f"Rejecting large object '{key}' in cache '{self.name}': "
+                    f"size={size_bytes / 1024 / 1024:.2f}MB > max={self.config.max_entry_size_mb}MB"
+                )
+                return
 
             # Use provided TTL or default
             effective_ttl = ttl_seconds if ttl_seconds is not None else self.config.ttl_seconds
@@ -428,16 +607,28 @@ class MemoryCacheManager:
             # Create cache entry
             entry = CacheEntry(value=value, size_bytes=size_bytes, ttl_seconds=effective_ttl)
 
-            # If key exists, remove old entry first
+            # Set up weak reference if enabled
+            if self.config.enable_weak_references:
+                if entry.create_weak_ref(self._weak_ref_callback):
+                    logger.debug(f"Created weak reference for entry '{key}' in cache '{self.name}'")
+                else:
+                    self.stats["weak_ref_failures"] += 1
+
+            # If key exists, clean up old entry first
             if key in self.cache:
                 old_entry = self.cache[key]
+                old_entry.cleanup()
                 logger.debug(f"Updating existing entry '{key}' in cache '{self.name}' (old_size: {old_entry.size_bytes}, new_size: {size_bytes})")
 
             # Add to cache
             self.cache[key] = entry
             self.cache.move_to_end(key)  # Mark as most recently used
 
-            logger.debug(f"Added entry '{key}' to cache '{self.name}' (size: {size_bytes} bytes, ttl: {effective_ttl}s)")
+            logger.debug(
+                f"Added entry '{key}' to cache '{self.name}' "
+                f"(size: {size_bytes} bytes, ttl: {effective_ttl}s, "
+                f"weak_ref: {entry._weak_ref is not None})"
+            )
 
             # Check if immediate cleanup is needed
             if len(self.cache) > self.config.max_entries or await self._check_memory_pressure():
@@ -453,9 +644,13 @@ class MemoryCacheManager:
         Returns:
             True if key was found and removed, False otherwise
         """
+        if self._finalized:
+            return False
+
         async with self.lock:
             if key in self.cache:
                 entry = self.cache[key]
+                entry.cleanup()  # Perform explicit cleanup
                 del self.cache[key]
                 logger.debug(f"Removed entry '{key}' from cache '{self.name}' (size: {entry.size_bytes} bytes)")
                 return True
@@ -465,7 +660,16 @@ class MemoryCacheManager:
         """Clear all entries from the cache."""
         async with self.lock:
             entry_count = len(self.cache)
+
+            # Cleanup all entries before clearing
+            for entry in self.cache.values():
+                entry.cleanup()
+
             self.cache.clear()
+
+            # Perform aggressive cleanup
+            await self._perform_aggressive_cleanup()
+
             logger.info(f"Cleared {entry_count} entries from cache '{self.name}'")
 
     async def get_stats(self) -> Dict[str, Any]:
@@ -485,6 +689,7 @@ class MemoryCacheManager:
                 "max_entries": self.config.max_entries,
                 "cache_memory_mb": cache_memory_mb,
                 "max_memory_mb": self.config.max_memory_mb,
+                "max_entry_size_mb": self.config.max_entry_size_mb,
                 "system_memory_mb": system_memory_mb,
                 "hit_rate": hit_rate,
                 "total_hits": self.stats["hits"],
@@ -493,8 +698,14 @@ class MemoryCacheManager:
                 "total_cleanups": self.stats["cleanups"],
                 "memory_pressure_events": self.stats["memory_pressure_events"],
                 "expired_entries": self.stats["expired_entries"],
+                "large_objects_rejected": self.stats["large_objects_rejected"],
+                "weak_ref_failures": self.stats["weak_ref_failures"],
+                "gc_collections": self.stats["gc_collections"],
                 "eviction_policy": self.config.eviction_policy.value,
                 "ttl_seconds": self.config.ttl_seconds,
+                "weak_references_enabled": self.config.enable_weak_references,
+                "aggressive_gc_enabled": self.config.aggressive_gc,
+                "finalized": self._finalized,
             }
 
     async def get_memory_info(self) -> Dict[str, Any]:
@@ -524,6 +735,52 @@ class MemoryCacheManager:
                 "largest_entries": top_entries,
                 "system_memory_percent": psutil.virtual_memory().percent,
             }
+
+    async def finalize(self) -> None:
+        """Finalize the cache and cleanup all resources."""
+        if self._finalized:
+            return
+
+        async with self.lock:
+            self._finalized = True
+
+            # Stop background cleanup
+            await self.stop_background_cleanup()
+
+            # Cleanup all entries
+            for entry in self.cache.values():
+                entry.cleanup()
+
+            # Clear cache
+            self.cache.clear()
+
+            # Clear weak reference callbacks
+            self._weak_ref_callbacks.clear()
+
+            # Perform final aggressive cleanup
+            await self._perform_aggressive_cleanup()
+
+            logger.info(f"Finalized cache '{self.name}'")
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with cleanup."""
+        await self.finalize()
+        return False
+
+    def __del__(self):
+        """Destructor to ensure cleanup on object deletion."""
+        if not self._finalized and hasattr(self, "cache"):
+            # Emergency cleanup if finalize wasn't called
+            for entry in self.cache.values():
+                try:
+                    entry.cleanup()
+                except Exception:
+                    pass
+            self.cache.clear()
 
 
 class GlobalCacheManager:
@@ -576,9 +833,11 @@ class GlobalCacheManager:
                 return False
 
             cache = self.caches[name]
-            await cache.stop_background_cleanup()
-            await cache.clear()
+            await cache.finalize()  # Use finalize instead of manual cleanup
             del self.caches[name]
+
+            # Clear memory monitor snapshot for this cache
+            await global_memory_monitor.clear_cache_snapshot(name)
 
             logger.info(f"Removed cache '{name}'")
             return True
@@ -594,6 +853,10 @@ class GlobalCacheManager:
     async def get_global_memory_info(self) -> Dict[str, Any]:
         """Get global memory information across all caches."""
         async with self.lock:
+            # Get information from memory monitor
+            memory_report = await global_memory_monitor.get_memory_report()
+
+            # Also get cache-specific stats
             total_entries = 0
             total_memory_mb = 0.0
             cache_info = []
@@ -610,7 +873,8 @@ class GlobalCacheManager:
             system_memory = psutil.virtual_memory()
             process_memory = psutil.Process().memory_info()
 
-            return {
+            # Combine with memory monitor report
+            result = {
                 "total_caches": len(self.caches),
                 "total_entries": total_entries,
                 "total_cache_memory_mb": total_memory_mb,
@@ -619,6 +883,12 @@ class GlobalCacheManager:
                 "process_memory_mb": process_memory.rss / 1024 / 1024,
                 "cache_details": cache_info,
             }
+
+            # Add memory monitor information
+            if "error" not in memory_report:
+                result["memory_monitor"] = memory_report
+
+            return result
 
     async def cleanup_all_caches(self) -> None:
         """Force cleanup on all caches."""
@@ -634,8 +904,7 @@ class GlobalCacheManager:
         """Shutdown all caches and cleanup resources."""
         async with self.lock:
             for name, cache in list(self.caches.items()):
-                await cache.stop_background_cleanup()
-                await cache.clear()
+                await cache.finalize()  # Use finalize for proper cleanup
 
             self.caches.clear()
             logger.info("Shutdown completed for all caches")

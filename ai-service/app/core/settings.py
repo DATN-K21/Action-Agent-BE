@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     CACHE_STARTUP_GRACE_PERIOD: float = 30.0  # Startup grace period in seconds
     CACHE_CLEANUP_RATIO: float = 0.2  # Default cleanup ratio
     CACHE_ENABLE_MEMORY_LOGGING: bool = True  # Enable detailed memory usage logging during cache checks
+    CACHE_DETAILED_LOGGING_INTERVAL: float = 300.0  # Interval for detailed memory reports in seconds (5 minutes)
 
     # Sets the number of processors
     MAX_WORKERS: int = 1
