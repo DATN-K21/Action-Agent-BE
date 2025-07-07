@@ -215,7 +215,10 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     return team_dict
 
 
-def convert_chatbot_ragbot_searchbot_team_to_dict(members: list[Member], workflow_type: WorkflowType) -> Mapping[str, GraphMember]:
+def convert_chatbot_ragbot_searchbot_team_to_dict(
+    members: list[Member],
+    workflow_type: WorkflowType,
+) -> Mapping[str, GraphMember]:
     team_dict: dict[str, GraphMember] = {}
 
     if len(members) != 1:
