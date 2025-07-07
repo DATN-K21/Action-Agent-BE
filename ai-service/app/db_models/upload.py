@@ -30,6 +30,8 @@ class Upload(BaseEntity):
     file_type: Mapped[str | None] = mapped_column(String, nullable=True)
     web_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    is_global: Mapped[bool] = mapped_column(default=True, nullable=False)
+
     # Relationships
     user = relationship("User", back_populates="uploads")
     threads = relationship(

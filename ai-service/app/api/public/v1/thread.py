@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header
 from langchain.prompts import PromptTemplate
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
@@ -12,6 +12,8 @@ from app.core.graph.checkpoint.utils import (
     get_checkpoint_tuples,
 )
 from app.db_models.thread import Thread
+from app.db_models.upload import Upload
+from app.db_models.upload_thread_link import UploadThreadLink
 from app.schemas.base import CursorPagingRequest, MessageResponse, ResponseWrapper
 from app.schemas.thread import (
     CreateThreadRequest,
@@ -27,6 +29,66 @@ from app.services.llm_service import get_llm_chat_model
 logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/thread", tags=["Thread"])
+
+
+async def _link_global_uploads_to_thread(session: SessionDep, thread_id: str, user_id: str) -> None:
+    """
+    Link all global uploads of a user to a new thread.
+
+    Args:
+        session: Database session
+        thread_id: ID of the thread to link uploads to
+        user_id: ID of the user who owns the thread
+    """
+    try:
+        # Find all global uploads for this user
+        global_uploads_statement = select(Upload).where(
+            Upload.user_id == user_id,
+            Upload.is_global.is_(True),
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(global_uploads_statement)
+        global_uploads = result.scalars().all()
+
+        # Create UploadThreadLink for each global upload
+        for upload in global_uploads:
+            # Check if link already exists to avoid duplicates
+            existing_link_statement = select(UploadThreadLink).where(UploadThreadLink.upload_id == upload.id, UploadThreadLink.thread_id == thread_id)
+            existing_result = await session.execute(existing_link_statement)
+            existing_link = existing_result.scalar_one_or_none()
+
+            if not existing_link:
+                link = UploadThreadLink(upload_id=upload.id, thread_id=thread_id)
+                session.add(link)
+
+        logger.info(f"Linked {len(global_uploads)} global uploads to thread {thread_id}")
+
+    except Exception as e:
+        logger.error(f"Error linking global uploads to thread {thread_id}: {str(e)}")
+        raise
+
+
+async def _remove_thread_upload_links(session: SessionDep, thread_id: str) -> None:
+    """
+    Remove all UploadThreadLinks associated with a thread.
+
+    Args:
+        session: Database session
+        thread_id: ID of the thread being deleted
+    """
+    try:
+        # Delete all UploadThreadLinks for this thread
+        delete_statement = delete(UploadThreadLink).where(UploadThreadLink.thread_id == thread_id)
+
+        result = await session.execute(delete_statement)
+        deleted_count = result.rowcount
+
+        logger.info(f"Removed {deleted_count} upload-thread links for thread {thread_id}")
+
+    except Exception as e:
+        logger.error(f"Error removing upload-thread links for thread {thread_id}: {str(e)}")
+        raise
 
 
 @router.get("/get-all", summary="Get threads of a user.", response_model=ResponseWrapper[GetThreadsResponse])
@@ -104,8 +166,13 @@ async def acreate_new_thread(session: SessionDep, request: CreateThreadRequest, 
             created_by=x_user_id,
         )
         session.add(thread)
-        await session.commit()
+        await session.flush()
         await session.refresh(thread)
+
+        # Link all global uploads to this new thread
+        await _link_global_uploads_to_thread(session, thread.id, x_user_id)
+
+        await session.commit()
 
         response_data = CreateThreadResponse.model_validate(thread, from_attributes=True)
         return ResponseWrapper.wrap(status=200, data=response_data)
@@ -220,6 +287,9 @@ async def update_thread(session: SessionDep, thread_id: str, request: UpdateThre
 @router.delete("/{thread_id}/delete", summary="Delete a thread.", response_model=ResponseWrapper[MessageResponse])
 async def delete_thread(session: SessionDep, thread_id: str, x_user_id: str = Header(None)):
     try:
+        # Remove all links associated with the thread
+        await _remove_thread_upload_links(session, thread_id)
+
         statement = (
             update(Thread)
             .where(

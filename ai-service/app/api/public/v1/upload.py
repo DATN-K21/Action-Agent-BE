@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
@@ -100,6 +100,9 @@ async def adelete_upload(
         return ResponseWrapper.wrap(status=400, message="Upload must be completed or failed before deletion").to_response()
 
     try:
+        # Remove all upload-thread links first
+        await _remove_upload_thread_links(session, upload_id)
+
         # Soft-delete upload record
         upload.is_deleted = True
         session.add(upload)
@@ -178,6 +181,9 @@ async def ainitiate_upload(
         logger.info(f"Upload info from blob service: {upload_info}")
 
         # Create Upload record in database
+        # Set is_global based on whether thread_id is provided
+        is_global = request.thread_id is None
+
         upload = Upload(
             id=str(unique_id),
             name=request.name,
@@ -188,6 +194,7 @@ async def ainitiate_upload(
             chunk_overlap=request.chunk_overlap,
             user_id=x_user_id,
             status=UploadStatus.UPLOADING,  # Set to uploading - file is being uploaded to Azure
+            is_global=is_global,
         )
 
         session.add(upload)
@@ -197,10 +204,14 @@ async def ainitiate_upload(
         if upload.id is None:
             raise HTTPException(status_code=500, detail="Failed to create upload record")
 
-        # Associate upload with thread if thread_id is provided
+        # Handle upload-thread relationships based on global/private nature
         if request.thread_id is not None:
+            # Private upload: link only to specified thread
             await _create_upload_thread_link(session, upload.id, request.thread_id)
             await _alink_upload_to_assistant_members(session, upload.id, request.thread_id, x_user_id)
+        else:
+            # Global upload: link to all user's threads
+            await _link_upload_to_all_user_threads(session, upload.id, x_user_id)
 
         await session.commit()
 
@@ -815,3 +826,59 @@ async def _create_upload_thread_link(session: SessionDep, upload_id: str, thread
     # Create link between upload and thread
     link = UploadThreadLink(upload_id=upload_id, thread_id=thread_id)
     session.add(link)
+
+
+async def _link_upload_to_all_user_threads(session: SessionDep, upload_id: str, user_id: str) -> None:
+    """
+    Link an upload to all threads of a user (for global uploads).
+
+    Args:
+        session: Database session
+        upload_id: ID of the upload to link
+        user_id: ID of the user who owns the upload
+    """
+    try:
+        # Find all threads for this user
+        user_threads_statement = select(Thread).where(Thread.user_id == user_id, Thread.is_deleted.is_(False))
+
+        result = await session.execute(user_threads_statement)
+        user_threads = result.scalars().all()
+
+        # Create UploadThreadLink for each thread
+        for thread in user_threads:
+            # Check if link already exists to avoid duplicates
+            existing_link_statement = select(UploadThreadLink).where(UploadThreadLink.upload_id == upload_id, UploadThreadLink.thread_id == thread.id)
+            existing_result = await session.execute(existing_link_statement)
+            existing_link = existing_result.scalar_one_or_none()
+
+            if not existing_link:
+                link = UploadThreadLink(upload_id=upload_id, thread_id=thread.id)
+                session.add(link)
+
+        logger.info(f"Linked upload {upload_id} to {len(user_threads)} user threads")
+
+    except Exception as e:
+        logger.error(f"Error linking upload {upload_id} to user threads: {str(e)}")
+        raise
+
+
+async def _remove_upload_thread_links(session: SessionDep, upload_id: str) -> None:
+    """
+    Remove all UploadThreadLinks associated with an upload.
+
+    Args:
+        session: Database session
+        upload_id: ID of the upload being deleted
+    """
+    try:
+        # Delete all UploadThreadLinks for this upload
+        delete_statement = delete(UploadThreadLink).where(UploadThreadLink.upload_id == upload_id)
+
+        result = await session.execute(delete_statement)
+        deleted_count = result.rowcount
+
+        logger.info(f"Removed {deleted_count} upload-thread links for upload {upload_id}")
+
+    except Exception as e:
+        logger.error(f"Error removing upload-thread links for upload {upload_id}: {str(e)}")
+        raise
