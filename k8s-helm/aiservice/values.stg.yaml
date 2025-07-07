@@ -189,6 +189,43 @@ env:
   - name: FASTEMBED_CACHE_PATH
     value: "./fastembed_cache"
 
+  # Memory and Cache settings
+  - name: SYSTEM_MEMORY_THRESHOLD
+    value: "92.0"
+  - name: CACHE_MEMORY_THRESHOLD
+    value: "0.92"
+  - name: CACHE_STARTUP_GRACE_PERIOD
+    value: "60.0"
+  - name: CACHE_CLEANUP_RATIO
+    value: "0.2"
+  - name: CACHE_ENABLE_MEMORY_LOGGING
+    value: "True"
+  - name: CACHE_DETAILED_LOGGING_INTERVAL
+    value: "300.0"
+  - name: CACHE_MEMORY_CHECK_INTERVAL
+    value: "120.0"
+  - name: CACHE_TTL_SECONDS
+    value: "3600.0"
+
+  # Cache for streaming connections
+  - name: STREAMING_CONNECTIONS_CACHE_MAX_ENTRIES
+    value: "1000"
+  - name: STREAMING_CONNECTIONS_CACHE_MAX_MEMORY_MB
+    value: "64.0"
+
+  # Cache for tools
+  - name: TOOLS_CACHE_MAX_ENTRIES
+    value: "1000"
+  - name: TOOLS_CACHE_MAX_MEMORY_MB
+    value: "512.0"
+
+  # Cache for extension services
+  - name: EXTENSION_SERVICES_CACHE_MAX_ENTRIES
+    value: "400"
+  - name: EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB
+    value: "256.0"
+
+  # Extension service URL
   - name: EXTENSION_SERVICE_URL
     value: "http://extensionservicestg:15300"
 
