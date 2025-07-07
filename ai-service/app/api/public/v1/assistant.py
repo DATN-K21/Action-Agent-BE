@@ -1695,7 +1695,7 @@ async def acreate_advanced_assistant(
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
-            provider=request.provider or env_settings.OPENAI_API_BASE_URL,
+            provider=request.provider or env_settings.OPENAI_PROVIDER,
             model_name=request.model_name or env_settings.LLM_BASIC_MODEL,
             temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=request.ask_human if request.ask_human is not None else True,
