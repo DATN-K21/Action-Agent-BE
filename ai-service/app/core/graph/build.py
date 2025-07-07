@@ -1101,3 +1101,15 @@ async def generator(
         yield f"data: {response.model_dump_json()}\n\n"
         await asyncio.sleep(0.1)  # Add a small delay to ensure the message is sent
         raise e
+    finally:
+        # Clean up resources after generator completes
+        if user_id:
+            from app.core.stream_control import acleanup_connection
+            await acleanup_connection(user_id, thread_id)
+        
+        # Force cleanup of local variables to help garbage collection
+        locals().clear()
+        
+        # Trigger garbage collection to release memory
+        import gc
+        gc.collect()

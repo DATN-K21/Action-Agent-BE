@@ -107,9 +107,23 @@ async def acleanup_connection(user_id: str, thread_id: str) -> None:
 
     await _initialize_connections_cache()
     if _connections_cache is not None:
+        # Get the event and clean it up before removal
+        stop_event = await _connections_cache.get(connection_key)
+        if stop_event is not None:
+            # Clear any waiters and set the event to release resources
+            if hasattr(stop_event, "_waiters"):
+                stop_event._waiters.clear()
+            stop_event.set()
+
         removed = await _connections_cache.remove(connection_key)
         if removed:
             logger.debug(f"Cleaned up connection '{connection_key}'")
+
+        # Force cleanup if we have many connections
+        stats = await _connections_cache.get_stats()
+        if stats["entries_count"] > env_settings.STREAMING_CONNECTIONS_CACHE_MAX_ENTRIES * 0.9:  # Cleanup threshold
+            await _connections_cache._check_and_cleanup()
+            logger.info(f"Forced cleanup of streaming connections cache due to high count: {stats['entries_count']}")
 
 
 async def ais_stop_requested(user_id: str, thread_id: str) -> bool:
