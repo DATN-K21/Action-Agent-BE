@@ -94,6 +94,13 @@ class Settings(BaseSettings):
     # Upload settings
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
 
+    # Memory and Cache settings
+    SYSTEM_MEMORY_THRESHOLD: float = 92.0  # System memory threshold percentage
+    CACHE_MEMORY_THRESHOLD: float = 0.85  # Cache memory threshold ratio
+    CACHE_STARTUP_GRACE_PERIOD: float = 30.0  # Startup grace period in seconds
+    CACHE_CLEANUP_RATIO: float = 0.2  # Default cleanup ratio
+    CACHE_ENABLE_MEMORY_LOGGING: bool = True  # Enable detailed memory usage logging during cache checks
+
     # Sets the number of processors
     MAX_WORKERS: int = 1
 
