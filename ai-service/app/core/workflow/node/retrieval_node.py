@@ -46,7 +46,7 @@ class RetrievalNode:
                 content=messages[-1].content if messages else "No answer available."
             )
 
-        # 更新 node_outputs
+        # node_outputs
         new_output = {self.node_id: {"response": result.content}}
         state["node_outputs"] = update_node_outputs(state["node_outputs"], new_output)
         return_state: ReturnWorkflowTeamState = {
