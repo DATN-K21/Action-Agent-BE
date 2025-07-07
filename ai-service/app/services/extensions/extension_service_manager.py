@@ -1,46 +1,69 @@
-import asyncio
-from collections import OrderedDict
-from typing import Dict, Optional
-from typing import OrderedDict as OrderedDictType
+from typing import Any, Dict, Optional
 
 from app.core import logging
+from app.core.cache import CacheConfig, EvictionPolicy, global_cache_manager
 from app.core.settings import env_settings
 from app.services.extensions.extension_client import ExtensionServiceInfo
 
 logger = logging.get_logger(__name__)
 
 # --- Constants ---
-MAX_CACHED_EXTENSION_SERVICES = env_settings.MAX_CACHED_EXTENSION_SERVICES
+EXTENSION_SERVICES_CACHE_MAX_ENTRIES = env_settings.EXTENSION_SERVICES_CACHE_MAX_ENTRIES
 
 
 class ExtensionServiceManager:
     """
     Manages and provides access to various extension services.
-    It maintains an LRU cache for frequently used services and fetches services
+    It maintains a memory-aware cache for frequently used services and fetches services
     on-demand from the extension service when not cached.
     """
 
     def __init__(self):
         """
         Initializes the ExtensionServiceManager.
-        - Initializes an LRU cache for services.
-        - Sets up a lock for async-safe operations.
+        - Initializes a memory-aware cache for services.
+        - Sets up async initialization for cache.
         """
-        # LRU Cache for services.
-        # Key: service_enum (str), Value: ExtensionServiceInfo
-        self.service_cache: OrderedDictType[str, ExtensionServiceInfo] = OrderedDict()
+        # Memory-aware cache for services
+        self.service_cache = None
+        self.cache_initialized = False
 
-        # Lock for ensuring async-safety when accessing/modifying the service_cache.
-        self.cache_lock = asyncio.Lock()
-
-        if MAX_CACHED_EXTENSION_SERVICES <= 0:
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES <= 0:
             logger.warning("MAX_CACHED_EXTENSION_SERVICES is non-positive. Cache will be disabled.")
+
+    async def _initialize_cache(self):
+        """Initialize the memory-aware cache for extension services."""
+        if self.cache_initialized:
+            return
+
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES > 0:
+            # Configure cache with memory limits
+            cache_config = CacheConfig(
+                max_entries=EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
+                max_memory_mb=env_settings.EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB,  # x MB for extension service cache
+                ttl_seconds=env_settings.CACHE_TTL_SECONDS,  # x seconds TTL
+                eviction_policy=EvictionPolicy.MEMORY_PRESSURE,
+                memory_check_interval=env_settings.CACHE_MEMORY_CHECK_INTERVAL,  # Check every x seconds (reduced frequency)
+                memory_threshold=env_settings.CACHE_MEMORY_THRESHOLD,  # Increased threshold
+                cleanup_ratio=env_settings.CACHE_CLEANUP_RATIO,  # Reduced cleanup ratio
+                enable_size_tracking=True,
+            )
+
+            self.service_cache = await global_cache_manager.create_cache("extension_services", cache_config)
+
+            logger.info(
+                f"Initialized memory-aware cache for extension services: "
+                f"max_entries={cache_config.max_entries}, "
+                f"max_memory_mb={cache_config.max_memory_mb}"
+            )
+
+        self.cache_initialized = True
 
     async def aget_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
         """
         Retrieves an extension service.
         First checks the cache, if not found, fetches from extension service and adds to cache.
-        Uses LRU eviction when cache is full.
+        Uses memory-aware eviction when needed.
 
         Args:
             service_enum: The unique enum of the service to retrieve.
@@ -50,52 +73,45 @@ class ExtensionServiceManager:
         """
         service_enum = service_enum.lower()  # Normalize service_enum to lowercase for consistency
 
-        async with self.cache_lock:  # Ensure async-safe access to the cache
-            # 1. Handle disabled cache scenario
-            if MAX_CACHED_EXTENSION_SERVICES <= 0:
-                logger.debug(f"Service caching disabled. Fetching '{service_enum}' directly from extension service.")
-                try:
-                    from app.services.extensions.extension_client import extension_client
+        # Initialize cache if not already done
+        await self._initialize_cache()
 
-                    return await extension_client.aget_extension_service_info(service_enum)
-                except Exception as e:
-                    logger.error(f"Failed to fetch service '{service_enum}': {str(e)}")
-                    return None
-
-            # 2. Check cache first
-            if service_enum in self.service_cache:
-                self.service_cache.move_to_end(service_enum)  # Mark as recently used
-                logger.debug(f"Service '{service_enum}' found in cache. Marked as recently used.")
-                return self.service_cache[service_enum]
-
-            # 3. Service not in cache, fetch from extension service
+        # Handle disabled cache scenario
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES <= 0 or self.service_cache is None:
+            logger.debug(f"Service caching disabled. Fetching '{service_enum}' directly from extension service.")
             try:
                 from app.services.extensions.extension_client import extension_client
 
-                logger.debug(f"Service '{service_enum}' not in cache. Fetching from extension service.")
-                service_info = await extension_client.aget_extension_service_info(service_enum)
-
-                if not service_info:
-                    logger.warning(f"Service '{service_enum}' not found in extension service.")
-                    return None
-
-                # 4. Add to cache with LRU eviction if needed
-                if len(self.service_cache) >= MAX_CACHED_EXTENSION_SERVICES:
-                    # Evict the least recently used service (oldest item)
-                    evicted_service_enum, _ = self.service_cache.popitem(last=False)
-                    logger.info(
-                        f"Service cache limit ({MAX_CACHED_EXTENSION_SERVICES}) reached. "
-                        f"Evicted '{evicted_service_enum}' to make space for '{service_enum}'."
-                    )
-
-                # Add the new service to the cache
-                self.service_cache[service_enum] = service_info
-                logger.info(f"Service '{service_enum}' fetched and added to cache.")
-                return service_info
-
+                return await extension_client.aget_extension_service_info(service_enum)
             except Exception as e:
-                logger.error(f"Failed to fetch service '{service_enum}' from extension service: {str(e)}")
+                logger.error(f"Failed to fetch service '{service_enum}': {str(e)}")
                 return None
+
+        # Check cache first
+        cached_service = await self.service_cache.get(service_enum)
+        if cached_service is not None:
+            logger.debug(f"Service '{service_enum}' found in cache.")
+            return cached_service
+
+        # Service not in cache, fetch from extension service
+        try:
+            from app.services.extensions.extension_client import extension_client
+
+            logger.debug(f"Service '{service_enum}' not in cache. Fetching from extension service.")
+            service_info = await extension_client.aget_extension_service_info(service_enum)
+
+            if not service_info:
+                logger.warning(f"Service '{service_enum}' not found in extension service.")
+                return None
+
+            # Add to cache (Memory Cache Manager handles eviction automatically)
+            await self.service_cache.put(service_enum, service_info)
+            logger.info(f"Service '{service_enum}' fetched and added to cache.")
+            return service_info
+
+        except Exception as e:
+            logger.error(f"Failed to fetch service '{service_enum}' from extension service: {str(e)}")
+            return None
 
     async def get_fresh_service_info(self, service_enum: str) -> Optional[ExtensionServiceInfo]:
         """
@@ -119,11 +135,10 @@ class ExtensionServiceManager:
             if fresh_service_info:
                 logger.debug(f"Successfully retrieved fresh service info for '{service_enum}'")
                 # Update the cache with fresh info
-                async with self.cache_lock:
-                    if service_enum in self.service_cache:
-                        self.service_cache[service_enum] = fresh_service_info
-                        self.service_cache.move_to_end(service_enum)  # Mark as recently used
-                        logger.debug(f"Updated cached service info for '{service_enum}'")
+                await self._initialize_cache()
+                if self.service_cache is not None:
+                    await self.service_cache.put(service_enum, fresh_service_info)
+                    logger.debug(f"Updated cached service info for '{service_enum}'")
             else:
                 logger.warning(f"Fresh service info not found for '{service_enum}'")
 
@@ -138,17 +153,24 @@ class ExtensionServiceManager:
         Returns information about all currently cached extension services.
 
         Returns:
-            A dictionary copy of the service cache.
+            A dictionary of cached services (limited functionality with memory cache).
         """
-        async with self.cache_lock:
-            return self.service_cache.copy()
+        await self._initialize_cache()
+        if self.service_cache is None:
+            return {}
+
+        # Note: Memory cache doesn't support direct iteration like OrderedDict
+        # This is a limitation when migrating to memory-aware cache
+        logger.warning("get_cached_services_info: Direct cache iteration not supported by MemoryCacheManager")
+        return {}
 
     async def clear_service_cache(self):
         """
         Clears all services from the service cache.
         """
-        async with self.cache_lock:
-            self.service_cache.clear()
+        await self._initialize_cache()
+        if self.service_cache is not None:
+            await self.service_cache.clear()
             logger.info("Service cache has been cleared.")
 
     async def remove_service_from_cache(self, service_enum: str) -> bool:
@@ -163,26 +185,47 @@ class ExtensionServiceManager:
         """
         service_enum = service_enum.lower()
 
-        async with self.cache_lock:
-            if service_enum in self.service_cache:
-                del self.service_cache[service_enum]
-                logger.info(f"Service '{service_enum}' removed from cache.")
-                return True
-            else:
-                logger.debug(f"Service '{service_enum}' not found in cache.")
-                return False
+        await self._initialize_cache()
+        if self.service_cache is None:
+            logger.debug(f"Cache not initialized. Service '{service_enum}' not found in cache.")
+            return False
 
-    def get_cache_stats(self) -> Dict[str, int]:
+        removed = await self.service_cache.remove(service_enum)
+        if removed:
+            logger.info(f"Service '{service_enum}' removed from cache.")
+        else:
+            logger.debug(f"Service '{service_enum}' not found in cache.")
+        return removed
+
+    async def get_cache_stats(self) -> Dict[str, Any]:
         """
         Get cache statistics.
 
         Returns:
             Dictionary with cache statistics.
         """
+        await self._initialize_cache()
+
+        if self.service_cache is None:
+            return {
+                "cached_services_count": 0,
+                "max_cached_services": EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
+                "cache_enabled": False,
+            }
+
+        # Get detailed stats from memory-aware cache
+        cache_stats = await self.service_cache.get_stats()
+
         return {
-            "cached_services_count": len(self.service_cache),
-            "max_cached_services": MAX_CACHED_EXTENSION_SERVICES,
-            "cache_enabled": MAX_CACHED_EXTENSION_SERVICES > 0,
+            "cached_services_count": cache_stats["entries_count"],
+            "max_cached_services": EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
+            "cache_enabled": True,
+            "cache_memory_mb": cache_stats["cache_memory_mb"],
+            "hit_rate": cache_stats["hit_rate"],
+            "total_hits": cache_stats["total_hits"],
+            "total_misses": cache_stats["total_misses"],
+            "total_evictions": cache_stats["total_evictions"],
+            "memory_pressure_events": cache_stats["memory_pressure_events"],
         }
 
 

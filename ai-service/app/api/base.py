@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.api.internal import memory as internal_memory
 from app.api.internal import user as internal_user
 from app.api.public.v1 import (
     assistant,
@@ -41,6 +42,7 @@ router.include_router(test.router)
 # Private routes
 private_router = APIRouter(prefix="/private", tags=["Private"])
 private_router.include_router(internal_user.router)
+private_router.include_router(internal_memory.router)
 router.include_router(private_router)
 
 # Public routes v1

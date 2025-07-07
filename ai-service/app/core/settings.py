@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Suggestion service LLM settings
     LLM_SUGGESTION_MODEL: str = "gpt-4.1-mini"
     SUGGESTION_MODEL_TEMPERATURE: float = 0.3
-    SUGGESTION_MODEL_MAX_TOKENS: int = 500
+    SUGGESTION_MODEL_MAX_TOKENS: int = 5000
 
     OPENAI_API_KEY: str = "<YOUR-API-KEY>"
     OPENAI_API_BASE_URL: str = "https://api.openai.com/v1"
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = "<YOUR-API-KEY>"
     ANTHROPIC_API_BASE_URL: str = "https://api.anthropic.com"
 
-    DEFAULT_CONTEXT_LIMIT: int = 8000  # Default context limit in tokens
+    DEFAULT_CONTEXT_LIMIT: int = 100000  # Default context limit in tokens
     DEFAULT_CONTEXT_RATIO: float = 0.2  # Ratio of context to response tokens
 
     # Embedding
@@ -84,15 +84,32 @@ class Settings(BaseSettings):
     PGVECTOR_COLLECTION: str = "<collection-name>"
 
     # Graph settings
-    RECURSION_LIMIT: int = 25  # Cache settings
-    MAX_PERSONAL_TOOLS_PER_USER: int = 500
-    MAX_CACHED_USERS: int = 200
-    MAX_CACHED_EXTENSION_SERVICES: int = 400
-    MAX_CACHED_MCP_USERS: int = 100
-    MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
+    RECURSION_LIMIT: int = 25
 
     # Upload settings
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
+
+    # Memory and Cache settings
+    SYSTEM_MEMORY_THRESHOLD: float = 92.0  # System memory threshold percentage
+    CACHE_MEMORY_THRESHOLD: float = 0.92  # Cache memory threshold ratio
+    CACHE_STARTUP_GRACE_PERIOD: float = 60.0  # Startup grace period in seconds
+    CACHE_CLEANUP_RATIO: float = 0.2  # Default cleanup ratio
+    CACHE_ENABLE_MEMORY_LOGGING: bool = True  # Enable detailed memory usage logging during cache checks
+    CACHE_DETAILED_LOGGING_INTERVAL: float = 300.0  # Interval for detailed memory reports in seconds (5 minutes)
+    CACHE_MEMORY_CHECK_INTERVAL: float = 120.0  # Interval for memory checks in seconds
+    CACHE_TTL_SECONDS: float = 3600.0  # Default TTL for cache entries in seconds (1 hour)
+
+    # Cache for streaming connections
+    STREAMING_CONNECTIONS_CACHE_MAX_ENTRIES: int = 1000  # Maximum concurrent
+    STREAMING_CONNECTIONS_CACHE_MAX_MEMORY_MB: float = 64.0  # 64MB for connection tracking
+
+    # Cache for tools
+    TOOLS_CACHE_MAX_ENTRIES: int = 1000  # Maximum number of cached
+    TOOLS_CACHE_MAX_MEMORY_MB: float = 512.0  # 512MB for tool tracking
+
+    # Cache for extension services
+    EXTENSION_SERVICES_CACHE_MAX_ENTRIES: int = 400  # Maximum number of cached extension services
+    EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB: float = 256.0  #
 
     # Sets the number of processors
     MAX_WORKERS: int = 1
