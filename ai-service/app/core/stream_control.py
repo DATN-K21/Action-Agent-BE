@@ -27,11 +27,11 @@ async def _initialize_connections_cache():
 
     # Configure cache for streaming connections
     cache_config = CacheConfig(
-        max_entries=1000,  # Maximum concurrent connections
-        max_memory_mb=64.0,  # 64MB for connection tracking
-        ttl_seconds=3600.0,  # 1 hour TTL for inactive connections
+        max_entries=env_settings.STREAMING_CONNECTIONS_CACHE_MAX_ENTRIES,  # Maximum concurrent connections
+        max_memory_mb=env_settings.STREAMING_CONNECTIONS_CACHE_MAX_MEMORY_MB,  # x MB for connection tracking
+        ttl_seconds=env_settings.CACHE_TTL_SECONDS,  #  x seconds TTL for inactive connections
         eviction_policy=EvictionPolicy.MEMORY_PRESSURE,
-        memory_check_interval=60.0,  # Check every 60 seconds (reduced frequency)
+        memory_check_interval=env_settings.CACHE_MEMORY_CHECK_INTERVAL,  # Check every x seconds (reduced frequency)
         memory_threshold=env_settings.CACHE_MEMORY_THRESHOLD,  # Use configurable threshold
         cleanup_ratio=env_settings.CACHE_CLEANUP_RATIO,  # Use configurable cleanup ratio
         enable_size_tracking=True,

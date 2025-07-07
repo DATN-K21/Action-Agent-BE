@@ -473,7 +473,7 @@ class SummariserNode(BaseNode):
                 history_string=self.get_optimized_context_string(state["history"]),
             )
             | self.final_answer_model
-            | RunnableLambda(self.tag_with_name).bind(name="final-answer")  # type: ignore[arg-type]
+            | RunnableLambda(self.tag_with_name).bind(name="hierarchical-final-answer")  # type: ignore[arg-type]
         )
         result = await summarise_chain.ainvoke(state, config)
         return {"history": [result], "all_messages": [result]}

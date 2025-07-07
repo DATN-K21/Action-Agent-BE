@@ -328,9 +328,9 @@ class MemoryCacheManager:
 
         # Check system memory usage
         try:
-            system_memory = psutil.virtual_memory()
-            if system_memory.percent > env_settings.SYSTEM_MEMORY_THRESHOLD:
-                logger.warning(f"System memory usage is high: {system_memory.percent:.1f}%")
+            system_virtual_memory = psutil.virtual_memory()
+            if system_virtual_memory.percent > env_settings.SYSTEM_MEMORY_THRESHOLD:
+                logger.warning(f"System memory usage is high: {system_virtual_memory.percent:.1f}%")
                 return True
         except Exception as e:
             logger.warning(f"Failed to get system memory info: {e}")
@@ -676,7 +676,7 @@ class MemoryCacheManager:
         """Get cache statistics."""
         async with self.lock:
             cache_memory_mb = self._get_cache_memory_usage_mb()
-            system_memory_mb = self._get_current_memory_usage_mb()
+            process_memory_mb = self._get_current_memory_usage_mb()
 
             hit_rate = 0.0
             total_requests = self.stats["hits"] + self.stats["misses"]
@@ -690,7 +690,7 @@ class MemoryCacheManager:
                 "cache_memory_mb": cache_memory_mb,
                 "max_memory_mb": self.config.max_memory_mb,
                 "max_entry_size_mb": self.config.max_entry_size_mb,
-                "system_memory_mb": system_memory_mb,
+                "process_memory_mb": process_memory_mb,
                 "hit_rate": hit_rate,
                 "total_hits": self.stats["hits"],
                 "total_misses": self.stats["misses"],
@@ -733,7 +733,7 @@ class MemoryCacheManager:
                 "total_size_mb": total_size / 1024 / 1024,
                 "average_size_mb": avg_size / 1024 / 1024,
                 "largest_entries": top_entries,
-                "system_memory_percent": psutil.virtual_memory().percent,
+                "system_memory_usage_percent": psutil.virtual_memory().percent,
             }
 
     async def finalize(self) -> None:
@@ -870,17 +870,17 @@ class GlobalCacheManager:
                 total_memory_mb += stats["cache_memory_mb"]
 
             # System memory info
-            system_memory = psutil.virtual_memory()
-            process_memory = psutil.Process().memory_info()
+            system_virtual_memory = psutil.virtual_memory()
+            process_memory_info = psutil.Process().memory_info()
 
             # Combine with memory monitor report
             result = {
                 "total_caches": len(self.caches),
                 "total_entries": total_entries,
                 "total_cache_memory_mb": total_memory_mb,
-                "system_memory_total_gb": system_memory.total / 1024 / 1024 / 1024,
-                "system_memory_used_percent": system_memory.percent,
-                "process_memory_mb": process_memory.rss / 1024 / 1024,
+                "system_memory_total_gb": system_virtual_memory.total / 1024 / 1024 / 1024,
+                "system_memory_usage_percent": system_virtual_memory.percent,
+                "process_memory_mb": process_memory_info.rss / 1024 / 1024,
                 "cache_details": cache_info,
             }
 

@@ -8,7 +8,7 @@ from app.services.extensions.extension_client import ExtensionServiceInfo
 logger = logging.get_logger(__name__)
 
 # --- Constants ---
-MAX_CACHED_EXTENSION_SERVICES = env_settings.MAX_CACHED_EXTENSION_SERVICES
+EXTENSION_SERVICES_CACHE_MAX_ENTRIES = env_settings.EXTENSION_SERVICES_CACHE_MAX_ENTRIES
 
 
 class ExtensionServiceManager:
@@ -28,7 +28,7 @@ class ExtensionServiceManager:
         self.service_cache = None
         self.cache_initialized = False
 
-        if MAX_CACHED_EXTENSION_SERVICES <= 0:
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES <= 0:
             logger.warning("MAX_CACHED_EXTENSION_SERVICES is non-positive. Cache will be disabled.")
 
     async def _initialize_cache(self):
@@ -36,16 +36,16 @@ class ExtensionServiceManager:
         if self.cache_initialized:
             return
 
-        if MAX_CACHED_EXTENSION_SERVICES > 0:
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES > 0:
             # Configure cache with memory limits
             cache_config = CacheConfig(
-                max_entries=MAX_CACHED_EXTENSION_SERVICES,
-                max_memory_mb=256.0,  # 256MB for extension service cache
-                ttl_seconds=3600.0,  # 1 hour TTL
+                max_entries=EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
+                max_memory_mb=env_settings.EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB,  # x MB for extension service cache
+                ttl_seconds=env_settings.CACHE_TTL_SECONDS,  # x seconds TTL
                 eviction_policy=EvictionPolicy.MEMORY_PRESSURE,
-                memory_check_interval=90.0,  # Check every 90 seconds (reduced frequency)
-                memory_threshold=0.85,  # Increased threshold
-                cleanup_ratio=0.25,  # Reduced cleanup ratio
+                memory_check_interval=env_settings.CACHE_MEMORY_CHECK_INTERVAL,  # Check every x seconds (reduced frequency)
+                memory_threshold=env_settings.CACHE_MEMORY_THRESHOLD,  # Increased threshold
+                cleanup_ratio=env_settings.CACHE_CLEANUP_RATIO,  # Reduced cleanup ratio
                 enable_size_tracking=True,
             )
 
@@ -77,7 +77,7 @@ class ExtensionServiceManager:
         await self._initialize_cache()
 
         # Handle disabled cache scenario
-        if MAX_CACHED_EXTENSION_SERVICES <= 0 or self.service_cache is None:
+        if EXTENSION_SERVICES_CACHE_MAX_ENTRIES <= 0 or self.service_cache is None:
             logger.debug(f"Service caching disabled. Fetching '{service_enum}' directly from extension service.")
             try:
                 from app.services.extensions.extension_client import extension_client
@@ -209,7 +209,7 @@ class ExtensionServiceManager:
         if self.service_cache is None:
             return {
                 "cached_services_count": 0,
-                "max_cached_services": MAX_CACHED_EXTENSION_SERVICES,
+                "max_cached_services": EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
                 "cache_enabled": False,
             }
 
@@ -218,7 +218,7 @@ class ExtensionServiceManager:
 
         return {
             "cached_services_count": cache_stats["entries_count"],
-            "max_cached_services": MAX_CACHED_EXTENSION_SERVICES,
+            "max_cached_services": EXTENSION_SERVICES_CACHE_MAX_ENTRIES,
             "cache_enabled": True,
             "cache_memory_mb": cache_stats["cache_memory_mb"],
             "hit_rate": cache_stats["hit_rate"],

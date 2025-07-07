@@ -454,7 +454,7 @@ async def acreate_hierarchical_graph(
         ),
     )
     build.add_node(
-        "final-answer",
+        "hierarchical-final-answer",
         RunnableLambda(
             SummariserNode(
                 provider=env_settings.OPENAI_PROVIDER,
@@ -534,11 +534,11 @@ async def acreate_hierarchical_graph(
             build.add_edge(name, leader_name)
 
     conditional_mapping: dict[Hashable, str] = {v: v for v in members}
-    conditional_mapping["FINISH"] = "final-answer"
+    conditional_mapping["FINISH"] = "hierarchical-final-answer"
     build.add_conditional_edges(leader_name, router, conditional_mapping)
 
     build.set_entry_point(leader_name)
-    build.set_finish_point("final-answer")
+    build.set_finish_point("hierarchical-final-answer")
     # Note: No interrupt_before needed since we use HumanNode with interrupt() function
     graph = build.compile(checkpointer=checkpointer, debug=env_settings.DEBUG_AGENT)
 

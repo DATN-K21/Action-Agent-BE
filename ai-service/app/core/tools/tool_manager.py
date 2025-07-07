@@ -25,8 +25,6 @@ os.environ.setdefault("USER_AGENT", env_settings.USER_AGENT)
 logger = logging.get_logger(__name__)
 
 # --- Constants ---
-MAX_PERSONAL_TOOLS_PER_USER = env_settings.MAX_PERSONAL_TOOLS_PER_USER
-MAX_CACHED_USERS = env_settings.MAX_CACHED_USERS
 DEFAULT_TOOLS_PACKAGE_PATH = "app.core.tools"
 
 
@@ -115,11 +113,6 @@ class ToolManager:
         self.personal_tool_cache = None
         self.cache_initialized = False
 
-        if MAX_CACHED_USERS <= 0:
-            logger.warning("Warning: MAX_CACHED_USERS non-positive. Personal user caching disabled.")
-        if MAX_PERSONAL_TOOLS_PER_USER <= 0:
-            logger.warning("Warning: MAX_PERSONAL_TOOLS_PER_USER non-positive. Per-user tool caching disabled.")
-
         self._load_initial_global_tools()  # Assumed to be called before concurrent access begins
 
     async def _initialize_cache(self):
@@ -127,16 +120,16 @@ class ToolManager:
         if self.cache_initialized:
             return
 
-        if MAX_CACHED_USERS > 0 and MAX_PERSONAL_TOOLS_PER_USER > 0:
+        if env_settings.TOOLS_CACHE_MAX_ENTRIES > 0:
             # Configure cache with memory limits
             cache_config = CacheConfig(
-                max_entries=MAX_CACHED_USERS * MAX_PERSONAL_TOOLS_PER_USER,
-                max_memory_mb=512.0,  # 512MB for tool cache
-                ttl_seconds=7200.0,  # 2 hours TTL
+                max_entries=env_settings.TOOLS_CACHE_MAX_ENTRIES,  # Use settings for max entries
+                max_memory_mb=env_settings.TOOLS_CACHE_MAX_MEMORY_MB,  # Use settings for max memory
+                ttl_seconds=env_settings.CACHE_TTL_SECONDS,
                 eviction_policy=EvictionPolicy.MEMORY_PRESSURE,
-                memory_check_interval=120.0,  # Check every 2 minutes (reduced frequency)
-                memory_threshold=0.85,  # Increased threshold
-                cleanup_ratio=0.15,  # Reduced cleanup ratio
+                memory_check_interval=env_settings.CACHE_MEMORY_CHECK_INTERVAL,  # Check every x minutes (reduced frequency)
+                memory_threshold=env_settings.CACHE_MEMORY_THRESHOLD,  # Increased threshold
+                cleanup_ratio=env_settings.CACHE_CLEANUP_RATIO,  # Reduced cleanup ratio
                 enable_size_tracking=True,
             )
 
@@ -259,7 +252,7 @@ class ToolManager:
 
     async def aadd_personal_tool(self, user_id: str, tool_key: str, tool_info: ToolInfo):
         """Add a personal tool to the cache."""
-        if MAX_CACHED_USERS <= 0 or MAX_PERSONAL_TOOLS_PER_USER <= 0:
+        if env_settings.TOOLS_CACHE_MAX_ENTRIES <= 0:
             return
 
         await self._initialize_cache()
@@ -303,7 +296,7 @@ class ToolManager:
         available_tools = self.global_tools.copy()
 
         # Add personal tools if cache is available
-        if self.personal_tool_cache is not None and MAX_CACHED_USERS > 0:
+        if self.personal_tool_cache is not None and env_settings.TOOLS_CACHE_MAX_ENTRIES > 0:
             # Get cache statistics to understand current state
             cache_stats = await self.personal_tool_cache.get_stats()
             logger.debug(
