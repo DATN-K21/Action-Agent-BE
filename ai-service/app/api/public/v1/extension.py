@@ -31,20 +31,8 @@ async def active(
         # Get the service object
         extension_service = extension_service_info.service_object
 
-        # Create connected extension
-        connected_extension = ConnectedExtension(
-            user_id=x_user_id,
-            extension_enum=str(extension_service.get_app_enum()),
-            extension_name=extension_service.get_name(),
-            connection_status=ConnectionStatus.PENDING,
-        )
-
-        session.add(connected_extension)
-        await session.commit()
-        await session.refresh(connected_extension)
-
         # Initialize the connection
-        connection_request = extension_service.initialize_connection(user_id=x_user_id, connected_extension_id=connected_extension.id)
+        connection_request = extension_service.initialize_connection(user_id=x_user_id)
 
         if connection_request is None:
             response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
@@ -74,6 +62,7 @@ async def disconnect(
                 func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
                 ConnectedExtension.user_id == x_user_id,
                 ConnectedExtension.is_deleted.is_(False),
+                ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
             )
             .limit(1)
         )
@@ -105,9 +94,10 @@ async def disconnect(
             statement = (
                 update(ConnectedExtension)
                 .where(
-                    ConnectedExtension.id == connected_extension.connected_account_id,
+                    ConnectedExtension.extension_enum == connected_extension.extension_enum,
                     ConnectedExtension.user_id == connected_extension.user_id,
                     ConnectedExtension.is_deleted.is_(False),
+                    ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
                 )
                 .values(
                     is_deleted=True,
@@ -141,6 +131,7 @@ async def check_active(
                 func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
                 ConnectedExtension.user_id == x_user_id,
                 ConnectedExtension.is_deleted.is_(False),
+                ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
             )
             .limit(1)
         )

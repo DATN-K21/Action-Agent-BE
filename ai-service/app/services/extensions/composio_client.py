@@ -26,13 +26,13 @@ class ComposioClient:
             logger.error(f"Error creating {app_enum} integration: {e}")
 
     @classmethod
-    def initiate_app_connection(cls, user_id: str, connected_extension_id: str, app_enum: App, redirect_url: str) -> ConnectionRequestModel | None:
+    def initiate_app_connection(cls, user_id: str, app_enum: App, redirect_url: str) -> ConnectionRequestModel | None:
         toolset = ComposioToolSet(api_key=env_settings.COMPOSIO_API_KEY)
         try:
             toolset.client.get_entity(id=user_id).get_connection(app=app_enum)
             return None
         except NoItemsFound:
-            request = toolset.initiate_connection(app=app_enum, entity_id=user_id, redirect_url=f"{redirect_url}/{user_id}/{connected_extension_id}")
+            request = toolset.initiate_connection(app=app_enum, entity_id=user_id, redirect_url=f"{redirect_url}/{user_id}")
             return request
 
     @classmethod
