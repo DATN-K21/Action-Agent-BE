@@ -1,11 +1,11 @@
 import { AiServiceAxiosInstance } from '@/configs/axios.config';
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, Types } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { App, AppDocument } from './schema/apps.schema';
 
 export interface GetAllAppsParams {
-	cursor?: string;
+	page?: number;
 	limit?: number;
 	category?: string,
 	sortBy?: string,
@@ -35,9 +35,9 @@ export interface CursorPaginationResponse {
 	meta: {
 		count: number,
 		limit: number,
-		all: number,
-		nextCursor: string | null,
-		hasMore: boolean,
+		total: number,
+		page: number,
+		totalPages: number,
 	};
 }
 
@@ -62,19 +62,12 @@ export class AppsService {
 	populateFilters = (params: GetAllAppsParams, keys: string[]): FilterQuery<AppDocument> => {
 		const filter: FilterQuery<AppDocument> = {};
 		const {
-			cursor,
 			category,
 			search,
 			connected,
 			userId,
 		} = params;
 
-		if (cursor) {
-			if (Types.ObjectId.isValid(cursor) === false) {
-				throw new BadRequestException('Invalid cursor');
-      }
-      filter._id = { $gt: new Types.ObjectId(cursor) };
-    }
 		if (category) {
 			filter.categories = { $in: [category] };
 		}
@@ -101,7 +94,7 @@ export class AppsService {
 		userId?: string,
 	): UserSpecifiedApp[] {
 		const userSpecifiedApps: UserSpecifiedApp[] = apps.map(app => {
-			const appObj = app.toObject();
+			const appObj = app;
 			return {
 				id: appObj._id.toString(),
 				key: appObj.key,
@@ -122,36 +115,35 @@ export class AppsService {
 
 	async getAllApps(params: GetAllAppsParams): Promise<CursorPaginationResponse> {
 		let connectedAppKeys: string[] = [];
-		const totalAppNumber = await this.appsModel.countDocuments().exec();
-		
-		const { limit, userId, sortBy, sortOrder } = params;
+		const { page, limit, userId, sortBy, sortOrder } = params;
+
 		if (userId) {
 			const connectedExtensions = await this.getConnectedApps(userId);
 			connectedAppKeys = connectedExtensions.map(app => app.extensionName);
 		}
 		const filter: FilterQuery<AppDocument> = this.populateFilters(params, connectedAppKeys);
 		
+		const pipeline: any[] = [];
+		pipeline.push({ $match: filter });
+    
 		const sortOptions: Record<string, 1 | -1> = {};
 		if (sortBy) {
 			sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+		} else {
+			sortOptions.key = 1;
 		}
-		sortOptions._id = 1;
+		sortOptions.id = 1;
 
-		const apps: AppDocument[] = await this.appsModel.find(filter)
-		.sort(sortOptions)
-		.limit(limit + 1)
-		.exec();
+		// Only get total count suitable for filter
+		const totalCount = await this.appsModel.countDocuments(filter).exec();
+		const totalPages = Math.ceil(totalCount / limit);
 
-		const hasMore: boolean = apps.length > limit;
-		let nextCursor: string | null = null;
+		pipeline.push({ $sort: sortOptions });
+		const skip = (page - 1) * limit;
+		pipeline.push({ $skip: skip });
+		pipeline.push({ $limit: limit });
 
-    if (hasMore) {
-      apps.pop();
-			const lastApp = apps[apps.length - 1] as AppDocument & { _id: Types.ObjectId } | undefined;
-			nextCursor = lastApp
-				? lastApp._id.toHexString()
-				: null;
-    }
+		const apps = await this.appsModel.aggregate(pipeline).exec();
 
 		const userSpecifiedApps = this.sanitizeApps(apps, connectedAppKeys, userId);
 		return {
@@ -159,9 +151,9 @@ export class AppsService {
 			meta: {
 				count: userSpecifiedApps.length,
 				limit,
-				all: totalAppNumber,
-				nextCursor,
-				hasMore,
+				total: totalCount,
+				page,
+				totalPages,
 			},
 		};
 	}

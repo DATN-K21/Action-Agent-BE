@@ -9,7 +9,7 @@ export class AppsController {
 
 	@Get('')
 	async getAllApps(
-		@Query('cursor') cursor?: string,
+		@Query('page') page?: number,
 		@Query('category') category?: string, // Optional, can be used for filtering apps by category
 		@Query('sortBy') sortBy?: string, // Optional, can be used for sorting apps
 		@Query('sortOrder') sortOrder?: 'asc' | 'desc', // Optional, can be used for sorting order
@@ -20,7 +20,7 @@ export class AppsController {
 ): Promise<{ status: string; message: string; data?: any; metadata?: any }> {
 	try {
 		const { result, meta } = await this.appsService.getAllApps({
-			cursor: cursor,
+			page: page ? parseInt(page.toString(), 10) : 1,
 			limit: limit ? parseInt(limit.toString(), 10) : 24, // Default limit, can be adjusted or made dynamic
 			category: category, // Optional category filter
 			sortBy: sortBy, // Optional sorting field
