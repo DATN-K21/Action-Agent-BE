@@ -508,6 +508,11 @@ async def _acreate_extension_member_with_skills(
         root_member_id: Root member ID for source reference
         request: Request data containing provider/model info
     """
+    # Load extension tools and create skills
+    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
+    if not extension_service_info or not extension_service_info.service_object:
+        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
     # Create member
     member_id = str(uuid.uuid4())
     member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
@@ -515,7 +520,7 @@ async def _acreate_extension_member_with_skills(
         id=member_id,
         name=member_name,
         team_id=team_id,
-        backstory="",
+        backstory=extension_service_info.description,
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
@@ -528,12 +533,6 @@ async def _acreate_extension_member_with_skills(
     )
     session.add(member)
     await session.flush()
-
-    # Load extension tools and create skills
-    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
-
-    if not extension_service_info or not extension_service_info.service_object:
-        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
 
     extension_service = extension_service_info.service_object
     tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -1038,6 +1037,11 @@ async def _aupdate_extension_members(
             connected_extension = result.scalar_one_or_none()
 
             if connected_extension:
+                # Create extension skills
+                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
+                if not extension_service_info or not extension_service_info.service_object:
+                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
                 # Create member
                 member_id = str(uuid.uuid4())
                 member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
@@ -1045,7 +1049,7 @@ async def _aupdate_extension_members(
                     id=member_id,
                     name=member_name,
                     team_id=hierarchical_team.id,
-                    backstory="",
+                    backstory=extension_service_info.description,
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
@@ -1058,12 +1062,6 @@ async def _aupdate_extension_members(
                 )
                 session.add(member)
                 await session.flush()
-
-                # Create extension skills
-                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
-
-                if not extension_service_info or not extension_service_info.service_object:
-                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
 
                 extension_service = extension_service_info.service_object
                 tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -1768,7 +1766,9 @@ async def acreate_advanced_assistant(
             select(Assistant).options(selectinload(Assistant.teams).selectinload(Team.members)).where(Assistant.id == new_assistant.id)
         )
         assistant_result = await session.execute(assistant_statement)
-        created_assistant = assistant_result.scalar_one()  # Format teams data for response using helper function
+        created_assistant = assistant_result.scalar_one()
+
+        # Format teams data for response using helper function
         teams_data = _format_team_data(created_assistant.teams)
 
         # Create response using helper function
@@ -1795,7 +1795,7 @@ async def acreate_advanced_assistant(
         return ResponseWrapper.wrap(status=201, data=response).to_response()
 
     except Exception as e:
-        logger.error(f"Error creating advanced assistant: {e}")
+        logger.exception(f"Error creating advanced assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -1861,7 +1861,7 @@ async def aget_assistant_by_id(
         return ResponseWrapper.wrap(status=200, data=response).to_response()
 
     except Exception as e:
-        logger.error(f"Error fetching assistant details: {e}")
+        logger.exception(f"Error fetching assistant details: {e}")
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
@@ -1996,7 +1996,7 @@ async def aupdate_advanced_assistant(
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:
-        logger.error(f"Error updating assistant: {e}", exc_info=True)
+        logger.exception(f"Error updating assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2049,7 +2049,7 @@ async def ahard_delete_advanced_assistant(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error deleting assistant: {e}")
+        logger.exception(f"Error deleting assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2100,7 +2100,7 @@ async def asoft_delete_advanced_assistant(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error soft deleting assistant: {e}")
+        logger.exception(f"Error soft deleting assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2169,6 +2169,6 @@ async def aupdate_assistant_config(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error updating assistant configuration: {e}")
+        logger.exception(f"Error updating assistant configuration: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
