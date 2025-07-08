@@ -1,14 +1,14 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
 import os
 import subprocess
 import uuid
 
+from app.core import logging
 from app.core.langmanus.ppt.graph.state import PPTState
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 def ppt_generator_node(state: PPTState):

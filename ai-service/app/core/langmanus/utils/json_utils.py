@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: MIT
 
 import json
-import logging
 
 import json_repair
 
-logger = logging.getLogger(__name__)
+from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 
 def repair_json_output(content: str) -> str:

@@ -1,3 +1,4 @@
+import asyncio
 import socket
 from contextlib import asynccontextmanager
 
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core import logging
 from app.core.db_session import async_engine
+from app.core.grpc_pool import close_grpc_connections, configure_grpc_pool
 from app.core.settings import env_settings
 from app.db_models import Base
 from app.memory.checkpoint import AsyncPostgresPool
@@ -24,17 +26,19 @@ async def lifespan(app: FastAPI):
         # Force IPv4: increase the speed when fetching data from Composio server
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
-        # Setup database schema and tables
-        await _setup_database()
-
-        # Manually set up the PostgreSQL connection pool
-        await AsyncPostgresPool.asetup()
+        # Setup database, PostgreSQL connection pool, and gRPC pool in parallel
+        await asyncio.gather(
+            _setup_database(),
+            AsyncPostgresPool.asetup(),
+            configure_grpc_pool(max_channels=20, channel_ttl=600.0),
+        )
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()
 
         yield
     finally:
+        await close_grpc_connections()
         await AsyncPostgresPool.atear_down()
 
 
@@ -45,7 +49,7 @@ async def _setup_database():
     """Setup database schema and tables."""
     await _create_database_schema()
     await _create_database_tables()
-    logger.info(f"Database schema and tables created/verified successfully. Schema = {env_settings.POSTGRES_SCHEMA}")
+    logger.info(f"Database schema/tables created/verified. Schema = {env_settings.POSTGRES_SCHEMA}")
 
 
 async def _create_database_schema():

@@ -1,26 +1,13 @@
-"""
-Main module for the ingest-service. This is just a wrapper to import the celery app.
-"""
+from app.core import logging
 
-from celery import Celery, signals
+logging.configure_logging()
+
+from celery import Celery
 from kombu import Queue
 
-from app.core import logging
 from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
-
-
-@signals.after_setup_logger.connect
-def _update_root_logger(logger, *args, **kwargs):
-    logger.setLevel(env_settings.LOGGING_LOG_LEVEL)  # global “celery” logger
-    for h in logger.handlers:  # keep handlers in sync
-        h.setLevel(env_settings.LOGGING_LOG_LEVEL)
-
-
-@signals.after_setup_task_logger.connect
-def _update_task_logger(logger, *args, **kwargs):
-    logger.setLevel(env_settings.LOGGING_LOG_LEVEL)  # per-task logger
 
 
 celery_app = Celery(
@@ -41,7 +28,6 @@ celery_app.conf.update(
 # This tells Celery which queues to consume from when no -Q is specified
 celery_app.conf.task_queues = (
     Queue("document.processing"),
-    Queue("document.search"),
     Queue("ping"),
 )
 

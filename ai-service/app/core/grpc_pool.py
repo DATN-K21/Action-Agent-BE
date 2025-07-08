@@ -226,7 +226,7 @@ def get_grpc_pool_stats() -> Dict[str, Any]:
     return _connection_pool.get_stats()
 
 
-def configure_grpc_pool(max_channels: int = 10, channel_ttl: float = 300.0):
+async def configure_grpc_pool(max_channels: int = 10, channel_ttl: float = 300.0):
     """Configure the gRPC connection pool parameters.
 
     Args:
@@ -239,5 +239,3 @@ def configure_grpc_pool(max_channels: int = 10, channel_ttl: float = 300.0):
     global _connection_pool
     if not hasattr(_connection_pool, "_initialized"):
         _connection_pool = GRPCConnectionPool(max_channels, channel_ttl)
-    else:
-        logger.warning("gRPC pool already initialized, configuration not applied")

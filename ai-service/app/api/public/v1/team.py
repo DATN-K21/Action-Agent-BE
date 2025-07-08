@@ -10,7 +10,7 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import WorkflowType
 from app.core.graph.build import generator
-from app.db_models import Member, Team, Thread
+from app.db_models import Member, Team, Thread, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.team import ChatTeamRequest, CreateTeamRequest, TeamResponse, TeamsResponse, UpdateTeamRequest
 
@@ -387,6 +387,15 @@ async def astream(
         for graph in graphs:
             graph.config = graph.config
 
+        # Load global uploads for this user
+        statement = select(Upload).where(Upload.user_id == x_user_id, Upload.is_deleted.is_(False), Upload.is_global.is_(True))
+        result = await session.execute(statement)
+        global_uploads = result.scalars().all()
+
+        # Append global uploads to the team members
+        for member in members:
+            member.uploads.extend(global_uploads)
+
         from app.core.stream_control import acleanup_connection, acreate_stop_event
 
         # Create a stop event for this streaming session
@@ -396,6 +405,15 @@ async def astream(
             try:
                 async for item in generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
                     yield item
+            except asyncio.CancelledError:
+                # Handle cancellation gracefully
+                logger.info(f"Stream cancelled for user {x_user_id}, thread {thread_id}")
+                raise
+            except Exception as e:
+                # Log the error and yield an error event
+                logger.error(f"Error in stream generator for user {x_user_id}, thread {thread_id}: {e}", exc_info=True)
+                # Yield a server-sent event with error information
+                yield f"event: error\ndata: {{\"error\": \"An error occurred during streaming\", \"details\": \"{str(e)}\"}}\n\n"
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:

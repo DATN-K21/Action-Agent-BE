@@ -3,7 +3,6 @@
 
 import base64
 import json
-import logging
 import os
 from typing import Annotated, Any, List, cast
 from uuid import uuid4
@@ -14,6 +13,7 @@ from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.types import Command
 
+from app.core import logging
 from app.core.langmanus.config.tools import SELECTED_RAG_PROVIDER
 from app.core.langmanus.graph.builder import build_graph_with_memory
 from app.core.langmanus.podcast.graph.builder import build_graph as build_podcast_graph
@@ -34,7 +34,7 @@ from app.core.langmanus.server.mcp_utils import load_mcp_tools
 from app.core.langmanus.server.rag_request import RAGConfigResponse, RAGResourceRequest, RAGResourcesResponse
 from app.core.langmanus.tools import VolcengineTTS
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 

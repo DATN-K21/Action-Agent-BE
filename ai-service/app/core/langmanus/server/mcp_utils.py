@@ -1,7 +1,6 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -10,7 +9,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 
-logger = logging.getLogger(__name__)
+from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 
 async def _get_tools_from_client_session(client_context_manager: Any, timeout_seconds: int = 10) -> List:

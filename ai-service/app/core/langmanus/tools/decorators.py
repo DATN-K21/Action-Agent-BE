@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: MIT
 
 import functools
-import logging
 from typing import Any, Callable, Type, TypeVar, cast
 
-logger = logging.getLogger(__name__)
+from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 T = TypeVar("T")
 

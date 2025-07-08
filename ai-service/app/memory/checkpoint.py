@@ -35,7 +35,7 @@ class AsyncPostgresPool:
                     timeout=5,
                 )
                 await cls._async_pool.open()
-                logger.info("Connection pool set up successfully")
+                logger.info("Checkpoint connection pool set up successfully")
             except Exception as e:
                 logger.exception("Error setting up connection pool: %s", e)
                 raise HTTPException(status_code=500, detail="Error setting up connection pool") from e
@@ -49,7 +49,7 @@ class AsyncPostgresPool:
             try:
                 await cls._async_pool.close()
                 cls._async_pool = None
-                logger.info("Connection pool torn down successfully")
+                logger.info("Checkpoint connection pool torn down successfully")
             except Exception as e:
                 logger.exception("Error tearing down connection pool: %s", e)
                 raise HTTPException(status_code=500, detail="Error tearing down connection pool") from e

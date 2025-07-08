@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "azure-storage-blob>=12.25.1",
     "beautifulsoup4>=4.13.3",
+    "cachetools>=5.5.2",
     "celery[redis]>=5.5.3",
     "composio>=0.1.1",
     "composio-langchain>=0.7.4",

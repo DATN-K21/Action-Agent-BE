@@ -37,12 +37,13 @@ async def update_upload_status(
             return ResponseWrapper.wrap(status=400, message=f"Invalid status: {request.status}").to_response()
 
         upload.status = upload_status
-        await session.commit()
-
         if upload_status == UploadStatus.FAILED:
+            upload.failed_reason = request.error_message
             logger.warning(f"Upload {upload_id} failed. Error message = {request.error_message}")
         else:
             logger.info(f"Upload {upload_id} status updated to {upload_status}")
+
+        await session.commit()
         return ResponseWrapper.wrap(status=200, data=None).to_response()
 
     except Exception as e:
@@ -50,31 +51,3 @@ async def update_upload_status(
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
-
-@router.delete("/{upload_id}", summary="Delete upload record")
-async def delete_upload(
-    upload_id: str,
-    session: SessionDep,
-):
-    """Internal API endpoint for deleting upload record after vector store cleanup."""
-    logger.info(f"Deleting upload record {upload_id}")
-
-    try:
-        statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
-        result = await session.execute(statement)
-        upload = result.scalar_one_or_none()
-
-        if not upload:
-            return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-
-        # Soft delete pattern instead of physically deleting
-        upload.is_deleted = True
-        await session.commit()
-
-        logger.info(f"Successfully deleted upload record {upload_id}")
-        return ResponseWrapper.wrap(status=200, data=None).to_response()
-
-    except Exception as e:
-        logger.error(f"Error deleting upload: {e}", exc_info=True)
-        await session.rollback()
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

@@ -10,7 +10,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from app.core import logging
 from app.core.enums import StorageStrategy
-from app.core.search_client import SearchAPIWrapper
+from app.core.search_client import create_search_client
 from app.core.tools.api_tool import dynamic_api_tool
 from app.core.tools.retriever_tool import create_retriever_tool_custom_modified
 from app.core.tools.tool_manager import global_tools, tool_manager
@@ -134,7 +134,7 @@ class GraphUpload(BaseModel):
     upload_id: str = Field(description="Id of the upload")
 
     async def aget_tool(self) -> BaseTool:
-        retriever = SearchAPIWrapper().retriever(self.user_id, [self.upload_id])
+        retriever = create_search_client(self.user_id, self.upload_id)
         return create_retriever_tool_custom_modified(retriever)
 
 

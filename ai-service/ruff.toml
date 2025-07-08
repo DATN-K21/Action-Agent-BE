@@ -3,7 +3,11 @@ indent-width = 4
 
 # Exclude generated protobuf files
 exclude = [
-    "app/grpc/*_pb2.py",
-    "app/grpc/*_pb2_grpc.py",
+    "generated/*_pb2.py",
+    "generated/*_pb2_grpc.py",
 ]
+
+# Per-file ignores
+[per-file-ignores]
+"app/main.py" = ["E402"]  # Module level import not at top of file
 

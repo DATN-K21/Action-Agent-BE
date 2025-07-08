@@ -1,16 +1,16 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
 from typing import Annotated
 
 from langchain_core.tools import tool
 
+from app.core import logging
 from app.core.langmanus.crawler import Crawler
 
 from .decorators import log_io
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 @tool

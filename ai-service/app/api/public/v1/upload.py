@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
@@ -10,14 +10,13 @@ from app.celery import celery_app
 from app.core import logging
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, UploadStatus, WorkflowType
-from app.core.search_client import SearchAPIRetriever
+from app.core.search_client import create_search_client
 from app.core.settings import env_settings
 from app.db_models.assistant import Assistant
 from app.db_models.member_upload_link import MemberUploadLink
 from app.db_models.team import Team
 from app.db_models.thread import Thread
 from app.db_models.upload import Upload
-from app.db_models.upload_thread_link import UploadThreadLink
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.upload import (
     UploadInitiateRequest,
@@ -100,9 +99,6 @@ async def adelete_upload(
         return ResponseWrapper.wrap(status=400, message="Upload must be completed or failed before deletion").to_response()
 
     try:
-        # Remove all upload-thread links first
-        await _remove_upload_thread_links(session, upload_id)
-
         # Soft-delete upload record
         upload.is_deleted = True
         session.add(upload)
@@ -195,6 +191,7 @@ async def ainitiate_upload(
             user_id=x_user_id,
             status=UploadStatus.UPLOADING,  # Set to uploading - file is being uploaded to Azure
             is_global=is_global,
+            thread_id=request.thread_id,  # Set thread_id directly (None for global uploads)
         )
 
         session.add(upload)
@@ -206,12 +203,9 @@ async def ainitiate_upload(
 
         # Handle upload-thread relationships based on global/private nature
         if request.thread_id is not None:
-            # Private upload: link only to specified thread
-            await _create_upload_thread_link(session, upload.id, request.thread_id)
+            # Private upload: validate thread exists and link to assistant members
+            await _validate_thread_exists(session, request.thread_id)
             await _alink_upload_to_assistant_members(session, upload.id, request.thread_id, x_user_id)
-        else:
-            # Global upload: link to all user's threads
-            await _link_upload_to_all_user_threads(session, upload.id, x_user_id)
 
         await session.commit()
 
@@ -561,12 +555,10 @@ async def atry_search_upload(
             return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
         # Create search retriever
-        retriever = SearchAPIRetriever(
-            user_id=upload.user_id, upload_id=upload.id, search_type=search_type, top_k=top_k, score_threshold=score_threshold
-        )
+        retriever = create_search_client(user_id=x_user_id, thread_id=upload.thread_id or "global")
 
         # Perform search
-        documents = retriever._get_relevant_documents(query)
+        documents = await retriever._perform_search(query, [upload_id])
 
         # Format results
         search_results = []
@@ -632,14 +624,12 @@ async def atry_search_thread(
         if x_user_role not in ["admin", "super_admin"] and thread.user_id != x_user_id:
             return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
 
-        # Get all completed uploads linked to this thread + global uploads (uploads without any thread link)
-        uploads_statement = (
-            select(Upload)
-            .join(UploadThreadLink, Upload.id == UploadThreadLink.upload_id)
-            .where(
-                Upload.status == UploadStatus.COMPLETED,
-                Upload.is_deleted.is_(False),
-            )
+        # Get all completed uploads linked to this thread + global uploads
+        uploads_statement = select(Upload).where(
+            Upload.is_deleted.is_(False),
+            Upload.status == UploadStatus.COMPLETED,
+            Upload.user_id == x_user_id,  # Only user's uploads
+            (Upload.thread_id == thread_id) | Upload.is_global,  # Thread-specific or global uploads
         )
 
         uploads_result = await session.execute(uploads_statement)
@@ -654,12 +644,10 @@ async def atry_search_thread(
         all_results = []
 
         try:
-            # Create search retriever for this upload
-            retriever = SearchAPIRetriever(
+            # Create search retriever for this thread
+            retriever = create_search_client(
                 user_id=x_user_id,
-                upload_ids=[upload.id for upload in uploads],
-                top_k=top_k,
-                score_threshold=score_threshold,
+                thread_id=thread_id,
             )
 
             # Perform search
@@ -699,6 +687,24 @@ async def atry_search_thread(
 # =============================================================================
 # Private Helper Methods
 # =============================================================================
+
+
+async def _validate_thread_exists(session: SessionDep, thread_id: str) -> None:
+    """
+    Validate that the thread exists.
+
+    Args:
+        session: Database session
+        thread_id: ID of the thread
+
+    Raises:
+        HTTPException: If thread not found
+    """
+    thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+    thread_result = await session.execute(thread_statement)
+    thread = thread_result.scalar_one_or_none()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
 
 
 async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str, thread_id: str, user_id: str) -> None:
@@ -802,83 +808,3 @@ def _get_file_type(filename: str) -> str:
         return "md"
     else:
         return "unknown"
-
-
-async def _create_upload_thread_link(session: SessionDep, upload_id: str, thread_id: str) -> None:
-    """
-    Validate thread existence and create upload-thread link.
-
-    Args:
-        session: Database session
-        upload_id: ID of the upload
-        thread_id: ID of the thread
-
-    Raises:
-        HTTPException: If thread not found
-    """
-    # Check if thread exists
-    thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
-    thread_result = await session.execute(thread_statement)
-    thread = thread_result.scalar_one_or_none()
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
-
-    # Create link between upload and thread
-    link = UploadThreadLink(upload_id=upload_id, thread_id=thread_id)
-    session.add(link)
-
-
-async def _link_upload_to_all_user_threads(session: SessionDep, upload_id: str, user_id: str) -> None:
-    """
-    Link an upload to all threads of a user (for global uploads).
-
-    Args:
-        session: Database session
-        upload_id: ID of the upload to link
-        user_id: ID of the user who owns the upload
-    """
-    try:
-        # Find all threads for this user
-        user_threads_statement = select(Thread).where(Thread.user_id == user_id, Thread.is_deleted.is_(False))
-
-        result = await session.execute(user_threads_statement)
-        user_threads = result.scalars().all()
-
-        # Create UploadThreadLink for each thread
-        for thread in user_threads:
-            # Check if link already exists to avoid duplicates
-            existing_link_statement = select(UploadThreadLink).where(UploadThreadLink.upload_id == upload_id, UploadThreadLink.thread_id == thread.id)
-            existing_result = await session.execute(existing_link_statement)
-            existing_link = existing_result.scalar_one_or_none()
-
-            if not existing_link:
-                link = UploadThreadLink(upload_id=upload_id, thread_id=thread.id)
-                session.add(link)
-
-        logger.info(f"Linked upload {upload_id} to {len(user_threads)} user threads")
-
-    except Exception as e:
-        logger.error(f"Error linking upload {upload_id} to user threads: {str(e)}")
-        raise
-
-
-async def _remove_upload_thread_links(session: SessionDep, upload_id: str) -> None:
-    """
-    Remove all UploadThreadLinks associated with an upload.
-
-    Args:
-        session: Database session
-        upload_id: ID of the upload being deleted
-    """
-    try:
-        # Delete all UploadThreadLinks for this upload
-        delete_statement = delete(UploadThreadLink).where(UploadThreadLink.upload_id == upload_id)
-
-        result = await session.execute(delete_statement)
-        deleted_count = result.rowcount
-
-        logger.info(f"Removed {deleted_count} upload-thread links for upload {upload_id}")
-
-    except Exception as e:
-        logger.error(f"Error removing upload-thread links for upload {upload_id}: {str(e)}")
-        raise

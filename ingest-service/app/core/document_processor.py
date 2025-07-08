@@ -12,7 +12,6 @@ Fully Async Azure-blob → Document chunks
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import tempfile
 from typing import List, Sequence
@@ -32,12 +31,13 @@ from langchain_community.document_loaders import (
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from app.core import logging
 from app.core.settings import env_settings
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
-async def _download_azure_blob_async(blob_url: str) -> tuple[bytes, str]:
+async def _download_azure_blob_async(blob_url: str) -> tuple[bytes, str, str]:
     """Async download via Azure SDK (aio variant)."""
     if not env_settings.AZURE_BLOB_CONNECTION_STRING:
         raise ValueError("Azure Blob Storage connection string not configured")
@@ -52,9 +52,10 @@ async def _download_azure_blob_async(blob_url: str) -> tuple[bytes, str]:
         stream = await blob_client.download_blob()
         blob_data: bytes = await stream.readall()
 
+        filename = blob_name.split(".")[0] if "." in blob_name else blob_name
         ext = blob_name.split(".")[-1] if "." in blob_name else ""
         logger.info("Downloaded blob %s (%s bytes)", blob_name, len(blob_data))
-        return blob_data, ext
+        return blob_data, filename, ext
     finally:
         await svc.close()
 
@@ -83,10 +84,10 @@ async def aload_and_split_document(
     if "blob.core.windows.net" not in file_path:
         raise ValueError("Only Azure blob URLs are supported")
 
-    blob_data, ext = await _download_azure_blob_async(file_path)
+    blob_data, filename, ext = await _download_azure_blob_async(file_path)
 
     # 1. Write to a temp file (async)
-    fd, temp_path = tempfile.mkstemp(suffix=f".{ext}")
+    fd, temp_path = tempfile.mkstemp(prefix=f"{filename}_", suffix=f".{ext}")
     os.close(fd)  # Close the file descriptor so we can open it async
 
     async with aiofiles.open(temp_path, "wb") as f:

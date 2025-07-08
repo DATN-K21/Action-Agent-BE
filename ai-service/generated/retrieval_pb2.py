@@ -10,7 +10,14 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
-_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 0, "", "retrieval.proto")
+_runtime_version.ValidateProtobufRuntimeVersion(
+    _runtime_version.Domain.PUBLIC,
+    5,
+    29,
+    0,
+    '',
+    'retrieval.proto'
+)
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -18,7 +25,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fretrieval.proto\x12\tretrieval\"k\n\rSearchRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x12\n\nupload_ids\x18\x02 \x03(\t\x12\r\n\x05query\x18\x03 \x01(\t\x12\r\n\x05top_k\x18\x04 \x01(\x05\x12\x17\n\x0fscore_threshold\x18\x05 \x01(\x02\"\x98\x01\n\x0cSearchResult\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x37\n\x08metadata\x18\x02 \x03(\x0b\x32%.retrieval.SearchResult.MetadataEntry\x12\r\n\x05score\x18\x03 \x01(\x02\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"X\n\x0eSearchResponse\x12(\n\x07results\x18\x01 \x03(\x0b\x32\x17.retrieval.SearchResult\x12\r\n\x05total\x18\x02 \x01(\x05\x12\r\n\x05query\x18\x03 \x01(\t2Q\n\x10RetrievalService\x12=\n\x06Search\x12\x18.retrieval.SearchRequest\x1a\x19.retrieval.SearchResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fretrieval.proto\x12\tretrieval\"j\n\rSearchRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x11\n\tupload_id\x18\x02 \x01(\t\x12\r\n\x05query\x18\x03 \x01(\t\x12\r\n\x05top_k\x18\x04 \x01(\x05\x12\x17\n\x0fscore_threshold\x18\x05 \x01(\x02\"\x98\x01\n\x0cSearchResult\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x37\n\x08metadata\x18\x02 \x03(\x0b\x32%.retrieval.SearchResult.MetadataEntry\x12\r\n\x05score\x18\x03 \x01(\x02\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"X\n\x0eSearchResponse\x12(\n\x07results\x18\x01 \x03(\x0b\x32\x17.retrieval.SearchResult\x12\r\n\x05total\x18\x02 \x01(\x05\x12\r\n\x05query\x18\x03 \x01(\t2Q\n\x10RetrievalService\x12=\n\x06Search\x12\x18.retrieval.SearchRequest\x1a\x19.retrieval.SearchResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -28,13 +35,13 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SEARCHRESULT_METADATAENTRY']._loaded_options = None
   _globals['_SEARCHRESULT_METADATAENTRY']._serialized_options = b'8\001'
   _globals['_SEARCHREQUEST']._serialized_start=30
-  _globals['_SEARCHREQUEST']._serialized_end=137
-  _globals['_SEARCHRESULT']._serialized_start=140
-  _globals['_SEARCHRESULT']._serialized_end=292
-  _globals['_SEARCHRESULT_METADATAENTRY']._serialized_start=245
-  _globals['_SEARCHRESULT_METADATAENTRY']._serialized_end=292
-  _globals['_SEARCHRESPONSE']._serialized_start=294
-  _globals['_SEARCHRESPONSE']._serialized_end=382
-  _globals['_RETRIEVALSERVICE']._serialized_start=384
-  _globals['_RETRIEVALSERVICE']._serialized_end=465
+  _globals['_SEARCHREQUEST']._serialized_end=136
+  _globals['_SEARCHRESULT']._serialized_start=139
+  _globals['_SEARCHRESULT']._serialized_end=291
+  _globals['_SEARCHRESULT_METADATAENTRY']._serialized_start=244
+  _globals['_SEARCHRESULT_METADATAENTRY']._serialized_end=291
+  _globals['_SEARCHRESPONSE']._serialized_start=293
+  _globals['_SEARCHRESPONSE']._serialized_end=381
+  _globals['_RETRIEVALSERVICE']._serialized_start=383
+  _globals['_RETRIEVALSERVICE']._serialized_end=464
 # @@protoc_insertion_point(module_scope)

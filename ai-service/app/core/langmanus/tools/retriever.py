@@ -1,17 +1,17 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
 from typing import List, Optional, Type
 
 from langchain_core.callbacks import AsyncCallbackManagerForToolRun, CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from app.core import logging
 from app.core.langmanus.config.tools import SELECTED_RAG_PROVIDER
 from app.core.langmanus.rag import Document, Resource, Retriever, build_retriever
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class RetrieverInput(BaseModel):

@@ -12,10 +12,10 @@ service RetrievalService {
 //  Messages
 // --------------------------------------------------
 message SearchRequest  {
-  string user_id       = 1;
-  repeated string upload_ids = 2;
-  string query         = 3;
-  int32  top_k         = 4;
+  string user_id    = 1;
+  string upload_id  = 2;
+  string query      = 3;
+  int32  top_k      = 4;
   float  score_threshold = 5;
 }
 

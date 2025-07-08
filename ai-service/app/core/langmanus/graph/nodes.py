@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 import json
-import logging
 import os
 from typing import Annotated, Literal
 
@@ -12,6 +11,7 @@ from langchain_core.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.types import Command, interrupt
 
+from app.core import logging
 from app.core.langmanus.agents import create_agent
 from app.core.langmanus.config.agents import AGENT_LLM_MAP
 from app.core.langmanus.config.configuration import Configuration
@@ -25,7 +25,7 @@ from app.core.langmanus.utils.json_utils import repair_json_output
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 from .types import State
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 @tool

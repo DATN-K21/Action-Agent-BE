@@ -1,15 +1,18 @@
+from app.core import logging
+
+logging.configure_logging()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.base import router
-from app.core import exceptions, logging, swagger
+from app.core import exceptions, swagger
 from app.core.lifespan import lifespan
 from app.core.settings import env_settings
 
-logging.configure_logging()
-
 logger = logging.get_logger(__name__)
-logger.info(f"Starting server... DebugMode = {env_settings.DEBUG_SERVER}")
+if env_settings.DEBUG_SERVER:
+    logger.info("FastAPI server is running. DebugMode = True")
 
 app = FastAPI(
     debug=env_settings.DEBUG_SERVER,
