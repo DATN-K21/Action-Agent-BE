@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Header
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
@@ -63,25 +63,20 @@ async def active(
 @router.post(path="/disconnect", summary="Disconnect the account.", response_model=ResponseWrapper[DeleteConnectionResponse])
 async def disconnect(
     session: SessionDep,
-    connected_extension_id: str,
+    extension_enum: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
         # Get connected extension
-
-        if x_user_role in ["admin", "super admin"]:
-            statement = (
-                select(ConnectedExtension).where(ConnectedExtension.id == connected_extension_id, ConnectedExtension.is_deleted.is_(False)).limit(1)
+        statement = (
+            select(ConnectedExtension)
+            .where(
+                func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
+                ConnectedExtension.user_id == x_user_id,
+                ConnectedExtension.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.id == connected_extension_id, ConnectedExtension.user_id == x_user_id, ConnectedExtension.is_deleted.is_(False)
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_extension = result.scalar_one_or_none()
@@ -107,32 +102,18 @@ async def disconnect(
 
         # Delete the account from the database
         if result.status == "success":
-            if x_user_role in ["admin", "super admin"]:
-                statement = (
-                    update(ConnectedExtension)
-                    .where(
-                        ConnectedExtension.id == connected_extension.connected_account_id,
-                        ConnectedExtension.is_deleted.is_(False),
-                    )
-                    .values(
-                        is_deleted=True,
-                        deleted_at=datetime.now(),
-                    )
+            statement = (
+                update(ConnectedExtension)
+                .where(
+                    ConnectedExtension.id == connected_extension.connected_account_id,
+                    ConnectedExtension.user_id == connected_extension.user_id,
+                    ConnectedExtension.is_deleted.is_(False),
                 )
-
-            else:
-                statement = (
-                    update(ConnectedExtension)
-                    .where(
-                        ConnectedExtension.id == connected_extension.connected_account_id,
-                        ConnectedExtension.user_id == connected_extension.user_id,
-                        ConnectedExtension.is_deleted.is_(False),
-                    )
-                    .values(
-                        is_deleted=True,
-                        deleted_at=datetime.now(),
-                    )
+                .values(
+                    is_deleted=True,
+                    deleted_at=datetime.now(),
                 )
+            )
 
             await session.execute(statement)
             await session.commit()
@@ -149,26 +130,20 @@ async def disconnect(
 @router.get(path="/check-active", summary="Check the connection.", response_model=ResponseWrapper[CheckConnectionResponse])
 async def check_active(
     session: SessionDep,
-    connected_extension_id: str,
+    extension_enum: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
         # Get the connected extension
-        if x_user_role in ["admin", "super admin"]:
-            statement = (
-                select(ConnectedExtension).where(ConnectedExtension.id == connected_extension_id, ConnectedExtension.is_deleted.is_(False)).limit(1)
+        statement = (
+            select(ConnectedExtension)
+            .where(
+                func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
+                ConnectedExtension.user_id == x_user_id,
+                ConnectedExtension.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.id == connected_extension_id,
-                    ConnectedExtension.user_id == x_user_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_extension = result.scalar_one_or_none()
