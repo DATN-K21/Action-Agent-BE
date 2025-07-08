@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from crewai import LLM
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
@@ -49,6 +51,7 @@ SUPPORTED_MODELS = [
 ]
 
 
+@lru_cache(maxsize=32)
 def init_model(model: str, temperature: float, api_key: str, base_url: str, **kwargs):
     model_info = next((m for m in SUPPORTED_MODELS if m["name"] == model), None)
     if model_info and ModelCategory.CHAT in model_info["categories"]:
@@ -63,6 +66,7 @@ def init_model(model: str, temperature: float, api_key: str, base_url: str, **kw
         raise ValueError(f"Model {model} is not supported as a chat model.")
 
 
+@lru_cache(maxsize=32)
 def init_crewai_model(model: str, api_key: str, base_url: str, **kwargs):
     model_info = next((m for m in SUPPORTED_MODELS if m["name"] == model), None)
     if model_info and ModelCategory.CHAT in model_info["categories"]:
