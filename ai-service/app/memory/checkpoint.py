@@ -25,7 +25,12 @@ class AsyncPostgresPool:
             try:
                 cls._async_pool = AsyncConnectionPool(
                     conninfo=f"postgresql://{env_settings.POSTGRES_URL_PATH}",
-                    kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+                    kwargs={
+                        "autocommit": True,
+                        "prepare_threshold": 0,
+                        "row_factory": dict_row,
+                        "options": f"-csearch_path={env_settings.POSTGRES_SCHEMA}",
+                    },
                     open=False,
                     timeout=5,
                     min_size=2,  # Minimum connections in pool
@@ -48,7 +53,7 @@ class AsyncPostgresPool:
             try:
                 await cls._async_pool.close()
                 cls._async_pool = None
-                logger.info("Connection pool torn down successfully")
+                logger.info("Checkpoint connection pool torn down successfully")
             except Exception as e:
                 logger.exception("Error tearing down connection pool: %s", e)
                 raise HTTPException(status_code=500, detail="Error tearing down connection pool") from e

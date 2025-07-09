@@ -1,23 +1,17 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
+from app.core import logging
 
 from .graph import build_graph
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,  # Default level is INFO
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 
 
 def enable_debug_logging():
     """Enable debug level logging for more detailed execution information."""
-    logging.getLogger("src").setLevel(logging.DEBUG)
+    logging.get_logger("src").setLevel(logging.DEBUG)
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 # Create the graph
 graph = build_graph()

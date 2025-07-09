@@ -1,0 +1,32 @@
+syntax = "proto3";
+package retrieval;
+
+// --------------------------------------------------
+//  Retrieval service
+// --------------------------------------------------
+service RetrievalService {
+  rpc Search (SearchRequest) returns (SearchResponse);
+}
+
+// --------------------------------------------------
+//  Messages
+// --------------------------------------------------
+message SearchRequest  {
+  string user_id    = 1;
+  string upload_id  = 2;
+  string query      = 3;
+  int32  top_k      = 4;
+  float  score_threshold = 5;
+}
+
+message SearchResult {
+  string content              = 1;
+  map<string,string> metadata = 2;
+  float score                 = 3;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+  int32  total                  = 2;
+  string query                  = 3;
+}

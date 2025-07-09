@@ -7,7 +7,6 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import SessionDep
 from app.core import logging
-from app.core.settings import env_settings
 from app.db_models import Member, Skill, Team, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.member import CreateMemberRequest, MemberResponse, MembersResponse, UpdateMemberRequest
@@ -15,11 +14,11 @@ from app.schemas.member import CreateMemberRequest, MemberResponse, MembersRespo
 router = APIRouter(prefix="/member", tags=["Member"])
 
 logger = logging.get_logger(__name__)
-
+PROTECTED_NAMES = ["user", "ignore", "error"]
 
 async def async_validate_name_on_create(session: SessionDep, assistant_id: str, member_in: CreateMemberRequest) -> None:
     """Check if (name, assistant_id) is unique and name is not a protected name"""
-    if member_in.name in env_settings.PROTECTED_NAMES:
+    if member_in.name in PROTECTED_NAMES:
         raise HTTPException(
             status_code=400, detail="Name is a protected name. Choose another name."
         )
@@ -34,7 +33,7 @@ async def async_validate_name_on_create(session: SessionDep, assistant_id: str, 
 
 async def async_validate_names_on_update(session: SessionDep, assistant_id: str, member_in: UpdateMemberRequest, member_id: str) -> None:
     """Check if (name, assistant_id) is unique and name is not a protected name"""
-    if member_in.name in env_settings.PROTECTED_NAMES:
+    if member_in.name in PROTECTED_NAMES:
         raise HTTPException(
             status_code=400, detail="Name is a protected name. Choose another name."
         )

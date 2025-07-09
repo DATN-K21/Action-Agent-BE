@@ -13,7 +13,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UploadStatus
 from app.db_models.base_entity import BaseEntity
-from app.db_models.upload_thread_link import UploadThreadLink
 
 
 class Upload(BaseEntity):
@@ -30,11 +29,11 @@ class Upload(BaseEntity):
     file_type: Mapped[str | None] = mapped_column(String, nullable=True)
     web_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    thread_id: Mapped[str | None] = mapped_column(String, ForeignKey("threads.id", ondelete="CASCADE"), nullable=True)
+    is_global: Mapped[bool] = mapped_column(default=True, nullable=False)
+    failed_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
     # Relationships
+    thread = relationship("Thread", back_populates="uploads")
     user = relationship("User", back_populates="uploads")
-    threads = relationship(
-        "Thread",
-        secondary=UploadThreadLink.__tablename__,
-        back_populates="uploads",
-    )
     members = relationship("Member", secondary="member_upload_links", back_populates="uploads")

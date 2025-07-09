@@ -94,24 +94,16 @@ def convert_checkpoint_tuple_to_messages(checkpoint_tuple: CheckpointTuple, recu
                 )
         elif isinstance(message, ToolMessage) and message.name:
             documents: list[dict[str, Any]] = []
-            if message.name == "KnowledgeBase" and hasattr(message, "artifact"):
-                try:
-                    docs: list[Document] = message.artifact
-                    for doc in docs:
-                        if isinstance(doc, Document) and hasattr(doc, "metadata") and "score" in doc.metadata:
-                            documents.append(
-                                {
-                                    "score": doc.metadata["score"],
-                                    "content": doc.page_content,
-                                }
-                            )
-                except (AttributeError, TypeError, KeyError):
-                    # Handle any errors while processing documents
-                    pass
-
-            # Get tool_call_id safely
+            if message.name == "KnowledgeBase" and message.artifact is not None:
+                docs: list[Document] = message.artifact
+                for doc in docs:
+                    documents.append(
+                        {
+                            "score": getattr(doc, "metadata", {}).get("score", 0),
+                            "content": getattr(doc, "page_content", ""),
+                        }
+                    )
             tool_call_id = getattr(message, "tool_call_id", str(uuid4()))
-
             formatted_messages.append(
                 ChatResponse(
                     type="tool",

@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated, Literal
 
 from langchain_core.documents import Document
@@ -6,12 +5,18 @@ from langchain_core.prompts import BasePromptTemplate, PromptTemplate, format_do
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.tools import BaseTool
 
-logger = logging.getLogger(__name__)
+from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 
 class RetrieverTool(BaseTool):
     name: str = "KnowledgeBase"
-    description: str = "Query documents for answers."
+    description: str = (
+        "This tool will retrieve relevant information from the documents User have uploaded. "
+        "It can be used to answer questions that is private to the user, specific to the user documents, "
+        "or to retrieve information from a knowledge base. "
+    )
     response_format: Literal["content", "content_and_artifact"] = "content_and_artifact"
 
     retriever: BaseRetriever

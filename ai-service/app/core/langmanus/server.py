@@ -6,19 +6,14 @@ Server script for running the DeerFlow API.
 """
 
 import argparse
-import logging
 import signal
 import sys
 
 import uvicorn
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+from app.core import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 def handle_shutdown(signum, frame):

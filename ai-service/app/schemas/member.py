@@ -34,7 +34,7 @@ class UpdateMemberRequest(MemberBase, BaseRequest):
     backstory: str | None = Field(None, description="A brief backstory of the member")
     role: str | None = Field(None, description="The role of the member")
     type: str | None = Field(None, description="The type of the member")
-    team_id: int | None = Field(None, description="The id of the member")
+    team_id: str | None = Field(None, description="The id of the member")
     position_x: float | None = Field(None, description="X coordinate of the member's position")
     position_y: float | None = Field(None, description="Y coordinate of the member's position")
     skills: list[SkillResponse] | None = Field(None, description="List of skills associated with the member")

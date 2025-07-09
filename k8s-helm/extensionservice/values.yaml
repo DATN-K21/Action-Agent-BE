@@ -17,10 +17,7 @@ nameOverride: "extensionservice"
 fullnameOverride: "extensionservice"
 
 env:
-  secrets:
-    name: env-secret
-    secret:
-      mongodbconnectionstring: mongodbconnectionstring
+  # Placeholder
 
 service:
   type: ClusterIP

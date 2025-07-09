@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.core.enums import UploadStatus
-from app.schemas.base import BaseRequest, BaseResponse
+from app.schemas.base import BaseResponse
 
 
 class UploadBase(BaseModel):
@@ -16,20 +16,24 @@ class UploadBase(BaseModel):
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
-class CreateUploadRequest(UploadBase, BaseRequest):
-    chunk_size: int = Field(..., description="Size of each chunk in bytes for file upload")
-    chunk_overlap: int = Field(..., description="Overlap size in bytes for each chunk during upload")
+
+class UpdateUploadStatusRequest(BaseModel):
+    """Request schema for updating upload status from ingest-service."""
+
+    status: str = Field(..., description="New upload status")
+    error_message: str | None = Field(None, description="Error message if status is failed")
 
 
-class UpdateUploadRequest(UploadBase, BaseRequest):
-    name: str | None = None
-    description: str | None = None
-    last_modified: datetime
-    file_type: str | None = None
-    web_url: str | None = None
-    thread_id: str | None = None
-    chunk_size: int | None = None
-    chunk_overlap: int | None = None
+class UploadInitiateRequest(BaseModel):
+    """Request to initiate a new upload."""
+
+    filename: str = Field(..., description="Original filename")
+    file_size_bytes: int = Field(..., description="File size in bytes")
+    name: str = Field(..., description="Display name for the upload")
+    description: str = Field(..., description="Description of the upload")
+    chunk_size: int = Field(default=1000, description="Chunk size for processing")
+    chunk_overlap: int = Field(default=200, description="Chunk overlap for processing")
+    thread_id: str | None = Field(None, description="Optional thread ID to link the upload")
 
 
 ##################################################
@@ -38,19 +42,44 @@ class UpdateUploadRequest(UploadBase, BaseRequest):
 
 
 class UploadResponse(UploadBase, BaseResponse):
-    id: int
+    id: str
     name: str
     description: str
     last_modified: datetime
     status: UploadStatus
-    user_id: int | None
+    user_id: str | None
     file_type: str
     web_url: str | None
-    thread_id: str | None
     chunk_size: int
     chunk_overlap: int
 
 
 class UploadsResponse(BaseResponse):
     uploads: list[UploadResponse]
-    count: int
+
+
+class UploadInitiateResponse(BaseResponse):
+    """Response from upload initiation."""
+
+    upload_id: str = Field(..., description="ID of the created upload record")
+    upload_url: str = Field(..., description="SAS URL for direct upload to Azure Blob Storage")
+    blob_url: str = Field(..., description="Final blob URL")
+    blob_name: str = Field(..., description="Generated blob name")
+    expires_at: str = Field(..., description="ISO timestamp when the SAS URL expires")
+    max_file_size_bytes: int = Field(..., description="Maximum allowed file size in bytes")
+    instructions: dict = Field(..., description="Upload instructions for the frontend")
+
+
+class UploadStatusResponse(BaseResponse):
+    """Response for upload status check."""
+
+    upload_id: str = Field(..., description="ID of the upload")
+    upload_status: UploadStatus = Field(..., description="Current upload status in database")
+    blob_exists: bool = Field(..., description="Whether the blob exists in storage")
+    blob_size_bytes: int = Field(..., description="Current blob size in bytes")
+    blob_size_mb: float = Field(..., description="Current blob size in MB")
+    within_size_limits: bool = Field(..., description="Whether blob is within size limits")
+    upload_complete: bool = Field(..., description="Whether upload appears complete")
+    max_file_size_bytes: int = Field(..., description="Maximum allowed file size in bytes")
+    created_at: datetime = Field(..., description="When the upload record was created")
+    last_modified: datetime = Field(..., description="When the upload was last modified")

@@ -104,8 +104,9 @@ async def acreate_new_thread(session: SessionDep, request: CreateThreadRequest, 
             created_by=x_user_id,
         )
         session.add(thread)
-        await session.commit()
+        await session.flush()
         await session.refresh(thread)
+        await session.commit()
 
         response_data = CreateThreadResponse.model_validate(thread, from_attributes=True)
         return ResponseWrapper.wrap(status=200, data=response_data)

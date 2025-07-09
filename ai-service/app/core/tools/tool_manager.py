@@ -4,8 +4,8 @@ import re
 from typing import Any, Dict
 
 from langchain.tools import BaseTool
-from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
-from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.tools.tavily_search.tool import TavilySearchResults
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
 from pydantic import SecretStr
@@ -212,12 +212,12 @@ class ToolManager:
     def _load_hardcoded_external_tools_to_global(self):
         # (Implementation as before)
         external_tools = {
-            "duckduckgo-search": ToolInfo(
-                description="Searches web via DuckDuckGo - a short, plain-text snippet summarizing the top result .",
-                tool=DuckDuckGoSearchRun(),
-                display_name="DuckDuckGo Search",
-                input_parameters={"query": {"type": "string", "required": True, "description": "Search query."}},
-            ),
+            # "duckduckgo-search": ToolInfo(
+            #     description="Searches web via DuckDuckGo - a short, plain-text snippet summarizing the top result .",
+            #     tool=DuckDuckGoSearchRun(),
+            #     display_name="DuckDuckGo Search",
+            #     input_parameters={"query": {"type": "string", "required": True, "description": "Search query."}},
+            # ),
             "tavily-search": ToolInfo(
                 description="Searches web via Tavily - structured, citation-friendly results ideal for RAG and agents.",
                 tool=TavilySearchResults(
@@ -245,7 +245,6 @@ class ToolManager:
         self.global_tools.update(external_tools)
 
     def _load_initial_global_tools(self):
-        logger.info("Loading global tools...")
         self._load_local_tools_to_global()
         self._load_hardcoded_external_tools_to_global()
         logger.info(f"Loaded {len(self.global_tools)} global tools.")

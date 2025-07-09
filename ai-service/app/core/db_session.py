@@ -17,6 +17,7 @@ async_engine = create_async_engine(
     ASYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"server_settings": {"search_path": env_settings.POSTGRES_SCHEMA}},
     pool_size=10,  # Limit connection pool size
     max_overflow=20,  # Maximum overflow connections
     pool_recycle=3600,  # Recycle connections every hour
@@ -26,6 +27,7 @@ sync_engine = create_engine(
     SYNC_URL,
     pool_pre_ping=True,
     echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"options": f"-csearch_path={env_settings.POSTGRES_SCHEMA}"},
     pool_size=5,  # Smaller pool for sync operations
     max_overflow=10,
     pool_recycle=3600,

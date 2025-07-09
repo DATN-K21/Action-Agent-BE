@@ -75,8 +75,6 @@ class MemoryMonitor:
         self.last_detailed_log = 0.0
         self.high_memory_alerts_sent = set()  # Track which caches have sent alerts
 
-        logger.info(f"Initialized {self.name} - logging_enabled={self.enable_logging}")
-
     async def log_memory_check(
         self, cache_name: str, cache_entries: int, cache_memory_mb: float, max_cache_memory_mb: float, process_memory_mb: float
     ) -> MemorySnapshot:

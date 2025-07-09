@@ -1,0 +1,28 @@
+[project]
+name = "retrieval-service"
+version = "0.1.0"
+description = "The Retrieval Service for RAG-based document search"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastembed>=0.7.1",
+    "grpcio>=1.66.0",
+    "grpcio-health-checking>=1.66.0",
+    "langchain>=0.3.26",
+    "langchain-openai>=0.3.27",
+    "langchain-qdrant>=0.2.0",
+    "protobuf>=6.31.1",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "structlog>=25.4.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "grpcio-tools>=1.66.0",
+]
+
+[dependency-groups]
+lint = [
+    "ruff>=0.9.7",
+]

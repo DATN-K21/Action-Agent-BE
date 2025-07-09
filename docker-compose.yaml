@@ -82,10 +82,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
       POSTGRES_DB: ai-database
+      POSTGRES_SCHEMA: aiservice
       COMPOSIO_LOGGING_LEVEL: debug
       COMPOSIO_API_KEY: <COMPOSIO_API_KEY>
       COMPOSIO_REDIRECT_URL: http://localhost:15200/api/v1/callback/extension
       FRONTEND_REDIRECT_URL: http://localhost:3000/callback/extension
+      RETRIEVAL_SERVICE_GRPC_URL: retrieval-service:15601
       MODEL_PROVIDER_ENCRYPTION_KEY: <MODEL_PROVIDER_ENCRYPTION_KEY>
       SECRET_KEY: <SECRET_KEY>
       PGVECTOR_COLLECTION: kb_uploads
@@ -140,6 +142,56 @@ services:
       - "15400:15400"
     restart: always
 
+  ingest-service:
+    image: myaagent.azurecr.io/ingestservicedev
+    container_name: ingest-service
+    environment:
+      DEBUG_SERVER: False
+      LOGGING_LOG_LEVEL: INFO
+      PGVECTOR_HOST: ai-database
+      PGVECTOR_PORT: 5432
+      PGVECTOR_USER: postgres
+      PGVECTOR_PASSWORD: 123456
+      PGVECTOR_DB: ai-database
+      PGVECTOR_SCHEMA: ingestservice
+      PGVECTOR_COLLECTION: kb_uploads
+      CELERY_BROKER_URL: redis://root:root@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://root:root@redis:6379/0
+      AZURE_STORAGE_CONNECTION_STRING: <AZURE_STORAGE_CONNECTION_STRING>
+      AZURE_CONTAINER_NAME: <AZURE_CONTAINER_NAME>
+      AI_SERVICE_URL: http://ai-service:15200
+      DENSE_EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
+      SPARSE_EMBEDDING_MODEL: prithivida/Splade_PP_en_v1
+      FASTEMBED_CACHE_PATH: ./fastembed_cache
+    ports:
+      - "15500:15500"
+    restart: always
+
+  retrieval-service:
+    image: myaagent.azurecr.io/retrievalservicedev
+    container_name: retrieval-service
+    environment:
+      DEBUG_SERVER: False
+      LOGGING_LOG_LEVEL: INFO
+      OPENAI_API_KEY: <YOUR_OPENAI_API_KEY>
+      PGVECTOR_POSTGRES_URL_PATH: postgres:123456@ai-database:5432/ai-database
+      PGVECTOR_POSTGRES_SCHEMA: ingestservice
+      PGVECTOR_COLLECTION: kb_uploads
+    ports:
+      - "15601:15601"  # gRPC API
+    restart: always
+
+  flower:
+    image: mher/flower:latest
+    container_name: flower
+    environment:
+      CELERY_BROKER_URL: redis://root:root@redis:6379/0
+      FLOWER_PORT: 15501
+    ports:
+      - "15501:15501"
+    command: celery flower --broker=redis://root:root@redis:6379/0 --port=15501
+    restart: always
+
   ####################################################
   ################ Databases #########################
   ####################################################
@@ -168,6 +220,20 @@ services:
       - "27017:27017"
     volumes:
       - mongo-database:/data/db
+    restart: always
+
+  qdrant-database:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-database
+    environment:
+      QDRANT_LOG_LEVEL: info
+      QDRANT_ENABLE_AUTH: "false"
+      # QDRANT_API_KEY: <YOUR_QDRANT_API_KEY>
+    ports:
+      - "6333:6333"
+      - "6334:6334"  # gRPC API
+    volumes:
+      - qdrant-data:/qdrant/storage
     restart: always
 
   ####################################################
@@ -236,3 +302,4 @@ volumes:
   mongo-database:
   rabbitmq:
   redis:
+  qdrant-data:

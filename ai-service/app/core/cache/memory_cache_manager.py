@@ -791,8 +791,6 @@ class GlobalCacheManager:
         self.caches: Dict[str, MemoryCacheManager] = {}
         self.lock = asyncio.Lock()
 
-        logger.info("Initialized GlobalCacheManager")
-
     async def create_cache(self, name: str, config: CacheConfig, start_background_cleanup: bool = True) -> MemoryCacheManager:
         """
         Create a new memory-aware cache.

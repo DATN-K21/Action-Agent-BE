@@ -1,0 +1,6 @@
+line-length = 120
+indent-width = 4
+
+# Per-file ignores
+[per-file-ignores]
+"app/main.py" = ["E402"]  # Module level import not at top of file

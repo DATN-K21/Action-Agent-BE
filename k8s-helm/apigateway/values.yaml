@@ -17,10 +17,7 @@ nameOverride: "apigateway"
 fullnameOverride: "apigateway"
 
 env:
-  secrets:
-    name: env-secret
-    secret:
-      elasticsearchurl: elasticsearchurl
+  # Placeholder
 
 service:
   type: ClusterIP

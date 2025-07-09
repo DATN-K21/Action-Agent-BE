@@ -1,51 +1,38 @@
+import asyncio
 import socket
 from contextlib import asynccontextmanager
 
 import urllib3.util.connection as urllib3_conn
 from fastapi import FastAPI
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core import logging
 from app.core.cache.memory_cache_manager import global_cache_manager
 from app.core.db_session import async_engine
+from app.core.grpc_pool import close_grpc_connections, configure_grpc_pool
+from app.core.settings import env_settings
 from app.db_models import Base
 from app.memory.checkpoint import AsyncPostgresPool
 
 logger = logging.get_logger(__name__)
 
 
-async def check_database_schema():
-    """Check if database schema is properly initialized."""
-    try:
-        # This is a lightweight check to see if the main tables exist
-        # If migrations are needed, they should be run separately before starting the app
-        logger.info("Checking database schema...")
-
-        # We can add a simple table existence check here if needed
-        # For now, we'll assume the database is properly migrated
-        logger.info("Database schema check completed")
-
-    except Exception as e:
-        logger.error(f"Database schema check failed: {e}")
-        logger.info("Please run migrations manually: alembic upgrade head")
-        raise
-
-
+# =============================================================================
+# Lifespan event handler for FastAPI
+# =============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         # Force IPv4: increase the speed when fetching data from Composio server
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
-        # Check database schema (lightweight check)
-        await check_database_schema()
-
-        # Manually set up the PostgreSQL connection pool
-        await AsyncPostgresPool.asetup()
-
-        # Run database migrations using SQLAlchemy
-        async with async_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database migrations completed")
+        # Setup database, PostgreSQL connection pool, and gRPC pool in parallel
+        await asyncio.gather(
+            _setup_database(),
+            AsyncPostgresPool.asetup(),
+            configure_grpc_pool(max_channels=20, channel_ttl=600.0),
+        )
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()
@@ -54,7 +41,38 @@ async def lifespan(app: FastAPI):
     finally:
         # Shutdown cache manager first to cleanup all caches
         await global_cache_manager.shutdown()
-        logger.info("Cache manager shutdown completed")
 
         # Then shutdown database connections
+        await close_grpc_connections()
         await AsyncPostgresPool.atear_down()
+
+
+# =============================================================================
+# Private Helper Methods
+# =============================================================================
+async def _setup_database():
+    """Setup database schema and tables."""
+    await _create_database_schema()
+    await _create_database_tables()
+    logger.info(f"Database schema/tables created/verified. Schema = {env_settings.POSTGRES_SCHEMA}")
+
+
+async def _create_database_schema():
+    """Create the database schema if it doesn't exist."""
+    temp_async_engine = create_async_engine(
+        f"postgresql+asyncpg://{env_settings.POSTGRES_URL_PATH}",
+        pool_pre_ping=True,
+        echo=env_settings.DEBUG_SQLALCHEMY,
+    )
+    try:
+        async with temp_async_engine.begin() as conn:
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
+
+    finally:
+        await temp_async_engine.dispose()
+
+
+async def _create_database_tables():
+    """Create database tables using SQLAlchemy."""
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)

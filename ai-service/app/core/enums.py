@@ -2,7 +2,8 @@ from enum import Enum
 
 
 class UploadStatus(str, Enum):
-    IN_PROGRESS = "In Progress"
+    UPLOADING = "Uploading"
+    INGESTING = "Ingesting"
     COMPLETED = "Completed"
     FAILED = "Failed"
 

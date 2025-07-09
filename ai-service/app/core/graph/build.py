@@ -215,7 +215,10 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     return team_dict
 
 
-def convert_chatbot_ragbot_searchbot_team_to_dict(members: list[Member], workflow_type: WorkflowType) -> Mapping[str, GraphMember]:
+def convert_chatbot_ragbot_searchbot_team_to_dict(
+    members: list[Member],
+    workflow_type: WorkflowType,
+) -> Mapping[str, GraphMember]:
     team_dict: dict[str, GraphMember] = {}
 
     if len(members) != 1:
@@ -815,45 +818,7 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
-        elif team.workflow_type == WorkflowType.RAGBOT:
-            member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
-            first_member = list(member_dict.values())[0]
-            state = {
-                "history": formatted_messages,
-                "team": GraphTeam(
-                    name=first_member.name,
-                    role=first_member.role,
-                    backstory=first_member.backstory,
-                    members=member_dict,  # type: ignore[arg-type]
-                    provider=first_member.provider,
-                    model=first_member.model,
-                    temperature=first_member.temperature,
-                ),
-                "messages": [],
-                "next": first_member.name,
-                "all_messages": formatted_messages,
-            }
-        elif team.workflow_type == WorkflowType.CHATBOT:
-            member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
-            first_member = list(member_dict.values())[0]
-            state = {
-                "history": formatted_messages,
-                "team": GraphTeam(
-                    name=first_member.name,
-                    role=first_member.role,
-                    backstory=first_member.backstory,
-                    members=member_dict,  # type: ignore[arg-type]
-                    provider=first_member.provider,
-                    model=first_member.model,
-                    temperature=first_member.temperature,
-                ),
-                "messages": [],
-                "next": first_member.name,
-                "all_messages": formatted_messages,
-            }
-        elif team.workflow_type == WorkflowType.SEARCHBOT:
+        elif team.workflow_type == WorkflowType.CHATBOT or team.workflow_type == WorkflowType.RAGBOT or team.workflow_type == WorkflowType.SEARCHBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
             root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
             first_member = list(member_dict.values())[0]
@@ -873,13 +838,8 @@ async def generator(
                 "all_messages": formatted_messages,
             }
         elif team.workflow_type == WorkflowType.WORKFLOW:
-
             graph_config = team.graphs[0].config
-
-            root = initialize_graph(
-                graph_config, checkpointer, save_graph_img=False
-            )
-
+            root = initialize_graph(graph_config, checkpointer, save_graph_img=False)
             state = {
                 "history": formatted_messages,
                 "messages": [],

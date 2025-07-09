@@ -12,7 +12,7 @@ nameOverride: "aiserviceprod"
 fullnameOverride: "aiserviceprod"
 
 env:
-  # Debug modes
+  # ===================== DEBUG MODES =====================
   - name: DEBUG_AGENT
     value: "False"
   - name: DEBUG_SERVER
@@ -20,27 +20,21 @@ env:
   - name: DEBUG_SQLALCHEMY
     value: "False"
 
-  # Logging
+  # ===================== LOGGING =====================
   - name: LOGGING_LOG_LEVEL
     value: "INFO"
 
-  # User Agent for web requests
+  # ===================== USER AGENT =====================
   - name: USER_AGENT
     value: "Action-LLM-AI-Service/1.0 (Educational Project)"
 
-  # Tools
-  - name: TOOL_TAVILY_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: taviliapikey
-
-  # Settings for LLM
+  # ===================== LLM PROVIDERS =====================
   - name: OPENAI_PROVIDER
     value: "openai"
   - name: ANTHROPIC_PROVIDER
     value: "anthropic"
 
+  # ===================== LLM MODELS =====================
   - name: LLM_BASIC_MODEL
     value: "gpt-4o-mini"
   - name: BASIC_MODEL_TEMPERATURE
@@ -62,7 +56,14 @@ env:
   - name: VISION_MODEL_CONTEXT_RATIO
     value: "0.2"
 
-  # OpenAI API settings
+  - name: LLM_SUGGESTION_MODEL
+    value: "gpt-4.1-mini"
+  - name: SUGGESTION_MODEL_TEMPERATURE
+    value: "0.3"
+  - name: SUGGESTION_MODEL_MAX_TOKENS
+    value: "500"
+
+  # ===================== OPENAI API =====================
   - name: OPENAI_API_KEY
     valueFrom:
       secretKeyRef:
@@ -71,7 +72,7 @@ env:
   - name: OPENAI_API_BASE_URL
     value: "https://api.openai.com/v1"
 
-  # Anthropic API settings
+  # ===================== ANTHROPIC API =====================
   - name: ANTHROPIC_API_KEY
     valueFrom:
       secretKeyRef:
@@ -80,41 +81,29 @@ env:
   - name: ANTHROPIC_API_BASE_URL
     value: "https://api.anthropic.com"
 
-  # Default context settings
+  # ===================== DEFAULT CONTEXT SETTINGS =====================
   - name: DEFAULT_CONTEXT_LIMIT
     value: "100000"
   - name: DEFAULT_CONTEXT_RATIO
     value: "0.2"
 
-  # Embedding
-  - name: EMBEDDING_PROVIDER
-    value: "openai"
+  # ===================== DATABASE =====================
+  - name: POSTGRES_URL_PATH
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: postgresurlpath
+  - name: POSTGRES_SCHEMA
+    value: "aiservice"
 
-  # Database
-  - name: POSTGRES_HOST
+  # ===================== TOOLS =====================
+  - name: TOOL_TAVILY_API_KEY
     valueFrom:
       secretKeyRef:
         name: env-secret
-        key: posgresqlhost
-  - name: POSTGRES_PORT
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: postgresqlport
-  - name: POSTGRES_USER
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: postgresqluser
-  - name: POSTGRES_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: postgresqlpassword
-  - name: POSTGRES_DB
-    value: "aiserviceprod"
+        key: taviliapikey
 
-  # Composio
+  # ===================== COMPOSIO =====================
   - name: COMPOSIO_LOGGING_LEVEL
     value: "debug"
   - name: COMPOSIO_API_KEY
@@ -125,42 +114,66 @@ env:
   - name: COMPOSIO_REDIRECT_URL
     value: "https://api.action-agent.software/ai/api/v1/callback/extension"
 
-  # Frontend redirect URL
-  - name: FRONTEND_REDIRECT_URL
-    value: "https://action-agent.software/callback/extension"
-
-  # Security keys
-  - name: MODEL_PROVIDER_ENCRYPTION_KEY
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: modelproviderencryptionkey
+  # ===================== SECURITY KEYS =====================
   - name: SECRET_KEY
     valueFrom:
       secretKeyRef:
         name: env-secret
         key: secretkey
+  - name: MODEL_PROVIDER_ENCRYPTION_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: modelproviderencryptionkey
 
-  # VectorStore
-  - name: PGVECTOR_COLLECTION
-    value: "kb_uploads"
-
-  # Graph settings
+  # ===================== GRAPH SETTINGS =====================
   - name: RECURSION_LIMIT
     value: "25"
 
-  # Cache settings
+  # ===================== CACHE SETTINGS =====================
   - name: MAX_PERSONAL_TOOLS_PER_USER
-    value: "200"
+    value: "500"
   - name: MAX_CACHED_USERS
-    value: "100"
-  - name: MAX_CACHED_TOOL_EXTENSION_SERVICES
+    value: "200"
+  - name: MAX_CACHED_EXTENSION_SERVICES
     value: "400"
   - name: MAX_CACHED_MCP_USERS
     value: "100"
   - name: MAX_MCP_CLIENT_INSTANCES_PER_USER
     value: "20"
 
+  # ===================== UPLOAD SETTINGS =====================
+  - name: MAX_UPLOAD_SIZE_MB
+    value: "52428800"
+  - name: AZURE_BLOB_CONNECTION_STRING
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: azureblobconnectionstring
+  - name: AZURE_BLOB_CONTAINER_NAME
+    value: "uploadingprod"
+
+  # ===================== CELERY SETTINGS =====================
+  - name: RABBITMQ_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: rabbitmqurl
+  - name: REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: redisurl
+
+  # ===================== URLS =====================
+  - name: RETRIEVAL_SERVICE_GRPC_URL
+    value: "retrievalserviceprod:15600"
+  - name: EXTENSION_SERVICE_URL
+    value: "http://extensionserviceprod:15300"
+  - name: FRONTEND_REDIRECT_URL
+    value: "https://action-agent.software/callback/extension"
+
+  # ===================== CACHE SETTINGS =====================
   # Memory and Cache settings
   - name: SYSTEM_MEMORY_THRESHOLD
     value: "92.0"
@@ -204,27 +217,4 @@ env:
   # Sets the number of processors
   - name: MAX_WORKERS
     value: "1"
-
-  # Settings for celery
-  - name: CELERY_BROKER_URL
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: celerybrokerurl
-  - name: CELERY_RESULT_BACKEND
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: celeryresultbackend
-
-  # Embedding model
-  - name: DENSE_EMBEDDING_MODEL
-    value: "BAAI/bge-small-en-v1.5"
-  - name: SPARSE_EMBEDDING_MODEL
-    value: "prithivida/Splade_PP_en_v1"
-  - name: FASTEMBED_CACHE_PATH
-    value: "./fastembed_cache"
-
-  - name: EXTENSION_SERVICE_URL
-    value: "http://extensionserviceprod:15300"
     

@@ -1,34 +1,710 @@
-import logging
-import os
-import shutil
 import uuid
-from datetime import datetime
-from tempfile import NamedTemporaryFile
-from typing import IO, Annotated, Any
+from typing import Any
 
-import aiofiles
-from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
-from sqlalchemy import and_, func, select
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
-from starlette import status
 
 from app.api.deps import SessionDep
+from app.celery import celery_app
+from app.core import logging
 from app.core.constants import SYSTEM
 from app.core.enums import AssistantType, UploadStatus, WorkflowType
+from app.core.search_client import create_search_client
 from app.core.settings import env_settings
 from app.db_models.assistant import Assistant
 from app.db_models.member_upload_link import MemberUploadLink
 from app.db_models.team import Team
+from app.db_models.thread import Thread
 from app.db_models.upload import Upload
-from app.db_models.upload_thread_link import UploadThreadLink
-from app.jobs.tasks import add_upload, edit_upload, perform_search, remove_upload
-from app.schemas.base import MessageResponse, ResponseWrapper
-from app.schemas.upload import CreateUploadRequest, UploadResponse, UploadsResponse
+from app.schemas.base import PagingRequest, ResponseWrapper
+from app.schemas.upload import (
+    UploadInitiateRequest,
+    UploadInitiateResponse,
+    UploadResponse,
+    UploadsResponse,
+    UploadStatusResponse,
+)
+from app.services import get_blob_storage_service
 
-router = APIRouter(prefix="/upload", tags=["Upload"])
+router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
+
+
+# =============================================================================
+# API Endpoints
+# =============================================================================
+
+
+@router.get("/", response_model=ResponseWrapper[UploadsResponse])
+async def aread_uploads(
+    session: SessionDep,
+    status: UploadStatus | None = None,
+    paging: PagingRequest = Depends(),
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Retrieve uploads.
+    """
+    page_number = paging.page_number
+    max_per_page = paging.max_per_page
+
+    filters = []
+    if status:
+        filters.append(Upload.status == status)
+    if x_user_role not in ["admin", "super_admin"]:
+        filters.append(Upload.user_id == x_user_id)
+    filters.append(Upload.is_deleted.is_(False))
+
+    # Only apply where clause if there are filters, otherwise return all rows
+    if filters:
+        filter_conditions = and_(*filters)
+        statement = select(Upload).where(filter_conditions).offset((page_number - 1) * max_per_page).limit(max_per_page)
+    else:
+        statement = select(Upload).where(Upload.is_deleted.is_(False)).offset((page_number - 1) * max_per_page).limit(max_per_page)
+
+    result = await session.execute(statement)
+    uploads = result.scalars().all()
+
+    response_data = [UploadResponse.model_validate(upload) for upload in uploads]
+
+    return ResponseWrapper.wrap(
+        status=200,
+        data=UploadsResponse(uploads=response_data),
+    ).to_response()
+
+
+@router.delete("/{upload_id}", response_model=ResponseWrapper)
+async def adelete_upload(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
+    statement = select(Upload).where(
+        Upload.id == upload_id,
+        Upload.is_deleted.is_(False),
+    )
+
+    result = await session.execute(statement)
+    upload = result.scalar_one_or_none()
+
+    if not upload:
+        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
+        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+    if upload.status not in [UploadStatus.COMPLETED, UploadStatus.FAILED]:
+        return ResponseWrapper.wrap(status=400, message="Upload must be completed or failed before deletion").to_response()
+
+    try:
+        # Soft-delete upload record
+        upload.is_deleted = True
+        session.add(upload)
+        await session.commit()
+
+        # Enqueue upload removal task to ingest-service
+        celery_app.send_task(
+            "ingest.document.remove",
+            args=[upload_id, upload.user_id],
+            queue="document.processing",
+        )
+
+        return ResponseWrapper.wrap(status=202, data=None).to_response()
+    except Exception as e:
+        logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message=f"Failed to delete upload: {str(e)}").to_response()
+
+
+@router.post("/initiate", response_model=ResponseWrapper[UploadInitiateResponse])
+async def ainitiate_upload(
+    session: SessionDep,
+    request: UploadInitiateRequest,
+    x_user_id: str = Header(None),
+) -> Any:
+    """
+    Initiate a new direct upload to Azure Blob Storage using append blobs.
+
+    This endpoint:
+    1. Validates the file size against limits
+    2. Creates an Upload record in the database with status "Uploading"
+    3. Generates an append-blob SAS URL for direct client upload
+    4. Returns upload instructions and metadata
+
+    The client should then upload directly to Azure using the returned SAS URL.
+    After upload completes, call /uploads/{upload_id}/process to trigger processing.
+    """
+    try:
+        # Validate file size before creating any resources
+        max_file_size_mb = env_settings.MAX_UPLOAD_SIZE_MB
+        max_file_size_bytes = max_file_size_mb * 1024 * 1024
+        if request.file_size_bytes > max_file_size_bytes:
+            return ResponseWrapper.wrap(
+                status=400, message=f"File size ({request.file_size_bytes} bytes) exceeds maximum limit of {max_file_size_mb}MB"
+            ).to_response()
+
+        # Validate filename and get file type
+        if not request.filename or not request.filename.strip():
+            return ResponseWrapper.wrap(status=400, message="Filename is required").to_response()
+
+        actual_file_type = _get_file_type(request.filename)
+        if actual_file_type == "unknown":
+            return ResponseWrapper.wrap(
+                status=400,
+                message="Unsupported file type. Only support: pdf, docx, pptx, xlsx, txt, html, md",
+            ).to_response()
+
+        # Validate other parameters
+        if request.chunk_size <= 0 or request.chunk_overlap < 0:
+            return ResponseWrapper.wrap(
+                status=400,
+                message="Chunk size must be greater than 0 and chunk overlap must be non-negative",
+            ).to_response()
+
+        unique_id = uuid.uuid4()
+
+        # Generate append-blob SAS URL
+        blob_service = get_blob_storage_service()
+        upload_info = await blob_service.generate_append_blob_sas(
+            f"{unique_id}-{request.filename}",
+            expiry_hours=1,
+            max_file_size_mb=max_file_size_mb,
+        )
+
+        # Debug: Log the upload_info to see what's being returned
+        logger.info(f"Upload info from blob service: {upload_info}")
+
+        # Create Upload record in database
+        # Set is_global based on whether thread_id is provided
+        is_global = request.thread_id is None
+
+        upload = Upload(
+            id=str(unique_id),
+            name=request.name,
+            description=request.description,
+            file_type=actual_file_type,
+            web_url=upload_info["blob_url"],  # Store the final blob URL
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+            user_id=x_user_id,
+            status=UploadStatus.UPLOADING,  # Set to uploading - file is being uploaded to Azure
+            is_global=is_global,
+            thread_id=request.thread_id,  # Set thread_id directly (None for global uploads)
+        )
+
+        session.add(upload)
+        await session.flush()
+        await session.refresh(upload)
+
+        if upload.id is None:
+            raise HTTPException(status_code=500, detail="Failed to create upload record")
+
+        # Handle upload-thread relationships based on global/private nature
+        if request.thread_id is not None:
+            # Private upload: validate thread exists and link to assistant members
+            await _validate_thread_exists(session, request.thread_id)
+            await _alink_upload_to_assistant_members(session, upload.id, request.thread_id, x_user_id)
+
+        await session.commit()
+
+        # Note: Processing will be triggered later when client calls /uploads/{id}/process
+        # after successful upload to Azure
+
+        # Prepare response
+        response_data = UploadInitiateResponse(
+            upload_id=upload.id,
+            upload_url=str(upload_info["upload_url"]),
+            blob_url=str(upload_info["blob_url"]),
+            blob_name=str(upload_info["blob_name"]),
+            expires_at=str(upload_info["expires_at"]),
+            max_file_size_bytes=int(upload_info["max_file_size_bytes"]),
+            instructions={
+                "method": "PUT",
+                "headers": {
+                    "x-ms-blob-type": "AppendBlob",
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": "REQUIRED - Must be set by client to actual file size",
+                },
+                "append_blob_instructions": {
+                    "step1": "Create the append blob: PUT to upload_url with x-ms-blob-type: AppendBlob and Content-Length: 0",
+                    "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
+                    "note": "Or use a single PUT with the entire file content if under 4MB per block",
+                },
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
+                "size_validation": "Server will verify upload completion when you call the process endpoint.",
+                "status_flow": "Uploading -> Ingesting -> Completed/Failed",
+            },
+        )
+
+        # Debug: Log the response data
+        logger.info(
+            f"Response data created: upload_id={upload.id}, expires_at={upload_info.get('expires_at')}, max_size={upload_info.get('max_file_size_bytes', 0)}B"
+        )
+
+        logger.info(f"Initiated upload for user {x_user_id}: id={upload.id}, filename={request.filename}")
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error initiating upload: {str(e)}", exc_info=True)
+        # Clean up upload record if it was created
+        if "upload" in locals() and upload.id:
+            try:
+                await session.delete(upload)
+                await session.commit()
+            except Exception:
+                pass
+        return ResponseWrapper.wrap(status=500, message=f"Failed to initiate upload: {str(e)}").to_response()
+
+
+@router.get("/{upload_id}/status", response_model=ResponseWrapper[UploadStatusResponse])
+async def aget_upload_status(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Get the status of an upload by checking both the database record and blob storage.
+
+    This endpoint:
+    1. Retrieves the Upload record from the database
+    2. Checks the actual blob status in Azure Storage
+    3. Updates the database if blob exceeds size limits
+    4. Returns comprehensive status information
+
+    Use this endpoint to monitor upload progress. After upload completes,
+    call /uploads/{upload_id}/process to trigger processing.
+    """
+    try:
+        # Get upload record from database
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Check blob status in Azure Storage
+        if not upload.web_url:
+            return ResponseWrapper.wrap(status=500, message="Upload record missing blob URL").to_response()
+
+        blob_service = get_blob_storage_service()
+        blob_status = await blob_service.check_blob_status(upload.web_url, max_file_size_mb=100)
+
+        # Check blob status and update database if needed
+        upload_was_updated = False
+        if blob_status.get("exists", False) and blob_status.get("complete", False) and not blob_status.get("within_limits", True):
+            # File exceeded size limits - mark as failed
+            upload.status = UploadStatus.FAILED
+            session.add(upload)
+            upload_was_updated = True
+            logger.warning(f"Upload {upload_id} failed due to size limit violation")
+
+        if upload_was_updated:
+            await session.commit()
+
+        # Prepare response with proper type casting
+        response_data = UploadStatusResponse(
+            upload_id=upload.id,
+            upload_status=upload.status,
+            blob_exists=bool(blob_status.get("exists", False)),
+            blob_size_bytes=int(blob_status.get("size_bytes", 0)),
+            blob_size_mb=float(blob_status.get("size_mb", 0.0)),
+            within_size_limits=bool(blob_status.get("within_limits", True)),
+            upload_complete=bool(blob_status.get("complete", False)),
+            max_file_size_bytes=int(blob_status.get("max_size_bytes", 100 * 1024 * 1024)),
+            created_at=upload.created_at,
+            last_modified=upload.last_modified,
+        )
+
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error getting upload status: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message=f"Failed to get upload status: {str(e)}").to_response()
+
+
+@router.post("/{upload_id}/process", response_model=ResponseWrapper[UploadResponse])
+async def aprocess_upload(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Process an uploaded file after successful upload to Azure Blob Storage.
+
+    This endpoint should be called by the client after they have successfully
+    uploaded the file to Azure using the SAS URL from /initiate.
+
+    This endpoint:
+    1. Verifies the Upload record exists and belongs to the user
+    2. Checks that the blob was successfully uploaded to Azure
+    3. Validates the blob size is within limits
+    4. Updates status to "Ingesting" and triggers the Celery processing job
+    5. Returns the updated upload record
+
+    Status flow: Uploading -> Ingesting -> Completed/Failed
+    """
+    try:
+        # Get upload record from database
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Check if already processing or completed
+        if upload.status == UploadStatus.COMPLETED:
+            return ResponseWrapper.wrap(status=400, message="Upload has already been processed").to_response()
+
+        if upload.status == UploadStatus.INGESTING:
+            return ResponseWrapper.wrap(status=400, message="Upload is already being processed").to_response()
+
+        # Verify blob exists and is valid
+        if not upload.web_url:
+            return ResponseWrapper.wrap(status=500, message="Upload record missing blob URL").to_response()
+
+        blob_service = get_blob_storage_service()
+        blob_status = await blob_service.check_blob_status(upload.web_url, max_file_size_mb=100)
+
+        # Validate blob upload
+        if not blob_status.get("exists", False):
+            return ResponseWrapper.wrap(
+                status=400, message="File not found in Azure storage. Please ensure upload completed successfully."
+            ).to_response()
+
+        if not blob_status.get("complete", False):
+            return ResponseWrapper.wrap(status=400, message="File appears to be empty. Please ensure upload completed successfully.").to_response()
+
+        if not blob_status.get("within_limits", True):
+            # Mark as failed and clean up oversized blob
+            upload.status = UploadStatus.FAILED
+            session.add(upload)
+            await session.commit()
+            return ResponseWrapper.wrap(
+                status=400, message=f"File exceeds size limit of {blob_status.get('max_size_mb', 100)}MB. Upload marked as failed."
+            ).to_response()
+
+        # All validations passed - trigger processing
+        # Update status to ingesting before triggering Celery job
+        upload.status = UploadStatus.INGESTING
+        session.add(upload)
+        await session.commit()
+
+        # Enqueue upload processing task to ingest-service
+        celery_app.send_task(
+            "ingest.document.add",
+            args=[upload.web_url, upload.id, upload.user_id, upload.chunk_size, upload.chunk_overlap],
+            queue="document.processing",
+        )
+
+        logger.info(f"Processing triggered for upload {upload_id}: blob_size={blob_status.get('size_bytes', 0)} bytes")
+
+        # Return updated upload record
+        await session.refresh(upload)
+        response_data = UploadResponse.model_validate(upload)
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error processing upload: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
+
+
+@router.post("/{upload_id}/re-initiate", response_model=ResponseWrapper[UploadInitiateResponse])
+async def are_initiate_upload(
+    session: SessionDep,
+    upload_id: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Re-initiate an existing upload by generating a new SAS URL.
+
+    This endpoint is useful when:
+    - The original SAS URL expired
+    - Frontend lost the SAS URL
+    - Need to resume an interrupted upload
+
+    Only works for uploads in "Uploading" status.
+    """
+    try:
+        # Get upload record from database
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Only allow re-initiation for uploads in "Uploading" status
+        if upload.status != UploadStatus.UPLOADING:
+            return ResponseWrapper.wrap(
+                status=400, message=f"Cannot re-initiate upload with status '{upload.status}'. Only uploads in 'Uploading' status are eligible."
+            ).to_response()
+
+        # Extract filename from the existing blob URL for regeneration
+        if not upload.web_url:
+            return ResponseWrapper.wrap(status=500, message="Upload record missing blob URL").to_response()
+
+        # Get the blob name from the existing URL to maintain consistency
+        blob_name = upload.web_url.split("/")[-1]
+
+        # Generate new SAS URL
+        blob_service = get_blob_storage_service()
+        upload_info = await blob_service.generate_append_blob_sas(blob_name, expiry_hours=1, max_file_size_mb=100)
+
+        # Prepare response (same format as initiate endpoint)
+        response_data = UploadInitiateResponse(
+            upload_id=upload.id,
+            upload_url=str(upload_info["upload_url"]),
+            blob_url=str(upload_info["blob_url"]),
+            blob_name=str(upload_info["blob_name"]),
+            expires_at=str(upload_info["expires_at"]),
+            max_file_size_bytes=int(upload_info["max_file_size_bytes"]),
+            instructions={
+                "method": "PUT",
+                "headers": {
+                    "x-ms-blob-type": "AppendBlob",
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": "REQUIRED - Must be set by client to actual file size",
+                },
+                "append_blob_instructions": {
+                    "step1": "Create the append blob: PUT to upload_url with x-ms-blob-type: AppendBlob and Content-Length: 0",
+                    "step2": "Append data: PUT to upload_url with x-ms-blob-type: AppendBlob and your file data",
+                    "note": "Or use a single PUT with the entire file content if under 4MB per block",
+                },
+                "note": f"Upload directly to upload_url (max {upload_info['max_file_size_bytes']}B), then call /uploads/{upload.id}/process to trigger processing",
+                "size_validation": "Server will verify upload completion when you call the process endpoint.",
+                "status_flow": "Uploading -> Ingesting -> Completed/Failed",
+            },
+        )
+
+        logger.info(f"Re-initiated upload for user {x_user_id}: id={upload_id}")
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error re-initiating upload: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(status=500, message=f"Failed to re-initiate upload: {str(e)}").to_response()
+
+
+@router.get("/try-search/{upload_id}", response_model=ResponseWrapper)
+async def atry_search_upload(
+    session: SessionDep,
+    upload_id: str,
+    query: str = "What is this document about?",
+    search_type: str = "vector",
+    top_k: int = 3,
+    score_threshold: float = 0.5,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Test search endpoint for a specific upload using gRPC retrieval service.
+
+    Args:
+        upload_id: ID of the upload to search
+        query: Search query string (default: "What is this document about?")
+        search_type: Type of search - vector, fulltext, or hybrid (default: vector)
+        top_k: Number of results to return (default: 3)
+        score_threshold: Minimum relevance score (default: 0.5)
+    """
+    try:
+        # Get the specific upload
+        statement = select(Upload).where(
+            Upload.id == upload_id,
+            Upload.status == UploadStatus.COMPLETED,
+            Upload.is_deleted.is_(False),
+        )
+
+        result = await session.execute(statement)
+        upload = result.scalar_one_or_none()
+
+        if not upload:
+            return ResponseWrapper.wrap(status=404, message="Upload not found or not completed").to_response()
+
+        # Check permissions
+        if x_user_role not in ["admin", "super_admin"] and upload.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Create search retriever
+        retriever = create_search_client(user_id=x_user_id, thread_id=upload.thread_id or "global")
+
+        # Perform search
+        documents = await retriever._perform_search(query, [upload_id])
+
+        # Format results
+        search_results = []
+        for doc in documents:
+            search_results.append({"content": doc.page_content, "metadata": doc.metadata, "score": doc.metadata.get("score", 0.0)})
+
+        response_data = {
+            "query": query,
+            "search_params": {"search_type": search_type, "top_k": top_k, "score_threshold": score_threshold},
+            "upload": {"id": upload.id, "name": upload.name, "file_type": upload.file_type, "description": upload.description},
+            "results_count": len(search_results),
+            "results": search_results,
+            "grpc_status": "success",
+        }
+
+        logger.info(f"Search completed for upload {upload.id} with query '{query}': {len(search_results)} results")
+        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+
+    except Exception as e:
+        logger.error(f"Error searching upload {upload_id}: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500, message=f"Search failed: {str(e)}", data={"grpc_status": "error", "error_details": str(e)}
+        ).to_response()
+
+
+@router.get("/try-search/thread/{thread_id}", response_model=ResponseWrapper)
+async def atry_search_thread(
+    session: SessionDep,
+    thread_id: str,
+    query: str = "What is this conversation about?",
+    top_k: int = 5,
+    score_threshold: float = 0.5,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+) -> Any:
+    """
+    Test search endpoint for all uploads in a thread using gRPC retrieval service.
+
+    This searches across ALL documents uploaded to a specific conversation thread,
+    which is more realistic for RAG scenarios.
+
+    Args:
+        thread_id: ID of the thread to search all uploads from
+        query: Search query string (default: "What is this conversation about?")
+        search_type: Type of search - vector, fulltext, or hybrid (default: vector)
+        top_k: Number of results to return (default: 5)
+        score_threshold: Minimum relevance score (default: 0.5)
+    """
+    try:
+        # Get the thread and verify access
+        thread_statement = select(Thread).where(
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
+
+        thread_result = await session.execute(thread_statement)
+        thread = thread_result.scalar_one_or_none()
+
+        if not thread:
+            return ResponseWrapper.wrap(status=404, message="Thread not found").to_response()
+
+        # Check permissions (thread should belong to user)
+        if x_user_role not in ["admin", "super_admin"] and thread.user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
+
+        # Get all completed uploads linked to this thread + global uploads
+        uploads_statement = select(Upload).where(
+            Upload.is_deleted.is_(False),
+            Upload.status == UploadStatus.COMPLETED,
+            Upload.user_id == x_user_id,  # Only user's uploads
+            (Upload.thread_id == thread_id) | Upload.is_global,  # Thread-specific or global uploads
+        )
+
+        uploads_result = await session.execute(uploads_statement)
+        uploads = uploads_result.scalars().all()
+
+        if not uploads:
+            return ResponseWrapper.wrap(status=404, message="No completed uploads found in this thread").to_response()
+
+        logger.info(f"Found completed uploads in thread {thread_id} for search. List of uploads: {[upload.id for upload in uploads]}")
+
+        # Search across all uploads in the thread
+        all_results = []
+
+        try:
+            # Create search retriever for this thread
+            retriever = create_search_client(
+                user_id=x_user_id,
+                thread_id=thread_id,
+            )
+
+            # Perform search
+            documents = await retriever._aget_relevant_documents(query)
+
+            # Format results
+            upload_search_results = []
+            for doc in documents:
+                result = {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": doc.metadata.get("score", 0.0),
+                }
+                upload_search_results.append(result)
+                all_results.append(result)
+
+        except Exception as e:
+            logger.warning(f"Failed to search upload: {str(e)}")
+
+        logger.info(
+            f"Thread search completed for thread {thread_id} with query '{query}': {len(all_results)} total results from {len(uploads)} uploads"
+        )
+        return ResponseWrapper.wrap(
+            status=200,
+            data={
+                "count": len(all_results),
+            },
+        ).to_response()
+
+    except Exception as e:
+        logger.error(f"Error searching thread {thread_id}: {str(e)}", exc_info=True)
+        return ResponseWrapper.wrap(
+            status=500, message=f"Thread search failed: {str(e)}", data={"grpc_status": "error", "error_details": str(e)}
+        ).to_response()
+
+
+# =============================================================================
+# Private Helper Methods
+# =============================================================================
+
+
+async def _validate_thread_exists(session: SessionDep, thread_id: str) -> None:
+    """
+    Validate that the thread exists.
+
+    Args:
+        session: Database session
+        thread_id: ID of the thread
+
+    Raises:
+        HTTPException: If thread not found
+    """
+    thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+    thread_result = await session.execute(thread_statement)
+    thread = thread_result.scalar_one_or_none()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
 
 
 async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str, thread_id: str, user_id: str) -> None:
@@ -51,12 +727,13 @@ async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str
     """
     try:
         # Get thread with assistant
-        from app.db_models.thread import Thread
-
         thread_statement = (
             select(Thread)
             .options(selectinload(Thread.assistant).selectinload(Assistant.teams).selectinload(Team.members))
-            .where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+            .where(
+                Thread.id == thread_id,
+                Thread.is_deleted.is_(False),
+            )
         )
 
         thread_result = await session.execute(thread_statement)
@@ -97,7 +774,6 @@ async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str
             member_upload_link = MemberUploadLink(member_id=member_id, upload_id=upload_id)
             session.add(member_upload_link)
 
-        await session.flush()
         logger.info(f"Upload {upload_id} linked to {len(members_to_link)} members")
 
     except Exception as e:
@@ -105,431 +781,30 @@ async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str
         # Don't raise the exception to avoid breaking the upload creation process
 
 
-async def _valid_content_length(
-    content_length: int = Header(..., le=env_settings.MAX_UPLOAD_SIZE),
-) -> int:
-    return content_length
-
-
-def _save_file_if_within_size_limit(file: UploadFile, file_size: int) -> IO[bytes]:
-    """
-    Check if the uploaded file size is smaller than the specified file size.
-    This is to restrict an attacker from sending a valid Content-Length header and a
-    body bigger than what the app can take.
-    If the file size exceeds the limit, raise an HTTP 413 error. Otherwise, save the file
-    to a temporary location and return the temporary file.
-
-    Args:
-        file (UploadFile): The file uploaded by the user.
-        file_size (int): The file size in bytes.
-
-    Raises:
-        HTTPException: If the file size exceeds the maximum allowed size.
-
-    Returns:
-        IO: A temporary file containing the uploaded data.
-    """
-    # Check file size
-    real_file_size = 0
-    temp: IO[bytes] = NamedTemporaryFile(delete=False)
-    for chunk in file.file:
-        real_file_size += len(chunk)
-        if real_file_size > file_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large"
-            )
-        temp.write(chunk)
-    temp.close()
-    return temp
-
-
-def _move_upload_to_shared_folder(filename: str, temp_file_dir: str) -> str:
-    """
-    Move an uploaded file to a shared folder with a unique name and set its permissions.
-
-    Args:
-        filename (str): The original name of the uploaded file.
-        temp_file_dir (str): The directory of the temporary file.
-
-    Returns:
-        str: The new file path in the shared folder.
-    """
-    file_name = f"{uuid.uuid4()}-{filename}"
-    file_path = f"./app/shared_folder/{file_name}"
-    shutil.move(temp_file_dir, file_path)
-    os.chmod(file_path, 0o775)
-    return file_path
-
-
-@router.get("/", response_model=ResponseWrapper[UploadsResponse])
-async def aread_uploads(
-    session: SessionDep,
-    status: UploadStatus | None = None,
-    skip: int = 0,
-    limit: int = 100,
-    x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
-) -> Any:
-    """
-    Retrieve uploads.
-    """
-    filters = []
-    if status:
-        filters.append(Upload.status == status)
-    if x_user_role not in ["admin", "super_admin"]:
-        filters.append(Upload.user_id == x_user_id)
-    filters.append(Upload.is_deleted.is_(False))
-
-    # Only apply where clause if there are filters, otherwise return all rows
-    if filters:
-        filter_conditions = and_(*filters)
-        count_statement = select(func.count()).select_from(Upload).where(filter_conditions)
-        statement = select(Upload).where(filter_conditions).offset(skip).limit(limit)
-    else:
-        count_statement = select(func.count()).select_from(Upload).where(Upload.is_deleted.is_(False))
-        statement = select(Upload).where(Upload.is_deleted.is_(False)).offset(skip).limit(limit)
-
-    result = await session.execute(count_statement)
-    count = result.scalar_one()
-
-    result = await session.execute(statement)
-    uploads = result.scalars().all()
-
-    response_data = [UploadResponse.model_validate(upload) for upload in uploads]
-
-    return ResponseWrapper.wrap(
-        status=200,
-        data=UploadsResponse(
-            uploads=response_data,
-            count=count,
-        ),
-    ).to_response()
-
-
 def _get_file_type(filename: str) -> str:
-    extension = filename.split(".")[-1].lower()
-    file_types = {
-        "pdf": "pdf",
-        "docx": "docx",
-        "pptx": "pptx",
-        "xlsx": "xlsx",
-        "txt": "txt",
-        "html": "html",
-        "md": "md",
-    }
-    return file_types.get(extension, "unknown")
-
-
-@router.post("/", response_model=ResponseWrapper[UploadResponse])
-async def acreate_upload(
-    session: SessionDep,
-    name: Annotated[str, Form()],
-    description: Annotated[str, Form()],
-    file_type: Annotated[str, Form()],
-    chunk_size: Annotated[int, Form()],
-    chunk_overlap: Annotated[int, Form()],
-    web_url: Annotated[str | None, Form()] = None,
-    thread_id: str | None = Form(None),
-    file: UploadFile | None = None,
-    x_user_id: str = Header(None),
-) -> Any:
-    """Create upload"""
-    logger.info(f"Received upload request: file_type={file_type}, name={name}")
-
-    try:
-        if file_type not in ["file", "web"]:
-            return ResponseWrapper.wrap(status=400, message=f"Invalid file type: {file_type}").to_response()
-
-        if file_type == "web" and not web_url:
-            return ResponseWrapper.wrap(status=400, message="Web URL is required for web uploads").to_response()
-
-        if file_type == "file" and not file:
-            return ResponseWrapper.wrap(status=400, message="File is required for file uploads").to_response()
-
-        try:
-            chunk_size = int(chunk_size)
-            chunk_overlap = int(chunk_overlap)
-            if chunk_size <= 0 or chunk_overlap < 0:
-                return ResponseWrapper.wrap(
-                    status=400,
-                    message="Chunk size must be greater than 0 and chunk overlap must be non-negative",
-                ).to_response()
-        except ValueError:
-            return ResponseWrapper.wrap(status=400, message="Invalid chunk size or overlap").to_response()
-
-        if file_type == "file":
-            if file and file.filename:
-                actual_file_type = _get_file_type(file.filename)
-                if actual_file_type == "unknown":
-                    return ResponseWrapper.wrap(status=400, message="Unsupported file type").to_response()
-            else:
-                return ResponseWrapper.wrap(status=400, message="File name is required for file uploads").to_response()
-        else:
-            actual_file_type = "web"
-
-        upload_request = CreateUploadRequest(
-            name=name,
-            description=description,
-            file_type=actual_file_type,
-            web_url=web_url if web_url else "",
-            thread_id=thread_id,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-        )
-
-        upload = Upload(
-            name=upload_request.name,
-            description=upload_request.description,
-            file_type=upload_request.file_type,
-            web_url=upload_request.web_url,
-            thread_id=upload_request.thread_id,
-            chunk_size=upload_request.chunk_size,
-            chunk_overlap=upload_request.chunk_overlap,
-            user_id=x_user_id,
-            status=UploadStatus.IN_PROGRESS,
-        )
-
-        session.add(upload)
-        await session.flush()
-        await session.refresh(upload)
-
-        if upload.id is None:
-            raise HTTPException(status_code=500, detail="Failed to create upload")
-
-        if thread_id is not None:
-            # Associate upload with thread if thread_id is provided
-            from app.db_models.thread import Thread
-
-            # Check if thread exists
-            thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
-
-            thread_result = await session.execute(thread_statement)
-            thread = thread_result.scalar_one_or_none()
-
-            if not thread:
-                raise HTTPException(status_code=404, detail="Thread not found")
-
-            # Create link between upload and thread
-            link = UploadThreadLink(upload_id=upload.id, thread_id=thread_id)
-            session.add(link)
-            await session.commit()
-            await session.refresh(link)
-
-            # Link upload to appropriate assistant members based on assistant type
-            await _alink_upload_to_assistant_members(session, upload.id, thread_id, x_user_id)
-
-        if file_type == "web":
-            # Handle web upload
-            add_upload.delay(web_url, upload.id, x_user_id, chunk_size, chunk_overlap)
-        else:
-            # Handle file upload
-            if not file or not file.filename:
-                raise HTTPException(status_code=400, detail="File is required")
-
-            file_path = await save_upload_file(file)
-            add_upload.delay(file_path, upload.id, x_user_id, chunk_size, chunk_overlap)
-
-        logger.info(f"Upload created successfully: id={upload.id}")
-        return upload
-
-    except Exception as e:
-        logger.error(f"Error processing upload: {str(e)}", exc_info=True)
-        if "upload" in locals():
-            await session.delete(upload)
-            await session.commit()
-        return ResponseWrapper.wrap(status=500, message=f"Failed to process upload: {str(e)}").to_response()
-
-
-async def save_upload_file(file: UploadFile) -> str:
-    file_name = f"{uuid.uuid4()}-{file.filename}"
-    file_path = f"./app/{file_name}"
-
-    async with aiofiles.open(file_path, "wb") as out_file:
-        content = await file.read()
-        await out_file.write(content)
-
-    os.chmod(file_path, 0o775)
-    return file_path
-
-
-@router.put("/{upload_id}", response_model=ResponseWrapper[UploadResponse])
-async def aupdate_upload(
-    session: SessionDep,
-    upload_id: str,
-    name: str | None = Form(None),
-    description: str | None = Form(None),
-    file_type: str | None = Form(None),
-    chunk_size: Annotated[int, Form(ge=0)] | None = Form(None),
-    chunk_overlap: Annotated[int, Form(ge=0)] | None = Form(None),
-    web_url: str | None = Form(None),
-    file: UploadFile | None = File(None),
-    file_size: int = Depends(_valid_content_length),
-    x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
-) -> Any:
-    """Update upload"""
-    statement = select(Upload).where(Upload.id == upload_id, Upload.is_deleted.is_(False))
-
-    result = await session.execute(statement)
-    upload = result.scalar_one_or_none()
-
-    if not upload:
-        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
-        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
-
-    update_data: dict[str, Any] = {}
-    if name is not None:
-        update_data["name"] = name
-    if description is not None:
-        update_data["description"] = description
-    if file_type is not None:
-        update_data["file_type"] = file_type
-    if web_url is not None:
-        update_data["web_url"] = web_url
-    if chunk_size is not None:
-        update_data["chunk_size"] = chunk_size
-    if chunk_overlap is not None:
-        update_data["chunk_overlap"] = chunk_overlap
-
-    if update_data:
-        update_data["last_modified"] = datetime.now()
-        for key, value in update_data.items():
-            setattr(upload, key, value)
-        session.add(upload)
-        await session.commit()
-
-    if file_type == "web" and web_url:
-        # Handle web update
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
-        session.add(upload)
-        await session.commit()
-        edit_upload.delay(
-            web_url,
-            id,
-            upload.user_id,
-            chunk_size or upload.chunk_size,
-            chunk_overlap or upload.chunk_overlap,
-        )
-    elif file:
-        # Handle file update
-        if file.content_type not in [
-            "application/pdf",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "text/plain",
-            "text/html",
-            "text/markdown",
-        ]:
-            return ResponseWrapper.wrap(status=400, message="Invalid file type. Supported types: pdf, docx, pptx, xlsx, txt, html, md").to_response()
-
-        temp_file = _save_file_if_within_size_limit(file, file_size)
-        if upload.user_id is None:
-            return ResponseWrapper.wrap(status=500, message="Failed to retrieve owner ID").to_response()
-
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
-        session.add(upload)
-        await session.commit()
-
-        if not file.filename or not isinstance(temp_file.name, str):
-            raise HTTPException(status_code=500, detail="Failed to upload file")
-
-        file_path = _move_upload_to_shared_folder(file.filename, temp_file.name)
-        edit_upload.delay(
-            file_path,
-            id,
-            upload.user_id,
-            chunk_size or upload.chunk_size,
-            chunk_overlap or upload.chunk_overlap,
-        )
-
-    await session.commit()
-    await session.refresh(upload)
-
-    response_data = UploadResponse.model_validate(upload)
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-
-
-@router.delete("/{upload_id}", response_model=ResponseWrapper[MessageResponse])
-async def adelete_upload(session: SessionDep, upload_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
-    statement = select(Upload).where(
-        Upload.id == upload_id,
-        Upload.is_deleted.is_(False),
-    )
-
-    result = await session.execute(statement)
-    upload = result.scalar_one_or_none()
-
-    if not upload:
-        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_role not in ["admin", "super admin"] and upload.user_id != x_user_id:
-        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
-    try:
-        # Set upload status to in progress
-        setattr(upload, "status", UploadStatus.IN_PROGRESS)
-        session.add(upload)
-        await session.commit()
-
-        if upload.user_id is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve owner ID")
-
-        remove_upload.delay(id, upload.user_id)
-    except Exception as e:
-        logger.error(f"Error deleting upload: {str(e)}", exc_info=True)
-        await session.rollback()
-        return ResponseWrapper.wrap(status=500, message=f"Failed to delete upload: {str(e)}").to_response()
-
-    response_data = MessageResponse(message="Upload deletion initiated successfully")
-    return ResponseWrapper.wrap(status=200, data=response_data).to_response()
-
-
-@router.post("/{upload_id}/search")
-async def asearch_upload(
-    session: SessionDep,
-    upload_id: str,
-    search_params: dict[str, Any],
-    x_user_id: str = Header(None),
-):
     """
-    Initiate an asynchronous search within a specific upload.
+    Determine file type based on filename extension.
+
+    Args:
+        filename: The filename to check
+
+    Returns:
+        File type string or 'unknown' if not supported
     """
-    statement = select(Upload).where(
-        Upload.id == upload_id,
-        Upload.is_deleted.is_(False),
-    )
-
-    result = await session.execute(statement)
-    upload = result.scalar_one_or_none()
-
-    if not upload:
-        return ResponseWrapper.wrap(status=404, message="Upload not found").to_response()
-    if x_user_id not in ["admin", "super admin"] and upload.user_id != x_user_id:
-        return ResponseWrapper.wrap(status=403, message="Not enough permissions").to_response()
-
-    search_type = search_params.get("search_type", "vector")
-    if search_type not in ["vector", "fulltext", "hybrid"]:
-        return ResponseWrapper.wrap(status=400, message="Invalid search type. Supported types: vector, fulltext, hybrid").to_response()
-
-    task = perform_search.delay(
-        x_user_id,
-        upload_id,
-        search_params["query"],
-        search_type,
-        search_params.get("top_k", 5),
-        search_params.get("score_threshold", 0.5),
-    )
-
-    return {"task_id": task.id}
-
-
-@router.get("/{upload_id}/search/{task_id}")
-async def aget_search_results(task_id: str):
-    """
-    Retrieve the results of an asynchronous search task.
-    """
-    task_result = AsyncResult(task_id)
-    if task_result.ready():
-        return {"status": "completed", "results": task_result.result}
+    filename = filename.lower()
+    if filename.endswith(".pdf"):
+        return "pdf"
+    elif filename.endswith(".docx"):
+        return "docx"
+    elif filename.endswith(".pptx"):
+        return "pptx"
+    elif filename.endswith(".xlsx"):
+        return "xlsx"
+    elif filename.endswith(".txt"):
+        return "txt"
+    elif filename.endswith(".html"):
+        return "html"
+    elif filename.endswith(".md"):
+        return "md"
     else:
-        return {"status": "pending"}
+        return "unknown"

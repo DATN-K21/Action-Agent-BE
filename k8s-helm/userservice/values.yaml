@@ -17,18 +17,7 @@ nameOverride: "userservice"
 fullnameOverride: "userservice"
 
 env:
-  secrets:
-    name: env-secret
-    secret:
-      mongodbconnectionstring: mongodbconnectionstring
-      jwtsecret: jwtsecret
-      emailusername: emailusername
-      emailpassword: emailpassword
-      googleappclientid: googleappclientid
-      googleappclientsecret: googleappclientsecret
-      facebookappclientid: facebookappclientid
-      facebookappclientsecret: facebookappclientsecret
-      clienturl: clienturl
+  # Placeholder
 
 service:
   type: ClusterIP

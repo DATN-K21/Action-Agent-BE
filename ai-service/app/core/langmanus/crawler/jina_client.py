@@ -1,12 +1,13 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import logging
 import os
 
 import requests
 
-logger = logging.getLogger(__name__)
+from app.core import logging
+
+logger = logging.get_logger(__name__)
 
 
 class JinaClient:
