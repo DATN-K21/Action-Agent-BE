@@ -15,10 +15,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./ 
 
 # Install dependencies with uv
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen --no-cache --no-dev
 
 # Copy application code
 COPY . .
 
 # Command to start Celery worker
-CMD [ ".venv/bin/celery", "--app=app.main", "worker" ]
+CMD [ "/app/.venv/bin/celery", "--app=app.main", "worker" ]

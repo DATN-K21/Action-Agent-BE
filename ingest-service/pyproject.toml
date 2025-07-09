@@ -24,7 +24,6 @@ dependencies = [
     "pypdf>=5.7.0",
     "python-docx>=1.2.0",
     "python-multipart>=0.0.20",
-    "sentence-transformers>=5.0.0",
     "structlog>=25.4.0",
     # "unstructured[all-docs]>=0.10.0",
 ]
