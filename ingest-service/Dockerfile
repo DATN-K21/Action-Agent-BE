@@ -20,10 +20,5 @@ RUN uv sync --frozen --no-cache
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash ingest
-RUN chown -R ingest:ingest /app
-USER ingest
-
 # Command to start Celery worker
-CMD [ "celery", "--app=app.main", "worker" ]
+CMD [ ".venv/bin/celery", "--app=app.main", "worker" ]
