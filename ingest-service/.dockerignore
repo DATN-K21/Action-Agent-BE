@@ -1,0 +1,24 @@
+# Ignore unnecessary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.md
+.pytest_cache/
+.vscode/
+.idea/
+.git/
+
+.venv/
+.ruff_cache/
+tests/
+docs/
+*.sh
+*.DS_Store
+
+ruff.toml
+.env.example
+.env
