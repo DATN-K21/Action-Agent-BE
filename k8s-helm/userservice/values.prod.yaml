@@ -49,10 +49,10 @@ env:
     value: "http://aiserviceprod:15200"
 
   - name: REDIS_URL
-    value: "redis://redisprod:6379"
+    value: "redis://default:default@redisprod:6379"
 
   - name: GOOGLE_APP_REDIRECT_URL
-    value: "https://apigateway:15000/user/api/v1/access/auth/google/grant-gmail-permission/callback"
+    value: "https://api.action-agent.software/user/api/v1/access/auth/google/grant-gmail-permission/callback"
   - name: GOOGLE_APP_CLIENT_ID
     valueFrom:
       secretKeyRef:
@@ -65,7 +65,7 @@ env:
         key: googleappclientsecret
 
   - name: FACEBOOK_APP_REDIRECT_URL
-    value: "https://apigateway:15000/user/api/v1/access/facebook/verify"
+    value: "https://api.action-agent.software/user/api/v1/access/facebook/verify"
   - name: FACEBOOK_APP_CLIENT_ID
     valueFrom:
       secretKeyRef:
@@ -78,7 +78,4 @@ env:
         key: facebookappclientsecret
     
   - name: CLIENT_URL
-    valueFrom:
-      secretKeyRef:
-        name: env-secret
-        key: clienturl
+    value: "https://action-agent.software"
