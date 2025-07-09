@@ -404,7 +404,7 @@ def create_human_tool_review_node(member_name: str) -> HumanNode:
     """Create a HumanNode specifically for tool call review"""
     routes = {
         "approved": f"{member_name}-tools",
-        "rejected": member_name,
+        "rejected": "__end__",  # Use LangGraph's internal END
         "update": f"{member_name}-tools",
     }
 
@@ -457,7 +457,7 @@ async def acreate_hierarchical_graph(
         ),
     )
     build.add_node(
-        "final-answer",
+        "hierarchical-final-answer",
         RunnableLambda(
             SummariserNode(
                 provider=env_settings.OPENAI_PROVIDER,
@@ -501,8 +501,7 @@ async def acreate_hierarchical_graph(
                     if member.interrupt:
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
-                        # Route: member -> tool-review -> tools -> member
-                        build.add_edge(f"{name}-tool-review", f"{name}-tools")
+                        # No direct edge - HumanNode uses Command(goto=...) for routing
                         build.add_edge(f"{name}-tools", name)
                     else:
                         # Direct connection without review
@@ -538,11 +537,11 @@ async def acreate_hierarchical_graph(
             build.add_edge(name, leader_name)
 
     conditional_mapping: dict[Hashable, str] = {v: v for v in members}
-    conditional_mapping["FINISH"] = "final-answer"
+    conditional_mapping["FINISH"] = "hierarchical-final-answer"
     build.add_conditional_edges(leader_name, router, conditional_mapping)
 
     build.set_entry_point(leader_name)
-    build.set_finish_point("final-answer")
+    build.set_finish_point("hierarchical-final-answer")
     # Note: No interrupt_before needed since we use HumanNode with interrupt() function
     graph = build.compile(checkpointer=checkpointer, debug=env_settings.DEBUG_AGENT)
 
@@ -599,8 +598,7 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                 if member.interrupt:
                     human_tool_review_node = create_human_tool_review_node(member.name)
                     graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
-                    # Route: member -> tool-review -> tools -> member
-                    graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                    # No direct edge - HumanNode uses Command(goto=...) for routing
                     graph.add_edge(f"{member.name}-tools", member.name)
                 else:
                     # Direct connection without review
@@ -706,8 +704,7 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
             if member.interrupt:
                 human_tool_review_node = create_human_tool_review_node(member.name)
                 graph.add_node(f"{member.name}-tool-review", human_tool_review_node.work)
-                # Route: member -> tool-review -> tools -> member
-                graph.add_edge(f"{member.name}-tool-review", f"{member.name}-tools")
+                # No direct edge - HumanNode uses Command(goto=...) for routing
                 graph.add_edge(f"{member.name}-tools", member.name)
             else:
                 # Direct connection without review
@@ -1001,7 +998,7 @@ async def generator(
                     if tool_call["name"] == "ask-human":
                         response = ChatResponse(
                             type="interrupt",
-                            name="human",
+                            name="ask-human",
                             tool_calls=message.tool_calls,
                             id=str(uuid4()),
                         )
@@ -1036,7 +1033,8 @@ async def generator(
                     response = ChatResponse(
                         type="interrupt",
                         name=interrupt_name,
-                        content=f"LLM output is as follows:\n\n{message.content}\n\nPlease enter your additional information.",
+                        content=f"{message.content}",
+                        tool_calls=message.tool_calls,
                         id=str(uuid4()),
                     )
                 elif interrupt_name == "tool_review":
@@ -1063,3 +1061,15 @@ async def generator(
         yield f"data: {response.model_dump_json()}\n\n"
         await asyncio.sleep(0.1)  # Add a small delay to ensure the message is sent
         raise e
+    finally:
+        # Clean up resources after generator completes
+        if user_id:
+            from app.core.stream_control import acleanup_connection
+            await acleanup_connection(user_id, thread_id)
+        
+        # Force cleanup of local variables to help garbage collection
+        locals().clear()
+        
+        # Trigger garbage collection to release memory
+        import gc
+        gc.collect()

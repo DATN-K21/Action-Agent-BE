@@ -29,13 +29,13 @@ class ExtensionService:
         # Get the integration id if it exists, otherwise create a new one
         self._integration_id = ComposioClient.get_or_initiate_integration(app_enum=self._app_enum)
 
-    def initialize_connection(self, user_id: str, connected_extension_id: str):
+    def initialize_connection(self, user_id: str):
         if self._app_enum is None:
             raise ValueError("App enum is not set")
         if self._redirect_url is None:
             raise ValueError("Redirect URL is not set")
 
-        result = ComposioClient.initiate_app_connection(user_id, connected_extension_id, self._app_enum, self._redirect_url)
+        result = ComposioClient.initiate_app_connection(user_id, self._app_enum, self._redirect_url)
         return result
 
     def disconnect(self, connected_account_id: str) -> DeleteConnection:

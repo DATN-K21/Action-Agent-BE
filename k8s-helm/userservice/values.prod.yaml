@@ -49,7 +49,7 @@ env:
     value: "http://aiserviceprod:15200"
 
   - name: REDIS_URL
-    value: "redis://redisprod:6379"
+    value: "redis://default:default@redisprod:6379"
 
   - name: GOOGLE_APP_REDIRECT_URL
     value: "https://api.action-agent.software/user/api/v1/access/auth/google/grant-gmail-permission/callback"

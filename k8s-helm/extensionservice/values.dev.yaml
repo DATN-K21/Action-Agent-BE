@@ -17,6 +17,9 @@ env:
 
   - name: NODE_ENV
     value: "dev"
+
+  - name: AI_SERVICE_URL
+    value: "http://aiservicedev:15200/api/v1"
   
   - name: DATABASE_URL
     valueFrom:

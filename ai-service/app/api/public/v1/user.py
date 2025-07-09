@@ -1,17 +1,17 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Header
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import and_, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
+from app.core.enums import LlmProvider
 from app.db_models.user import User
 from app.db_models.user_api_key import UserApiKey
 from app.schemas.base import ResponseWrapper
 from app.schemas.user_api_key import (
     DeleteApiKeyRequest,
     DeleteApiKeyResponse,
-    GetApiKeyResponse,
     GetApiKeysResponse,
     SetDefaultApiKeyRequest,
     SetDefaultApiKeyResponse,
@@ -24,15 +24,22 @@ logger = logging.get_logger(__name__)
 router = APIRouter(prefix="/user", tags=["User"])
 
 
-@router.get("/key/get-all", summary="Get API Keys.", response_model=ResponseWrapper[GetApiKeyResponse])
+@router.get("/key/get-all", summary="Get API Keys.", response_model=ResponseWrapper[GetApiKeysResponse])
 async def aget_api_key(
     session: SessionDep,
-    x_user_id: str,
+    x_user_id: str = Header(None),
 ):
     try:
         # Fetch user data with API keys
         stmt = (
-            select(User)
+            select(
+                User.id.label("user_id"),
+                User.default_api_key_id,
+                User.remain_trial_tokens,
+                UserApiKey.id.label("api_key_id"),
+                UserApiKey.provider,
+                UserApiKey.created_at,
+            )
             .join(UserApiKey, and_((User.id == UserApiKey.user_id), (UserApiKey.is_deleted.is_(False))), isouter=True)
             .where(
                 User.id == x_user_id,
@@ -45,7 +52,7 @@ async def aget_api_key(
         logger.info(f"db_records: {records}")
 
         if not records:
-            return ResponseWrapper.wrap(status=404, message="User not found").to_response()
+            return ResponseWrapper.wrap(status=404, message="User not found")
 
         # Convert query result into structured object
         user_with_keys = None
@@ -73,11 +80,11 @@ async def aget_api_key(
             user_with_keys["api_keys"] = api_keys
 
         response_data = GetApiKeysResponse.model_validate(user_with_keys)
-        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+        return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
         logger.error(f"Error fetching user with API keys: {e}")
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
 @router.post("/key/set-default", summary="Set default API Key.", response_model=ResponseWrapper[SetDefaultApiKeyResponse])
@@ -101,7 +108,7 @@ async def aset_default_api_key(session: SessionDep, request: SetDefaultApiKeyReq
             api_key_id = result.scalar_one_or_none()
 
             if not api_key_id:
-                return ResponseWrapper.wrap(status=404, message="API key not found").to_response()
+                return ResponseWrapper.wrap(status=404, message="API key not found")
 
         # Update the user's default API key
         update_stmt = (
@@ -111,24 +118,25 @@ async def aset_default_api_key(session: SessionDep, request: SetDefaultApiKeyReq
                 User.is_deleted.is_(False),
             )
             .values(default_api_key_id=api_key_id)
-            .returning(User.default_api_key_id)
+            .returning(User.id)
         )
 
         result = await session.execute(update_stmt)
-        updated_default_api_key_id = result.scalar_one_or_none()
+        updated_user_id = result.scalar_one_or_none()
 
-        if api_key_id and not updated_default_api_key_id:
-            return ResponseWrapper.wrap(status=404, message="User not found").to_response()
+        if updated_user_id is None:
+            await session.rollback()
+            return ResponseWrapper.wrap(status=404, message="User not found")
 
         await session.commit()
 
         response_data = SetDefaultApiKeyResponse()
-        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+        return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
         logger.error(f"Error setting default API key: {e}")
         await session.rollback()
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
 @router.put("/key/upsert", summary="Upsert API Key.", response_model=ResponseWrapper[UpsertApiKeyResponse])
@@ -172,7 +180,8 @@ async def upsert_api_key(
             updated_api_key = result.mappings().one_or_none()
 
             if not updated_api_key:
-                return ResponseWrapper.wrap(status=404, message="API key not found").to_response()
+                await session.rollback()
+                return ResponseWrapper.wrap(status=404, message="API key not found")
 
             await session.commit()
             response_data = UpsertApiKeyResponse.model_validate(updated_api_key)
@@ -190,29 +199,38 @@ async def upsert_api_key(
             await session.commit()
             await session.refresh(new_api_key)
 
-            response_data = UpsertApiKeyResponse.model_validate(new_api_key)
+            response_data = UpsertApiKeyResponse(
+                id=new_api_key.id,
+                provider=LlmProvider(new_api_key.provider),
+                created_at=new_api_key.created_at,
+            )
 
-        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+        return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
         logger.error(f"Error upserting API key: {e}")
         await session.rollback()
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
-@router.delete("/{user_id}/key/delete", summary="Delete API Key.", response_model=ResponseWrapper[DeleteApiKeyResponse])
+@router.delete("/key/delete", summary="Delete API Key.", response_model=ResponseWrapper[DeleteApiKeyResponse])
 async def delete_api_key(
     session: SessionDep,
     request: DeleteApiKeyRequest,
     x_user_id: str = Header(None),
 ):
     try:
+        # Soft delete by updating is_deleted flag
         stmt = (
-            delete(UserApiKey)
+            update(UserApiKey)
             .where(
                 UserApiKey.user_id == x_user_id,
                 UserApiKey.provider == request.provider,
                 UserApiKey.is_deleted.is_(False),
+            )
+            .values(
+                is_deleted=True,
+                deleted_at=datetime.utcnow(),
             )
             .returning(UserApiKey.id)
         )
@@ -221,13 +239,14 @@ async def delete_api_key(
         deleted_api_key_id = result.scalar_one_or_none()
 
         if not deleted_api_key_id:
-            return ResponseWrapper.wrap(status=404, message="API key not found").to_response()
+            await session.rollback()
+            return ResponseWrapper.wrap(status=404, message="API key not found")
 
         await session.commit()
         response_data = DeleteApiKeyResponse()
-        return ResponseWrapper.wrap(status=200, data=response_data).to_response()
+        return ResponseWrapper.wrap(status=200, data=response_data)
 
     except Exception as e:
         logger.error(f"Error deleting API key: {e}", exc_info=True)
         await session.rollback()
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")

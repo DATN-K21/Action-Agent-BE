@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.deps import SessionDep
 from app.core import logging
+from app.core.enums import ConnectionStatus
 from app.db_models.connected_extension import ConnectedExtension
 from app.schemas.base import PagingRequest, ResponseWrapper
 from app.schemas.connected_extension import GetConnectedExtensionResponse, GetConnectedExtensionsResponse
@@ -83,7 +84,7 @@ async def aget_all(
     except SQLAlchemyError as e:
         # Handle database-specific errors
         logger.error("Database error: %s", str(e), exc_info=True)
-        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response
+        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response()
 
     except Exception as e:
         # Handle any other exceptions
@@ -91,8 +92,12 @@ async def aget_all(
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
 
 
-@router.get("/{connected_extension_id}/get-detail", summary="Get detail connection.", response_model=ResponseWrapper[GetConnectedExtensionResponse])
-async def aget_detail(
+@router.get(
+    "/{connected_extension_id}/get-detail-by-id",
+    summary="Get detail connection by id.",
+    response_model=ResponseWrapper[GetConnectedExtensionResponse],
+)
+async def aget_detail_by_id(
     session: SessionDep,
     connected_extension_id: str,
     x_user_id: str = Header(None),
@@ -110,7 +115,7 @@ async def aget_detail(
             )
         else:
             statement = (
-                select(ConnectedExtension.connected_account_id)
+                select(ConnectedExtension)
                 .where(
                     ConnectedExtension.user_id == x_user_id,
                     ConnectedExtension.id == connected_extension_id,
@@ -120,14 +125,69 @@ async def aget_detail(
             )
 
         result = await session.execute(statement)
-        connected_extension = result.scalar_one()
+        connected_extension = result.scalar_one_or_none()
+
+        if connected_extension is None:
+            return ResponseWrapper.wrap(status=404, message="Connected extension not found").to_response()
+
         connected_extension_data = GetConnectedExtensionResponse.model_validate(connected_extension)
         return ResponseWrapper.wrap(status=200, data=connected_extension_data).to_response()
 
     except SQLAlchemyError as e:
         # Handle database-specific errors
         logger.error("Database error: %s", str(e), exc_info=True)
-        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response
+        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response()
+
+    except Exception as e:
+        logger.exception("Has error: %s", str(e))
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get(
+    "/{extension_enum}/get-detail-by-enum", summary="Get detail connection by enum.", response_model=ResponseWrapper[GetConnectedExtensionResponse]
+)
+async def aget_detail_by_enum(
+    session: SessionDep,
+    extension_enum: str,
+    x_user_id: str = Header(None),
+    x_user_role: str = Header(None),
+):
+    try:
+        if x_user_role == "admin" or x_user_role == "super_admin":
+            statement = (
+                select(ConnectedExtension)
+                .where(
+                    func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
+                    ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
+                    ConnectedExtension.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+        else:
+            statement = (
+                select(ConnectedExtension)
+                .where(
+                    ConnectedExtension.user_id == x_user_id,
+                    func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
+                    ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
+                    ConnectedExtension.is_deleted.is_(False),
+                )
+                .limit(1)
+            )
+
+        result = await session.execute(statement)
+        connected_extension = result.scalar_one_or_none()
+
+        if connected_extension is None:
+            return ResponseWrapper.wrap(status=404, message="Connected extension not found").to_response()
+
+        connected_extension_data = GetConnectedExtensionResponse.model_validate(connected_extension)
+        return ResponseWrapper.wrap(status=200, data=connected_extension_data).to_response()
+
+    except SQLAlchemyError as e:
+        # Handle database-specific errors
+        logger.error("Database error: %s", str(e), exc_info=True)
+        return ResponseWrapper.wrap(status=500, message="Database error occurred").to_response()
 
     except Exception as e:
         logger.exception("Has error: %s", str(e))

@@ -327,7 +327,7 @@ async def _acreate_hierarchical_team(
 
     # Create root member (leader) for the hierarchical team
     root_member_id = str(uuid.uuid4())
-    root_member_name = create_unique_key(id_=root_member_id, name="Leader")
+    root_member_name = create_unique_key(id_=root_member_id, name="Hierarchical-Leader")
     root_member = Member(
         id=root_member_id,
         name=root_member_name,
@@ -379,7 +379,7 @@ async def _acreate_main_team(
 
     # Create root member (chatbot) for the main team
     root_member_id = str(uuid.uuid4())
-    root_member_name = create_unique_key(id_=root_member_id, name="Chatbot Unit Root")
+    root_member_name = create_unique_key(id_=root_member_id, name="Chatbot")
     root_member = Member(
         id=root_member_id,
         name=root_member_name,
@@ -423,7 +423,7 @@ async def _acreate_mcp_member_with_skills(
     """
     # Create member
     member_id = str(uuid.uuid4())
-    member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
+    member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
     member = Member(
         id=member_id,
         name=member_name,
@@ -508,14 +508,19 @@ async def _acreate_extension_member_with_skills(
         root_member_id: Root member ID for source reference
         request: Request data containing provider/model info
     """
+    # Load extension tools and create skills
+    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
+    if not extension_service_info or not extension_service_info.service_object:
+        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
     # Create member
     member_id = str(uuid.uuid4())
-    member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
+    member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
     member = Member(
         id=member_id,
         name=member_name,
         team_id=team_id,
-        backstory="",
+        backstory=extension_service_info.description,
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
@@ -528,12 +533,6 @@ async def _acreate_extension_member_with_skills(
     )
     session.add(member)
     await session.flush()
-
-    # Load extension tools and create skills
-    extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
-
-    if not extension_service_info or not extension_service_info.service_object:
-        raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
 
     extension_service = extension_service_info.service_object
     tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -615,7 +614,7 @@ async def _acreate_support_team(
 
     # Create root member for the support team
     support_root_member_id = str(uuid.uuid4())
-    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type} Support Root")
+    support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type}")
     support_root_member = Member(
         id=support_root_member_id,
         name=support_root_member_name,
@@ -927,7 +926,7 @@ async def _aupdate_mcp_members(
             if connected_mcp:
                 # Create member
                 member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=connected_mcp.mcp_name)
+                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
                 member = Member(
                     id=member_id,
                     name=member_name,
@@ -1038,14 +1037,19 @@ async def _aupdate_extension_members(
             connected_extension = result.scalar_one_or_none()
 
             if connected_extension:
+                # Create extension skills
+                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
+                if not extension_service_info or not extension_service_info.service_object:
+                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
+
                 # Create member
                 member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=connected_extension.extension_name)
+                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
                 member = Member(
                     id=member_id,
                     name=member_name,
                     team_id=hierarchical_team.id,
-                    backstory="",
+                    backstory=extension_service_info.description,
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
@@ -1058,12 +1062,6 @@ async def _aupdate_extension_members(
                 )
                 session.add(member)
                 await session.flush()
-
-                # Create extension skills
-                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
-
-                if not extension_service_info or not extension_service_info.service_object:
-                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
 
                 extension_service = extension_service_info.service_object
                 tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -1187,7 +1185,7 @@ async def _aupdate_support_units(
 
                 # Create root member for the support team
                 support_root_member_id = str(uuid.uuid4())
-                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit} Support Root")
+                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit}")
                 support_root_member = Member(
                     id=support_root_member_id,
                     name=support_root_member_name,
@@ -1540,7 +1538,7 @@ async def aget_assistants(
     session: SessionDep,
     assistant_type: AssistantType | None = None,
     paging: PagingRequest = Depends(),
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
     x_user_role: str = Header(None),
 ):
     """
@@ -1601,7 +1599,7 @@ async def aget_assistants(
 )
 async def aget_or_create_general_assistant(
     session: SessionDep,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Get or create a general assistant for the user.
@@ -1665,7 +1663,7 @@ async def aget_or_create_general_assistant(
 async def acreate_advanced_assistant(
     session: SessionDep,
     request: CreateAdvancedAssistantRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Create an advanced assistant with hierarchical workflow using helper functions.
@@ -1695,7 +1693,7 @@ async def acreate_advanced_assistant(
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
-            provider=request.provider or env_settings.OPENAI_API_BASE_URL,
+            provider=request.provider or env_settings.OPENAI_PROVIDER,
             model_name=request.model_name or env_settings.LLM_BASIC_MODEL,
             temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=request.ask_human if request.ask_human is not None else True,
@@ -1768,7 +1766,9 @@ async def acreate_advanced_assistant(
             select(Assistant).options(selectinload(Assistant.teams).selectinload(Team.members)).where(Assistant.id == new_assistant.id)
         )
         assistant_result = await session.execute(assistant_statement)
-        created_assistant = assistant_result.scalar_one()  # Format teams data for response using helper function
+        created_assistant = assistant_result.scalar_one()
+
+        # Format teams data for response using helper function
         teams_data = _format_team_data(created_assistant.teams)
 
         # Create response using helper function
@@ -1795,7 +1795,7 @@ async def acreate_advanced_assistant(
         return ResponseWrapper.wrap(status=201, data=response).to_response()
 
     except Exception as e:
-        logger.error(f"Error creating advanced assistant: {e}")
+        logger.exception(f"Error creating advanced assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -1805,7 +1805,12 @@ async def acreate_advanced_assistant(
     summary="Get assistant details.",
     response_model=ResponseWrapper[GetGeneralAssistantResponse | GetAdvancedAssistantResponse],
 )
-async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+async def aget_assistant_by_id(
+    session: SessionDep,
+    assistant_id: str,
+    x_user_id: str = Header(),
+    x_user_role: str = Header(None),
+):
     """
     Get details of an assistant by its ID using helper functions.
 
@@ -1856,7 +1861,7 @@ async def aget_assistant_by_id(session: SessionDep, assistant_id: str, x_user_id
         return ResponseWrapper.wrap(status=200, data=response).to_response()
 
     except Exception as e:
-        logger.error(f"Error fetching assistant details: {e}")
+        logger.exception(f"Error fetching assistant details: {e}")
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
 
@@ -1869,7 +1874,7 @@ async def aupdate_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAdvancedAssistantRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Update an assistant's information.
@@ -1920,7 +1925,7 @@ async def aupdate_advanced_assistant(
 
                 # Create root member for the hierarchical team
                 root_member_id = str(uuid.uuid4())
-                root_member_name = create_unique_key(id_=root_member_id, name="Leader")
+                root_member_name = create_unique_key(id_=root_member_id, name="Hierarchical-Leader")
                 root_member = Member(
                     id=root_member_id,
                     name=root_member_name,
@@ -1991,7 +1996,7 @@ async def aupdate_advanced_assistant(
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:
-        logger.error(f"Error updating assistant: {e}", exc_info=True)
+        logger.exception(f"Error updating assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2004,7 +2009,7 @@ async def aupdate_advanced_assistant(
 async def ahard_delete_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Delete an advanced assistant and all related entities using helper functions.
@@ -2044,7 +2049,7 @@ async def ahard_delete_advanced_assistant(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error deleting assistant: {e}")
+        logger.exception(f"Error deleting assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2053,7 +2058,7 @@ async def ahard_delete_advanced_assistant(
 async def asoft_delete_advanced_assistant(
     session: SessionDep,
     assistant_id: str,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """
     Soft delete an advanced assistant and all related entities by setting is_deleted=True.
@@ -2095,7 +2100,7 @@ async def asoft_delete_advanced_assistant(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error soft deleting assistant: {e}")
+        logger.exception(f"Error soft deleting assistant: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()
 
@@ -2105,7 +2110,7 @@ async def aupdate_assistant_config(
     session: SessionDep,
     assistant_id: str,
     request: UpdateAssistantConfigRequest,
-    x_user_id: str = Header(None),
+    x_user_id: str = Header(),
 ):
     """Update the configuration of an assistant.
 
@@ -2164,6 +2169,6 @@ async def aupdate_assistant_config(
         return ResponseWrapper.wrap(status=200, data=message).to_response()
 
     except Exception as e:
-        logger.error(f"Error updating assistant configuration: {e}")
+        logger.exception(f"Error updating assistant configuration: {e}")
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal Server Error").to_response()

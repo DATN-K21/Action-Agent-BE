@@ -132,7 +132,7 @@ class ExtensionClient:
             actions_data = await self.aget_app_actions(service_key)
 
             # Extract action enums from the actions data
-            action_enums = [action.get("enum", "") for action in actions_data if action.get("enum")]
+            action_enums = [action.get("enum", "") for action in actions_data]
 
             # Convert action enums to Composio Action enums
             composio_actions = self._convert_action_enums_to_composio_actions(action_enums)
@@ -199,9 +199,9 @@ class ExtensionClient:
             for app_data in apps_data:
                 app_key = app_data.get("key", "")
 
-                # Fetch actions for this app
+                # Fetch actions for this app (already filtered for non-deprecated actions and valid parameter names)
                 actions_data = await self.aget_app_actions(app_key)
-                action_enums = [action.get("enum", "") for action in actions_data if action.get("enum")]
+                action_enums = [action.get("enum", "") for action in actions_data]
                 composio_actions = self._convert_action_enums_to_composio_actions(action_enums)
 
                 # Convert app key to Composio App enum
@@ -309,12 +309,13 @@ class ExtensionClient:
     async def aget_app_actions(self, app_key: str) -> List[Dict]:
         """
         Get all actions for a specific app from the extension service.
+        Filters out actions that are deprecated or don't have enum values.
 
         Args:
             app_key: The unique key/identifier of the app
 
         Returns:
-            List of action dictionaries
+            List of action dictionaries (non-deprecated with valid enum values)
         """
         try:
             logger.info(f"Fetching actions for app: {app_key}")
@@ -325,8 +326,17 @@ class ExtensionClient:
                 logger.warning(f"No actions returned for app: {app_key}")
                 return []
 
-            logger.info(f"Successfully retrieved {len(actions_data)} actions for app: {app_key}")
-            return actions_data
+            # Filter out actions with invalid parameter names
+            valid_actions = [
+                action for action in actions_data if self._is_valid_action(action) and action.get("enum") and action.get("deprecated") is not True
+            ]
+
+            filtered_count = len(actions_data) - len(valid_actions)
+            if filtered_count > 0:
+                logger.warning(f"Filtered out {filtered_count} actions that were either invalid, deprecated, or without enum for app: {app_key}")
+
+            logger.info(f"Successfully retrieved {len(valid_actions)} valid non-deprecated actions for app: {app_key}")
+            return valid_actions
 
         except Exception as e:
             logger.error(f"Failed to get actions for app {app_key}: {str(e)}")
@@ -354,6 +364,73 @@ class ExtensionClient:
 
         logger.info(f"Converted {len(actions)} out of {len(action_enums)} action enums")
         return actions
+
+    def _is_valid_action(self, action_data: Dict) -> bool:
+        """
+        Check if an action has valid parameters (no Python reserved keywords as parameter names).
+
+        Args:
+            action_data: Dictionary containing action data
+
+        Returns:
+            True if action has valid parameters, False otherwise
+        """
+        # List of Python reserved keywords
+        python_reserved_keywords = {
+            "False",
+            "None",
+            "True",
+            "and",
+            "as",
+            "assert",
+            "async",
+            "await",
+            "break",
+            "class",
+            "continue",
+            "def",
+            "del",
+            "elif",
+            "else",
+            "except",
+            "finally",
+            "for",
+            "from",
+            "global",
+            "if",
+            "import",
+            "in",
+            "is",
+            "lambda",
+            "nonlocal",
+            "not",
+            "or",
+            "pass",
+            "raise",
+            "return",
+            "try",
+            "while",
+            "with",
+            "yield",
+        }
+
+        # Check if the action has parameters
+        parameters = action_data.get("parameters", {})
+        if not parameters:
+            return True
+
+        # Check if properties exist in parameters
+        properties = parameters.get("properties", {})
+        if not properties:
+            return True
+
+        # Check each property name against reserved keywords
+        for param_name in properties.keys():
+            if param_name in python_reserved_keywords:
+                logger.warning(f"Action {action_data.get('enum', 'unknown')} has invalid parameter name: {param_name}")
+                return False
+
+        return True
 
 
 extension_client = ExtensionClient()

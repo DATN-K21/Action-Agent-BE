@@ -33,9 +33,13 @@ class AsyncPostgresPool:
                     },
                     open=False,
                     timeout=5,
+                    min_size=2,  # Minimum connections in pool
+                    max_size=10,  # Maximum connections in pool
+                    max_idle=300,  # Maximum idle time (5 minutes)
+                    max_lifetime=3600,  # Maximum connection lifetime (1 hour)
                 )
                 await cls._async_pool.open()
-                logger.info("Checkpoint connection pool set up successfully")
+                logger.info("Connection pool set up successfully with size limits: min=2, max=10")
             except Exception as e:
                 logger.exception("Error setting up connection pool: %s", e)
                 raise HTTPException(status_code=500, detail="Error setting up connection pool") from e

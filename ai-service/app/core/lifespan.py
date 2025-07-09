@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core import logging
+from app.core.cache.memory_cache_manager import global_cache_manager
 from app.core.db_session import async_engine
 from app.core.grpc_pool import close_grpc_connections, configure_grpc_pool
 from app.core.settings import env_settings
@@ -38,6 +39,10 @@ async def lifespan(app: FastAPI):
 
         yield
     finally:
+        # Shutdown cache manager first to cleanup all caches
+        await global_cache_manager.shutdown()
+
+        # Then shutdown database connections
         await close_grpc_connections()
         await AsyncPostgresPool.atear_down()
 

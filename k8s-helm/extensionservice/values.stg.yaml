@@ -17,6 +17,9 @@ env:
 
   - name: NODE_ENV
     value: "stg"
+
+  - name: AI_SERVICE_URL
+    value: "http://aiservicestg:15200/api/v1"
   
   - name: DATABASE_URL
     valueFrom:
