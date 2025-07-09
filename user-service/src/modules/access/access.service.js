@@ -13,6 +13,8 @@ const GoogleHelper = require('../../helpers/google.helper');
 const { jwtSecret } = require('../../configs/jwt.config');
 const { syncData } = require("../../helpers/sync.helper");
 const emailConfig = require('../../configs/email.config');
+const fs = require('fs/promises');
+const path = require('path');
 class AccessService {
     constructor() {
         this.userModel = UserModel;
@@ -475,12 +477,9 @@ class AccessService {
                 },
             });
 
-            const otpMessage = `
-                <p>You have requested to reset your password on HCMUS Action-AI Agent. Your OTP code is:</p>
-                <h2>${otpValue}</h2>
-                <p>Please enter this code to reset your password.</p>
-                <strong>Note: The One-Time Password (OTP) is valid for 5 minutes.</strong>
-            `;
+            const otpTemplatePath = path.join(__dirname, "../..", "templates", "resetPasswordOTP.html");
+            let otpMessage = await fs.readFile(otpTemplatePath, "utf8");
+            otpMessage = otpMessage.replace("{{otpCode}}", otpValue);
 
             const sendEmailResult = await emailHelper.sendEmail({
                 from: emailConfig.user,
@@ -543,11 +542,9 @@ class AccessService {
                 },
             });
 
-            const activationMessage = `
-                <p>Thank you for registering an account on HCMUS Action-AI Agent. Please click the link below to activate your account:</p>
-                <a href="${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}">Activate Account</a><br>
-                <strong>Note: The activation link is valid for 15 minutes.</strong>
-             `;
+            const templatePath = path.join(__dirname, "../..", "templates", "accountActivation.html");
+            let activationMessage = await fs.readFile(templatePath, "utf8");
+            activationMessage = activationMessage.replace("{{activationLink}}", `${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}`);
 
             const sendEmailResult = await emailHelper.sendEmail({
                 from: emailConfig.user,
