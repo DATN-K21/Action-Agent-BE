@@ -641,36 +641,37 @@ async def _acreate_support_team(
 async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: str) -> None:
     """Create search skills for SEARCHBOT workflow type."""
     # DuckDuckGo search skill
-    ddg_tool_info = global_tools.get("duckduckgo-search")
-    if not ddg_tool_info:
-        raise ValueError("DuckDuckGo search tool not found in global tools.")
+    # ddg_tool_info = global_tools.get("duckduckgo-search")
+    # if not ddg_tool_info:
+    #     raise ValueError("DuckDuckGo search tool not found in global tools.")
 
-    ddg_skill_id = str(uuid.uuid4())
-    ddg_skill = Skill(
-        id=ddg_skill_id,
-        name="duckduckgo-search",
-        user_id=user_id,
-        description=ddg_tool_info.description,
-        icon="",
-        display_name=ddg_tool_info.display_name,
-        strategy=StorageStrategy.GLOBAL_TOOLS,
-        input_parameters=ddg_tool_info.input_parameters,
-        reference_type=ConnectedServiceType.NONE,
-    )
-    session.add(ddg_skill)
-    await session.flush()
+    # ddg_skill_id = str(uuid.uuid4())
+    # ddg_skill = Skill(
+    #     id=ddg_skill_id,
+    #     name="duckduckgo-search",
+    #     user_id=user_id,
+    #     description=ddg_tool_info.description,
+    #     icon="",
+    #     display_name=ddg_tool_info.display_name,
+    #     strategy=StorageStrategy.GLOBAL_TOOLS,
+    #     input_parameters=ddg_tool_info.input_parameters,
+    #     reference_type=ConnectedServiceType.NONE,
+    # )
+    # session.add(ddg_skill)
+    # await session.flush()
 
-    member_skill_link = MemberSkillLink(
-        member_id=member_id,
-        skill_id=ddg_skill.id,
-    )
-    session.add(member_skill_link)
-    await session.flush()
+    # member_skill_link = MemberSkillLink(
+    #     member_id=member_id,
+    #     skill_id=ddg_skill.id,
+    # )
+    # session.add(member_skill_link)
+    # await session.flush()
 
     # Tavily search skill
     tavily_tool_info = global_tools.get("tavily-search")
     if not tavily_tool_info:
         raise ValueError("Tavily search tool not found in global tools.")
+
     tavily_skill_id = str(uuid.uuid4())
     tavily_skill = Skill(
         id=tavily_skill_id,

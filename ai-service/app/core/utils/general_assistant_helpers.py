@@ -294,27 +294,52 @@ class GeneralAssistantHelpers:
             member_id: Member ID to assign skills to
             user_id: User ID
         """
-        # DuckDuckGo search skill
-        ddg_tool_info = global_tools.get("duckduckgo-search")
-        if ddg_tool_info:
-            ddg_skill_id = str(uuid.uuid4())
-            ddg_skill = Skill(
-                id=ddg_skill_id,
-                name="duckduckgo-search",
+        # # DuckDuckGo search skill
+        # ddg_tool_info = global_tools.get("duckduckgo-search")
+        # if ddg_tool_info:
+        #     ddg_skill_id = str(uuid.uuid4())
+        #     ddg_skill = Skill(
+        #         id=ddg_skill_id,
+        #         name="duckduckgo-search",
+        #         user_id=user_id,
+        #         description=ddg_tool_info.description,
+        #         icon="",
+        #         display_name=ddg_tool_info.display_name,
+        #         strategy=StorageStrategy.GLOBAL_TOOLS,
+        #         input_parameters=ddg_tool_info.input_parameters,
+        #         reference_type=ConnectedServiceType.NONE,
+        #     )
+        #     session.add(ddg_skill)
+        #     await session.flush()
+
+        #     member_skill_link = MemberSkillLink(
+        #         member_id=member_id,
+        #         skill_id=ddg_skill.id,
+        #     )
+        #     session.add(member_skill_link)
+        #     await session.flush()
+
+        # Tavily search skill
+        tavily_tool_info = global_tools.get("tavily-search")
+        if tavily_tool_info:
+            tavily_skill_id = str(uuid.uuid4())
+            tavily_skill = Skill(
+                id=tavily_skill_id,
+                name="tavily-search",
                 user_id=user_id,
-                description=ddg_tool_info.description,
+                description=tavily_tool_info.description,
                 icon="",
-                display_name=ddg_tool_info.display_name,
+                display_name=tavily_tool_info.display_name,
                 strategy=StorageStrategy.GLOBAL_TOOLS,
-                input_parameters=ddg_tool_info.input_parameters,
+                input_parameters=tavily_tool_info.input_parameters,
                 reference_type=ConnectedServiceType.NONE,
             )
-            session.add(ddg_skill)
+            session.add(tavily_skill)
             await session.flush()
 
             member_skill_link = MemberSkillLink(
                 member_id=member_id,
-                skill_id=ddg_skill.id,
+                skill_id=tavily_skill.id,
             )
             session.add(member_skill_link)
             await session.flush()

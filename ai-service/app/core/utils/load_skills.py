@@ -94,7 +94,7 @@ async def aload_skills(member_id: str, mcp: str | ConnectedMcp | None, extension
                         raise ValueError(f"Extension with ID {extension} not found or is deleted.")
 
                 # Now, extension is an instance of ConnectedExtension. Let us proceed to load skills.
-                extension_service_info = extension_service_manager.aget_service_info(service_enum=str(extension.extension_enum))
+                extension_service_info = await extension_service_manager.aget_service_info(service_enum=str(extension.extension_enum))
 
                 if not extension_service_info or not extension_service_info.service_object:
                     raise ValueError(f"Extension service info for {extension.extension_enum} not found or service object is None.")
@@ -179,30 +179,56 @@ async def aload_skills_for_chatbot(member_id: str):
             )
             session.add(member_skill_link)
 
-            # Wikipedia tool
-            ddg_tool_info = global_tools.get("duckduckgo-search")
-            if not ddg_tool_info:
-                raise ValueError("DuckDuckGo search tool not found in global tools.")
+            # Duckduckgo tool
+            # ddg_tool_info = global_tools.get("duckduckgo-search")
+            # if not ddg_tool_info:
+            #     raise ValueError("DuckDuckGo search tool not found in global tools.")
 
-            ddg_skill = Skill(
-                id=str(uuid.uuid4()),
+            # ddg_skill = Skill(
+            #     id=str(uuid.uuid4()),
+            #     user_id=str(member.team.user_id),
+            #     name=ddg_tool_info.display_name,
+            #     description=ddg_tool_info.description,
+            #     icon="",
+            #     display_name=ddg_tool_info.display_name,
+            #     strategy=StorageStrategy.GLOBAL_TOOLS,
+            #     input_parameters=ddg_tool_info.input_parameters,
+            #     reference_type=ConnectedServiceType.NONE,
+            # )
+            # session.add(ddg_skill)
+
+            # # Add link to member
+            # member_skill_link = MemberSkillLink(
+            #     member_id=member.id,
+            #     skill_id=ddg_skill.id,
+            # )
+            # session.add(member_skill_link)
+
+            # Tavily search skill
+            tavily_tool_info = global_tools.get("tavily-search")
+            if not tavily_tool_info:
+                raise ValueError("Tavily search tool not found in global tools.")
+            tavily_skill_id = str(uuid.uuid4())
+            tavily_skill = Skill(
+                id=tavily_skill_id,
+                name="tavily-search",
                 user_id=str(member.team.user_id),
-                name=ddg_tool_info.display_name,
-                description=ddg_tool_info.description,
+                description=tavily_tool_info.description,
                 icon="",
-                display_name=ddg_tool_info.display_name,
+                display_name=tavily_tool_info.display_name,
                 strategy=StorageStrategy.GLOBAL_TOOLS,
-                input_parameters=ddg_tool_info.input_parameters,
+                input_parameters=tavily_tool_info.input_parameters,
                 reference_type=ConnectedServiceType.NONE,
             )
-            session.add(ddg_skill)
+            session.add(tavily_skill)
+            await session.flush()
 
-            # Add link to member
             member_skill_link = MemberSkillLink(
-                member_id=member.id,
-                skill_id=ddg_skill.id,
+                member_id=member_id,
+                skill_id=tavily_skill.id,
             )
             session.add(member_skill_link)
+            await session.flush()
 
             # Wikipedia tool
             wikipedia_tool_info = global_tools.get("wikipedia")
@@ -276,6 +302,7 @@ async def aload_skills_for_rag(member_id: str):
             await session.rollback()
             raise
 
+
 async def aload_skills_for_searchbot(member_id: str):
     async with AsyncSessionLocal() as session:
         try:
@@ -290,34 +317,62 @@ async def aload_skills_for_searchbot(member_id: str):
                 raise ValueError(f"Member with ID {member_id} not found or is deleted.")
 
             # DDG tool
-            ddg_tool_info = global_tools.get("duckduckgo-search")
-            if not ddg_tool_info:
-                raise ValueError("DuckDuckGo search tool not found in global tools.")
+            # ddg_tool_info = global_tools.get("duckduckgo-search")
+            # if not ddg_tool_info:
+            #     raise ValueError("DuckDuckGo search tool not found in global tools.")
 
-            ddg_skill = Skill(
-                id=str(uuid.uuid4()),
+            # ddg_skill = Skill(
+            #     id=str(uuid.uuid4()),
+            #     user_id=str(member.team.user_id),
+            #     name=ddg_tool_info.display_name,
+            #     description=ddg_tool_info.description,
+            #     icon="",
+            #     display_name=ddg_tool_info.display_name,
+            #     strategy=StorageStrategy.GLOBAL_TOOLS,
+            #     input_parameters=ddg_tool_info.input_parameters,
+            #     reference_type=ConnectedServiceType.NONE,
+            # )
+            # session.add(ddg_skill)
+
+            # # Add link to member
+            # member_skill_link = MemberSkillLink(
+            #     member_id=member.id,
+            #     skill_id=ddg_skill.id,
+            # )
+            # session.add(member_skill_link)
+
+            # Tavily search skill
+            tavily_tool_info = global_tools.get("tavily-search")
+            if not tavily_tool_info:
+                raise ValueError("Tavily search tool not found in global tools.")
+
+            tavily_skill_id = str(uuid.uuid4())
+            tavily_skill = Skill(
+                id=tavily_skill_id,
+                name="tavily-search",
                 user_id=str(member.team.user_id),
-                name=ddg_tool_info.display_name,
-                description=ddg_tool_info.description,
+                description=tavily_tool_info.description,
                 icon="",
-                display_name=ddg_tool_info.display_name,
+                display_name=tavily_tool_info.display_name,
                 strategy=StorageStrategy.GLOBAL_TOOLS,
-                input_parameters=ddg_tool_info.input_parameters,
+                input_parameters=tavily_tool_info.input_parameters,
                 reference_type=ConnectedServiceType.NONE,
             )
-            session.add(ddg_skill)
+            session.add(tavily_skill)
+            await session.flush()
 
-            # Add link to member
             member_skill_link = MemberSkillLink(
-                member_id=member.id,
-                skill_id=ddg_skill.id,
+                member_id=member_id,
+                skill_id=tavily_skill.id,
             )
             session.add(member_skill_link)
+            await session.flush()
 
             # Wikipedia tool
             wikipedia_tool_info = global_tools.get("wikipedia")
             if not wikipedia_tool_info:
                 raise ValueError("Wikipedia tool not found in global tools.")
+
             wikipedia_skill = Skill(
                 id=str(uuid.uuid4()),
                 user_id=str(member.team.user_id),
