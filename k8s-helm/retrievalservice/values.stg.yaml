@@ -1,15 +1,15 @@
-# Default values for ingestservice.
+# Default values for retrievalservice.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 image:
-  repository: myaagent.azurecr.io/ingestservicestg
+  repository: myaagent.azurecr.io/retrievalservicestg
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: BuildID
 
-nameOverride: "ingestservicestg"
-fullnameOverride: "ingestservicestg"
+nameOverride: "retrievalservicestg"
+fullnameOverride: "retrievalservicestg"
 
 env:
   - name: LOGGING_LOG_LEVEL
