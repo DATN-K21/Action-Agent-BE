@@ -17,15 +17,7 @@ nameOverride: "voiceservice"
 fullnameOverride: "voiceservice"
 
 env:
-  secrets:
-    name: env-secret
-    secret:
-      voicegooglecredetialprojectid: voicegooglecredetialprojectid
-      voicegooglecredentialprivatekeyid: voicegooglecredentialprivatekeyid
-      voicegooglecredentialprivatekey: voicegooglecredentialprivatekey
-      voicegooglecredentialclientemail: voicegooglecredentialclientemail
-      voicegooglecredentialclientid: voicegooglecredentialclientid
-      voicegooglecredentialclientx509certurl: voicegooglecredentialclientx509certurl
+  # Placeholder
 
 service:
   type: ClusterIP

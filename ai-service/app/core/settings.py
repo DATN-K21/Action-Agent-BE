@@ -52,33 +52,20 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = "<YOUR-API-KEY>"
     ANTHROPIC_API_BASE_URL: str = "https://api.anthropic.com"
 
-    DEFAULT_CONTEXT_LIMIT: int = 8000  # Default context limit in tokens
+    DEFAULT_CONTEXT_LIMIT: int = 100000  # Default context limit in tokens
     DEFAULT_CONTEXT_RATIO: float = 0.2  # Ratio of context to response tokens
-
-    # Embedding
-    EMBEDDING_PROVIDER: str = "openai"
 
     # Database
     POSTGRES_URL_PATH: str = "postgres:123456@localhost:5432/ai-database"
     POSTGRES_SCHEMA: str = "aiservice"
 
-    @property
-    def POSTGRES_URL_PATH_WITH_SCHEMA(self) -> str:
-        """Construct PostgreSQL URL path with schema for SQLAlchemy."""
-        return f"{self.POSTGRES_URL_PATH}?options=-csearch_path%3D{self.POSTGRES_SCHEMA}"
-
-    # Tool
+    # Tools
     TOOL_TAVILY_API_KEY: str = "<your-api-key>"
 
     # Composio
     COMPOSIO_LOGGING_LEVEL: str = "debug"
     COMPOSIO_API_KEY: str = "<your-api-key>"
     COMPOSIO_REDIRECT_URL: str = "http://localhost:15200/callback/extension"
-
-    # Frontend service
-
-    # Retrieval service
-    RETRIEVAL_SERVICE_GRPC_URL: str = "localhost:15600"
 
     # Security keys
     SECRET_KEY: str = "<secret-key>"
@@ -95,7 +82,7 @@ class Settings(BaseSettings):
     MAX_MCP_CLIENT_INSTANCES_PER_USER: int = 20
 
     # Upload settings
-    MAX_UPLOAD_SIZE_MB: int = 100 * 1024 * 1024  # 100 MB
+    MAX_UPLOAD_SIZE_MB: int = 50 * 1024 * 1024  # 50 MB
     AZURE_BLOB_CONNECTION_STRING: str = "<your-connection-string>"
     AZURE_BLOB_CONTAINER_NAME: str = "uploadingdev"
 
@@ -104,10 +91,14 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://default:default@localhost:6379/0"
 
     # URLs
+    RETRIEVAL_SERVICE_GRPC_URL: str = "localhost:15600"
     EXTENSION_SERVICE_URL: str = "http://localhost:15300"
-    RAG_SERVICE_URL: str = "http://localhost:15500"
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
+    @property
+    def POSTGRES_URL_PATH_WITH_SCHEMA(self) -> str:
+        """Construct PostgreSQL URL path with schema for SQLAlchemy."""
+        return f"{self.POSTGRES_URL_PATH}?options=-csearch_path%3D{self.POSTGRES_SCHEMA}"
 
 @lru_cache()
 def get_settings():

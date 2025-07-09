@@ -25,10 +25,16 @@ env:
         key: elasticsearchurl
 
   - name: RABBITMQ_URL
-    value: "amqp://rabbitmqstg:5672"
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: rabbitmqurl
 
   - name: REDIS_URL
-    value: "redis://redisstg:6379"
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: redisurl
 
   - name: USER_SERVICE_URL
     value: "http://userservicestg:15100"
