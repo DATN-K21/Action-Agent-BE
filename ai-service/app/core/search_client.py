@@ -20,7 +20,6 @@ import time
 from typing import List
 
 import grpc.aio
-from cachetools import TTLCache
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
@@ -30,9 +29,6 @@ from app.core.grpc_pool import close_grpc_connections, get_grpc_channel
 from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
-
-# Cache for upload IDs with 15-second TTL using cachetools
-_upload_ids_cache = TTLCache(maxsize=1000, ttl=15)
 
 
 class SearchError(Exception):

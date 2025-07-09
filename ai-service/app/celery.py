@@ -7,7 +7,7 @@ logger = logging.get_logger(__name__)
 
 
 celery_app = Celery(
-    "aiservice",
+    "ai-service",
     broker=env_settings.RABBITMQ_URL,
     backend=env_settings.REDIS_URL,
     # No tasks included - ai-service only sends tasks to other services
