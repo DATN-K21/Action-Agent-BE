@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "retrievalservice.fullname" . }}
+  labels:
+    {{- include "retrievalservice.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetport }}
+      protocol: TCP
+  selector:
+    {{- include "retrievalservice.selectorLabels" . | nindent 4 }}
