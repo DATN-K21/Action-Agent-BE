@@ -27,7 +27,7 @@ export class AppsController {
 			sortOrder: sortOrder, // Optional sorting order
 			search: search, // Optional search term
 			userId: userId, // Optional user ID for filtering apps
-			connected: connected === "true" ? true : false, // Optional filter for connected apps
+			connected: connected === "true" ? true : (connected === "false" ? false : undefined), // Optional filter for connected apps
 		});
 		return {
 			status: 'success',
