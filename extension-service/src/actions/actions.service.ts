@@ -1,3 +1,4 @@
+import { ACTION_BLACKLIST_QUERY } from '@/constants/actionBlacklist';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -15,7 +16,11 @@ export class ActionsService {
 			throw new Error('App key is required');
 		}
 
-		const actions = await this.actionModel.find({ appKey }).exec();
+		const actions = await this.actionModel.find({ 
+			appKey,
+			deprecated: false, // Exclude deprecated actions
+			$nor: [ACTION_BLACKLIST_QUERY] // Exclude actions with blacklisted properties
+		}).exec();
 		if (!actions || actions.length === 0) {
 			throw new Error(`No actions found for app with key: ${appKey}`);
 		}
