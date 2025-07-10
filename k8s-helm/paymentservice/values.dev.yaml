@@ -1,0 +1,28 @@
+# Default values for paymentservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/paymentservicedev
+  pullPolicy: Always
+  tag: BuildID
+
+nameOverride: "paymentservicedev"
+fullnameOverride: "paymentservicedev"
+
+env:
+  - name: ASPNETCORE_HTTP_PORTS
+    value: "15700"
+  - name: MONGODB_CONNECTION_STRING
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: mongodbconnectionstring
+  - name: STRIPE_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: stripesecretkey
+
+ingress:
+  enabled: false

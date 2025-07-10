@@ -1,0 +1,25 @@
+# Default values for paymentservice.
+image:
+  repository: myaagent.azurecr.io/paymentserviceprod
+  pullPolicy: Always
+  tag: BuildID
+
+nameOverride: "paymentserviceprod"
+fullnameOverride: "paymentserviceprod"
+
+env:
+  - name: ASPNETCORE_HTTP_PORTS
+    value: "15700"
+  - name: MONGODB_CONNECTION_STRING
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: mongodbconnectionstring
+  - name: STRIPE_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: stripesecretkey
+
+ingress:
+  enabled: false

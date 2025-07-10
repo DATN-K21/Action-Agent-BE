@@ -47,6 +47,9 @@ env:
 
   - name: VOICE_SERVICE_URL
     value: "http://voiceservicestg:15400"
+  
+  - name: PAYMENT_SERVICE_URL
+    value: "http://paymentservicestg:15700"
 
 ingress:
   enabled: true
