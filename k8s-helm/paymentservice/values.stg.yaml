@@ -8,18 +8,42 @@ nameOverride: "paymentservicestg"
 fullnameOverride: "paymentservicestg"
 
 env:
+  - name: Logging__LogLevel__Default
+    value: "Information"
+  - name: Logging__LogLevel__Microsoft.AspNetCore
+    value: "Warning"
+
+  - name: AllowedHosts
+    value: "*"
+
   - name: ASPNETCORE_HTTP_PORTS
     value: "15700"
-  - name: MONGODB_CONNECTION_STRING
+
+  - name: MongoSettings__ConnectionString
     valueFrom:
       secretKeyRef:
         name: env-secret
         key: mongodbconnectionstring
-  - name: STRIPE_SECRET_KEY
+  - name: MongoSettings__DatabaseName
+    value: "user-database"
+  - name: MongoSettings__UserCollectionName
+    value: "users"
+  - name: MongoSettings__PaymentCollectionName
+    value: "payments"
+
+  - name: StripeSettings__SecretKey
     valueFrom:
       secretKeyRef:
         name: env-secret
         key: stripesecretkey
+  - name: StripeSettings__WebhookSecret
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: stripewebhooksecret
+
+  - name: RateSettings__CreditsPerUsd
+    value: "1000000"
 
 ingress:
   enabled: false
