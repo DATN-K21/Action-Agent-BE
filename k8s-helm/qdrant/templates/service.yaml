@@ -11,5 +11,9 @@ spec:
       targetPort: qdrant
       protocol: TCP
       name: qdrant
+    - port: {{ .Values.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
   selector:
     {{- include "qdrant.selectorLabels" . | nindent 4 }}

@@ -22,6 +22,9 @@ spec:
             - name: qdrant
               containerPort: 6333
               protocol: TCP
+            - name: grpc
+              containerPort: 6334
+              protocol: TCP
           env:
           {{- if .Values.qdrant.enableAuth }}
             - name: QDRANT__ENABLE_AUTH

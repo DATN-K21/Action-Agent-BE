@@ -21,7 +21,7 @@ def configure_logging():
         uvicorn_logger.propagate = False  # Important to prevent bubble-up
 
     # Disable HTTP request logs from external libraries
-    http_loggers = ["openai", "httpx", "anthropic", "httpcore", "numexpr"]
+    http_loggers = ["openai", "httpx", "anthropic", "httpcore", "numexpr", "azure.storage.blob"]
     for name in http_loggers:
         http_logger = logging.getLogger(name)
         http_logger.setLevel(logging.WARNING)  # Only show warnings and errors
