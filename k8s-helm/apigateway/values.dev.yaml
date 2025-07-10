@@ -48,6 +48,9 @@ env:
   - name: VOICE_SERVICE_URL
     value: "http://voiceservicedev:15400"
 
+  - name: PAYMENT_SERVICE_URL
+    value: "http://paymentservicedev:15700"
+
 ingress:
   enabled: true
   className: "nginx"

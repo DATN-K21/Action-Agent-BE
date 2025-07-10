@@ -169,6 +169,10 @@ class UserValidator extends ValidatorConfig {
             userId: userId,
         });
     }
+
+    static validateGetUserBalance(req) {
+        return UserValidator.validateGetUserById(req);
+    }
 }
 
 module.exports = UserValidator;

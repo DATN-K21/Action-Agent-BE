@@ -1,0 +1,17 @@
+@payment_service_HostAddress = http://localhost:5120
+
+GET /ping
+Accept: application/json
+Response 200 application/json
+{
+  "message": string
+}
+
+###
+POST /api/v1/confirm-payment
+Accept: application/json
+Content-Type: application/json
+Response 200 application/json
+{
+  "message": string
+}
