@@ -25,11 +25,11 @@ env:
         name: env-secret
         key: mongodbconnectionstring
   - name: MongoSettings__DatabaseName
-    value: "user-database"
+    value: "user-service"
   - name: MongoSettings__UserCollectionName
-    value: "users"
+    value: "Users"
   - name: MongoSettings__PaymentCollectionName
-    value: "payments"
+    value: "Payments"
 
   - name: StripeSettings__SecretKey
     valueFrom:

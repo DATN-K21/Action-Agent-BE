@@ -101,6 +101,29 @@ class UserController {
 		}
 	}
 
+	getUserBalance = async (req, res, next) => {
+		const validationResult = UserValidator.validateGetUserById(req);
+		if (validationResult?.error === true) {
+			throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
+		}
+
+		const { userId } = validationResult?.data;
+		try {
+			const balance = await this.userService.getUserBalance(userId);
+			return new OKSuccessResponse({
+				message: 'Get user balance success',
+				data: { balance },
+				code: 1040600
+			}).send(res);
+			
+		} catch (error) {
+			if (MongooseUtil.isMongooseError(error)) {
+				throw new BadRequestResponse("Something went wrong", 1040605);
+			}
+			throw error;
+		}
+	}
+
 	updateUser = async (req, res, next) => {
 		const validationResult = UserValidator.validateUpdateUser(req);
 		if (validationResult?.error === true) {

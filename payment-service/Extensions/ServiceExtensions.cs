@@ -9,21 +9,20 @@ public static class ServiceExtensions
 {
     public static IServiceCollection RegisterOptions(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<MongoSettings>(configuration.GetSection("MongoSettings"));
-        services.Configure<StripeSettings>(configuration.GetSection("StripeSettings"));
-        services.Configure<RateSettings>(configuration.GetSection("RateSettings"));
+        services.Configure<MongoSettings>(configuration.GetSection(nameof(MongoSettings)));
+        services.Configure<StripeSettings>(configuration.GetSection(nameof(StripeSettings)));
+        services.Configure<RateSettings>(configuration.GetSection(nameof(RateSettings)));
         return services;
     }
     
     public static IServiceCollection RegisterServices(this IServiceCollection services, IConfiguration configuration)
     {
-        var mongoSettings = configuration.GetSection("MongoSettings").Get<MongoSettings>()!;
+        var mongoSettings = configuration.GetSection(nameof(MongoSettings)).Get<MongoSettings>()!;
         var mongoClient = new MongoClient(mongoSettings.ConnectionString);
         var mongoDatabase = mongoClient.GetDatabase(mongoSettings.DatabaseName);
         services.AddSingleton(mongoDatabase);
 
-        StripeConfiguration.ApiKey = configuration.GetValue<string>("StripeSettings:SecretKey");
-        
+        StripeConfiguration.ApiKey = configuration.GetValue<string>(nameof(StripeSettings.SecretKey));
         services.AddScoped<IPaymentService, PaymentService>();
         
         return services;

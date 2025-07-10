@@ -33,6 +33,7 @@ class UserService {
                 avatar: 1,
                 verified: '$email_verified',
                 role: { $arrayElemAt: ['$role.name', 0] },
+                balance: 1,
             }
         });
         return pipeline;
@@ -131,6 +132,14 @@ class UserService {
             ...foundUser,
             role: foundRole.name,
         });
+    }
+
+    async getUserBalance(userId) {
+        const foundUser = await this.userModel.findById(MongooseUtil.convertToMongooseObjectIdType(userId)).lean();
+        if (!foundUser) {
+            throw new ConflictResponse('User not found', 1040601);
+        }
+        return foundUser.balance ?? 0;
     }
 
     async updateUser(userId, { username, password, fullname, role, email_verified, avatar, slug }) {
