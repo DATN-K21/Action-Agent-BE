@@ -1,21 +1,26 @@
 from typing import List, Optional
 
-from sqlalchemy import select, update, delete, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, select, update
 
 from app.core import logging
 from app.core.database import AsyncSessionLocal
 from app.core.scheduler import scheduler_manager
-from app.models.job import ScheduledJob, JobExecution, JobStatus, JobType
-from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobExecutionResponse
+from app.models.job import JobExecution, JobStatus, JobType, ScheduledJob
+from app.schemas.job import JobCreate, JobExecutionResponse, JobResponse, JobUpdate
 
 logger = logging.get_logger(__name__)
 
 
 class JobService:
     """Service layer for job operations."""
-    
-    async def create_job(self, job_data: JobCreate, created_by: str) -> JobResponse:
+
+    async def create_job(
+        self,
+        job_data: JobCreate,
+        user_id: str,
+        user_role: str,
+        user_timezone: str,
+    ) -> JobResponse:
         """Create a new scheduled job."""
         async with AsyncSessionLocal() as session:
             # Create job record
@@ -24,16 +29,21 @@ class JobService:
                 description=job_data.description,
                 job_type=job_data.job_type,
                 cron_expression=job_data.cron_expression,
-                timezone=job_data.timezone,
                 prompt=job_data.prompt,
                 team_id=job_data.team_id,
                 assistant_id=job_data.assistant_id,
                 max_retries=job_data.max_retries,
                 timeout_seconds=job_data.timeout_seconds,
                 job_config=job_data.job_config,
-                created_by=created_by,
                 is_active=job_data.is_active,
-                next_run_at=scheduler_manager.get_next_run_time(job_data.cron_expression) if job_data.cron_expression else None
+                next_run_at=scheduler_manager.get_next_run_time(
+                    job_data.cron_expression
+                )
+                if job_data.cron_expression
+                else None,
+                user_id=user_id,
+                user_role=user_role,
+                timezone=user_timezone,
             )
             
             session.add(job)
@@ -43,9 +53,13 @@ class JobService:
             # Add job to scheduler if it's a recurring job and active
             if job.job_type == JobType.RECURRING and job.is_active and job.cron_expression:
                 job_execution_data = {
-                    'prompt': job.prompt,
-                    'team_id': job.team_id,
-                    'job_config': job.job_config or {}
+                    "prompt": job.prompt,
+                    "user_id": job.user_id,
+                    "user_role": job.user_role,
+                    "user_timezone": job.timezone,
+                    "team_id": job.team_id,
+                    "assistant_id": job.assistant_id,
+                    "job_config": job.job_config or {},
                 }
                 
                 success = await scheduler_manager.add_job(
@@ -73,21 +87,21 @@ class JobService:
         limit: int = 100,
         status: Optional[JobStatus] = None,
         job_type: Optional[JobType] = None,
-        created_by: Optional[str] = None,
+        user_id: Optional[str] = None,
         assistant_id: Optional[str] = None,
-        team_id: Optional[str] = None
+        team_id: Optional[str] = None,
     ) -> List[JobResponse]:
         """Get list of jobs with optional filtering."""
         async with AsyncSessionLocal() as session:
-            query = select(ScheduledJob).where(ScheduledJob.is_deleted == False)
+            query = select(ScheduledJob).where(ScheduledJob.is_deleted.is_(False))
             
             # Apply filters
             if status:
                 query = query.where(ScheduledJob.status == status)
             if job_type:
                 query = query.where(ScheduledJob.job_type == job_type)
-            if created_by:
-                query = query.where(ScheduledJob.created_by == created_by)
+            if user_id:
+                query = query.where(ScheduledJob.user_id == user_id)
             if assistant_id:
                 query = query.where(ScheduledJob.assistant_id == assistant_id)
             if team_id:
@@ -105,12 +119,8 @@ class JobService:
         """Get a specific job by ID."""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(ScheduledJob)
-                .where(
-                    and_(
-                        ScheduledJob.id == job_id,
-                        ScheduledJob.is_deleted == False
-                    )
+                select(ScheduledJob).where(
+                    and_(ScheduledJob.id == job_id, ScheduledJob.is_deleted.is_(False))
                 )
             )
             job = result.scalar_one_or_none()
@@ -124,12 +134,8 @@ class JobService:
         async with AsyncSessionLocal() as session:
             # Get existing job
             result = await session.execute(
-                select(ScheduledJob)
-                .where(
-                    and_(
-                        ScheduledJob.id == job_id,
-                        ScheduledJob.is_deleted == False
-                    )
+                select(ScheduledJob).where(
+                    and_(ScheduledJob.id == job_id, ScheduledJob.is_deleted.is_(False))
                 )
             )
             job = result.scalar_one_or_none()
@@ -164,9 +170,13 @@ class JobService:
                 # Add updated job to scheduler
                 if job.cron_expression and job.is_active:
                     job_execution_data = {
-                        'prompt': job.prompt,
-                        'team_id': job.team_id,
-                        'job_config': job.job_config or {}
+                        "prompt": job.prompt,
+                        "user_id": job.user_id,
+                        "user_role": job.user_role,
+                        "user_timezone": job.timezone,
+                        "assistant_id": job.assistant_id,
+                        "team_id": job.team_id,
+                        "job_config": job.job_config or {},
                     }
                     
                     await scheduler_manager.add_job(
@@ -183,12 +193,8 @@ class JobService:
         async with AsyncSessionLocal() as session:
             # Check if job exists
             result = await session.execute(
-                select(ScheduledJob)
-                .where(
-                    and_(
-                        ScheduledJob.id == job_id,
-                        ScheduledJob.is_deleted == False
-                    )
+                select(ScheduledJob).where(
+                    and_(ScheduledJob.id == job_id, ScheduledJob.is_deleted.is_(False))
                 )
             )
             job = result.scalar_one_or_none()
@@ -214,12 +220,8 @@ class JobService:
         async with AsyncSessionLocal() as session:
             # Get job details
             result = await session.execute(
-                select(ScheduledJob)
-                .where(
-                    and_(
-                        ScheduledJob.id == job_id,
-                        ScheduledJob.is_deleted == False
-                    )
+                select(ScheduledJob).where(
+                    and_(ScheduledJob.id == job_id, ScheduledJob.is_deleted.is_(False))
                 )
             )
             job = result.scalar_one_or_none()
@@ -229,9 +231,13 @@ class JobService:
             
             # Prepare job execution data
             job_execution_data = {
-                'prompt': job.prompt,
-                'team_id': job.team_id,
-                'job_config': job.job_config or {}
+                "prompt": job.prompt,
+                "user_id": job.user_id,
+                "user_role": job.user_role,
+                "user_timezone": job.timezone,
+                "assistant_id": job.assistant_id,
+                "team_id": job.team_id,
+                "job_config": job.job_config or {},
             }
             
             # Run job
@@ -242,9 +248,8 @@ class JobService:
         async with AsyncSessionLocal() as session:
             # Update job status
             await session.execute(
-                update(ScheduledJob)
-                .where(ScheduledJob.id == job_id)
-                .values(status=JobStatus.PAUSED)
+                update(ScheduledJob).where(ScheduledJob.id == job_id),
+                ScheduledJob.is_deleted.is_(False).values(status=JobStatus.PAUSED),
             )
             await session.commit()
             

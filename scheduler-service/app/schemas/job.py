@@ -16,7 +16,6 @@ class JobBase(BaseModel):
     job_config: Optional[Dict] = Field(None, description="Additional job configuration")
     max_retries: int = Field(default=3, description="Maximum number of retries")
     timeout_seconds: int = Field(default=300, description="Job timeout in seconds")
-    timezone: str = Field(default="UTC", description="Job timezone")
 
 
 class JobCreate(JobBase):

@@ -1,15 +1,14 @@
 import asyncio
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict
 
 import httpx
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
 from app.core.database import AsyncSessionLocal
 from app.core.settings import env_settings
-from app.models.job import ScheduledJob, JobExecution, JobStatus
+from app.models.job import JobExecution, JobStatus, ScheduledJob
 
 logger = logging.get_logger(__name__)
 
@@ -54,7 +53,8 @@ class JobExecutor:
             logger.info(f"Starting job execution: {job_id}")
             
             # Execute the job
-            response = await self._send_prompt_to_ai_service(job_data)
+            thread_id = await self._create_thread_id(job_id, job_data)
+            response = await self._send_prompt_to_ai_service(thread_id, job_data)
             
             # Mark execution as successful
             await self._update_execution_success(
@@ -84,19 +84,56 @@ class JobExecutor:
             
             # Check if retry is needed
             await self._handle_retry(job_id, job_data, str(e))
-    
-    async def _send_prompt_to_ai_service(self, job_data: Dict) -> str:
+
+    async def _create_thread_id(self, job_id: str, job_data: Dict) -> str:
+        """Create a new thread ID from AI service."""
+        try:
+            url = f"{env_settings.AI_SERVICE_URL}/api/v1/thread/create"
+
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-User-Id": job_data.get("user_id", ""),
+                "X-User-Role": job_data.get("user_role", ""),
+                "X-User-Timezone": job_data.get("user_timezone", ""),
+            }
+
+            payload = {
+                "title": f"Run the job: {job_id}",
+                "assistant_id": job_data.get("assistant_id", ""),
+            }
+
+            response = await self.http_client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            thread_data = response.json()
+            return thread_data.get("id", "")
+
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"Failed to create thread - HTTP error {e.response.status_code}: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            raise Exception(f"Failed to create thread - Request error: {str(e)}")
+
+    async def _send_prompt_to_ai_service(self, thread_id: str, job_data: Dict) -> str:
         """Send prompt to AI service."""
         try:
-            url = f"{env_settings.AI_SERVICE_URL}{env_settings.AI_SERVICE_ENDPOINT}"
-            
-            payload = {
-                "prompt": job_data.get('prompt'),
-                "team_id": job_data.get('team_id'),
-                **job_data.get('job_config', {})
+            url = f"{env_settings.AI_SERVICE_URL}/api/v1/team/{job_data.get('team_id')}/stream/{thread_id}"
+
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-User-Id": job_data.get("user_id", ""),
+                "X-User-Role": job_data.get("user_role", ""),
+                "X-User-Timezone": job_data.get("user_timezone", ""),
             }
-            
-            response = await self.http_client.post(url, json=payload)
+
+            payload = {
+                "messages": [{"role": "user", "content": job_data.get("prompt", "")}]
+            }
+
+            response = await self.http_client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             
             return response.text

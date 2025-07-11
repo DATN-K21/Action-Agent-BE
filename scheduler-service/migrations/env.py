@@ -1,14 +1,15 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
-import sys
 import os
+import sys
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Add the app directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.models.base import Base
 from app.core.settings import env_settings
+from app.models.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -29,7 +30,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 def get_url():
-    return env_settings.DATABASE_URL
+    return env_settings.POSTGRES_URL_PATH_WITH_SCHEMA
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -62,7 +63,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    configuration = config.get_section(config.config_ini_section)
+    configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = get_url()
     connectable = engine_from_config(
         configuration,

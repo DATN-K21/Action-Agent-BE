@@ -30,12 +30,7 @@ class Settings(BaseSettings):
 
     # AI Service settings
     AI_SERVICE_URL: str = Field(
-        default="http://localhost:8001",
-        description="AI Service base URL"
-    )
-    AI_SERVICE_ENDPOINT: str = Field(
-        default="/api/v1/team/stream",
-        description="AI Service endpoint for job execution"
+        default="http://localhost:8001", description="AI Service base URL"
     )
 
     # Server settings

@@ -2,16 +2,15 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Optional
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from croniter import croniter
 from sqlalchemy import text
 
 from app.core import logging
+from app.core.database import async_engine, sync_engine
 from app.core.settings import env_settings
-from app.core.database import sync_engine, async_engine
 from app.services.job_executor import JobExecutor
 
 logger = logging.get_logger(__name__)
@@ -88,7 +87,7 @@ class SchedulerManager:
         job_id: str,
         cron_expression: str,
         job_data: Dict,
-        timezone: str = "UTC"
+        timezone: str,
     ) -> bool:
         """Add a job to the scheduler."""
         if not self.scheduler:
@@ -213,7 +212,7 @@ class SchedulerManager:
         """Get the next run time for a cron expression."""
         try:
             cron = croniter(cron_expression, datetime.now())
-            return cron.get_next(datetime)
+            return datetime.fromtimestamp(cron.get_next())
         except Exception:
             return None
     
