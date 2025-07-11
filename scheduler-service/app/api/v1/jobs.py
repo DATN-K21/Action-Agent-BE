@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Header
 from croniter import croniter
 
 from app.core import logging
@@ -21,7 +21,8 @@ router = APIRouter()
 @router.post("/", response_model=JobResponse, summary="Create Job")
 async def create_job(
     job_data: JobCreate,
-    created_by: str = Query(..., description="User ID who creates the job")
+    x_user_id=Header(None),
+    x_user_role=Header(None)
 ):
     """
     Create a new scheduled job.
@@ -32,6 +33,7 @@ async def create_job(
     - **cron_expression**: Cron expression for recurring jobs
     - **prompt**: Prompt to send to AI service
     - **team_id**: Team ID for the job
+    - **assistant_id**: Assistant ID for the job
     - **ai_service_endpoint**: AI service endpoint (default: /api/v1/team/stream)
     - **max_retries**: Maximum number of retries (default: 3)
     - **timeout_seconds**: Job timeout in seconds (default: 300)
@@ -40,6 +42,12 @@ async def create_job(
     - **job_config**: Additional job configuration
     """
     try:
+        if not x_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="User ID is required (x_user_id header)"
+            )
+        
         # Validate cron expression for recurring jobs
         if job_data.job_type == JobType.RECURRING:
             if not job_data.cron_expression:
@@ -54,7 +62,7 @@ async def create_job(
                     detail="Invalid cron expression"
                 )
         
-        job = await job_service.create_job(job_data, created_by)
+        job = await job_service.create_job(job_data, x_user_id, x_user_role)
         logger.info(f"Job created: {job.id}")
         return job
         
@@ -69,7 +77,8 @@ async def list_jobs(
     limit: int = Query(100, ge=1, le=1000, description="Number of jobs to return"),
     status: Optional[JobStatus] = Query(None, description="Filter by job status"),
     job_type: Optional[JobType] = Query(None, description="Filter by job type"),
-    created_by: Optional[str] = Query(None, description="Filter by creator")
+    x_user_id=Header(None),
+    x_user_role=Header(None)
 ):
     """
     Get list of scheduled jobs with optional filtering.
@@ -78,15 +87,25 @@ async def list_jobs(
     - **limit**: Maximum number of jobs to return
     - **status**: Filter by job status
     - **job_type**: Filter by job type
-    - **created_by**: Filter by job creator
+    
+    Users can only see their own jobs unless they are admin or super admin.
     """
     try:
+        if not x_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="User ID is required (x_user_id header)"
+            )
+        
+        # Determine user filter based on role
+        user_filter = None if x_user_role in ["admin", "super admin"] else x_user_id
+        
         jobs = await job_service.get_jobs(
             skip=skip,
             limit=limit,
             status=status,
             job_type=job_type,
-            created_by=created_by
+            user_id=user_filter
         )
         return jobs
         
@@ -97,17 +116,32 @@ async def list_jobs(
 
 @router.get("/{job_id}", response_model=JobResponse, summary="Get Job")
 async def get_job(
-    job_id: str = Path(..., description="Job ID")
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None)
 ):
     """
     Get details of a specific job.
     
     - **job_id**: Unique job identifier
+    
+    Users can only access their own jobs unless they are admin or super admin.
     """
     try:
+        if not x_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="User ID is required (x_user_id header)"
+            )
+        
         job = await job_service.get_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Check authorization
+        if x_user_role not in ["admin", "super admin"] and job.user_id != x_user_id:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+        
         return job
         
     except HTTPException:

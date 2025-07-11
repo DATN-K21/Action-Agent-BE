@@ -43,6 +43,7 @@ class ScheduledJob(BaseEntity):
     # Execution details
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     team_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    assistant_id: Mapped[str] = mapped_column(String(255), nullable=False)
     ai_service_endpoint: Mapped[str] = mapped_column(String(255), default="/api/v1/team/stream", nullable=False)
     
     # Job configuration
@@ -66,7 +67,8 @@ class ScheduledJob(BaseEntity):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     
     # User who created the job
-    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_role: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     def __repr__(self):
         return f"<ScheduledJob {self.name} ({self.status})>"

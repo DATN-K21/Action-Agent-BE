@@ -12,6 +12,7 @@ class JobBase(BaseModel):
     description: Optional[str] = Field(None, description="Job description")
     prompt: str = Field(..., description="Prompt to send to AI service")
     team_id: str = Field(..., description="Team ID for the job")
+    assistant_id: str = Field(..., description="Assistant ID for the job")
     ai_service_endpoint: str = Field(default="/api/v1/team/stream", description="AI service endpoint")
     job_config: Optional[Dict] = Field(None, description="Additional job configuration")
     max_retries: int = Field(default=3, description="Maximum number of retries")
@@ -34,6 +35,7 @@ class JobCreate(JobBase):
                 "cron_expression": "0 9 * * *",
                 "prompt": "Generate daily report for team activities",
                 "team_id": "team-123",
+                "assistant_id": "assistant-456",
                 "ai_service_endpoint": "/api/v1/team/stream",
                 "max_retries": 3,
                 "timeout_seconds": 300,
@@ -55,6 +57,7 @@ class JobUpdate(BaseModel):
     cron_expression: Optional[str] = Field(None, description="Cron expression")
     prompt: Optional[str] = Field(None, description="Prompt to send to AI service")
     team_id: Optional[str] = Field(None, description="Team ID")
+    assistant_id: Optional[str] = Field(None, description="Assistant ID")
     ai_service_endpoint: Optional[str] = Field(None, description="AI service endpoint")
     job_config: Optional[Dict] = Field(None, description="Job configuration")
     max_retries: Optional[int] = Field(None, description="Maximum retries")
@@ -70,7 +73,8 @@ class JobResponse(JobBase):
     cron_expression: Optional[str] = Field(None, description="Cron expression")
     status: JobStatus = Field(..., description="Job status")
     is_active: bool = Field(..., description="Whether job is active")
-    created_by: str = Field(..., description="User who created the job")
+    user_id: str = Field(..., description="User who created the job")
+    user_role: Optional[str] = Field(None, description="Role of the user who created the job")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
     last_run_at: Optional[datetime] = Field(None, description="Last execution timestamp")
