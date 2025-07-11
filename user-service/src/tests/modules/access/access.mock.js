@@ -29,7 +29,6 @@ const validLoginResult = { user: { ...validSignupResult }, accessToken: 'jest-ac
 
 const validInvokeNewTokenRequest = {
     headers: {
-        'x-client-id': 'jest-client-id',
         'authorization': 'Bearer jest-access-token',
     },
     body: {

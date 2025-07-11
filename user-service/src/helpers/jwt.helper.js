@@ -49,6 +49,10 @@ class JWTHelper {
         });
     }
 
+    static decodeToken(token) {
+        return jwt.decode(token);
+    }
+
 
 
     static checkIfTokenExpiredError(error) {

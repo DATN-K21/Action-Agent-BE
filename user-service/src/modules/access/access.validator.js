@@ -1,5 +1,6 @@
 const validator = require('validator');
 const JWTHelper = require('../../helpers/jwt.helper');
+const jwt = require('jsonwebtoken');
 const accessModel = require('./access.model');
 const MongooseUtil = require('../../utils/mongoose.util');
 const userModel = require('../user/user.model');
@@ -73,20 +74,22 @@ class AccessValidator extends ValidatorConfig {
     }
 
     static validateInvokeNewToken(req) {
-        // User ID validation
-        if (validator.isEmpty(req.headers['x-client-id'] || '')) {
-            return AccessValidator.returnFailedError('Client ID is required', 1010301);
-        }
-
         // Access token validation
         if (validator.isEmpty(req.headers['authorization'] || '')) {
             return AccessValidator.returnFailedError('Authentication credential is required', 1010302);
         }
         const tokenParts = req.headers['authorization'].split(' ');
-        if (!tokenParts || tokenParts?.length !== 2 || tokenParts[0] !== 'Bearer') {
+        if (!tokenParts || tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
             return AccessValidator.returnFailedError('Unauthorized', 1010303);
         }
         const accessToken = tokenParts[1];
+
+        // Decode token payload for user ID
+        const decoded = jwt.decode(accessToken);
+        if (!decoded?.id) {
+            return AccessValidator.returnFailedError('Invalid token payload: missing user ID', 1010301);
+        }
+        const userId = decoded.id;
 
         // Refresh token validation
         if (validator.isEmpty(req.body?.refreshToken || '')) {
@@ -96,27 +99,30 @@ class AccessValidator extends ValidatorConfig {
 
         // Validation passed
         return AccessValidator.returnPassedData({
-            userId: req.headers['x-client-id'],
+            userId: userId,
             refreshToken: refreshToken,
             accessToken: accessToken,
         });
     }
 
     static validateResetPassword(req) {
-        // User ID validation
-        if (validator.isEmpty(req.headers['x-client-id'] || '')) {
-            return AccessValidator.returnFailedError('Client ID is required', 1011401);
-        }
-
         // Access token validation
         if (validator.isEmpty(req.headers['authorization'] || '')) {
             return AccessValidator.returnFailedError('Authentication credential is required', 1011402);
         }
         const tokenParts = req.headers['authorization'].split(' ');
-        if (!tokenParts || tokenParts?.length !== 2 || tokenParts[0] !== 'Bearer') {
+        if (!tokenParts || tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
             return AccessValidator.returnFailedError('Unauthorized', 1011403);
         }
         const resetPasswordToken = tokenParts[1];
+
+        // Decode token payload for user ID
+        const decoded = jwt.decode(resetPasswordToken);
+        if (!decoded?.userId) {
+            return AccessValidator.returnFailedError('Invalid token payload: missing user ID', 1011401);
+        }
+        const userId = decoded.userId;
+
         // Password validation
         if (validator.isEmpty(req.body?.newPassword || '')) {
             return AccessValidator.returnFailedError('Password is required', 1011404);
@@ -136,7 +142,7 @@ class AccessValidator extends ValidatorConfig {
 
         // Validation passed
         return AccessValidator.returnPassedData({
-            userId: req.headers['x-client-id'],
+            userId: userId,
             resetPasswordToken: resetPasswordToken,
             newPassword: req.body?.newPassword,
         });
