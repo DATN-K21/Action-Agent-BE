@@ -32,7 +32,6 @@ class CreateJobInput(BaseModel):
     prompt: str = Field(..., description="The prompt to send to AI service when job executes")
     team_id: str = Field(..., description="Team ID that will process the prompt")
     assistant_id: str = Field(..., description="Assistant ID that will process the prompt")
-    ai_service_endpoint: str = Field("/api/v1/team/stream", description="AI service endpoint to call")
     job_config: Optional[Dict[str, Any]] = Field(None, description="Additional job configuration")
     max_retries: int = Field(3, description="Maximum number of retries")
     timeout_seconds: int = Field(300, description="Job timeout in seconds")
@@ -62,7 +61,6 @@ class UpdateJobInput(BaseModel):
     prompt: Optional[str] = Field(None, description="New prompt to execute")
     team_id: Optional[str] = Field(None, description="New team ID")
     assistant_id: Optional[str] = Field(None, description="New assistant ID")
-    ai_service_endpoint: Optional[str] = Field(None, description="New AI service endpoint")
     job_config: Optional[Dict[str, Any]] = Field(None, description="New job configuration")
     max_retries: Optional[int] = Field(None, description="New maximum number of retries")
     timeout_seconds: Optional[int] = Field(None, description="New timeout in seconds")
@@ -152,7 +150,6 @@ async def create_scheduled_job(user_id: str = "system", **kwargs) -> str:
             "prompt": job_data.prompt,
             "team_id": job_data.team_id,
             "assistant_id": job_data.assistant_id,
-            "ai_service_endpoint": job_data.ai_service_endpoint,
             "job_config": job_data.job_config,
             "max_retries": job_data.max_retries,
             "timeout_seconds": job_data.timeout_seconds,
@@ -278,8 +275,6 @@ async def update_scheduled_job(user_id: str = "system", **kwargs) -> str:
             payload["team_id"] = input_data.team_id
         if input_data.assistant_id is not None:
             payload["assistant_id"] = input_data.assistant_id
-        if input_data.ai_service_endpoint is not None:
-            payload["ai_service_endpoint"] = input_data.ai_service_endpoint
         if input_data.job_config is not None:
             payload["job_config"] = input_data.job_config
         if input_data.max_retries is not None:

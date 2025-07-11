@@ -34,7 +34,6 @@ async def create_job(
     - **prompt**: Prompt to send to AI service
     - **team_id**: Team ID for the job
     - **assistant_id**: Assistant ID for the job
-    - **ai_service_endpoint**: AI service endpoint (default: /api/v1/team/stream)
     - **max_retries**: Maximum number of retries (default: 3)
     - **timeout_seconds**: Job timeout in seconds (default: 300)
     - **timezone**: Job timezone (default: UTC)

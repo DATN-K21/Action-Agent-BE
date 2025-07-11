@@ -13,7 +13,6 @@ class JobBase(BaseModel):
     prompt: str = Field(..., description="Prompt to send to AI service")
     team_id: str = Field(..., description="Team ID for the job")
     assistant_id: str = Field(..., description="Assistant ID for the job")
-    ai_service_endpoint: str = Field(default="/api/v1/team/stream", description="AI service endpoint")
     job_config: Optional[Dict] = Field(None, description="Additional job configuration")
     max_retries: int = Field(default=3, description="Maximum number of retries")
     timeout_seconds: int = Field(default=300, description="Job timeout in seconds")
@@ -36,7 +35,6 @@ class JobCreate(JobBase):
                 "prompt": "Generate daily report for team activities",
                 "team_id": "team-123",
                 "assistant_id": "assistant-456",
-                "ai_service_endpoint": "/api/v1/team/stream",
                 "max_retries": 3,
                 "timeout_seconds": 300,
                 "timezone": "UTC",
@@ -58,7 +56,6 @@ class JobUpdate(BaseModel):
     prompt: Optional[str] = Field(None, description="Prompt to send to AI service")
     team_id: Optional[str] = Field(None, description="Team ID")
     assistant_id: Optional[str] = Field(None, description="Assistant ID")
-    ai_service_endpoint: Optional[str] = Field(None, description="AI service endpoint")
     job_config: Optional[Dict] = Field(None, description="Job configuration")
     max_retries: Optional[int] = Field(None, description="Maximum retries")
     timeout_seconds: Optional[int] = Field(None, description="Timeout in seconds")

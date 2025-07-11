@@ -88,7 +88,7 @@ class JobExecutor:
     async def _send_prompt_to_ai_service(self, job_data: Dict) -> str:
         """Send prompt to AI service."""
         try:
-            url = f"{env_settings.AI_SERVICE_URL}{job_data.get('ai_service_endpoint', '/api/v1/team/stream')}"
+            url = f"{env_settings.AI_SERVICE_URL}{env_settings.AI_SERVICE_ENDPOINT}"
             
             payload = {
                 "prompt": job_data.get('prompt'),

@@ -27,7 +27,7 @@ class JobService:
                 timezone=job_data.timezone,
                 prompt=job_data.prompt,
                 team_id=job_data.team_id,
-                ai_service_endpoint=job_data.ai_service_endpoint,
+                assistant_id=job_data.assistant_id,
                 max_retries=job_data.max_retries,
                 timeout_seconds=job_data.timeout_seconds,
                 job_config=job_data.job_config,
@@ -45,7 +45,6 @@ class JobService:
                 job_execution_data = {
                     'prompt': job.prompt,
                     'team_id': job.team_id,
-                    'ai_service_endpoint': job.ai_service_endpoint,
                     'job_config': job.job_config or {}
                 }
                 
@@ -161,7 +160,6 @@ class JobService:
                     job_execution_data = {
                         'prompt': job.prompt,
                         'team_id': job.team_id,
-                        'ai_service_endpoint': job.ai_service_endpoint,
                         'job_config': job.job_config or {}
                     }
                     
@@ -227,7 +225,6 @@ class JobService:
             job_execution_data = {
                 'prompt': job.prompt,
                 'team_id': job.team_id,
-                'ai_service_endpoint': job.ai_service_endpoint,
                 'job_config': job.job_config or {}
             }
             

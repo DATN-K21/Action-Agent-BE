@@ -44,7 +44,6 @@ class ScheduledJob(BaseEntity):
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     team_id: Mapped[str] = mapped_column(String(255), nullable=False)
     assistant_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    ai_service_endpoint: Mapped[str] = mapped_column(String(255), default="/api/v1/team/stream", nullable=False)
     
     # Job configuration
     max_retries: Mapped[int] = mapped_column(default=3, nullable=False)
