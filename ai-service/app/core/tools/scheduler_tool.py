@@ -43,6 +43,8 @@ class GetJobsInput(BaseModel):
     """Input schema for retrieving jobs."""
     status: Optional[str] = Field(None, description="Filter by job status: 'pending', 'running', 'completed', 'failed', 'paused'")
     job_type: Optional[str] = Field(None, description="Filter by job type: 'one_time' or 'recurring'")
+    assistant_id: Optional[str] = Field(None, description="Filter by assistant ID")
+    team_id: Optional[str] = Field(None, description="Filter by team ID")
     limit: int = Field(10, description="Maximum number of jobs to return")
     skip: int = Field(0, description="Number of jobs to skip for pagination")
 
@@ -184,7 +186,7 @@ async def get_scheduled_jobs(user_id: str = "system", **kwargs) -> str:
     Retrieve a list of scheduled jobs with optional filtering.
     
     This function fetches jobs from the scheduler service with optional
-    filters for status, type, and pagination.
+    filters for status, type, assistant_id, team_id, and pagination.
     """
     try:
         input_data = GetJobsInput(**kwargs)
@@ -198,6 +200,10 @@ async def get_scheduled_jobs(user_id: str = "system", **kwargs) -> str:
             params["status"] = input_data.status
         if input_data.job_type:
             params["job_type"] = input_data.job_type
+        if input_data.assistant_id:
+            params["assistant_id"] = input_data.assistant_id
+        if input_data.team_id:
+            params["team_id"] = input_data.team_id
         
         result = await _make_scheduler_request("GET", "", params=params, user_id=user_id)
         
@@ -586,7 +592,7 @@ def create_scheduler_tools(user_id: str, timezone: str = "UTC", team_id: Optiona
         "get_jobs": StructuredTool.from_function(
             func=get_jobs_with_context,
             name="Get Scheduled Jobs",
-            description=f"Retrieve scheduled jobs for user {user_id} with optional filtering by status, type, and pagination. "
+            description=f"Retrieve scheduled jobs for user {user_id} with optional filtering by status, type, assistant_id, team_id, and pagination. "
                        "Useful for monitoring and managing existing scheduled tasks.",
             args_schema=GetJobsInput,
             return_direct=False,

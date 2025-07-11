@@ -17,7 +17,7 @@ class JobService:
     
     async def create_job(self, job_data: JobCreate, created_by: str) -> JobResponse:
         """Create a new scheduled job."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Create job record
             job = ScheduledJob(
                 name=job_data.name,
@@ -73,10 +73,12 @@ class JobService:
         limit: int = 100,
         status: Optional[JobStatus] = None,
         job_type: Optional[JobType] = None,
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
+        assistant_id: Optional[str] = None,
+        team_id: Optional[str] = None
     ) -> List[JobResponse]:
         """Get list of jobs with optional filtering."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             query = select(ScheduledJob).where(ScheduledJob.is_deleted == False)
             
             # Apply filters
@@ -86,6 +88,10 @@ class JobService:
                 query = query.where(ScheduledJob.job_type == job_type)
             if created_by:
                 query = query.where(ScheduledJob.created_by == created_by)
+            if assistant_id:
+                query = query.where(ScheduledJob.assistant_id == assistant_id)
+            if team_id:
+                query = query.where(ScheduledJob.team_id == team_id)
             
             # Apply pagination
             query = query.offset(skip).limit(limit)
@@ -97,7 +103,7 @@ class JobService:
     
     async def get_job(self, job_id: str) -> Optional[JobResponse]:
         """Get a specific job by ID."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(ScheduledJob)
                 .where(
@@ -115,7 +121,7 @@ class JobService:
     
     async def update_job(self, job_id: str, job_update: JobUpdate) -> Optional[JobResponse]:
         """Update a job."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Get existing job
             result = await session.execute(
                 select(ScheduledJob)
@@ -174,7 +180,7 @@ class JobService:
     
     async def delete_job(self, job_id: str) -> bool:
         """Delete a job (soft delete)."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Check if job exists
             result = await session.execute(
                 select(ScheduledJob)
@@ -205,7 +211,7 @@ class JobService:
     
     async def run_job_now(self, job_id: str) -> bool:
         """Manually trigger a job execution."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Get job details
             result = await session.execute(
                 select(ScheduledJob)
@@ -233,7 +239,7 @@ class JobService:
     
     async def pause_job(self, job_id: str) -> bool:
         """Pause a job."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Update job status
             await session.execute(
                 update(ScheduledJob)
@@ -247,7 +253,7 @@ class JobService:
     
     async def resume_job(self, job_id: str) -> bool:
         """Resume a paused job."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Update job status
             await session.execute(
                 update(ScheduledJob)
@@ -266,7 +272,7 @@ class JobService:
         limit: int = 100
     ) -> List[JobExecutionResponse]:
         """Get execution history for a job."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             query = (
                 select(JobExecution)
                 .where(JobExecution.job_id == job_id)

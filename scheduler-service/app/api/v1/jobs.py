@@ -76,6 +76,8 @@ async def list_jobs(
     limit: int = Query(100, ge=1, le=1000, description="Number of jobs to return"),
     status: Optional[JobStatus] = Query(None, description="Filter by job status"),
     job_type: Optional[JobType] = Query(None, description="Filter by job type"),
+    assistant_id: Optional[str] = Query(None, description="Filter by assistant ID"),
+    team_id: Optional[str] = Query(None, description="Filter by team ID"),
     x_user_id=Header(None),
     x_user_role=Header(None)
 ):
@@ -86,8 +88,12 @@ async def list_jobs(
     - **limit**: Maximum number of jobs to return
     - **status**: Filter by job status
     - **job_type**: Filter by job type
+    - **assistant_id**: Filter by assistant ID (optional)
+    - **team_id**: Filter by team ID (optional)
     
     Users can only see their own jobs unless they are admin or super admin.
+    If assistant_id or team_id are provided, jobs will be filtered by these values.
+    If they are empty, all jobs for the user will be returned.
     """
     try:
         if not x_user_id:
@@ -104,7 +110,9 @@ async def list_jobs(
             limit=limit,
             status=status,
             job_type=job_type,
-            user_id=user_filter
+            created_by=user_filter,
+            assistant_id=assistant_id,
+            team_id=team_id
         )
         return jobs
         
