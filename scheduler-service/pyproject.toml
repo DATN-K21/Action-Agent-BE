@@ -1,0 +1,41 @@
+[project]
+name = "scheduler-service"
+version = "0.1.0"
+description = "The Scheduler Service for the Action-Executing AI Agent"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.104.1",
+    "uvicorn>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
+    "apscheduler>=3.10.4",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "httpx>=0.28.1",
+    "structlog>=25.4.0",
+    "python-multipart>=0.0.20",
+    "croniter>=2.0.5",
+]
+
+[dependency-groups]
+lint = [
+    "ruff>=0.9.7",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
