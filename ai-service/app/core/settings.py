@@ -118,6 +118,7 @@ class Settings(BaseSettings):
     # URLs
     RETRIEVAL_SERVICE_GRPC_URL: str = "localhost:15600"
     EXTENSION_SERVICE_URL: str = "http://localhost:15300"
+    SCHEDULER_SERVICE_URL: str = "http://localhost:15400"
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
     @property
