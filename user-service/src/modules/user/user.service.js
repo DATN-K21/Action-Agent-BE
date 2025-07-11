@@ -118,6 +118,7 @@ class UserService {
     }
 
     async getUserById(userId) {
+        console.log("[UserService] getUserById:", userId);
         const foundUser = await this.userModel.findById(MongooseUtil.convertToMongooseObjectIdType(userId)).lean();
         if (!foundUser) {
             throw new ConflictResponse('User not found', 1040303);
