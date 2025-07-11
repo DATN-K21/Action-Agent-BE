@@ -3,6 +3,8 @@ const axiosInstance = require('../configs/axios.config');
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
 
 const PUBLIC_ENDPOINTS = [
+  "/",
+  "/ping",
   "/user/api/v1/access/login",
   "/user/api/v1/access/signup",
   "/user/api/v1/access/forgot-password",
@@ -18,6 +20,10 @@ const PUBLIC_ENDPOINTS = [
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
+  req.headers['x-user-id'] = "";
+  req.headers['x-user-email'] = "";
+  req.headers['x-user-role'] = "";
+
   if( PUBLIC_ENDPOINTS.includes(req.path)) {
     console.log(`Skip auth middleware public endpoint: ${req.path}`);
     return next();
@@ -45,8 +51,8 @@ const currentUserMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Failed to get current user data: ', error.message);
-    if (error.status && error?.code && error?.message && error?.errorStack) {
+    console.error('Failed to get current user data: ', error);
+    if (error.status && error?.message && error?.errorStack) {
       const sanitizedError = {...error};
       if(process.env.NODE_ENV !== "development") {
         delete sanitizedError.errorStack; // Remove sensitive information
