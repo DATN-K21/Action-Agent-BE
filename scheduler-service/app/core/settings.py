@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -5,12 +7,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    # Debug mode
+    DEBUG_SQLALCHEMY: bool = False
 
     # Database settings
-    DATABASE_URL: str = Field(
-        default="postgresql://postgres:password@localhost:5432/scheduler_db",
-        description="PostgreSQL database connection URL"
+    POSTGRES_URL_PATH: str = Field(
+        default="postgres:123456@localhost:5432/ai-database",
+        description="PostgreSQL database connection URL path (without protocol)"
+    )
+    POSTGRES_SCHEMA: str = Field(
+        default="schedulerservice",
+        description="PostgreSQL schema name"
     )
 
     # AI Service settings
@@ -38,5 +53,15 @@ class Settings(BaseSettings):
     # API settings
     API_V1_PREFIX: str = Field(default="/api/v1", description="API v1 prefix")
 
+    @property
+    def POSTGRES_URL_PATH_WITH_SCHEMA(self) -> str:
+        """Construct PostgreSQL URL path with schema for SQLAlchemy."""
+        return f"{self.POSTGRES_URL_PATH}?options=-csearch_path%3D{self.POSTGRES_SCHEMA}"
 
-env_settings = Settings()
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+
+env_settings = get_settings()

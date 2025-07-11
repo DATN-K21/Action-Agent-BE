@@ -6,6 +6,7 @@ from sqlalchemy import JSON, String, Text, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseEntity
+from app.core.settings import env_settings
 
 
 class JobStatus(str, Enum):
@@ -28,7 +29,7 @@ class ScheduledJob(BaseEntity):
     """Database model for scheduled jobs."""
     
     __tablename__ = "scheduled_jobs"
-    __table_args__ = {"schema": "scheduler"}
+    __table_args__ = {"schema": env_settings.POSTGRES_SCHEMA}
 
     # Basic job information
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -75,7 +76,7 @@ class JobExecution(BaseEntity):
     """Database model for job execution logs."""
     
     __tablename__ = "job_executions"
-    __table_args__ = {"schema": "scheduler"}
+    __table_args__ = {"schema": env_settings.POSTGRES_SCHEMA}
 
     # Job reference
     job_id: Mapped[str] = mapped_column(String(255), nullable=False)

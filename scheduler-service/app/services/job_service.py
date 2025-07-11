@@ -4,7 +4,7 @@ from sqlalchemy import select, update, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.database import async_session_factory
+from app.core.database import AsyncSessionLocal
 from app.core.scheduler import scheduler_manager
 from app.models.job import ScheduledJob, JobExecution, JobStatus, JobType
 from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobExecutionResponse

@@ -11,75 +11,63 @@ from app.models.base import Base
 
 logger = logging.get_logger(__name__)
 
-# Create async engine with connection pooling
+ASYNC_URL = f"postgresql+asyncpg://{env_settings.POSTGRES_URL_PATH}"
+SYNC_URL = f"postgresql+psycopg2://{env_settings.POSTGRES_URL_PATH}"
+
 async_engine = create_async_engine(
-    env_settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
-    echo=env_settings.DEBUG_SERVER,
-    future=True,
-    pool_pre_ping=True,  # Enable connection health check
+    ASYNC_URL,
+    pool_pre_ping=True,
+    echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"server_settings": {"search_path": env_settings.POSTGRES_SCHEMA}},
     pool_size=10,  # Limit connection pool size
     max_overflow=20,  # Maximum overflow connections
     pool_recycle=3600,  # Recycle connections every hour
     pool_timeout=30,  # Connection timeout
 )
-
-# Create async session factory
-async_session_factory = async_sessionmaker(
-    async_engine, 
-    class_=AsyncSession, 
-    expire_on_commit=False,
-    autoflush=False,
-    autocommit=False
-)
-
-# Create sync engine for migrations
 sync_engine = create_engine(
-    env_settings.DATABASE_URL,
-    echo=env_settings.DEBUG_SERVER,
-    future=True,
+    SYNC_URL,
     pool_pre_ping=True,
+    echo=env_settings.DEBUG_SQLALCHEMY,
+    connect_args={"options": f"-csearch_path={env_settings.POSTGRES_SCHEMA}"},
     pool_size=5,  # Smaller pool for sync operations
     max_overflow=10,
     pool_recycle=3600,
     pool_timeout=30,
 )
 
-# Create sync session factory
-sync_session_factory = sessionmaker(
-    bind=sync_engine,
-    expire_on_commit=False,
-    autoflush=False,
-    autocommit=False
-)
+AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, autoflush=False, autocommit=False)
+SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False, autoflush=False, autocommit=False)
+
+# --- FastAPI dependencies ---------------------------------------------------
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """Get async database session with proper error handling and cleanup."""
-    async with async_session_factory() as session:
+    async with AsyncSessionLocal() as db:
         try:
-            yield session
-            await session.commit()
-        except SQLAlchemyError as e:
+            yield db
+            await db.commit()
+        except SQLAlchemyError:
             logger.exception("Async DB error")
-            await session.rollback()
-            raise e
+            await db.rollback()
+            raise
         finally:
             # Explicitly close the session to ensure cleanup
-            await session.close()
+            await db.close()
 
 
 def get_sync_session() -> Generator[Session, None, None]:
     """Get sync database session with proper error handling and cleanup."""
-    session: Session = sync_session_factory()
+    db: Session = SyncSessionLocal()
     try:
-        yield session
-        session.commit()
-    except SQLAlchemyError as e:
+        yield db
+        db.commit()
+    except SQLAlchemyError:
         logger.exception("Sync DB error")
-        session.rollback()
-        raise e
+        db.rollback()
+        raise
     finally:
-        session.close()
+        db.close()
 
 
 async def init_db():
@@ -89,8 +77,8 @@ async def init_db():
     try:
         async with async_engine.begin() as conn:
             # Create the scheduler schema if it doesn't exist
-            logger.info("Creating scheduler schema if not exists...")
-            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS scheduler"))
+            logger.info(f"Creating schema '{env_settings.POSTGRES_SCHEMA}' if not exists...")
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
             
             # Create all tables defined in models
             logger.info("Creating application tables...")
@@ -110,12 +98,12 @@ async def init_db():
 async def create_scheduler_schema():
     """Create scheduler schema in the database."""
     try:
-        logger.info("Ensuring scheduler schema exists...")
+        logger.info(f"Ensuring schema '{env_settings.POSTGRES_SCHEMA}' exists...")
         async with async_engine.begin() as conn:
-            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS scheduler"))
-            logger.info("Scheduler schema created or already exists")
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
+            logger.info(f"Schema '{env_settings.POSTGRES_SCHEMA}' created or already exists")
     except Exception as e:
-        logger.error(f"Failed to create scheduler schema: {e}")
+        logger.error(f"Failed to create schema '{env_settings.POSTGRES_SCHEMA}': {e}")
         raise
 
 

@@ -7,10 +7,11 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.executors.pool import ThreadPoolExecutor
 from croniter import croniter
+from sqlalchemy import text
 
 from app.core import logging
 from app.core.settings import env_settings
-from app.core.database import sync_engine
+from app.core.database import sync_engine, async_engine
 from app.services.job_executor import JobExecutor
 
 logger = logging.get_logger(__name__)
@@ -30,6 +31,9 @@ class SchedulerManager:
             logger.warning("Scheduler is already running")
             return
         
+        # Ensure schema exists before starting scheduler
+        await self._ensure_schema_exists()
+        
         # Initialize job executor
         self.job_executor = JobExecutor()
         
@@ -37,8 +41,7 @@ class SchedulerManager:
         jobstores = {
             'default': SQLAlchemyJobStore(
                 engine=sync_engine,
-                tablename='apscheduler_jobs',
-                metadata_tablename='apscheduler_jobs_metadata'
+                tablename=f'{env_settings.POSTGRES_SCHEMA}.apscheduler_jobs'
             )
         }
         
@@ -213,6 +216,17 @@ class SchedulerManager:
             return cron.get_next(datetime)
         except Exception:
             return None
+    
+    async def _ensure_schema_exists(self) -> None:
+        """Ensure the PostgreSQL schema exists for APScheduler tables."""
+        try:
+            logger.info(f"Ensuring schema '{env_settings.POSTGRES_SCHEMA}' exists...")
+            async with async_engine.begin() as conn:
+                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
+            logger.info(f"Schema '{env_settings.POSTGRES_SCHEMA}' ready")
+        except Exception as e:
+            logger.error(f"Failed to create schema '{env_settings.POSTGRES_SCHEMA}': {str(e)}")
+            raise
 
 
 # Global scheduler manager instance

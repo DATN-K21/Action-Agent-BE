@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import logging
-from app.core.database import async_session_factory
+from app.core.database import AsyncSessionLocal
 from app.core.settings import env_settings
 from app.models.job import ScheduledJob, JobExecution, JobStatus
 
@@ -27,7 +27,7 @@ class JobExecutor:
         
         try:
             # Create execution record
-            async with async_session_factory() as session:
+            async with AsyncSessionLocal() as session:
                 execution = JobExecution(
                     job_id=job_id,
                     status=JobStatus.RUNNING,
@@ -116,7 +116,7 @@ class JobExecutor:
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
         
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(JobExecution)
                 .where(JobExecution.id == execution_id)
@@ -139,7 +139,7 @@ class JobExecutor:
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
         
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(JobExecution)
                 .where(JobExecution.id == execution_id)
@@ -154,7 +154,7 @@ class JobExecutor:
     
     async def _update_job_success(self, job_id: str) -> None:
         """Update job success statistics."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(ScheduledJob)
                 .where(ScheduledJob.id == job_id)
@@ -167,7 +167,7 @@ class JobExecutor:
     
     async def _update_job_failure(self, job_id: str) -> None:
         """Update job failure statistics."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(ScheduledJob)
                 .where(ScheduledJob.id == job_id)
@@ -180,7 +180,7 @@ class JobExecutor:
     
     async def _handle_retry(self, job_id: str, job_data: Dict, error_message: str) -> None:
         """Handle job retry logic."""
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             # Get job details
             result = await session.execute(
                 select(ScheduledJob).where(ScheduledJob.id == job_id)
