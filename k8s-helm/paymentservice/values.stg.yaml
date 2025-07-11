@@ -25,7 +25,7 @@ env:
         name: env-secret
         key: mongodbconnectionstring
   - name: MongoSettings__DatabaseName
-    value: "user-service"
+    value: "test"
   - name: MongoSettings__UserCollectionName
     value: "Users"
   - name: MongoSettings__PaymentCollectionName

@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace payment_service.Models;
 
+[BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]
@@ -10,5 +11,6 @@ public class User
     
     [BsonElement("balance")]
     public decimal Balance { get; set; }
+    
     // ...
 }
