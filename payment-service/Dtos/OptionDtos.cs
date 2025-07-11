@@ -2,20 +2,20 @@ namespace payment_service.Dtos;
 
 public record MongoSettings
 (
-    string ConnectionString = "mongodb://root:root@localhost:27017/user-service?authSource=admin",
-    string DatabaseName = "user-service",
-    string UserCollectionName = "Users",
-    string PaymentCollectionName = "Payments"
+    string ConnectionString,
+    string DatabaseName,
+    string UserCollectionName,
+    string PaymentCollectionName
 );
 
 public record StripeSettings
 (
-    string WebhookSecret = "<your-webhook-secret>",
-    string SecretKey = "<your-secret-key>",
-    string Currency = "usd"
+    string WebhookSecret,
+    string SecretKey,
+    string Currency
 );
 
 public record RateSettings
 (
-    decimal CreditsPerUsd = 10000m
+    decimal CreditsPerUsd
 );
