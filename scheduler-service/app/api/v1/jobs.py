@@ -357,7 +357,8 @@ async def validate_cron(
         if not is_valid:
             return CronValidationResponse(
                 is_valid=False,
-                error_message="Invalid cron expression format"
+                error_message="Invalid cron expression format",
+                next_run_times=[],
             )
         
         # Get next 5 run times
@@ -370,8 +371,7 @@ async def validate_cron(
             pass
         
         return CronValidationResponse(
-            is_valid=True,
-            next_run_times=next_runs
+            is_valid=True, error_message=None, next_run_times=next_runs
         )
         
     except Exception as e:
