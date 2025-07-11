@@ -1,21 +1,21 @@
 namespace payment_service.Dtos;
 
-public record MongoSettings
-(
-    string ConnectionString,
-    string DatabaseName,
-    string UserCollectionName,
-    string PaymentCollectionName
-);
+public class MongoSettings
+{
+    public string ConnectionString { get; set; }
+    public string DatabaseName { get; set; }
+    public string UserCollectionName { get; set; }
+    public string PaymentCollectionName { get; set; }
+}
 
-public record StripeSettings
-(
-    string WebhookSecret,
-    string SecretKey,
-    string Currency
-);
+public class StripeSettings
+{
+    public string WebhookSecret { get; set; }
+    public string SecretKey { get; set; }
+    public string Currency { get; set; }
+}
 
-public record RateSettings
-(
-    decimal CreditsPerUsd
-);
+public class RateSettings
+{
+    public decimal CreditsPerUsd { get; set; }
+}
