@@ -3,40 +3,61 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Activate Your Account</title>
+    <title>Activate Your Account - Action Agent</title>
+    <link rel="icon" type="image/png" href="https://github.com/user-attachments/assets/17d07248-146b-4fa6-82f8-708e77f7048c">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #fff;
+            color: #222;
+            margin: 0;
         }
-
         .container {
             max-width: 600px;
-            margin: auto;
-            padding: 20px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 32px 24px 24px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.07);
             border: 1px solid #e6e6e6;
-            border-radius: 6px;
         }
-
+        .banner {
+            width: 100%;
+            max-width: 320px;
+            display: block;
+            margin: 0 auto 24px auto;
+            border-radius: 8px;
+        }
         h1 {
-            font-size: 20px;
+            font-size: 24px;
             text-align: center;
+            color: #222;
+            margin-bottom: 8px;
+            font-weight: 700;
         }
-
         .btn {
             display: inline-block;
-            padding: 10px 20px;
+            padding: 16px 40px;
             color: #fff;
-            background-color: #0d6efd;
+            background: #222;
             text-decoration: none;
-            border-radius: 4px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 1.5px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            border: 2px solid #222;
+            transition: background 0.2s, color 0.2s;
         }
-
+        .btn:hover {
+            background: #444;
+            color: #ffe082;
+            border-color: #ffe082;
+        }
         .footer {
-            font-size: 12px;
-            color: #777;
-            margin-top: 20px;
+            font-size: 13px;
+            color: #888;
+            margin-top: 32px;
             text-align: center;
         }
     </style>
@@ -44,20 +65,18 @@
 
 <body>
     <div class="container">
-        <h1>Welcome to HCMUS Action‑AI Agent</h1>
-        <p>Dear User,</p>
-        <p>Thank you for creating an account. Please activate your account by clicking the button below:</p>
-        <p style="text-align:center;">
-            <a href="{{activationLink}}" class="btn"
-                style="background: linear-gradient(90deg, #0d6efd 0%, #00c6ff 100%); box-shadow: 0 2px 8px rgba(13,110,253,0.15); font-weight: bold; letter-spacing: 1px; border: none;">Activate
-                Account</a>
+        <img src="https://github.com/user-attachments/assets/468048e5-10bc-4f1e-bda1-992b3f3077c9" alt="Action Agent Banner" class="banner">
+        <h1>Welcome to Action Agent</h1>
+        <p style="font-size:16px;">Dear User,</p>
+        <p style="font-size:16px;">Thank you for creating an account. Please activate your account by clicking the button below:</p>
+        <p style="text-align:center; margin: 24px 0;">
+            <a href="{{activationLink}}" class="btn">Activate Account</a>
         </p>
-        <p>If the button does not work, copy and paste the following link into your browser:</p>
-        <p><a href="{{activationLink}}">{{activationLink}}</a></p>
-        <p>This link will expire in 15 minutes.</p>
-        <p>Best regards,<br>HCMUS Action‑AI Agent Team</p>
-        <div class="footer">Please do not reply to this email. If you did not sign up, you may ignore this message.
-        </div>
+        <p style="font-size:15px;">If the button does not work, copy and paste the following link into your browser:</p>
+        <p style="word-break:break-all;"><a href="{{activationLink}}">{{activationLink}}</a></p>
+        <p style="font-size:15px;">This link will expire in 15 minutes.</p>
+        <p style="font-size:15px;">Best regards,<br>Action Agent Team</p>
+        <div class="footer">Please do not reply to this email. If you did not sign up, you may ignore this message.</div>
     </div>
 </body>
 
