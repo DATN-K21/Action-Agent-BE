@@ -43,31 +43,30 @@ public static class PaymentEndpoints
             [FromServices] IPaymentService paymentService,
             [FromServices] IOptions<StripeSettings> stripeOptions) =>
         {
-            request.EnableBuffering();
-
             // 1. Verify signature
             var json = await new StreamReader(request.Body, Encoding.UTF8).ReadToEndAsync();
-            request.Body.Position = 0;
-            var signature = request.Headers["Stripe-Signature"];
-            Event stripeEvent;
+            var webhookSecret = stripeOptions.Value.WebhookSecret;
 
             try
             {
-                stripeEvent = EventUtility.ConstructEvent(json, signature, stripeOptions.Value.WebhookSecret);
+                var stripeEvent = EventUtility.ParseEvent(json);
+                var signatureHeader = request.Headers["Stripe-Signature"];
+                stripeEvent = EventUtility.ConstructEvent(json, signatureHeader, webhookSecret);
+
+                // 2. Handle only succeeded intents
+                if (stripeEvent.Type == EventTypes.PaymentIntentSucceeded)
+                {
+                    // 3. Confirm the payment
+                    var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+                    var response = await paymentService.ConfirmPaymentAsync(paymentIntent!.Id);
+                    return response.ToResponse();
+                }
             }
             catch
             {
                 Console.WriteLine($"Raw JSON: {json}");
                 Console.WriteLine($"Invalid Stripe signature. Environment: {stripeOptions.Value.WebhookSecret}, Signature: {signature}");
                 return new ConfirmPaymentResponse(200, false, "Invalid Stripe signature").ToResponse();
-            }
-
-            // 2. Handle only succeeded intents
-            if (stripeEvent.Type == EventTypes.PaymentIntentSucceeded && stripeEvent.Data.Object is PaymentIntent paymentIntent)
-            {
-                // 3. Confirm the payment
-                var response = await paymentService.ConfirmPaymentAsync(paymentIntent.Id);
-                return response.ToResponse();
             }
 
             return new ConfirmPaymentResponse(200, true, "Event processed").ToResponse();
