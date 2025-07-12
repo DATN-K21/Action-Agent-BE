@@ -62,10 +62,12 @@ public static class PaymentEndpoints
                     return response.ToResponse();
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Console.WriteLine($"Raw JSON: {json}");
-                Console.WriteLine($"Invalid Stripe signature. Environment: {webhookSecret}, Signature: {request.Headers["Stripe-Signature"]}");
+                Console.WriteLine($"Error processing Stripe event: {ex.Message}");
+                Console.WriteLine($"Request body: {json}");
+                Console.WriteLine($"Signature header: {request.Headers["Stripe-Signature"]}");
+                Console.WriteLine($"Webhook secret: {webhookSecret}");
                 return new ConfirmPaymentResponse(200, false, "Invalid Stripe signature").ToResponse();
             }
 
