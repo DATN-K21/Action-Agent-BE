@@ -123,7 +123,8 @@ class LCQdrantIngestor:
                 rest.FieldCondition(key="metadata.upload_id", match=rest.MatchValue(value=upload_id)),
             ]
         )
-        _run(self._vs_lazy().delete, filter=filt)
+        # Serialize filter to dict for Qdrant client compatibility
+        _run(self._vs_lazy().delete, filter=filt.model_dump())
         log.info("Deleted upload=%s user=%s", upload_id, user_id)
         return True
 
