@@ -50,11 +50,24 @@ def get_message_type(message: Any) -> str | None:
     else:
         return None
 
+def ignore_evaluate_node(event: StreamEvent, nodes: list[Dict[str, Any]] | None = None) -> bool:
+    """Check if the evaluate node should be ignored"""
+    metadata = event.get("metadata", {})
+    node_id = metadata.get("langgraph_node", "unknown")
+    name = get_node_label(node_id, nodes) if nodes else node_id
+
+    if name.endswith("-tool-evaluation"):
+        return True
+    return False
+
 
 def event_to_response(
         event: StreamEvent, nodes: list[Dict[str, Any]] | None = None
 ) -> ChatResponse | None:
     """Convert event to ChatResponse"""
+
+    if ignore_evaluate_node(event, nodes):
+        return None
 
     kind = event["event"]
     id = event["run_id"]
@@ -91,7 +104,6 @@ def event_to_response(
             return None
         metadata = event.get("metadata", {})
         node_id = metadata.get("langgraph_node", "unknown")
-        name = get_node_label(node_id, nodes) if nodes else node_id
         name = get_node_label(node_id, nodes) if nodes else node_id
         tool_calls = message.tool_calls
         if tool_calls:
