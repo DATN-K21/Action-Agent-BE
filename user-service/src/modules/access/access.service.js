@@ -70,6 +70,7 @@ class AccessService {
     async handleLogin(email, password) {
         const foundUser = await this.userModel.findOne({ email, type_login: 'local' }).populate('role').lean();
         if (!foundUser) {
+            console.log('User not found with email: ', email);
             throw new ConflictResponse('Email or password is incorrect', 1010205);
         }
         if (foundUser?.email_verified === false) {
@@ -148,6 +149,7 @@ class AccessService {
                     throw new BadRequestResponse('Invalid refresh token', 1010312);
                 }
             } else if (foundAccess.refresh_token !== refreshToken) {
+                console.log('Refresh token does not match with the one in database. Refresh token: ', refreshToken, ' - Found access: ', foundAccess);
                 throw new BadRequestResponse('Invalid refresh token', 1010313);
             }
         } catch (error) {
