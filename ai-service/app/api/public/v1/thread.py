@@ -349,7 +349,7 @@ Given the following content, please generate a suitable title:
         return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
-@router.post("/{thread_id}/get-history", summary="Get history of the thread", response_model=ResponseWrapper[GetHistoryResponse])
+@router.get("/{thread_id}/get-history", summary="Get history of the thread", response_model=ResponseWrapper[GetHistoryResponse])
 async def get_thread_history(
     session: SessionDep,
     thread_id: str,
