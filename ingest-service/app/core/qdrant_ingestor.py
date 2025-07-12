@@ -123,9 +123,15 @@ class LCQdrantIngestor:
                 rest.FieldCondition(key="metadata.upload_id", match=rest.MatchValue(value=upload_id)),
             ]
         )
-        # Serialize filter to dict for Qdrant client compatibility
-        _run(self._vs_lazy().delete, filter=filt.model_dump())
-        log.info("Deleted upload=%s user=%s", upload_id, user_id)
+        # Find all matching documents and collect their IDs
+        docs = _run(self._vs_lazy().similarity_search, query="", k=1000, filter=filt)
+        ids = [doc.metadata.get("_id") for doc in docs if doc.metadata.get("_id")]
+        if not ids:
+            log.warning("No documents found to delete for upload=%s user=%s", upload_id, user_id)
+            return False
+        # Delete by IDs
+        _run(self._vs_lazy().delete, ids=ids)
+        log.info("Deleted upload=%s user=%s (deleted %d docs)", upload_id, user_id, len(ids))
         return True
 
     # ───────────────── context mgmt
