@@ -25,6 +25,7 @@ from app.core.graph.members import (
     SchedulerNode,
     SequentialWorkerNode,
     SummariserNode,
+    ToolEvaluationNode,
     WorkerNode,
 )
 from app.core.graph.messages import ChatResponse, event_to_response
@@ -386,6 +387,34 @@ def create_tools_condition_with_human_review(
     return mapping
 
 
+def create_tools_condition_with_tool_evaluation(
+    current_member_name: str,
+    next_member_name: str,
+    tools: list[GraphSkill | GraphUpload],
+) -> dict[Hashable, str]:
+    """Creates the mapping for conditional edges with intelligent tool evaluation
+    The tool evaluation node must be in format: '{current_member_name}-tool-evaluation'
+    The tool node must be in format: '{current_member_name}-tools'
+
+    Args:
+        current_member_name (str): The name of the member that is calling the tool
+        next_member_name (str): The name of the next member after tool processing. Can be END.
+        tools: List of tools that the agent has.
+    """
+    mapping: dict[Hashable, str] = {
+        # Else continue to the next node
+        "continue": next_member_name,
+    }
+
+    for tool in tools:
+        if tool.name == "ask-human":
+            mapping["call_human"] = f"{current_member_name}-ask-human-tool"
+        else:
+            # Route to tool evaluation node for intelligent assessment
+            mapping["call_tools"] = f"{current_member_name}-tool-evaluation"
+    return mapping
+
+
 def ask_human_node(state: GraphTeamState) -> None:
     """Dummy node for ask human tool"""
 
@@ -422,6 +451,19 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
         "continue": member_name,  # Continue with additional context
     }
     return create_human_review_node(member_name, "output_review", routes)
+
+
+def create_tool_evaluation_node(member_name: str) -> ToolEvaluationNode:
+    """Create a ToolEvaluationNode for intelligent tool call evaluation"""
+    return ToolEvaluationNode(
+        provider=env_settings.ANTHROPIC_PROVIDER,
+        model=env_settings.LLM_REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        routes={
+            "execute_directly": f"{member_name}-tools",
+            "require_human_approval": f"{member_name}-tool-review",
+        },
+    )
 
 
 async def acreate_hierarchical_graph(
@@ -499,6 +541,13 @@ async def acreate_hierarchical_graph(
 
                 # Add HumanNode for tool review if interrupt is True
                 if team_root.assistant.interrupt:
+                    use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
+                    if use_tool_evaluation:
+                        # Add ToolEvaluationNode for intelligent tool assessment
+                        tool_evaluation_node = create_tool_evaluation_node(name)
+                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+
+                    # Add HumanNode for tool review if member.interrupt is True
                     human_tool_review_node = create_human_tool_review_node(name)
                     build.add_node(f"{name}-tool-review", human_tool_review_node.work)
                     # No direct edge - HumanNode uses Command(goto=...) for routing
@@ -548,8 +597,14 @@ async def acreate_hierarchical_graph(
                     # Add node for normal tools
                     build.add_node(f"{name}-tools", ToolNode(normal_tools))
 
-                    # Add HumanNode for tool review if member.interrupt is True
                     if member.interrupt:
+                        use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
+                        if use_tool_evaluation:
+                            # Add ToolEvaluationNode for intelligent tool assessment
+                            tool_evaluation_node = create_tool_evaluation_node(name)
+                            build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+
+                        # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
                         # No direct edge - HumanNode uses Command(goto=...) for routing
@@ -575,9 +630,19 @@ async def acreate_hierarchical_graph(
         else:
             continue
 
-        # Create conditional edges with enhanced routing for HumanNode interrupts
+        # Create conditional edges with enhanced routing for HumanNode interrupts or tool evaluation
         if isinstance(member, GraphMember) and member.tools:
+            use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
+
             if member.interrupt:
+                if use_tool_evaluation:
+                    # Route to tool evaluation node for intelligent assessment
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_tool_evaluation(name, leader_name, member.tools),
+                    )
+
                 # Route to human review node first, then to tools
                 build.add_conditional_edges(
                     name,

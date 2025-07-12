@@ -707,3 +707,165 @@ class RAGBotNode(BaseNode):
                 "messages": [],
                 "all_messages": state["messages"] + [result],
             }
+
+
+class ToolEvaluationNode(BaseNode):
+    """Node that intelligently evaluates tool calls to determine if they require human-in-loop intervention"""
+
+    evaluation_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You are a tool evaluation specialist. Your job is to analyze tool calls and determine if they require human approval or can be executed directly.\n"
+                    "Consider the following criteria:\n"
+                    "- Information retrieval tools (search, lookup, get data, read files, query databases) can usually be executed directly\n"
+                    "- Tools that modify data, send communications, make purchases, or perform irreversible actions should require human approval\n"
+                    "- Tools that access sensitive information or perform administrative tasks should require human approval\n"
+                    "- Consider the context and potential impact of the tool call\n\n"
+                    "Available options for your decision:\n"
+                    "- EXECUTE_DIRECTLY: The tool is safe to execute without human intervention (typically retrieval/read operations)\n"
+                    "- REQUIRE_HUMAN_APPROVAL: The tool requires human review before execution (typically write/modify/send operations)\n"
+                ),
+            ),
+            (
+                "human",
+                (
+                    "Please analyze this tool call and determine if it requires human approval:\n\n"
+                    "Tool Name: {tool_name}\n"
+                    "Tool Description: {tool_description}\n"
+                    "Tool Arguments: {tool_args}\n"
+                    "Make your decision based on the safety and reversibility of the operation. "
+                    "Select one of: EXECUTE_DIRECTLY or REQUIRE_HUMAN_APPROVAL"
+                ),
+            ),
+        ]
+    )
+
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        routes: dict[str, str] | None = None,
+    ):
+        super().__init__(provider, model, temperature)
+        self.routes = routes or {
+            "execute_directly": "run_tool",
+            "require_human_approval": "human_review",
+        }
+
+    def get_tool_evaluation_definition(self) -> dict[str, Any]:
+        """Return the tool definition for evaluating tool calls"""
+        return {
+            "type": "function",
+            "function": {
+                "name": "evaluate",
+                "description": (
+                    "Evaluate whether a tool call requires human approval or can be executed directly."
+                    "\n'decision' - Your evaluation decision (EXECUTE_DIRECTLY or REQUIRE_HUMAN_APPROVAL)"
+                    "\n'reasoning' - Brief explanation of your decision"
+                    "\n\nExamples:"
+                    "\nTool: search_web, Args: {'query': 'latest news'}"
+                    '\n{"decision": "EXECUTE_DIRECTLY", "reasoning": "Information retrieval tool with no side effects"}'
+                    "\nTool: send_email, Args: {'to': 'user@example.com', 'subject': 'Hello'}"
+                    '\n{"decision": "REQUIRE_HUMAN_APPROVAL", "reasoning": "Communication tool that sends external messages"}'
+                    "\nTool: delete_file, Args: {'file_path': '/important/document.txt'}"
+                    '\n{"decision": "REQUIRE_HUMAN_APPROVAL", "reasoning": "Destructive operation that cannot be undone"}'
+                ),
+                "parameters": {
+                    "title": "toolEvaluationSchema",
+                    "type": "object",
+                    "properties": {
+                        "decision": {
+                            "title": "decision",
+                            "description": "The evaluation decision",
+                            "enum": ["EXECUTE_DIRECTLY", "REQUIRE_HUMAN_APPROVAL"],
+                        },
+                        "reasoning": {
+                            "title": "reasoning",
+                            "description": "Brief explanation of the decision",
+                            "type": "string",
+                        },
+                    },
+                    "required": ["decision", "reasoning"],
+                },
+            },
+        }
+
+    async def evaluate_tool_call(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+        """Evaluate if a tool call requires human approval"""
+
+        # Get the last message which should contain the tool call
+        last_message = state["messages"][-1] if state["messages"] else None
+
+        if not last_message or not isinstance(last_message, AIMessage) or not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+            # No tool call to evaluate, return as is
+            return {
+                "messages": state["messages"],
+                "history": state["history"],
+                "all_messages": state["all_messages"],
+                "next": self.routes.get("execute_directly", "run_tool"),
+            }
+
+        tool_call = last_message.tool_calls[-1]  # Evaluate the first tool call
+        tool_name = tool_call.get("name", "unknown")
+        tool_args = str(tool_call.get("args", {}))
+
+        # Get tool description if available
+        tool_description = "No description available"
+
+        # Create the evaluation tool
+        evaluation_tool = self.get_tool_evaluation_definition()
+
+        # Disable default parallel tool calls from ChatOpenAI
+        if isinstance(self.model, ChatOpenAI):
+            bind_tool = self.model.bind_tools(tools=[evaluation_tool], parallel_tool_calls=False)
+        else:
+            bind_tool = self.model.bind_tools(tools=[evaluation_tool])
+
+        evaluation_chain: RunnableSerializable[Any, Any] = (
+            self.evaluation_prompt.partial(
+                tool_name=tool_name,
+                tool_description=tool_description,
+                tool_args=tool_args,
+            )
+            | bind_tool
+            | JsonOutputKeyToolsParser(key_name="evaluate", first_tool_only=True)
+        )
+
+        try:
+            result = await evaluation_chain.ainvoke(state, config)
+        except Exception:
+            # If evaluation fails, default to requiring human approval for safety
+            return {
+                "next": self.routes.get("require_human_approval", "human_review"),
+            }
+
+        # Handle the evaluation result
+        if not isinstance(result, dict):
+            if result is not None and hasattr(result, "model_dump"):
+                result = result.model_dump()
+            else:
+                result = {"decision": "REQUIRE_HUMAN_APPROVAL"}
+
+        decision = result.get("decision", "REQUIRE_HUMAN_APPROVAL")
+        reasoning = result.get("reasoning", "Default safety decision")
+
+        # Create a message with the evaluation result
+        evaluation_message = AIMessage(content=f"Tool evaluation: {decision}. Reasoning: {reasoning}", name="tool-evaluator")
+
+        # Route based on decision
+        if decision == "EXECUTE_DIRECTLY":
+            next_node = self.routes.get("execute_directly", "run_tool")
+        else:
+            next_node = self.routes.get("require_human_approval", "human_review")
+
+        return {
+            "all_messages": state["all_messages"] + [evaluation_message],
+            "next": next_node,
+        }
+
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+        """Main work method that delegates to evaluate_tool_call"""
+        return await self.evaluate_tool_call(state, config)
