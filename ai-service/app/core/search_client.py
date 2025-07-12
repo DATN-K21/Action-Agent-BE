@@ -74,22 +74,7 @@ class CustomRetriever(BaseRetriever):
         """Create a new CustomRetriever instance with proper validation."""
         return cls(user_id=user_id, upload_id=upload_id, top_k=top_k, score_threshold=score_threshold, **kwargs)
 
-    def _get_relevant_documents(self, query: str) -> List[Document]:
-        """Sync method - runs async version in event loop with proper cleanup."""
-
-        async def _run_with_cleanup():
-            try:
-                return await self._aget_relevant_documents(query)
-            except Exception as e:
-                logger.error(f"Error in async retrieval: {e}")
-                return []
-
-        # Use asyncio.run() but with explicit cleanup
-        try:
-            return asyncio.run(_run_with_cleanup())
-        except Exception as e:
-            logger.error(f"Error in sync retrieval bridge: {e}")
-            return []
+    # Removed deprecated synchronous _get_relevant_documents method to enforce async-only usage
 
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
         """Main async search method."""
