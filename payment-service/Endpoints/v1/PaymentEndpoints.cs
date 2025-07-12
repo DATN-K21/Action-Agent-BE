@@ -11,7 +11,7 @@ namespace payment_service.Endpoints.v1;
 public static class PaymentEndpoints
 {
     private const string EndpointPrefix = "/api/v1/payment";
-    
+
     public static WebApplication MapPaymentEndpoints(this WebApplication app)
     {
         // Ping
@@ -19,9 +19,18 @@ public static class PaymentEndpoints
 
         // Create PaymentIntent
         app.MapPost($"{EndpointPrefix}/create-intent", async (
+            HttpRequest request,
             [FromServices] IPaymentService paymentService,
             [FromBody] CreatePaymentIntentRequest req) =>
         {
+            // Get x-user-id and x-user-role headers
+            var userIdHeader = request.Headers["x-user-id"].FirstOrDefault();
+            var userRoleHeader = request.Headers["x-user-role"].FirstOrDefault();
+            bool isAdmin = userRoleHeader != null && string.Equals(userRoleHeader, "admin", StringComparison.OrdinalIgnoreCase);
+            if (!isAdmin && (userIdHeader == null || userIdHeader != req.UserId))
+            {
+                return Results.StatusCode(403);
+            }
             var response = await paymentService.CreatePaymentIntentAsync(req.UserId, req.AmountUsd);
             return response.ToResponse();
         });
