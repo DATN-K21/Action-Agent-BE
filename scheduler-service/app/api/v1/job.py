@@ -41,7 +41,7 @@ def validate_user_headers(
         )
 
 
-@router.post("/", response_model=JobResponse, summary="Create Job")
+@router.post("/create", response_model=JobResponse, summary="Create Job")
 async def create_job(
     job_data: JobCreate,
     x_user_id=Header(None),
@@ -88,7 +88,7 @@ async def create_job(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/", response_model=List[JobResponse], summary="List Jobs")
+@router.get("/get-jobs", response_model=List[JobResponse], summary="List Jobs")
 async def list_jobs(
     skip: int = Query(0, ge=0, description="Number of jobs to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of jobs to return"),
@@ -166,7 +166,7 @@ async def get_job(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{job_id}", response_model=JobResponse, summary="Update Job")
+@router.put("/{job_id}/update", response_model=JobResponse, summary="Update Job")
 async def update_job(
     job_update: JobUpdate,
     job_id: str = Path(..., description="Job ID"),
@@ -205,7 +205,7 @@ async def update_job(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{job_id}", summary="Delete Job")
+@router.delete("/{job_id}/remove", summary="Delete Job")
 async def delete_job(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
