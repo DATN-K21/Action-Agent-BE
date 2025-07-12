@@ -3,8 +3,16 @@ const axiosInstance = require('../configs/axios.config');
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
 
 const PUBLIC_ENDPOINTS = [
+  // Ping endpoints
   "/",
   "/ping",
+  "user/ping",
+  "ai/ping",
+  "extension/ping",
+  "voice/ping",
+  "payment/ping",
+
+  // User service public endpoints
   "/user/api/v1/access/login",
   "/user/api/v1/access/signup",
   "/user/api/v1/access/forgot-password",
@@ -17,6 +25,9 @@ const PUBLIC_ENDPOINTS = [
   "/user/api/v1/access/reset-password/send-otp",
   "/user/api/v1/access/reset-password/confirm-otp",
   "/user/api/v1/access/reset-password",
+
+  // Payment service public endpoints
+  "/payment/api/v1/payment/confirm",
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
@@ -24,13 +35,13 @@ const currentUserMiddleware = async (req, res, next) => {
   req.headers['x-user-email'] = "";
   req.headers['x-user-role'] = "";
 
-  if( PUBLIC_ENDPOINTS.includes(req.path)) {
+  if (PUBLIC_ENDPOINTS.includes(req.path)) {
     console.log(`Skip auth middleware public endpoint: ${req.path}`);
     return next();
   }
 
   const authHeader = req.headers.authorization;
-  if(!authHeader) {
+  if (!authHeader) {
     console.error('Authorization header is missing!');
     return res.status(401).json({
       status: 401,
@@ -53,8 +64,8 @@ const currentUserMiddleware = async (req, res, next) => {
   } catch (error) {
     console.error('Failed to get current user data: ', error);
     if (error.status && error?.message && error?.errorStack) {
-      const sanitizedError = {...error};
-      if(process.env.NODE_ENV !== "development") {
+      const sanitizedError = { ...error };
+      if (process.env.NODE_ENV !== "development") {
         delete sanitizedError.errorStack; // Remove sensitive information
       }
       res.status(error.status).json(sanitizedError);
