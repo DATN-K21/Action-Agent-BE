@@ -426,14 +426,10 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
 
 async def acreate_hierarchical_graph(
     teams: dict[str, GraphTeam],
+    team_root: Team | None,
     leader_name: str,
     user_id: str | None = None,
     timezone: str | None = None,
-    assistant_id: str | None = None,
-    team_id: str | None = None,
-    ask_human: bool = False,
-    interrupt: bool = False,
-    scheduler_enabled: bool = False,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph:
     """Create the team's graph with manual interrupt capabilities using HumanNode.
@@ -465,7 +461,7 @@ async def acreate_hierarchical_graph(
         ),
     )
     # Add the scheduler node if enabled
-    if scheduler_enabled:
+    if team_root and team_root.assistant.scheduler_enabled:
         scheduler_node = SchedulerNode(
             provider=env_settings.ANTHROPIC_PROVIDER,
             model=env_settings.LLM_REASONING_MODEL,
@@ -473,9 +469,9 @@ async def acreate_hierarchical_graph(
             user_id=user_id,
             user_role="user",
             timezone=timezone,
-            assistant_id=assistant_id,
-            team_id=team_id,
-            ask_human=ask_human,
+            assistant_id=team_root.assistant_id,
+            team_id=team_root.id,
+            ask_human=team_root.assistant.ask_human,
         )
 
         tools = scheduler_node.get_scheduler_tools()
@@ -502,7 +498,7 @@ async def acreate_hierarchical_graph(
                 build.add_node(f"{name}-tools", ToolNode(normal_tools))
 
                 # Add HumanNode for tool review if interrupt is True
-                if interrupt:
+                if team_root.assistant.interrupt:
                     human_tool_review_node = create_human_tool_review_node(name)
                     build.add_node(f"{name}-tool-review", human_tool_review_node.work)
                     # No direct edge - HumanNode uses Command(goto=...) for routing
@@ -563,7 +559,14 @@ async def acreate_hierarchical_graph(
                         build.add_edge(f"{name}-tools", name)
 
         elif isinstance(member, GraphLeader):
-            subgraph = await acreate_hierarchical_graph(teams, leader_name=name, checkpointer=checkpointer)
+            subgraph = await acreate_hierarchical_graph(
+                teams,
+                team_root=None,
+                leader_name=name,
+                user_id=user_id,
+                timezone=timezone,
+                checkpointer=checkpointer,
+            )
             enter = partial(enter_chain, team=teams[name])
             build.add_node(
                 name,
@@ -852,14 +855,10 @@ async def generator(
             team_leader = list(teams.keys())[0]
             root = await acreate_hierarchical_graph(
                 teams,
+                team_root=team,
                 leader_name=team_leader,
                 user_id=user_id,
                 timezone=timezone,
-                assistant_id=assistant_id,
-                team_id=team_id,
-                ask_human=ask_human_enabled,
-                interrupt=interrupt_enabled,
-                scheduler_enabled=scheduler_enabled,
                 checkpointer=checkpointer,
             )
             state = {
