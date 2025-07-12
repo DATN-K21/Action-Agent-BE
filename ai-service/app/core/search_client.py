@@ -37,6 +37,12 @@ class SearchError(Exception):
 
 
 class CustomRetriever(BaseRetriever):
+    def _get_relevant_documents(self, query: str):
+        """
+        This method is required by BaseRetriever but is not implemented for sync usage.
+        Please use 'await _aget_relevant_documents(query)' instead.
+        """
+        raise NotImplementedError("Use the async method '_aget_relevant_documents' instead of the sync '_get_relevant_documents'.")
     """Fast, compact search client with async gRPC and connection pooling."""
 
     user_id: str = Field(description="User ID for the search")
