@@ -39,6 +39,7 @@ class PermissionMiddleware {
             const action = PermissionConfig.getPermissionAction(reqMethod, resource);
             try {
                 const foundGrantList = await this.roleService.getPermissionGrantList({});
+                console.log(`Found grants for resource "${resource}":`, foundGrantList);
                 if (!foundGrantList || !foundGrantList.data || !foundGrantList.data.length) {
                     throw new UnauthorizedResponse('Something went wrong', 1000201);
                 }
