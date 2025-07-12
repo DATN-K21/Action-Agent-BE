@@ -30,7 +30,7 @@ const PUBLIC_ENDPOINTS = [
   "/payment/api/v1/payment/confirm",
 
   // AI service public endpoints
-  "/ai/api/v1/callback/extension"
+  "/ai/api/v1/callback/extension/*"
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
@@ -38,7 +38,7 @@ const currentUserMiddleware = async (req, res, next) => {
   req.headers['x-user-email'] = "";
   req.headers['x-user-role'] = "";
 
-  if (PUBLIC_ENDPOINTS.includes(req.path)) {
+  if (PUBLIC_ENDPOINTS.includes(req.path)|| req.path.startsWith('/ai/api/v1/callback/extension')) {
     console.log(`Skip auth middleware public endpoint: ${req.path}`);
     return next();
   }
