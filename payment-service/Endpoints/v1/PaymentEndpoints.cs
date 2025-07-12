@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using payment_service.Dtos;
@@ -42,10 +43,14 @@ public static class PaymentEndpoints
             [FromServices] IPaymentService paymentService,
             [FromServices] IOptions<StripeSettings> stripeOptions) =>
         {
+            request.EnableBuffering();
+
             // 1. Verify signature
-            var json = await new StreamReader(request.Body).ReadToEndAsync();
+            var json = await new StreamReader(request.Body, Encoding.UTF8).ReadToEndAsync();
+            request.Body.Position = 0;
             var signature = request.Headers["Stripe-Signature"];
             Event stripeEvent;
+
             try
             {
                 stripeEvent = EventUtility.ConstructEvent(json, signature, stripeOptions.Value.WebhookSecret);
