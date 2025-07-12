@@ -50,7 +50,7 @@ public static class PaymentEndpoints
             try
             {
                 var signatureHeader = request.Headers["Stripe-Signature"];
-                var stripeEvent = EventUtility.ConstructEvent(json, signatureHeader, webhookSecret, throwOnApiVersionMismatch: false);
+                var stripeEvent = EventUtility.ConstructEvent(json, signatureHeader, webhookSecret);
 
                 // 2. Handle only succeeded intents
                 if (stripeEvent.Type == EventTypes.PaymentIntentSucceeded)
