@@ -376,7 +376,7 @@ async def get_thread_history(
         # Get the thread messages from the latest checkpoint
         checkpoint_tuple = await get_checkpoint_tuples(thread_id)
         messages = convert_checkpoint_tuple_to_messages(checkpoint_tuple) if checkpoint_tuple else []
-        if not messages:
+        if messages is None:
             return ResponseWrapper.wrap(status=404, message="Thread not found")
 
         response_data = GetHistoryResponse(
