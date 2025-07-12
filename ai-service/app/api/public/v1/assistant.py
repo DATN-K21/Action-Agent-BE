@@ -1634,7 +1634,7 @@ async def aget_or_create_general_assistant(
                 user_id=x_user_id,
                 name="General Assistant",
                 description="A helpful general assistant for everyday tasks and conversations.",
-                system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Use your available tools when needed to provide accurate and helpful information.",
+                system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Always leverage to use your available tools when needed to provide accurate and helpful information.",
             )
 
             # Commit the creation

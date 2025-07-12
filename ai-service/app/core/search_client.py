@@ -37,12 +37,47 @@ class SearchError(Exception):
 
 
 class CustomRetriever(BaseRetriever):
-    def _get_relevant_documents(self, query: str):
+    def _get_relevant_documents(self, query: str) -> List[Document]:
         """
-        This method is required by BaseRetriever but is not implemented for sync usage.
-        Please use 'await _aget_relevant_documents(query)' instead.
+        Synchronous wrapper for _aget_relevant_documents. Runs the async method safely in sync context.
+        Avoids asyncio.run() if an event loop is already running (e.g., in FastAPI).
         """
-        raise NotImplementedError("Use the async method '_aget_relevant_documents' instead of the sync '_get_relevant_documents'.")
+        logger.info(f"[SYNC] _get_relevant_documents called with query: {query}")
+        if not query.strip():
+            return []
+
+        MAX_RETRIES = 2
+        async def _run():
+            for attempt in range(MAX_RETRIES):
+                try:
+                    if not self.upload_id:
+                        logger.warning("No upload_id provided, skipping search.")
+                        return []
+                    return await self._aget_relevant_documents(query)
+                except SearchError:
+                    raise
+                except Exception as e:
+                    if attempt == MAX_RETRIES - 1:
+                        logger.error(f"Search failed after {MAX_RETRIES} attempts: {e}")
+                        return []
+                    await asyncio.sleep(0.5 * (attempt + 1))
+            return []
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # If already in an event loop, run the async code in a separate thread
+            import concurrent.futures
+            def runner():
+                return asyncio.run(_run())
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(runner)
+                return future.result()
+        else:
+            return asyncio.run(_run())
     """Fast, compact search client with async gRPC and connection pooling."""
 
     user_id: str = Field(description="User ID for the search")
@@ -84,6 +119,7 @@ class CustomRetriever(BaseRetriever):
 
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
         """Main async search method."""
+        logger.info(f"[ASYNC] _aget_relevant_documents called with query: {query}")
         if not query.strip():
             return []
 

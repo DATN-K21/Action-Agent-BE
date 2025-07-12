@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator, Hashable, Mapping
 from functools import partial
 from typing import Any
 from uuid import uuid4
+from langgraph.errors import GraphRecursionError
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -1054,6 +1055,15 @@ async def generator(
 
             formatted_output = f"data: {response.model_dump_json()}\n\n"
             yield formatted_output
+    except GraphRecursionError as e:
+        response = ChatResponse(
+            type="stop",
+            content="Graph recursion limit exceeded. Please try again with a simpler query.",
+            id=str(uuid4()),
+            name="system",
+        )
+        yield f"data: {response.model_dump_json()}\n\n"
+        await asyncio.sleep(0.1)
     except Exception as e:
         response = ChatResponse(
             type="error", content=str(e), id=str(uuid4()), name="error"
