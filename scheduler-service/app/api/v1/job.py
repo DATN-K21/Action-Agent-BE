@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from croniter import croniter
 from fastapi import APIRouter, Header, HTTPException, Path, Query
@@ -7,13 +7,11 @@ from fastapi import APIRouter, Header, HTTPException, Path, Query
 from app.core import logging
 from app.core.scheduler import scheduler_manager
 from app.models.job import JobStatus, JobType
+from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.job import (
     CronValidationRequest,
     CronValidationResponse,
     JobCreate,
-    JobExecutionResponse,
-    JobResponse,
-    JobRunRequest,
     JobRunResponse,
     JobStats,
     JobUpdate,
@@ -41,7 +39,7 @@ def validate_user_headers(
         )
 
 
-@router.post("/create", response_model=JobResponse, summary="Create Job")
+@router.post("/create", summary="Create Job")
 async def create_job(
     job_data: JobCreate,
     x_user_id=Header(None),
@@ -81,14 +79,15 @@ async def create_job(
             job_data, x_user_id, x_user_role, x_user_timezone
         )
         logger.info(f"Job created: {job.id}")
-        return job
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
 
     except Exception as e:
-        logger.error(f"Failed to create job: {str(e)}")
+        logger.exception(f"Failed to create job: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/get-jobs", response_model=List[JobResponse], summary="List Jobs")
+@router.get("/get-jobs", summary="List Jobs")
 async def list_jobs(
     skip: int = Query(0, ge=0, description="Number of jobs to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of jobs to return"),
@@ -126,14 +125,15 @@ async def list_jobs(
             assistant_id=assistant_id,
             team_id=team_id,
         )
-        return jobs
+
+        return ResponseWrapper.wrap(status=200, data={"jobs": jobs}).to_response()
 
     except Exception as e:
-        logger.error(f"Failed to list jobs: {str(e)}")
+        logger.exception(f"Failed to list jobs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{job_id}", response_model=JobResponse, summary="Get Job")
+@router.get("/{job_id}", summary="Get Job")
 async def get_job(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
@@ -156,17 +156,17 @@ async def get_job(
 
         if job.user_id != x_user_id:
             raise HTTPException(status_code=403, detail="Access denied to this job")
-        
-        return job
-        
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get job {job_id}: {str(e)}")
+        logger.exception(f"Failed to get job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{job_id}/update", response_model=JobResponse, summary="Update Job")
+@router.put("/{job_id}/update", summary="Update Job")
 async def update_job(
     job_update: JobUpdate,
     job_id: str = Path(..., description="Job ID"),
@@ -176,7 +176,7 @@ async def update_job(
 ):
     """
     Update an existing job.
-    
+
     - **job_id**: Unique job identifier
     - **job_update**: Updated job data
     """
@@ -186,22 +186,20 @@ async def update_job(
         # Validate cron expression if provided
         if job_update.cron_expression:
             if not scheduler_manager.is_valid_cron(job_update.cron_expression):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid cron expression"
-                )
-        
+                raise HTTPException(status_code=400, detail="Invalid cron expression")
+
         job = await job_service.update_job(job_id, job_update)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        
+
         logger.info(f"Job updated: {job_id}")
-        return job
-        
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update job {job_id}: {str(e)}")
+        logger.exception(f"Failed to update job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -214,7 +212,7 @@ async def delete_job(
 ):
     """
     Delete a job (soft delete).
-    
+
     - **job_id**: Unique job identifier
     """
     try:
@@ -223,28 +221,30 @@ async def delete_job(
         success = await job_service.delete_job(job_id)
         if not success:
             raise HTTPException(status_code=404, detail="Job not found")
-        
+
         logger.info(f"Job deleted: {job_id}")
-        return {"message": "Job deleted successfully"}
-        
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job deleted successfully")
+        ).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete job {job_id}: {str(e)}")
+        logger.exception(f"Failed to delete job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{job_id}/run", response_model=JobRunResponse, summary="Run Job Now")
+@router.post("/{job_id}/run", summary="Run Job Now")
 async def run_job_now(
     job_id: str = Path(..., description="Job ID"),
-    run_request: Optional[JobRunRequest] = None,
     x_user_id=Header(None),
     x_user_role=Header(None),
     x_user_timezone=Header(None),
 ):
     """
     Manually trigger a job execution.
-    
+
     - **job_id**: Unique job identifier
     - **run_request**: Optional reason for manual execution
     """
@@ -253,114 +253,131 @@ async def run_job_now(
 
         execution_result = await job_service.run_job_now(job_id)
         if not execution_result:
-            raise HTTPException(status_code=404, detail="Job not found or could not be executed")
-        
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be executed"
+            )
+
         logger.info(f"Job triggered manually: {job_id}")
-        return JobRunResponse(
+
+        job_run_response = JobRunResponse(
             success=True,
             message="Job execution triggered successfully",
             execution_id=execution_result.get("execution_id")
             if isinstance(execution_result, dict)
             else str(execution_result),
         )
-        
+
+        return ResponseWrapper.wrap(status=200, data=job_run_response).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to run job {job_id}: {str(e)}")
+        logger.exception(f"Failed to run job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{job_id}/pause", summary="Pause Job")
-async def pause_job(
-    job_id: str = Path(..., description="Job ID")
-):
+async def pause_job(job_id: str = Path(..., description="Job ID")):
     """
     Pause a running job.
-    
+
     - **job_id**: Unique job identifier
     """
     try:
         success = await job_service.pause_job(job_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Job not found or could not be paused")
-        
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be paused"
+            )
+
         logger.info(f"Job paused: {job_id}")
-        return {"message": "Job paused successfully"}
-        
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job paused successfully")
+        ).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to pause job {job_id}: {str(e)}")
+        logger.exception(f"Failed to pause job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{job_id}/resume", summary="Resume Job")
-async def resume_job(
-    job_id: str = Path(..., description="Job ID")
-):
+async def resume_job(job_id: str = Path(..., description="Job ID")):
     """
     Resume a paused job.
-    
+
     - **job_id**: Unique job identifier
     """
     try:
         success = await job_service.resume_job(job_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Job not found or could not be resumed")
-        
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be resumed"
+            )
+
         logger.info(f"Job resumed: {job_id}")
-        return {"message": "Job resumed successfully"}
-        
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job resumed successfully")
+        ).to_response()
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to resume job {job_id}: {str(e)}")
+        logger.exception(f"Failed to resume job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{job_id}/executions", response_model=List[JobExecutionResponse], summary="Get Job Executions")
+@router.get("/{job_id}/executions", summary="Get Job Executions")
 async def get_job_executions(
     job_id: str = Path(..., description="Job ID"),
     skip: int = Query(0, ge=0, description="Number of executions to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of executions to return")
+    limit: int = Query(
+        100, ge=1, le=1000, description="Number of executions to return"
+    ),
 ):
     """
     Get execution history for a job.
-    
+
     - **job_id**: Unique job identifier
     - **skip**: Number of executions to skip for pagination
     - **limit**: Maximum number of executions to return
     """
     try:
         executions = await job_service.get_job_executions(job_id, skip, limit)
-        return executions
-        
+
+        return ResponseWrapper.wrap(status=200, data=executions).to_response()
+
     except Exception as e:
-        logger.error(f"Failed to get executions for job {job_id}: {str(e)}")
+        logger.exception(f"Failed to get executions for job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/validate-cron", response_model=CronValidationResponse, summary="Validate Cron Expression")
-async def validate_cron(
-    request: CronValidationRequest
-):
+@router.post("/validate-cron", summary="Validate Cron Expression")
+async def validate_cron(request: CronValidationRequest):
     """
     Validate a cron expression and get next run times.
-    
+
     - **cron_expression**: Cron expression to validate
     - **timezone**: Timezone for validation (default: UTC)
     """
     try:
         is_valid = scheduler_manager.is_valid_cron(request.cron_expression)
-        
+
         if not is_valid:
-            return CronValidationResponse(
+            validation_response = CronValidationResponse(
                 is_valid=False,
                 error_message="Invalid cron expression format",
                 next_run_times=[],
             )
-        
+
+            return ResponseWrapper.wrap(
+                status=400,
+                message="Cron expression validation failed",
+            ).to_response()
+
         # Get next 5 run times
         next_runs = []
         try:
@@ -369,17 +386,19 @@ async def validate_cron(
                 next_runs.append(cron.get_next(datetime))
         except Exception:
             pass
-        
-        return CronValidationResponse(
+
+        validation_response = CronValidationResponse(
             is_valid=True, error_message=None, next_run_times=next_runs
         )
-        
+
+        return ResponseWrapper.wrap(status=200, data=validation_response).to_response()
+
     except Exception as e:
-        logger.error(f"Failed to validate cron expression: {str(e)}")
+        logger.exception(f"Failed to validate cron expression: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/stats/overview", response_model=JobStats, summary="Get Job Statistics")
+@router.get("/stats/overview", summary="Get Job Statistics")
 async def get_job_stats():
     """
     Get overview statistics for all jobs.
@@ -387,16 +406,18 @@ async def get_job_stats():
     try:
         # This would be implemented with proper database queries
         # For now, returning mock data
-        return JobStats(
+        stats = JobStats(
             total_jobs=0,
             active_jobs=0,
             paused_jobs=0,
             failed_jobs=0,
             total_executions=0,
             successful_executions=0,
-            failed_executions=0
+            failed_executions=0,
         )
-        
+
+        return ResponseWrapper.wrap(status=200, data=stats).to_response()
+
     except Exception as e:
-        logger.error(f"Failed to get job stats: {str(e)}")
+        logger.exception(f"Failed to get job stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

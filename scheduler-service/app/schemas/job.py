@@ -4,6 +4,7 @@ from typing import Dict, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.job import JobStatus, JobType
+from app.schemas.base import BaseRequest, BaseResponse
 
 
 class JobBase(BaseModel):
@@ -18,7 +19,7 @@ class JobBase(BaseModel):
     timeout_seconds: int = Field(default=300, description="Job timeout in seconds")
 
 
-class JobCreate(JobBase):
+class JobCreate(JobBase, BaseRequest):
     """Schema for creating a new job."""
     job_type: JobType = Field(..., description="Job type (one_time or recurring)")
     cron_expression: Optional[str] = Field(None, description="Cron expression for recurring jobs")
@@ -47,7 +48,7 @@ class JobCreate(JobBase):
     )
 
 
-class JobUpdate(BaseModel):
+class JobUpdate(BaseRequest):
     """Schema for updating a job."""
     name: Optional[str] = Field(None, description="Job name")
     description: Optional[str] = Field(None, description="Job description")
@@ -62,7 +63,7 @@ class JobUpdate(BaseModel):
     is_active: Optional[bool] = Field(None, description="Whether job is active")
 
 
-class JobResponse(JobBase):
+class JobResponse(JobBase, BaseResponse):
     """Schema for job response."""
     id: str = Field(..., description="Job ID")
     job_type: JobType = Field(..., description="Job type")
@@ -82,7 +83,7 @@ class JobResponse(JobBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class JobExecutionResponse(BaseModel):
+class JobExecutionResponse(BaseResponse):
     """Schema for job execution response."""
     id: str = Field(..., description="Execution ID")
     job_id: str = Field(..., description="Job ID")
@@ -100,7 +101,7 @@ class JobExecutionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class JobStats(BaseModel):
+class JobStats(BaseResponse):
     """Schema for job statistics."""
     total_jobs: int = Field(..., description="Total number of jobs")
     active_jobs: int = Field(..., description="Number of active jobs")
@@ -111,25 +112,25 @@ class JobStats(BaseModel):
     failed_executions: int = Field(..., description="Failed executions")
 
 
-class CronValidationRequest(BaseModel):
+class CronValidationRequest(BaseRequest):
     """Schema for cron expression validation."""
     cron_expression: str = Field(..., description="Cron expression to validate")
     timezone: str = Field(default="UTC", description="Timezone for validation")
 
 
-class CronValidationResponse(BaseModel):
+class CronValidationResponse(BaseResponse):
     """Schema for cron validation response."""
     is_valid: bool = Field(..., description="Whether cron expression is valid")
     error_message: Optional[str] = Field(None, description="Error message if invalid")
     next_run_times: Optional[list[datetime]] = Field(None, description="Next 5 run times")
 
 
-class JobRunRequest(BaseModel):
+class JobRunRequest(BaseRequest):
     """Schema for manual job execution request."""
     reason: Optional[str] = Field(None, description="Reason for manual execution")
 
 
-class JobRunResponse(BaseModel):
+class JobRunResponse(BaseResponse):
     """Schema for job run response."""
     success: bool = Field(..., description="Whether job was triggered successfully")
     message: str = Field(..., description="Response message")

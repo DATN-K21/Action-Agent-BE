@@ -1,52 +1,53 @@
 import logging
 import sys
-from typing import Any, Dict
 
 import structlog
+from structlog.stdlib import BoundLogger
+
+from app.core.settings import env_settings
 
 
-def configure_logging(log_level: str = "INFO") -> None:
-    """Configure structured logging for the application."""
-    
-    # Configure stdlib logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, log_level.upper()),
-    )
+def configure_logging():
+    """Configures structured logging with clean, colored, non-duplicated logs"""
 
-    # Configure structlog
+    # Clear any existing handlers
+    logging.root.handlers.clear()
+
+    # Disable Uvicorn default loggers to prevent duplicate logs
+    uvicorn_loggers = ["uvicorn", "uvicorn.access", "uvicorn.error"]
+    for name in uvicorn_loggers:
+        uvicorn_logger = logging.getLogger(name)
+        uvicorn_logger.handlers.clear()
+        uvicorn_logger.propagate = False  # Important to prevent bubble-up
+
+    # Disable HTTP request logs from external libraries
+    http_loggers = ["httpx", "httpcore", "apscheduler"]
+    for name in http_loggers:
+        http_logger = logging.getLogger(name)
+        http_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+        http_logger.propagate = False
+
     structlog.configure(
         processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
             structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.add_logger_name,
+            structlog.processors.ExceptionPrettyPrinter(),
+            structlog.dev.ConsoleRenderer(colors=True),
         ],
-        context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
+        wrapper_class=structlog.make_filtering_bound_logger(env_settings.LOG_LEVEL),
+        context_class=dict,
     )
 
+    # Ensure standard logging uses structlog
+    handler = logging.StreamHandler(sys.stdout)
+    logging.basicConfig(
+        format="%(message)s", level=env_settings.LOG_LEVEL, handlers=[handler]
+    )
+    logging.getLogger().handlers = [handler]
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Get a structured logger instance."""
+
+def get_logger(name: str) -> BoundLogger:
+    """Get a logger instance."""
     return structlog.get_logger(name)
-
-
-def log_request(request_data: Dict[str, Any]) -> None:
-    """Log incoming request data."""
-    logger = get_logger("request")
-    logger.info("Incoming request", **request_data)
-
-
-def log_response(response_data: Dict[str, Any]) -> None:
-    """Log outgoing response data."""
-    logger = get_logger("response")
-    logger.info("Outgoing response", **response_data)

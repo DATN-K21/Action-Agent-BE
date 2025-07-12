@@ -1,21 +1,14 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 from app.core.database import get_db_health
 from app.core.scheduler import scheduler_manager
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.health import DatabaseHealthResponse, HealthResponse
 
 router = APIRouter()
 
 
-class HealthResponse(BaseModel):
-    """Health check response schema."""
-    status: str
-    scheduler_running: bool
-    database_status: str
-    message: str
-
-
-@router.get("/", response_model=HealthResponse, summary="Health Check")
+@router.get("/", summary="Health Check")
 async def health_check():
     """
     Health check endpoint for the scheduler service.
@@ -25,11 +18,17 @@ async def health_check():
     
     overall_healthy = scheduler_running and db_health["status"] == "healthy"
     
-    return HealthResponse(
+    health_data = HealthResponse(
         status="healthy" if overall_healthy else "unhealthy",
         scheduler_running=scheduler_running,
         database_status=db_health["status"],
         message="All services are running" if overall_healthy else "Some services are not running properly"
+    )
+    
+    return ResponseWrapper.wrap(
+        status=200 if overall_healthy else 503,
+        data=health_data,
+        message="Health check completed"
     )
 
 
@@ -38,7 +37,11 @@ async def ping():
     """
     Simple ping endpoint.
     """
-    return {"message": "pong"}
+    return ResponseWrapper.wrap(
+        status=200,
+        data=MessageResponse(message="pong"),
+        message="Ping successful"
+    )
 
 
 @router.get("/database", summary="Database Health Check")
@@ -46,4 +49,16 @@ async def database_health():
     """
     Detailed database health check endpoint.
     """
-    return await get_db_health()
+    db_health = await get_db_health()
+    
+    health_data = DatabaseHealthResponse(
+        status=db_health["status"],
+        message=db_health.get("message"),
+        connection_count=db_health.get("connection_count")
+    )
+    
+    return ResponseWrapper.wrap(
+        status=200 if db_health["status"] == "healthy" else 503,
+        data=health_data,
+        message="Database health check completed"
+    )

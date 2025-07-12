@@ -1,14 +1,11 @@
-from app.core import logging
-
-logging.configure_logging()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.base import router
+from app.core import exceptions, logging, swagger
 from app.core.lifespan import lifespan
-from app.core.settings import env_settings
 
+logging.configure_logging()
 logger = logging.get_logger(__name__)
 
 app = FastAPI(
@@ -30,14 +27,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Set custom OpenAPI schema
+
+swagger.set_custom_openapi(app)
+
+# Register exception handlers
+exceptions.register_exception_handlers(app)
+
 # Include routers
 app.include_router(router)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host=env_settings.HOST,
-        port=env_settings.PORT,
-        reload=env_settings.DEBUG_SERVER,
-    )
