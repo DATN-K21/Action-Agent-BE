@@ -52,7 +52,7 @@ const currentUserMiddleware = async (req, res, next) => {
 
   try {
     const response = await axiosInstance.get(`${ENDPOINT_CONFIGS.USER_SERVICE_URL}/api/v1/user/me`, {
-      headers: { Authorization: authHeader, 'x-client-id': req.headers['x-client-id'] },
+      headers: { Authorization: authHeader },
     });
 
     const userData = response.data;
