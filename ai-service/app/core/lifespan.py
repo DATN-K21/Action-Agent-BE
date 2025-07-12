@@ -1,4 +1,3 @@
-import asyncio
 import socket
 from contextlib import asynccontextmanager
 
@@ -28,11 +27,9 @@ async def lifespan(app: FastAPI):
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
         # Setup database, PostgreSQL connection pool, and gRPC pool in parallel
-        await asyncio.gather(
-            _setup_database(),
-            AsyncPostgresPool.asetup(),
-            configure_grpc_pool(max_channels=20, channel_ttl=600.0),
-        )
+        await _setup_database()
+        await AsyncPostgresPool.asetup()
+        await configure_grpc_pool(max_channels=20, channel_ttl=600.0)
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()
