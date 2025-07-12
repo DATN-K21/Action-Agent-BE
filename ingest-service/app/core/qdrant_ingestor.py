@@ -119,8 +119,8 @@ class LCQdrantIngestor:
     def delete_upload(self, upload_id: str, user_id: str) -> bool:
         filt = rest.Filter(
             must=[
-                rest.FieldCondition(key="user_id", match=rest.MatchValue(value=user_id)),
-                rest.FieldCondition(key="upload_id", match=rest.MatchValue(value=upload_id)),
+                rest.FieldCondition(key="metadata.user_id", match=rest.MatchValue(value=user_id)),
+                rest.FieldCondition(key="metadata.upload_id", match=rest.MatchValue(value=upload_id)),
             ]
         )
         _run(self._vs_lazy().delete, filter=filt)
