@@ -544,7 +544,8 @@ class AccessService {
 
             const templatePath = path.join(__dirname, "../..", "templates", "accountActivation.html");
             let activationMessage = await fs.readFile(templatePath, "utf8");
-            activationMessage = activationMessage.replace("{{activationLink}}", `${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}`);
+            const realActivationLink = `${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}`;
+            activationMessage = activationMessage.replace(/\{\{activationLink\}\}/g, realActivationLink);
 
             const sendEmailResult = await emailHelper.sendEmail({
                 from: emailConfig.user,
