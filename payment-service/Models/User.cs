@@ -8,9 +8,10 @@ public class User
 {
     [BsonId]
     public ObjectId Id { get; set; }
-    
+
     [BsonElement("balance")]
-    public decimal Balance { get; set; }
-    
+    [BsonRepresentation(BsonType.Int64)]
+    public long Balance { get; set; }
+
     // ...
 }
