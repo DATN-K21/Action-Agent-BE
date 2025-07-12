@@ -12,6 +12,7 @@ from langchain_core.runnables import (
 from langchain_core.tools import BaseTool, StructuredTool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import add_messages
+from langgraph.types import Command
 from typing_extensions import NotRequired, TypedDict
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
@@ -793,20 +794,16 @@ class ToolEvaluationNode(BaseNode):
             },
         }
 
-    async def evaluate_tool_call(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+    async def evaluate_tool_call(self, state: GraphTeamState, config: RunnableConfig) -> Command[str]:
         """Evaluate if a tool call requires human approval"""
 
         # Get the last message which should contain the tool call
         last_message = state["messages"][-1] if state["messages"] else None
 
         if not last_message or not isinstance(last_message, AIMessage) or not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-            # No tool call to evaluate, return as is
-            return {
-                "messages": state["messages"],
-                "history": state["history"],
-                "all_messages": state["all_messages"],
-                "next": self.routes.get("execute_directly", "run_tool"),
-            }
+            # No tool call to evaluate, continue to direct execution
+            next_node = self.routes.get("execute_directly", "run_tool")
+            return Command(goto=next_node)
 
         tool_call = last_message.tool_calls[-1]  # Evaluate the first tool call
         tool_name = tool_call.get("name", "unknown")
@@ -838,9 +835,8 @@ class ToolEvaluationNode(BaseNode):
             result = await evaluation_chain.ainvoke(state, config)
         except Exception:
             # If evaluation fails, default to requiring human approval for safety
-            return {
-                "next": self.routes.get("require_human_approval", "human_review"),
-            }
+            next_node = self.routes.get("require_human_approval", "human_review")
+            return Command(goto=next_node)
 
         # Handle the evaluation result
         if not isinstance(result, dict):
@@ -850,10 +846,6 @@ class ToolEvaluationNode(BaseNode):
                 result = {"decision": "REQUIRE_HUMAN_APPROVAL"}
 
         decision = result.get("decision", "REQUIRE_HUMAN_APPROVAL")
-        reasoning = result.get("reasoning", "Default safety decision")
-
-        # Create a message with the evaluation result
-        evaluation_message = AIMessage(content=f"Tool evaluation: {decision}. Reasoning: {reasoning}", name="tool-evaluator")
 
         # Route based on decision
         if decision == "EXECUTE_DIRECTLY":
@@ -861,11 +853,8 @@ class ToolEvaluationNode(BaseNode):
         else:
             next_node = self.routes.get("require_human_approval", "human_review")
 
-        return {
-            "all_messages": state["all_messages"] + [evaluation_message],
-            "next": next_node,
-        }
+        return Command(goto=next_node)
 
-    async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> Command[str]:
         """Main work method that delegates to evaluate_tool_call"""
         return await self.evaluate_tool_call(state, config)

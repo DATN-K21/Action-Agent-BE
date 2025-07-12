@@ -1699,7 +1699,7 @@ async def acreate_advanced_assistant(
             temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=request.ask_human if request.ask_human is not None else True,
             interrupt=request.interrupt if request.interrupt is not None else True,
-            enable_scheduler=request.scheduler_enabled if request.scheduler_enabled is not None else False,
+            scheduler_enabled=request.scheduler_enabled if request.scheduler_enabled is not None else False,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams

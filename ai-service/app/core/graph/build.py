@@ -8,7 +8,7 @@ from uuid import uuid4
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.config import RunnableConfig
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
@@ -334,9 +334,9 @@ def should_continue(state: GraphTeamState) -> str:
 
 
 def create_tools_condition(
-        current_member_name: str,
-        next_member_name: str,
-        tools: list[GraphSkill | GraphUpload],
+    current_member_name: str,
+    next_member_name: str,
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges
     The tool node must be in format: '{current_member_name}-tools'
@@ -362,7 +362,7 @@ def create_tools_condition(
 def create_tools_condition_with_human_review(
     current_member_name: str,
     next_member_name: str,
-    tools: list[GraphSkill | GraphUpload],
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges with human review capabilities
     The tool review node must be in format: '{current_member_name}-tool-review'
@@ -390,7 +390,7 @@ def create_tools_condition_with_human_review(
 def create_tools_condition_with_tool_evaluation(
     current_member_name: str,
     next_member_name: str,
-    tools: list[GraphSkill | GraphUpload],
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges with intelligent tool evaluation
     The tool evaluation node must be in format: '{current_member_name}-tool-evaluation'
@@ -516,17 +516,17 @@ async def acreate_hierarchical_graph(
             ask_human=team_root.assistant.ask_human,
         )
 
-        tools = scheduler_node.get_scheduler_tools()
+        scheduler_tools = scheduler_node.get_scheduler_tools()
         build.add_node(
             "hierarchical-scheduler",
             RunnableLambda(scheduler_node.work),
         )
 
-        if tools:
+        if scheduler_tools:
             name = "hierarchical-scheduler"
             normal_tools: list[BaseTool] = []
 
-            for tool in tools:
+            for tool in scheduler_tools:
                 if tool.name == "ask-human":
                     # Handling Ask-Human tool with HumanNode for context input
                     human_context_node = create_human_review_node(name, "context_input", {"continue": name})
@@ -541,20 +541,34 @@ async def acreate_hierarchical_graph(
 
                 # Add HumanNode for tool review if interrupt is True
                 if team_root.assistant.interrupt:
-                    use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
-                    if use_tool_evaluation:
-                        # Add ToolEvaluationNode for intelligent tool assessment
-                        tool_evaluation_node = create_tool_evaluation_node(name)
-                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
-
+                    # Add ToolEvaluationNode for intelligent tool assessment
+                    tool_evaluation_node = create_tool_evaluation_node(name)
+                    build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                     # Add HumanNode for tool review if member.interrupt is True
                     human_tool_review_node = create_human_tool_review_node(name)
                     build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+                    # No conditional edge needed - ToolEvaluationNode uses Command(goto=...) for routing
                     # No direct edge - HumanNode uses Command(goto=...) for routing
                     build.add_edge(f"{name}-tools", name)
                 else:
                     # Direct connection without review
                     build.add_edge(f"{name}-tools", name)
+
+            # Add conditional edges for the scheduler
+            if team_root.assistant.interrupt:
+                # Route to tool evaluation node for intelligent assessment
+                build.add_conditional_edges(
+                    name,
+                    should_continue,
+                    create_tools_condition_with_tool_evaluation(name, leader_name, list(scheduler_tools)),
+                )
+            else:
+                # Direct routing without human review
+                build.add_conditional_edges(
+                    name,
+                    should_continue,
+                    create_tools_condition(name, leader_name, list(scheduler_tools)),
+                )
     # Add the final answer node
     build.add_node(
         "hierarchical-final-answer",
@@ -598,15 +612,14 @@ async def acreate_hierarchical_graph(
                     build.add_node(f"{name}-tools", ToolNode(normal_tools))
 
                     if member.interrupt:
-                        use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
-                        if use_tool_evaluation:
-                            # Add ToolEvaluationNode for intelligent tool assessment
-                            tool_evaluation_node = create_tool_evaluation_node(name)
-                            build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
-
+                        # Add ToolEvaluationNode for intelligent tool assessment
+                        tool_evaluation_node = create_tool_evaluation_node(name)
+                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                         # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+
+                        # No conditional edge needed - ToolEvaluationNode uses Command(goto=...) for routing
                         # No direct edge - HumanNode uses Command(goto=...) for routing
                         build.add_edge(f"{name}-tools", name)
                     else:
@@ -632,29 +645,19 @@ async def acreate_hierarchical_graph(
 
         # Create conditional edges with enhanced routing for HumanNode interrupts or tool evaluation
         if isinstance(member, GraphMember) and member.tools:
-            use_tool_evaluation = getattr(team_root, "tool_evaluation_enabled", False) if team_root else False
-
             if member.interrupt:
-                if use_tool_evaluation:
-                    # Route to tool evaluation node for intelligent assessment
-                    build.add_conditional_edges(
-                        name,
-                        should_continue,
-                        create_tools_condition_with_tool_evaluation(name, leader_name, member.tools),
-                    )
-
-                # Route to human review node first, then to tools
+                # Route to tool evaluation node for intelligent assessment
                 build.add_conditional_edges(
                     name,
                     should_continue,
-                    create_tools_condition_with_human_review(name, leader_name, member.tools),
+                    create_tools_condition_with_tool_evaluation(name, leader_name, list(member.tools)),
                 )
             else:
                 # Direct routing without human review
                 build.add_conditional_edges(
                     name,
                     should_continue,
-                    create_tools_condition(name, leader_name, member.tools),
+                    create_tools_condition(name, leader_name, list(member.tools)),
                 )
         else:
             build.add_edge(name, leader_name)
@@ -735,14 +738,14 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                     graph.add_conditional_edges(
                         previous_member.name,
                         should_continue,
-                        create_tools_condition_with_human_review(previous_member.name, member.name, previous_member.tools),
+                        create_tools_condition_with_human_review(previous_member.name, member.name, list(previous_member.tools)),
                     )
                 else:
                     # Direct routing without human review
                     graph.add_conditional_edges(
                         previous_member.name,
                         should_continue,
-                        create_tools_condition(previous_member.name, member.name, previous_member.tools),
+                        create_tools_condition(previous_member.name, member.name, list(previous_member.tools)),
                     )
             else:
                 graph.add_edge(previous_member.name, member.name)
@@ -755,14 +758,14 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
             graph.add_conditional_edges(
                 final_member.name,
                 should_continue,
-                create_tools_condition_with_human_review(final_member.name, END, final_member.tools),
+                create_tools_condition_with_human_review(final_member.name, END, list(final_member.tools)),
             )
         else:
             # Direct routing without human review
             graph.add_conditional_edges(
                 final_member.name,
                 should_continue,
-                create_tools_condition(final_member.name, END, final_member.tools),
+                create_tools_condition(final_member.name, END, list(final_member.tools)),
             )
     else:
         graph.add_edge(final_member.name, END)
@@ -839,14 +842,14 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
             graph.add_conditional_edges(
                 member.name,
                 should_continue,
-                create_tools_condition_with_human_review(member.name, END, member.tools),
+                create_tools_condition_with_human_review(member.name, END, list(member.tools)),
             )
         else:
             # Direct routing without human review
             graph.add_conditional_edges(
                 member.name,
                 should_continue,
-                create_tools_condition(member.name, END, member.tools),
+                create_tools_condition(member.name, END, list(member.tools)),
             )
     else:
         graph.add_edge(member.name, END)
@@ -911,11 +914,6 @@ async def generator(
         response: Any = None
         interrupt_name = None
         if team.workflow_type == WorkflowType.HIERARCHICAL:
-            assistant_id = team.assistant_id
-            team_id = team.id
-            ask_human_enabled = team.assistant.ask_human
-            interrupt_enabled = team.assistant.interrupt
-            scheduler_enabled = team.assistant.scheduler_enabled
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
             root = await acreate_hierarchical_graph(
