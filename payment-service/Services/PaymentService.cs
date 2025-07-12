@@ -49,7 +49,7 @@ public class PaymentService : IPaymentService
         try
         {
             var validation = await ValidateUserExistsAsync(userId, amountUsd);
-            if (validation is not null) 
+            if (validation is not null)
                 return validation;
 
             // 1) create Stripe PaymentIntent
@@ -105,8 +105,8 @@ public class PaymentService : IPaymentService
             if (payment is null)
                 return new ConfirmPaymentResponse(404, false, "Payment record not found");
 
-            if (payment.Status == PaymentStatus.Created)
-                return new ConfirmPaymentResponse(200, true, "Already processed");
+            if (payment.Status == PaymentStatus.Confirmed || payment.Status == PaymentStatus.Refunded)
+                return new ConfirmPaymentResponse(200, true, "Already confirmed or refunded");
 
             // 2) retrieve intent from Stripe
             var intent = await _stripeIntentService.GetAsync(paymentIntentId);
