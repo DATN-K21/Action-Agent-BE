@@ -31,7 +31,8 @@ public static class PaymentEndpoints
             {
                 return Results.StatusCode(403);
             }
-            var response = await paymentService.CreatePaymentIntentAsync(req.UserId, req.AmountUsd);
+
+            var response = await paymentService.CreatePaymentIntentAsync(req.UserId, req.AmountUsd, new List<string> { "card" });
             return response.ToResponse();
         });
 
