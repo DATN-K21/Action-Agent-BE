@@ -52,7 +52,9 @@ public static class PaymentEndpoints
             }
             catch
             {
-                return new ConfirmPaymentResponse(400, false, "Invalid Stripe signature").ToResponse();
+                Console.WriteLine($"Raw JSON: {json}");
+                Console.WriteLine($"Invalid Stripe signature. Environment: {stripeOptions.Value.WebhookSecret}, Signature: {signature}");
+                return new ConfirmPaymentResponse(200, false, "Invalid Stripe signature").ToResponse();
             }
 
             // 2. Handle only succeeded intents
