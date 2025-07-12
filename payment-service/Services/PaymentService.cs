@@ -57,7 +57,7 @@ public class PaymentService : IPaymentService
             {
                 Amount = (long)(amountUsd * 100),
                 Currency = _stripeSettings.Currency,
-                AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true }
+                PaymentMethodTypes = new List<string> { "card" }
             };
 
             var idempotencyKey = $"{userId}-{Guid.NewGuid()}";
