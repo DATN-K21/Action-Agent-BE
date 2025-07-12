@@ -28,6 +28,10 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
         None,
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
     )
+    scheduler_enabled: Optional[bool] = Field(
+        False,
+        description="Whether scheduler functionality is enabled for this assistant. If true, the assistant can create and manage scheduled tasks.",
+    )
     support_units: Optional[list[WorkflowType]] = Field(
         None,
         description="List of units (teams) to be used by the assistant. If not provided, the assistant will not use any units.",
@@ -58,6 +62,10 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
         None,
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
     )
+    scheduler_enabled: Optional[bool] = Field(
+        None,
+        description="Whether scheduler functionality is enabled for this assistant.",
+    )
     support_units: Optional[list[WorkflowType]] = None
     mcp_ids: Optional[list[str]] = None
     extension_ids: Optional[list[str]] = None
@@ -76,11 +84,16 @@ class UpdateAssistantConfigRequest(BaseRequest):
         None,
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
     )
+    scheduler_enabled: Optional[bool] = Field(
+        None,
+        description="Whether scheduler functionality is enabled for this assistant.",
+    )
 
 
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
+
 
 class CreateAdvancedAssistantResponse(BaseResponse):
     id: str
@@ -99,6 +112,10 @@ class CreateAdvancedAssistantResponse(BaseResponse):
     interrupt: Optional[bool] = Field(
         None,
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
+    )
+    scheduler_enabled: Optional[bool] = Field(
+        None,
+        description="Whether scheduler functionality is enabled for this assistant.",
     )
     main_unit: WorkflowType
     support_units: Optional[list[WorkflowType]]  # unit alias team in this case

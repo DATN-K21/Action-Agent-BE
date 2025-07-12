@@ -24,41 +24,26 @@ router = APIRouter(prefix="/mcp", tags=["Connected MCP"])
 
 
 @router.get("/get-all", summary="Get all connected mcps of a user.", response_model=ResponseWrapper[GetConnectedMcpsResponse])
-async def aget_all(session: SessionDep, paging: PagingRequest = Depends(), x_user_id: str = Header(None), x_user_role: str = Header(None)):
+async def aget_all(session: SessionDep, paging: PagingRequest = Depends(), x_user_id: str = Header(None)):
     try:
         page_number = paging.page_number if paging else 1
         max_per_page = paging.max_per_page if paging else 10
 
-        if x_user_role == "admin" or x_user_role == "super_admin":
-            # COUNT total connected mcps
-            count_stmt = select(func.count(ConnectedMcp.id)).where(
-                ConnectedMcp.is_deleted.is_(False),
-            )
+        count_stmt = select(func.count(ConnectedMcp.id)).where(
+            ConnectedMcp.user_id == x_user_id,
+            ConnectedMcp.is_deleted.is_(False),
+        )
 
-            statement = (
-                select(ConnectedMcp)
-                .where(ConnectedMcp.is_deleted.is_(False))
-                .offset((page_number - 1) * max_per_page)
-                .limit(max_per_page)
-                .order_by(ConnectedMcp.created_at.desc())
-            )
-
-        else:
-            count_stmt = select(func.count(ConnectedMcp.id)).where(
+        statement = (
+            select(ConnectedMcp)
+            .where(
                 ConnectedMcp.user_id == x_user_id,
                 ConnectedMcp.is_deleted.is_(False),
             )
-
-            statement = (
-                select(ConnectedMcp)
-                .where(
-                    ConnectedMcp.user_id == x_user_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .offset((page_number - 1) * max_per_page)
-                .limit(max_per_page)
-                .order_by(ConnectedMcp.created_at.desc())
-            )
+            .offset((page_number - 1) * max_per_page)
+            .limit(max_per_page)
+            .order_by(ConnectedMcp.created_at.desc())
+        )
 
         count_result = await session.execute(count_stmt)
         count = count_result.scalar_one()
@@ -95,7 +80,6 @@ async def acreate(
     session: SessionDep,
     request: CreateConnectedMcpRequest,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
         connected_mcp = ConnectedMcp(
@@ -129,28 +113,17 @@ async def aget_detail(
     session: SessionDep,
     connected_mcp_id: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
-        if x_user_role in ["admin", "super_admin"]:
-            statement = (
-                select(ConnectedMcp)
-                .where(
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .limit(1)
+        statement = (
+            select(ConnectedMcp)
+            .where(
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedMcp)
-                .where(
-                    ConnectedMcp.user_id == x_user_id,
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_mcp = result.scalar_one_or_none()
@@ -186,28 +159,17 @@ async def aupdate(
     connected_mcp_id: str,
     request: UpdateConnectedMcpRequest,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
-        if x_user_role in ["admin", "super_admin"]:
-            statement = (
-                update(ConnectedMcp)
-                .where(
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .values(**request.model_dump(exclude_unset=True))
+        statement = (
+            update(ConnectedMcp)
+            .where(
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                update(ConnectedMcp)
-                .where(
-                    ConnectedMcp.user_id == x_user_id,
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .values(**request.model_dump(exclude_unset=True))
-            )
+            .values(**request.model_dump(exclude_unset=True))
+        )
 
         result = await session.execute(statement)
 
@@ -217,18 +179,11 @@ async def aupdate(
 
         await session.commit()
 
-        # Fetch the updated record
-        if x_user_role in ["admin", "super_admin"]:
-            fetch_statement = select(ConnectedMcp).where(
-                ConnectedMcp.id == connected_mcp_id,
-                ConnectedMcp.is_deleted.is_(False),
-            )
-        else:
-            fetch_statement = select(ConnectedMcp).where(
-                ConnectedMcp.user_id == x_user_id,
-                ConnectedMcp.id == connected_mcp_id,
-                ConnectedMcp.is_deleted.is_(False),
-            )
+        fetch_statement = select(ConnectedMcp).where(
+            ConnectedMcp.user_id == x_user_id,
+            ConnectedMcp.id == connected_mcp_id,
+            ConnectedMcp.is_deleted.is_(False),
+        )
 
         fetch_result = await session.execute(fetch_statement)
         connecte_mcp = fetch_result.scalar_one_or_none()
@@ -255,34 +210,21 @@ async def adelete(
     session: SessionDep,
     connected_mcp_id: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
-        if x_user_role in ["admin", "super_admin"]:
-            statement = (
-                update(ConnectedMcp)
-                .where(
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .values(
-                    is_deleted=True,
-                    deleted_at=datetime.now(),
-                )
+       
+        statement = (
+            update(ConnectedMcp)
+            .where(
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                update(ConnectedMcp)
-                .where(
-                    ConnectedMcp.user_id == x_user_id,
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .values(
-                    is_deleted=True,
-                    deleted_at=datetime.now(),
-                )
+            .values(
+                is_deleted=True,
+                deleted_at=datetime.now(),
             )
+        )
 
         # Execute the update statement
         await session.execute(statement)
@@ -307,29 +249,18 @@ async def aget_tool_infos(
     session: SessionDep,
     connected_mcp_id: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
         # Check if the connected MCP exists and user has access
-        if x_user_role in ["admin", "super_admin"]:
-            statement = (
-                select(ConnectedMcp)
-                .where(
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .limit(1)
+        statement = (
+            select(ConnectedMcp)
+            .where(
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.id == connected_mcp_id,
+                ConnectedMcp.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedMcp)
-                .where(
-                    ConnectedMcp.user_id == x_user_id,
-                    ConnectedMcp.id == connected_mcp_id,
-                    ConnectedMcp.is_deleted.is_(False),
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_mcp = result.scalar_one_or_none()

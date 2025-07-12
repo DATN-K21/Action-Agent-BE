@@ -22,6 +22,7 @@ from app.core.graph.members import (
     GraphTeam,
     GraphTeamState,
     LeaderNode,
+    SchedulerNode,
     SequentialWorkerNode,
     SummariserNode,
     WorkerNode,
@@ -426,6 +427,13 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
 async def acreate_hierarchical_graph(
     teams: dict[str, GraphTeam],
     leader_name: str,
+    user_id: str | None = None,
+    timezone: str | None = None,
+    assistant_id: str | None = None,
+    team_id: str | None = None,
+    ask_human: bool = False,
+    interrupt: bool = False,
+    scheduler_enabled: bool = False,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph:
     """Create the team's graph with manual interrupt capabilities using HumanNode.
@@ -456,6 +464,53 @@ async def acreate_hierarchical_graph(
             ).delegate  # type: ignore[arg-type]
         ),
     )
+    # Add the scheduler node if enabled
+    if scheduler_enabled:
+        scheduler_node = SchedulerNode(
+            provider=env_settings.ANTHROPIC_PROVIDER,
+            model=env_settings.LLM_REASONING_MODEL,
+            temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+            user_id=user_id,
+            user_role="user",
+            timezone=timezone,
+            assistant_id=assistant_id,
+            team_id=team_id,
+            ask_human=ask_human,
+        )
+
+        tools = scheduler_node.get_scheduler_tools()
+        build.add_node(
+            "hierarchical-scheduler",
+            RunnableLambda(scheduler_node.work),
+        )
+
+        if tools:
+            name = "hierarchical-scheduler"
+            normal_tools: list[BaseTool] = []
+
+            for tool in tools:
+                if tool.name == "ask-human":
+                    # Handling Ask-Human tool with HumanNode for context input
+                    human_context_node = create_human_review_node(name, "context_input", {"continue": name})
+                    build.add_node(f"{name}-ask-human-tool", human_context_node.work)
+                    build.add_edge(f"{name}-ask-human-tool", name)
+                else:
+                    normal_tools.append(tool)
+
+            if normal_tools:
+                # Add node for normal tools
+                build.add_node(f"{name}-tools", ToolNode(normal_tools))
+
+                # Add HumanNode for tool review if interrupt is True
+                if interrupt:
+                    human_tool_review_node = create_human_tool_review_node(name)
+                    build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+                    # No direct edge - HumanNode uses Command(goto=...) for routing
+                    build.add_edge(f"{name}-tools", name)
+                else:
+                    # Direct connection without review
+                    build.add_edge(f"{name}-tools", name)
+    # Add the final answer node
     build.add_node(
         "hierarchical-final-answer",
         RunnableLambda(
@@ -463,7 +518,7 @@ async def acreate_hierarchical_graph(
                 provider=env_settings.OPENAI_PROVIDER,
                 model=env_settings.LLM_BASIC_MODEL,
                 temperature=env_settings.BASIC_MODEL_TEMPERATURE,
-            ).summarise  # type: ignore[arg-type]
+            ).summarise
         ),
     )
 
@@ -758,6 +813,7 @@ async def generator(
     thread_id: str,
     interrupt: Interrupt | None = None,
     user_id: str | None = None,
+    timezone: str | None = None,
 ) -> AsyncGenerator[Any, Any]:
     """Create the graph and stream responses as JSON."""
 
@@ -787,9 +843,25 @@ async def generator(
         response: Any = None
         interrupt_name = None
         if team.workflow_type == WorkflowType.HIERARCHICAL:
+            assistant_id = team.assistant_id
+            team_id = team.id
+            ask_human_enabled = team.assistant.ask_human
+            interrupt_enabled = team.assistant.interrupt
+            scheduler_enabled = team.assistant.scheduler_enabled
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
-            root = await acreate_hierarchical_graph(teams, leader_name=team_leader, checkpointer=checkpointer)
+            root = await acreate_hierarchical_graph(
+                teams,
+                leader_name=team_leader,
+                user_id=user_id,
+                timezone=timezone,
+                assistant_id=assistant_id,
+                team_id=team_id,
+                ask_human=ask_human_enabled,
+                interrupt=interrupt_enabled,
+                scheduler_enabled=scheduler_enabled,
+                checkpointer=checkpointer,
+            )
             state = {
                 "history": formatted_messages,
                 "messages": [],

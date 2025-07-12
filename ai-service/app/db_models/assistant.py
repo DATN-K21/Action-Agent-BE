@@ -26,6 +26,9 @@ class Assistant(BaseEntity):
         default=False, nullable=True
     )  # Whether to ask human for confirmation before executing the assistant's task
     interrupt: Mapped[bool | None] = mapped_column(default=False, nullable=True)  # Whether to interrupt the assistant's current task
+    scheduler_enabled: Mapped[bool | None] = mapped_column(
+        default=False, nullable=False
+    )  # Whether scheduler functionality is enabled for this assistant
 
     # Relationships
     user = relationship("User", back_populates="assistants")

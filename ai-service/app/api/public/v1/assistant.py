@@ -123,7 +123,6 @@ def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
 async def _abuild_assistant_query(
     session: AsyncSession,
     user_id: Optional[str] = None,
-    user_role: Optional[str] = None,
     assistant_type: Optional[AssistantType] = None,
     assistant_id: Optional[str] = None,
     page_number: int = 1,
@@ -135,7 +134,6 @@ async def _abuild_assistant_query(
     Args:
         session: Database session
         user_id: User ID for filtering (None for admin users)
-        user_role: User role for access control
         assistant_type: Filter by assistant type
         assistant_id: Specific assistant ID to query
         page_number: Page number for pagination
@@ -159,7 +157,7 @@ async def _abuild_assistant_query(
         query = query.where(Assistant.id == assistant_id)
         count_query = count_query.where(Assistant.id == assistant_id)
 
-    if user_role not in ["admin", "superuser"] and user_id:
+    if user_id:
         query = query.where(Assistant.user_id == user_id)
         count_query = count_query.where(Assistant.user_id == user_id)
 
@@ -268,6 +266,7 @@ def _format_assistant_response(
             temperature=assistant.temperature if assistant.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=assistant.ask_human,
             interrupt=assistant.interrupt,
+            scheduler_enabled=assistant.scheduler_enabled,
             main_unit=WorkflowType.CHATBOT,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
@@ -877,6 +876,8 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
         setattr(assistant, "ask_human", request.ask_human)
     if request.interrupt is not None:
         setattr(assistant, "interrupt", request.interrupt)
+    if request.scheduler_enabled is not None:
+        setattr(assistant, "scheduler_enabled", request.scheduler_enabled)
 
 
 async def _aupdate_mcp_members(
@@ -1105,6 +1106,7 @@ async def _aupdate_extension_members(
                 # Add ask_human skill to worker if ask_human is enabled
                 if request.ask_human:
                     await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+
 
 # Not included chatbot and hierarchical team
 async def _aupdate_support_units(
@@ -1540,7 +1542,6 @@ async def aget_assistants(
     assistant_type: AssistantType | None = None,
     paging: PagingRequest = Depends(),
     x_user_id: str = Header(),
-    x_user_role: str = Header(None),
 ):
     """
     List all assistants for a user with pagination.
@@ -1552,7 +1553,6 @@ async def aget_assistants(
         result, count, total_pages = await _abuild_assistant_query(
             session=session,
             user_id=x_user_id,
-            user_role=x_user_role,
             assistant_type=assistant_type,
             page_number=page_number,
             max_per_page=max_per_page,
@@ -1699,6 +1699,7 @@ async def acreate_advanced_assistant(
             temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=request.ask_human if request.ask_human is not None else True,
             interrupt=request.interrupt if request.interrupt is not None else True,
+            enable_scheduler=request.scheduler_enabled if request.scheduler_enabled is not None else False,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1785,6 +1786,7 @@ async def acreate_advanced_assistant(
             temperature=request.temperature,
             ask_human=request.ask_human,
             interrupt=request.interrupt,
+            scheduler_enabled=request.scheduler_enabled,
             main_unit=WorkflowType.CHATBOT,
             support_units=request.support_units,
             mcp_ids=request.mcp_ids,
@@ -1810,7 +1812,6 @@ async def aget_assistant_by_id(
     session: SessionDep,
     assistant_id: str,
     x_user_id: str = Header(),
-    x_user_role: str = Header(None),
 ):
     """
     Get details of an assistant by its ID using helper functions.
@@ -1826,9 +1827,7 @@ async def aget_assistant_by_id(
     """
     try:
         # Use helper function to build and execute query for single assistant
-        result, count, _ = await _abuild_assistant_query(
-            session=session, user_id=x_user_id, user_role=x_user_role, assistant_id=assistant_id, page_number=1, max_per_page=1
-        )
+        result, count, _ = await _abuild_assistant_query(session=session, user_id=x_user_id, assistant_id=assistant_id, page_number=1, max_per_page=1)
 
         if count == 0:
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()

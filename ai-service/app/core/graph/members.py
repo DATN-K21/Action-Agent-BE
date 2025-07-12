@@ -9,7 +9,7 @@ from langchain_core.runnables import (
     RunnableLambda,
     RunnableSerializable,
 )
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import add_messages
 from typing_extensions import NotRequired, TypedDict
@@ -22,6 +22,7 @@ from app.core.state import (
     GraphTeam,
     add_or_replace_messages,
 )
+from app.core.tools.scheduler_tool import create_scheduler_tools
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.tools.tool_manager import extract_name
 
@@ -436,6 +437,116 @@ class LeaderNode(BaseNode):
     ) -> ReturnGraphTeamState:
         # This method should contain the logic of the delegate method.
         return await self.delegate(state, config)
+
+# Create SchedulerNode here
+
+
+class SchedulerNode(BaseNode):
+    scheduler_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You are a scheduler specialist and team member of {team_name} with the following team members: {team_members_name}. "
+                    "Your role is to handle scheduling tasks including creating, managing, and executing automated jobs.\n"
+                    "You can create jobs that automatically send prompts and execute tasks at scheduled times.\n"
+                    "You can also perform CRUD operations (Create, Read, Update, Delete) on these jobs.\n\n"
+                    "Available scheduling capabilities:\n"
+                    "- Create new scheduled jobs with specific timing\n"
+                    "- List and view existing jobs\n"
+                    "- Get job details and status\n"
+                    "- Update job schedules and configurations\n"
+                    "- Delete jobs when no longer needed\n"
+                    "Stay true to your persona and role:\n{persona}\n"
+                ),
+            ),
+            (
+                "human",
+                "Here is the scheduling task: \n\n {task_string} \n\n Here is the previous conversation: \n\n {history_string} \n\n "
+                "Use your scheduler tools to handle this request. Provide your response with the appropriate scheduling action.",
+            ),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
+
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        user_id: str | None = None,
+        user_role: str | None = None,
+        timezone: str | None = None,
+        assistant_id: str | None = None,
+        team_id: str | None = None,
+        ask_human: bool = False,
+    ):
+        super().__init__(provider, model, temperature)
+
+        self.user_id = user_id
+        self.user_role = user_role
+        self.timezone = timezone
+        self.assistant_id = assistant_id
+        self.team_id = team_id
+        self.ask_human = ask_human
+
+    def get_scheduler_tools(self) -> list[StructuredTool]:
+        """Create and return the scheduler tools for the current user."""
+        result = create_scheduler_tools(
+            user_id=self.user_id,  # type: ignore[arg-type]
+            timezone=self.timezone,  # type: ignore[arg-type]
+            user_role=self.user_role,  # type: ignore[arg-type]
+            assistant_id=self.assistant_id,  # type: ignore[arg-type]
+            team_id=self.team_id,  # type: ignore[arg-type]
+        )
+
+        tools = [value for key, value in result.items()]
+
+        if self.ask_human:
+            from app.core.tools.ask_human.ask_human import ask_human
+
+            tools.append(ask_human)
+
+        return tools
+
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+        name = state["next"]
+        member = state["team"].members[name]
+        assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
+        team_members_name = self.get_team_members_name(state["team"].members)
+
+        prompt = self.scheduler_prompt.partial(
+            team_name=state["team"].name,
+            team_members_name=team_members_name,
+            persona=member.persona,
+            history_string=self.get_optimized_context_string(state["history"]),
+            task_string=self.get_optimized_context_string(state["task"]),
+        )
+
+        # Scheduler node should always have scheduler tools
+        if len(member.tools) >= 1:
+            tools = self.get_scheduler_tools()
+            chain = prompt | self.model.bind_tools(tools)
+        else:
+            # Fallback to regular model if no tools available
+            chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
+                prompt | self.model
+            )
+
+        work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
+            self.tag_with_name  # type: ignore[arg-type]
+        ).bind(name="hierarchical-scheduler")
+
+        result: AIMessage = await self._handle_messages(state, config, work_chain)
+
+        if result.tool_calls:
+            return {"messages": [result]}
+        else:
+            return {
+                "history": [result],
+                "messages": [],
+                "all_messages": state["messages"] + [result],
+            }
 
 
 class SummariserNode(BaseNode):

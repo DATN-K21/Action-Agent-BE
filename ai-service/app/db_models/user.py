@@ -17,6 +17,7 @@ class User(BaseEntity):
     first_name: Mapped[str | None] = mapped_column(String, nullable=True)
     last_name: Mapped[str | None] = mapped_column(String, nullable=True)
     language: Mapped[str] = mapped_column(String, default="en-US")
+    timezone: Mapped[str] = mapped_column(String, default="UTC", nullable=False)
 
     default_api_key_id: Mapped[str | None] = mapped_column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
     remain_trial_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

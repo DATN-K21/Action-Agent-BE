@@ -15,6 +15,7 @@ class CreateUserRequest(BaseRequest):
     email: EmailStr = Field(..., max_length=50)
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
+    timezone: Optional[str] = Field("UTC", description="User's timezone for scheduling (e.g., 'America/New_York', 'UTC')")
 
     @field_validator("email")
     def normalize_email(cls, v: str) -> str:
@@ -26,6 +27,7 @@ class UpdateUserRequest(BaseModel):
     email: Optional[EmailStr] = Field(None, max_length=50)
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    timezone: Optional[str] = Field(None, description="User's timezone for scheduling")
 
 
 ##################################################
@@ -37,6 +39,7 @@ class CreateUserResponse(BaseResponse):
     username: str = Field(...)
     first_name: str = Field(...)
     last_name: str = Field(...)
+    timezone: str = Field(...)
     created_at: datetime = Field(...)
 
 
@@ -46,6 +49,7 @@ class GetUserResponse(BaseResponse):
     username: Optional[str] = Field(None)
     first_name: Optional[str] = Field(None)
     last_name: Optional[str] = Field(None)
+    timezone: Optional[str] = Field(None)
     created_at: Optional[datetime] = Field(None)
 
 

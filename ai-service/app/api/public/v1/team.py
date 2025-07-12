@@ -336,7 +336,7 @@ async def astream(
     thread_id: str,
     team_chat: ChatTeamRequest,
     x_user_id=Header(None),
-    x_user_role=Header(None),
+    x_user_timezone=Header(None),
 ) -> Any:
     """
     Stream a response to a user's input.
@@ -354,10 +354,8 @@ async def astream(
 
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
-        if x_user_role not in ["admin", "super admin"] and (team.user_id != x_user_id):
-            return ResponseWrapper(
-                status=403, message="Not enough permissions"
-            ).to_response()
+        if team.user_id != x_user_id:
+            return ResponseWrapper(status=403, message="You do not have permission to access this team").to_response()
 
         # Check if thread belongs to the team
         statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
@@ -403,7 +401,15 @@ async def astream(
 
         async def controlled_generator():
             try:
-                async for item in generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
+                async for item in generator(
+                    team,
+                    list(members),
+                    team_chat.messages,
+                    thread_id,
+                    team_chat.interrupt,
+                    user_id=x_user_id,
+                    timezone=x_user_timezone,
+                ):
                     yield item
             except asyncio.CancelledError:
                 # Handle cancellation gracefully

@@ -96,7 +96,7 @@ async def aget_all_threads(session: SessionDep, paging: CursorPagingRequest = De
 
 
 @router.post("/create", summary="Create a new thread.", response_model=ResponseWrapper[CreateThreadResponse])
-async def acreate_new_thread(session: SessionDep, request: CreateThreadRequest, x_user_id: str = Header(None), x_user_role: str = Header(None)):
+async def acreate_new_thread(session: SessionDep, request: CreateThreadRequest, x_user_id: str = Header(None)):
     try:
         thread = Thread(
             **request.model_dump(),

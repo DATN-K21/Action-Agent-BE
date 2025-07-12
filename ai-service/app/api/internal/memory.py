@@ -15,7 +15,7 @@ from app.core.cache.memory_monitor import global_memory_monitor
 
 logger = logging.get_logger(__name__)
 
-router = APIRouter(prefix="/internal/memory", tags=["Memory Monitoring"])
+router = APIRouter(prefix="/memory", tags=["Memory Monitoring"])
 
 
 @router.get("/caches", response_model=Dict[str, Any])

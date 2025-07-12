@@ -140,3 +140,12 @@ class GenerationType(str, Enum):
     @classmethod
     def supported_values(cls) -> list[str]:
         return [member for member in cls]
+
+
+class SchedulerType(str, Enum):
+    RECURRING = "recurring"
+    ONE_TIME = "one_time"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]
