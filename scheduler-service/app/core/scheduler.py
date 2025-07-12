@@ -16,12 +16,22 @@ from app.services.job_executor import JobExecutor
 logger = logging.get_logger(__name__)
 
 
+async def execute_job_task(job_id: str, job_data: Dict) -> None:
+    """Module-level function to execute a job (for APScheduler serialization)."""
+    job_executor = JobExecutor()
+    try:
+        await job_executor.execute_job(job_id, job_data)
+    except Exception as e:
+        logger.exception(f"Job execution failed for {job_id}: {str(e)}")
+    finally:
+        await job_executor.close()
+
+
 class SchedulerManager:
     """Manages the APScheduler instance and job operations."""
     
     def __init__(self):
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_executor: Optional[JobExecutor] = None
         self._running = False
     
     async def start(self) -> None:
@@ -32,9 +42,6 @@ class SchedulerManager:
         
         # Ensure schema exists before starting scheduler
         await self._ensure_schema_exists()
-        
-        # Initialize job executor
-        self.job_executor = JobExecutor()
         
         # Configure job stores - using SQLAlchemy instead of Redis
         jobstores = {
@@ -102,7 +109,7 @@ class SchedulerManager:
             
             # Add job to scheduler
             self.scheduler.add_job(
-                func=self._execute_job,
+                func=execute_job_task,
                 trigger='cron',
                 id=job_id,
                 args=[job_id, job_data],
@@ -115,7 +122,7 @@ class SchedulerManager:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to add job {job_id}: {str(e)}")
+            logger.exception(f"Failed to add job {job_id}: {str(e)}")
             return False
     
     async def remove_job(self, job_id: str) -> bool:
@@ -129,7 +136,7 @@ class SchedulerManager:
             logger.info(f"Job {job_id} removed from scheduler")
             return True
         except Exception as e:
-            logger.error(f"Failed to remove job {job_id}: {str(e)}")
+            logger.exception(f"Failed to remove job {job_id}: {str(e)}")
             return False
     
     async def pause_job(self, job_id: str) -> bool:
@@ -143,7 +150,7 @@ class SchedulerManager:
             logger.info(f"Job {job_id} paused")
             return True
         except Exception as e:
-            logger.error(f"Failed to pause job {job_id}: {str(e)}")
+            logger.exception(f"Failed to pause job {job_id}: {str(e)}")
             return False
     
     async def resume_job(self, job_id: str) -> bool:
@@ -157,34 +164,21 @@ class SchedulerManager:
             logger.info(f"Job {job_id} resumed")
             return True
         except Exception as e:
-            logger.error(f"Failed to resume job {job_id}: {str(e)}")
+            logger.exception(f"Failed to resume job {job_id}: {str(e)}")
             return False
     
     async def run_job_now(self, job_id: str, job_data: Dict) -> bool:
         """Run a job immediately."""
-        if not self.job_executor:
-            logger.error("Job executor not initialized")
-            return False
-        
         try:
             # Execute job in background
-            asyncio.create_task(self._execute_job(job_id, job_data))
+            asyncio.create_task(execute_job_task(job_id, job_data))
             logger.info(f"Job {job_id} triggered manually")
             return True
         except Exception as e:
-            logger.error(f"Failed to run job {job_id}: {str(e)}")
+            logger.exception(f"Failed to run job {job_id}: {str(e)}")
             return False
     
-    async def _execute_job(self, job_id: str, job_data: Dict) -> None:
-        """Execute a job."""
-        if not self.job_executor:
-            logger.error("Job executor not initialized")
-            return
-        
-        try:
-            await self.job_executor.execute_job(job_id, job_data)
-        except Exception as e:
-            logger.error(f"Job execution failed for {job_id}: {str(e)}")
+
     
     def is_valid_cron(self, cron_expression: str) -> bool:
         """Validate a cron expression."""
@@ -224,7 +218,9 @@ class SchedulerManager:
                 await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
             logger.info(f"Schema '{env_settings.POSTGRES_SCHEMA}' ready")
         except Exception as e:
-            logger.error(f"Failed to create schema '{env_settings.POSTGRES_SCHEMA}': {str(e)}")
+            logger.exception(
+                f"Failed to create schema '{env_settings.POSTGRES_SCHEMA}': {str(e)}"
+            )
             raise
 
 

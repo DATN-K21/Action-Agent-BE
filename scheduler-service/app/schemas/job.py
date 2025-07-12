@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.job import JobStatus, JobType
 from app.schemas.base import BaseRequest, BaseResponse
@@ -37,12 +37,8 @@ class JobCreate(JobBase, BaseRequest):
                 "assistant_id": "assistant-456",
                 "max_retries": 3,
                 "timeout_seconds": 300,
-                "timezone": "UTC",
                 "is_active": True,
-                "job_config": {
-                    "format": "markdown",
-                    "include_metrics": True
-                }
+                "job_config": {"format": "markdown", "include_metrics": True},
             }
         }
     )
@@ -59,7 +55,6 @@ class JobUpdate(BaseRequest):
     job_config: Optional[Dict] = Field(None, description="Job configuration")
     max_retries: Optional[int] = Field(None, description="Maximum retries")
     timeout_seconds: Optional[int] = Field(None, description="Timeout in seconds")
-    timezone: Optional[str] = Field(None, description="Timezone")
     is_active: Optional[bool] = Field(None, description="Whether job is active")
 
 
@@ -83,6 +78,10 @@ class JobResponse(JobBase, BaseResponse):
     model_config = ConfigDict(from_attributes=True)
 
 
+class JobsResponse(BaseResponse):
+    jobs: list[JobResponse] = Field(..., description="List of jobs")
+
+
 class JobExecutionResponse(BaseResponse):
     """Schema for job execution response."""
     id: str = Field(..., description="Execution ID")
@@ -99,6 +98,12 @@ class JobExecutionResponse(BaseResponse):
     created_at: datetime = Field(..., description="Creation timestamp")
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class JobExecutionsResponse(BaseResponse):
+    executions: list[JobExecutionResponse] = Field(
+        ..., description="List of job executions"
+    )
 
 
 class JobStats(BaseResponse):

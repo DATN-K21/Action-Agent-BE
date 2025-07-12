@@ -6,7 +6,6 @@ from fastapi import FastAPI
 from app.core import logging
 from app.core.database import close_db_connections, init_db
 from app.core.scheduler import scheduler_manager
-from app.core.settings import env_settings
 
 logger = logging.get_logger(__name__)
 

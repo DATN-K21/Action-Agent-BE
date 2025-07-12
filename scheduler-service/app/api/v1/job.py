@@ -12,7 +12,9 @@ from app.schemas.job import (
     CronValidationRequest,
     CronValidationResponse,
     JobCreate,
+    JobExecutionsResponse,
     JobRunResponse,
+    JobsResponse,
     JobStats,
     JobUpdate,
 )
@@ -125,8 +127,9 @@ async def list_jobs(
             assistant_id=assistant_id,
             team_id=team_id,
         )
-
-        return ResponseWrapper.wrap(status=200, data={"jobs": jobs}).to_response()
+        return ResponseWrapper.wrap(
+            status=200, data=JobsResponse(jobs=jobs)
+        ).to_response()
 
     except Exception as e:
         logger.exception(f"Failed to list jobs: {str(e)}")
@@ -347,8 +350,11 @@ async def get_job_executions(
     """
     try:
         executions = await job_service.get_job_executions(job_id, skip, limit)
-
-        return ResponseWrapper.wrap(status=200, data=executions).to_response()
+        
+        # Wrap the executions list in the proper response schema
+        executions_response = JobExecutionsResponse(executions=executions)
+        
+        return ResponseWrapper.wrap(status=200, data=executions_response).to_response()
 
     except Exception as e:
         logger.exception(f"Failed to get executions for job {job_id}: {str(e)}")
