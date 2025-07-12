@@ -28,6 +28,9 @@ const PUBLIC_ENDPOINTS = [
 
   // Payment service public endpoints
   "/payment/api/v1/payment/confirm",
+
+  // AI service public endpoints
+  "/ai/callback/extension"
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
