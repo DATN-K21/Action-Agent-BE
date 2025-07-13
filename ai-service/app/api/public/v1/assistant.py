@@ -1,7 +1,9 @@
+import typing
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+import anyio
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1673,8 +1675,8 @@ async def acreate_advanced_assistant(
     1. A new assistant instance
     2. A main chatbot team with root member
     3. A hierarchical team with root member (An advanced assistant always has a hierarchical team - support unit)
-    4. MCP members and their skills (if specified)
-    5. Extension members and their skills (if specified)
+    4. MCP members and their skills (if specified)       -> SLOW
+    5. Extension members and their skills (if specified) -> SLOW
     6. Support teams for different workflow types (if specified)
 
     Args:
@@ -1714,43 +1716,47 @@ async def acreate_advanced_assistant(
             if not hierarchical_team or not hierarchical_root_member:
                 raise ValueError("Failed to create hierarchical team or root member")
 
-        # Create MCP members and their skills using helper function
+        # Prepare MCP members and their skills from database
+        mcp_results: typing.Sequence[ConnectedMcp] = []
         if request.mcp_ids and hierarchical_team and hierarchical_root_member:
-            for mcp_id in request.mcp_ids:
-                # Load connected MCP
-                mcp_statement = select(ConnectedMcp).where(
-                    ConnectedMcp.id == mcp_id, ConnectedMcp.user_id == x_user_id, ConnectedMcp.is_deleted.is_(False)
-                )
-                mcp_result = await session.execute(mcp_statement)
-                connected_mcp = mcp_result.scalar_one_or_none()
+            mcp_statement = select(ConnectedMcp).where(
+                ConnectedMcp.id.in_(request.mcp_ids),
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.is_deleted.is_(False),
+            )
+            statement_result = await session.execute(mcp_statement)
+            mcp_results = statement_result.scalars().all()
 
+        # Prepare extension members and their skills from database
+        extension_results: typing.Sequence[ConnectedExtension] = []
+        if request.extension_ids and hierarchical_team and hierarchical_root_member:
+            ext_statement = select(ConnectedExtension).where(
+                ConnectedExtension.id.in_(request.extension_ids),
+                ConnectedExtension.user_id == x_user_id,
+                ConnectedExtension.is_deleted.is_(False),
+            )
+            ext_result = await session.execute(ext_statement)
+            extension_results = ext_result.scalars().all()
+
+        async with anyio.create_task_group() as tg:
+            for connected_mcp in mcp_results:
                 if connected_mcp:
-                    await _acreate_mcp_member_with_skills(
+                    tg.start_soon(
+                        _acreate_mcp_member_with_skills,
                         session,
                         connected_mcp,
-                        hierarchical_team.id,
-                        hierarchical_root_member.id,
+                        hierarchical_team.id,  # type: ignore
+                        hierarchical_root_member.id,  # type: ignore
                         request,
                     )
-
-        # Create extension members and their skills using helper function
-        if request.extension_ids and hierarchical_team and hierarchical_root_member:
-            for extension_id in request.extension_ids:
-                # Load connected extension
-                ext_statement = select(ConnectedExtension).where(
-                    ConnectedExtension.id == extension_id,
-                    ConnectedExtension.user_id == x_user_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                ext_result = await session.execute(ext_statement)
-                connected_extension = ext_result.scalar_one_or_none()
-
+            for connected_extension in extension_results:
                 if connected_extension:
-                    await _acreate_extension_member_with_skills(
+                    tg.start_soon(
+                        _acreate_extension_member_with_skills,
                         session,
                         connected_extension,
-                        hierarchical_team.id,
-                        hierarchical_root_member.id,
+                        hierarchical_team.id,  # type: ignore
+                        hierarchical_root_member.id,  # type: ignore
                         request,
                     )
 

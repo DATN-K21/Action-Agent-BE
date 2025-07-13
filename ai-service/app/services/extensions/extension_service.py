@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Sequence
 
 from composio import App
@@ -76,8 +77,17 @@ class ExtensionService:
 
     def get_authed_tools(self, user_id: str) -> Sequence[BaseTool]:
         """Get the tools for a specific user"""
+
+        start_time = datetime.now()
+
+        logger.info(f"[_get_authed_tools] get_user_toolset. UserId={user_id}")
         toolset = ComposioClient.get_user_toolset(user_id=user_id)
+        end_time = datetime.now()
+        logger.info(f"[_get_authed_tools] get_user_toolset completed in {end_time - start_time}. UserId={user_id}")
+
         tools = toolset.get_tools(actions=self._supported_actions)
+        logger.info(f"[_get_authed_tools] get_tools completed in {datetime.now() - end_time}. UserId={user_id}, Tools={len(tools)}")
+
         return tools
 
     @classmethod
