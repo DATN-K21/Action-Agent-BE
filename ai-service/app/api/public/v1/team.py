@@ -431,7 +431,7 @@ async def astream(
                     from app.core.graph.messages import ChatResponse
 
                     response = ChatResponse(
-                        type="credits",
+                        type="error",
                         content="You have no credits left. Please go to your profile and add credits to continue.",
                         id=str(uuid4()),
                         name="system",
