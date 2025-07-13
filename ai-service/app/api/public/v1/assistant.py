@@ -86,7 +86,6 @@ async def _aadd_ask_human_skill_to_worker(
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(ask_human_skill)
-    await session.flush()
 
     # Link skill to member
     member_skill_link = MemberSkillLink(
@@ -94,7 +93,6 @@ async def _aadd_ask_human_skill_to_worker(
         skill_id=ask_human_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
 
 def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
@@ -442,7 +440,6 @@ async def _acreate_mcp_member_with_skills(
         position_y=0.0,
     )
     session.add(member)
-    await session.flush()
 
     # Load MCP tools and create skills using proper connection format
     connections = {}
@@ -452,7 +449,10 @@ async def _acreate_mcp_member_with_skills(
     }
 
     # Use the existing MCP service to get tool info
+    start_time = datetime.now()
     tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+    elapsed_time = datetime.now() - start_time
+    logger.info(f"[_acreate_mcp_member_with_skills] Fetched {len(tool_infos)} tools in {elapsed_time.total_seconds()} seconds.")
 
     # Create skills and links
     for tool_info in tool_infos:
@@ -471,7 +471,6 @@ async def _acreate_mcp_member_with_skills(
             mcp_id=connected_mcp.id,
         )
         session.add(skill)
-        await session.flush()
 
         # Link skill to member
         member_skill_link = MemberSkillLink(
@@ -479,7 +478,6 @@ async def _acreate_mcp_member_with_skills(
             skill_id=skill.id,
         )
         session.add(member_skill_link)
-        await session.flush()
 
         # Add tool to cache
         await tool_manager.aadd_personal_tool(
@@ -534,7 +532,6 @@ async def _acreate_extension_member_with_skills(
         position_y=0.0,
     )
     session.add(member)
-    await session.flush()
 
     extension_service = extension_service_info.service_object
     tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -557,7 +554,6 @@ async def _acreate_extension_member_with_skills(
             extension_id=connected_extension.id,
         )
         session.add(skill)
-        await session.flush()
 
         # Link skill to member
         member_skill_link = MemberSkillLink(
@@ -565,7 +561,6 @@ async def _acreate_extension_member_with_skills(
             skill_id=skill.id,
         )
         session.add(member_skill_link)
-        await session.flush()
 
         # Add tool to cache
         await tool_manager.aadd_personal_tool(
@@ -612,7 +607,6 @@ async def _acreate_support_team(
         assistant_id=assistant.id,
     )
     session.add(support_team)
-    await session.flush()
 
     # Create root member for the support team
     support_root_member_id = str(uuid.uuid4())
@@ -632,7 +626,6 @@ async def _acreate_support_team(
         position_y=0.0,
     )
     session.add(support_root_member)
-    await session.flush()
 
     if workflow_type == WorkflowType.SEARCHBOT:
         await _acreate_search_skills(session, support_root_member.id, user_id)
@@ -640,7 +633,7 @@ async def _acreate_support_team(
     return support_team
 
 
-async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: str) -> None:
+async def _acreate_search_skills(session: AsyncSession, member_id: str, user_id: str) -> None:
     """Create search skills for SEARCHBOT workflow type."""
     # DuckDuckGo search skill
     # ddg_tool_info = global_tools.get("duckduckgo-search")
@@ -674,9 +667,8 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
     if not tavily_tool_info:
         raise ValueError("Tavily search tool not found in global tools.")
 
-    tavily_skill_id = str(uuid.uuid4())
     tavily_skill = Skill(
-        id=tavily_skill_id,
+        id=str(uuid.uuid4()),
         name="tavily-search",
         user_id=user_id,
         description=tavily_tool_info.description,
@@ -687,23 +679,20 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(tavily_skill)
-    await session.flush()
 
     member_skill_link = MemberSkillLink(
         member_id=member_id,
         skill_id=tavily_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
     # Wikipedia search skill
     wikipedia_tool_info = global_tools.get("wikipedia")
     if not wikipedia_tool_info:
         raise ValueError("Wikipedia tool not found in global tools.")
 
-    wikipedia_skill_id = str(uuid.uuid4())
     wikipedia_skill = Skill(
-        id=wikipedia_skill_id,
+        id=str(uuid.uuid4()),
         name="wikipedia",
         user_id=user_id,
         description=wikipedia_tool_info.description,
@@ -714,14 +703,12 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(wikipedia_skill)
-    await session.flush()
 
     member_skill_link = MemberSkillLink(
         member_id=member_id,
         skill_id=wikipedia_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
 
 async def _adelete_members_with_service_type(session: AsyncSession, team: Team, service_type: ConnectedServiceType) -> None:
@@ -1759,11 +1746,17 @@ async def acreate_advanced_assistant(
                         hierarchical_root_member.id,  # type: ignore
                         request,
                     )
-
-        # Create another support teams for each workflow type using helper function
-        if request.support_units:
-            for workflow_type in request.support_units:
-                await _acreate_support_team(session, new_assistant, workflow_type, request, x_user_id)
+            # Create another support teams for each workflow type using helper function
+            if request.support_units:
+                for workflow_type in request.support_units:
+                    tg.start_soon(
+                        _acreate_support_team,
+                        session,
+                        new_assistant,
+                        workflow_type,
+                        request,
+                        x_user_id
+                    )
 
         # Commit all changes
         await session.commit()
