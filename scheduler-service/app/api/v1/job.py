@@ -19,6 +19,7 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.services.job_service import job_service
+from app.services.job_executor import JobExecutor
 
 logger = logging.get_logger(__name__)
 router = APIRouter()
@@ -427,3 +428,88 @@ async def get_job_stats():
     except Exception as e:
         logger.exception(f"Failed to get job stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ai-service/health", summary="Check AI Service Health")
+async def check_ai_service_health():
+    """
+    Check if the AI service is accessible and healthy.
+    
+    This endpoint can be used to diagnose connection issues with the AI service.
+    """
+    try:
+        executor = JobExecutor()
+        
+        try:
+            # Run diagnostic
+            diagnosis = await executor.diagnose_connection_issues()
+            
+            # Determine overall status
+            if diagnosis["connection_successful"] and diagnosis["health_check_passed"]:
+                status_code = 200
+                message = "AI service is healthy and accessible"
+            else:
+                status_code = 503
+                message = "AI service is not accessible or unhealthy"
+            
+            return ResponseWrapper.wrap(
+                status=status_code,
+                message=message,
+                data=diagnosis
+            ).to_response()
+            
+        finally:
+            await executor.close()
+            
+    except Exception as e:
+        logger.exception(f"Failed to check AI service health: {str(e)}")
+        return ResponseWrapper.wrap(
+            status=500,
+            message="Failed to check AI service health",
+            data={"error": str(e)}
+        ).to_response()
+
+
+@router.post("/ai-service/validate", summary="Validate AI Service Connectivity")
+async def validate_ai_service():
+    """
+    Validate AI service connectivity for job execution.
+    
+    This endpoint tests if the scheduler service can properly connect to the AI service
+    and execute the necessary operations for job processing.
+    """
+    try:
+        executor = JobExecutor()
+        
+        try:
+            # Run validation
+            is_valid = await executor.validate_ai_service_connectivity()
+            
+            if is_valid:
+                return ResponseWrapper.wrap(
+                    status=200,
+                    message="AI service connectivity validation successful",
+                    data={"validation_passed": True}
+                ).to_response()
+            else:
+                # Get detailed diagnosis
+                diagnosis = await executor.diagnose_connection_issues()
+                return ResponseWrapper.wrap(
+                    status=503,
+                    message="AI service connectivity validation failed",
+                    data={
+                        "validation_passed": False,
+                        "diagnosis": diagnosis
+                    }
+                ).to_response()
+                
+        finally:
+            await executor.close()
+            
+    except Exception as e:
+        logger.exception(f"Failed to validate AI service: {str(e)}")
+        return ResponseWrapper.wrap(
+            status=500,
+            message="Failed to validate AI service connectivity",
+            data={"error": str(e)}
+        ).to_response()

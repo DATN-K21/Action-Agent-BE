@@ -83,13 +83,6 @@ async def init_db():
             # Create all tables defined in models
             logger.info("Creating application tables...")
             await conn.run_sync(Base.metadata.create_all)
-            
-            # Create APScheduler tables for SQLAlchemy job store
-            # These tables will be created automatically by APScheduler when needed
-            logger.info("APScheduler tables will be created automatically when scheduler starts")
-            
-            logger.info("Database initialization completed successfully")
-            
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
@@ -98,7 +91,6 @@ async def init_db():
 async def create_scheduler_schema():
     """Create scheduler schema in the database."""
     try:
-        logger.info(f"Ensuring schema '{env_settings.POSTGRES_SCHEMA}' exists...")
         async with async_engine.begin() as conn:
             await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
             logger.info(f"Schema '{env_settings.POSTGRES_SCHEMA}' created or already exists")
@@ -110,16 +102,11 @@ async def create_scheduler_schema():
 async def close_db_connections():
     """Close all database connections and cleanup resources."""
     try:
-        logger.info("Closing database connections...")
-        
         # Dispose async engine
         await async_engine.dispose()
-        logger.info("Async database engine disposed")
         
         # Dispose sync engine
         sync_engine.dispose()
-        logger.info("Sync database engine disposed")
-        
         logger.info("All database connections closed successfully")
         
     except Exception as e:

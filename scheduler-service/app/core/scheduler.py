@@ -74,9 +74,7 @@ class SchedulerManager:
         # Start scheduler
         self.scheduler.start()
         self._running = True
-        
-        logger.info("Scheduler started successfully")
-    
+
     async def stop(self) -> None:
         """Stop the scheduler."""
         if not self._running:
@@ -85,9 +83,8 @@ class SchedulerManager:
         if self.scheduler:
             self.scheduler.shutdown(wait=True)
             self.scheduler = None
-        
+
         self._running = False
-        logger.info("Scheduler stopped")
     
     async def add_job(
         self,
@@ -213,7 +210,6 @@ class SchedulerManager:
     async def _ensure_schema_exists(self) -> None:
         """Ensure the PostgreSQL schema exists for APScheduler tables."""
         try:
-            logger.info(f"Ensuring schema '{env_settings.POSTGRES_SCHEMA}' exists...")
             async with async_engine.begin() as conn:
                 await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {env_settings.POSTGRES_SCHEMA}"))
             logger.info(f"Schema '{env_settings.POSTGRES_SCHEMA}' ready")

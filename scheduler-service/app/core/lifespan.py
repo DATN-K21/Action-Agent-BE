@@ -18,7 +18,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         # Initialize database
         await init_db()
-        logger.info("Database initialized")
         
         # Start scheduler
         await scheduler_manager.start()
@@ -43,5 +42,3 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Database connections closed")
         except Exception as e:
             logger.error(f"Error closing database connections: {e}")
-        
-        logger.info("Scheduler service shutdown completed")

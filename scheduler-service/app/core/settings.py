@@ -19,35 +19,22 @@ class Settings(BaseSettings):
     DEBUG_SQLALCHEMY: bool = False
 
     # Database settings
-    POSTGRES_URL_PATH: str = Field(
-        default="postgres:123456@localhost:5432/ai-database",
-        description="PostgreSQL database connection URL path (without protocol)"
-    )
-    POSTGRES_SCHEMA: str = Field(
-        default="schedulerservice",
-        description="PostgreSQL schema name"
-    )
+    POSTGRES_URL_PATH: str = "postgres:123456@localhost:5432/ai-database"
+    POSTGRES_SCHEMA: str = "schedulerservice"
 
     # AI Service settings
-    AI_SERVICE_URL: str = Field(
-        default="http://localhost:8001", description="AI Service base URL"
-    )
-
-    # Server settings
-    HOST: str = Field(default="0.0.0.0", description="Server host")
-    PORT: int = Field(default=8000, description="Server port")
-    DEBUG_SERVER: bool = Field(default=False, description="Enable debug mode")
+    AI_SERVICE_URL: str = "http://localhost:8001"
 
     # Logging settings
-    LOG_LEVEL: str = Field(default="INFO", description="Logging level")
+    LOG_LEVEL: str = "INFO"
 
     # Scheduler settings
-    SCHEDULER_TIMEZONE: str = Field(default="UTC", description="Scheduler timezone")
-    MAX_CONCURRENT_JOBS: int = Field(default=10, description="Maximum concurrent jobs")
+    MAX_CONCURRENT_JOBS: int = 10
+    SCHEDULER_TIMEZONE: str = "Asia/Ho_Chi_Minh"
 
     # Job execution settings
-    JOB_TIMEOUT: int = Field(default=300, description="Job timeout in seconds")
-    MAX_RETRIES: int = Field(default=3, description="Maximum job retries")
+    JOB_TIMEOUT: int = 300
+    MAX_RETRIES: int = 3
 
     # API settings
     API_V1_PREFIX: str = Field(default="/api/v1", description="API v1 prefix")
