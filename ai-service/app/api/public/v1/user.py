@@ -250,3 +250,31 @@ async def delete_api_key(
         logger.error(f"Error deleting API key: {e}", exc_info=True)
         await session.rollback()
         return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+@router.get("/{user_id}/credits", summary="Get user's credits.", response_model=ResponseWrapper)
+async def get_user_credits(
+    session: SessionDep,
+    user_id: str,
+    x_user_id: str = Header(None),
+):
+    """
+    Get user's credit credits.
+    """
+    try:
+        if not user_id or user_id != x_user_id:
+            return ResponseWrapper.wrap(status=403, message="Forbidden").to_response()
+
+        stmt = select(User.credits).where(
+            User.id == user_id,
+            User.is_deleted.is_(False),
+        )
+        result = await session.execute(stmt)
+        credits = result.scalar_one_or_none()
+        if credits is None:
+            return ResponseWrapper.wrap(status=404, message="User not found").to_response()
+        return ResponseWrapper.wrap(status=200, data={"credits": credits}).to_response()
+
+    except Exception as e:
+        logger.exception(f"Has error: {str(e)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

@@ -294,23 +294,3 @@ async def deposit_credits(session: SessionDep, user_id: str, credits: int):
         await session.rollback()
         logger.exception(f"Has error: {str(e)}")
         return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
-
-
-@router.get("/{user_id}/credits", summary="Get user's credits.", response_model=ResponseWrapper)
-async def get_user_credits(session: SessionDep, user_id: str):
-    """
-    Get user's credit credits.
-    """
-    try:
-        stmt = select(User.credits).where(
-            User.id == user_id,
-            User.is_deleted.is_(False),
-        )
-        result = await session.execute(stmt)
-        credits = result.scalar_one_or_none()
-        if credits is None:
-            return ResponseWrapper.wrap(status=404, message="User not found").to_response()
-        return ResponseWrapper.wrap(status=200, data={"credits": credits}).to_response()
-    except Exception as e:
-        logger.exception(f"Has error: {str(e)}")
-        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
