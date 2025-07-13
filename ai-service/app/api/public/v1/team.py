@@ -342,6 +342,8 @@ async def astream(
     Stream a response to a user's input.
     """
     try:
+        print("[astream] - Timezone:", x_user_timezone)
+
         # Get team and join members and skills
         statement = (
             select(Team)

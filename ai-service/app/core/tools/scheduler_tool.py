@@ -93,16 +93,16 @@ async def _make_scheduler_request(
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            if method.upper() == "GET":
-                response = await client.get(url, headers=headers, params=params)
-            elif method.upper() == "POST":
-                response = await client.post(url, headers=headers, json=data, params=params)
-            elif method.upper() == "PUT":
-                response = await client.put(url, headers=headers, json=data, params=params)
-            elif method.upper() == "DELETE":
-                response = await client.delete(url, headers=headers, params=params)
-            else:
-                return {"error": f"Unsupported HTTP method: {method}"}
+            print(f"[_make_scheduler_request] -Making {method} request to {url} with headers: {headers} and data: {data} params: {params}")
+
+            response = await client.request(
+                method.upper(),
+                url,
+                headers=headers,
+                json=data,
+                params=params,
+            )
+
             response.raise_for_status()
             return response.json()
             
@@ -423,8 +423,8 @@ def create_scheduler_tools(
     # Create the tools with context
     tools = {
         "create_job": StructuredTool.from_function(
-            func=create_job_with_context,
-            name="Create Scheduled Job",
+            coroutine=create_job_with_context,
+            name="create_scheduled_job",
             description=f"Create a new scheduled job for user {user_id} that will automatically execute AI prompts at specified times. "
             "Supports both one-time and recurring jobs. Use cron expressions for recurring jobs (e.g., '0 9 * * *' for 9 AM daily, "
             "'0 */2 * * *' for every 2 hours, '0 0 * * 1' for every Monday at midnight). "
@@ -434,8 +434,8 @@ def create_scheduler_tools(
             return_direct=False,
         ),
         "get_jobs": StructuredTool.from_function(
-            func=get_jobs_with_context,
-            name="Get Scheduled Jobs",
+            coroutine=get_jobs_with_context,
+            name="get_scheduled_jobs",
             description=f"Retrieve a list of scheduled jobs for user {user_id} with comprehensive filtering options. "
             "Filter by job status (pending, running, completed, failed, paused), job type (one_time, recurring), "
             "assistant_id, team_id, and supports pagination with limit/skip parameters. "
@@ -444,8 +444,8 @@ def create_scheduler_tools(
             return_direct=False,
         ),
         "get_job_details": StructuredTool.from_function(
-            func=get_job_details_with_context,
-            name="Get Job Details",
+            coroutine=get_job_details_with_context,
+            name="get_job_details",
             description=f"Get comprehensive detailed information about a specific scheduled job for user {user_id}. "
             "Returns complete job configuration including name, description, schedule settings, prompt content, "
             "current status, execution history, retry configuration, timeout settings, and associated team/assistant information. "
@@ -454,8 +454,8 @@ def create_scheduler_tools(
             return_direct=False,
         ),
         "update_job": StructuredTool.from_function(
-            func=update_job_with_context,
-            name="Update Scheduled Job",
+            coroutine=update_job_with_context,
+            name="update_scheduled_job",
             description=f"Update an existing scheduled job for user {user_id} with flexible modification options. "
             "Can modify job name, description, schedule (cron expression), prompt content, active status, "
             "retry configuration, timeout settings, and job configuration parameters. "
@@ -465,8 +465,8 @@ def create_scheduler_tools(
             return_direct=False,
         ),
         "delete_job": StructuredTool.from_function(
-            func=delete_job_with_context,
-            name="Delete Scheduled Job",
+            coroutine=delete_job_with_context,
+            name="delete_scheduled_job",
             description=f"Permanently delete a scheduled job for user {user_id} and stop all future executions. "
             "This action is irreversible and will immediately cancel any pending executions of the job. "
             "Use with caution as deleted jobs cannot be recovered. Consider pausing the job first if temporary "

@@ -407,6 +407,11 @@ class LeaderNode(BaseNode):
         team_members_name = self.get_team_members_name(team.members, scheduler_enabled)
         team_members_info = self.get_team_members_info(team.members, scheduler_enabled)
         options = list(team.members) + ["FINISH"]
+        
+        # Add scheduler to options if enabled
+        if scheduler_enabled:
+            options.insert(-1, "hierarchical-scheduler")  # Insert before FINISH
+        
         tools = [self.get_tool_definition(options)]
 
         # Disable default parallel tool calls from ChatOpenAI
@@ -536,22 +541,26 @@ class SchedulerNode(BaseNode):
         return tools
 
     async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
-        name = state["next"]
-        member = state["team"].members[name]
-        assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
         team_members_name = self.get_team_members_name(state["team"].members)
+        
+        # The scheduler has a default persona
+        scheduler_persona = (
+            "You are a specialized scheduling assistant that manages automated job execution. "
+            "You help create, monitor, update, and delete scheduled tasks that run AI prompts at specified times. "
+            "You understand cron expressions, timezone handling, and job lifecycle management."
+        )
 
         prompt = self.scheduler_prompt.partial(
             team_name=state["team"].name,
             team_members_name=team_members_name,
-            persona=member.persona,
+            persona=scheduler_persona,
             history_string=self.get_optimized_context_string(state["history"]),
             task_string=self.get_optimized_context_string(state["task"]),
         )
 
         # Scheduler node should always have scheduler tools
-        if len(member.tools) >= 1:
-            tools = self.get_scheduler_tools()
+        tools = self.get_scheduler_tools()
+        if tools:
             chain = prompt | self.model.bind_tools(tools)
         else:
             # Fallback to regular model if no tools available

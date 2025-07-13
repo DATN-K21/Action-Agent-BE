@@ -523,8 +523,8 @@ async def acreate_hierarchical_graph(
             RunnableLambda(scheduler_node.work),
         )
 
+        name = "hierarchical-scheduler"
         if scheduler_tools:
-            name = "hierarchical-scheduler"
             normal_tools: list[BaseTool] = []
 
             for tool in scheduler_tools:
@@ -578,6 +578,9 @@ async def acreate_hierarchical_graph(
                     should_continue,
                     create_tools_condition(name, leader_name, list(scheduler_tools)),
                 )
+        else:
+            # If scheduler has no tools, add direct edge back to leader
+            build.add_edge(name, leader_name)
     # Add the final answer node
     build.add_node(
         "hierarchical-final-answer",
@@ -682,6 +685,11 @@ async def acreate_hierarchical_graph(
 
     conditional_mapping: dict[Hashable, str] = {v: v for v in members}
     conditional_mapping["FINISH"] = "hierarchical-final-answer"
+
+    # Add scheduler to conditional mapping if enabled
+    if team_root and team_root.assistant.scheduler_enabled:
+        conditional_mapping["hierarchical-scheduler"] = "hierarchical-scheduler"
+
     build.add_conditional_edges(leader_name, router, conditional_mapping)
 
     build.set_entry_point(leader_name)
