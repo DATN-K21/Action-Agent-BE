@@ -1053,7 +1053,7 @@ async def generator(
 
     except GraphRecursionError:
         response = ChatResponse(
-            type="stop",
+            type="error",
             content="Graph recursion limit exceeded. Please try again with a simpler query.",
             id=str(uuid4()),
             name="system",
