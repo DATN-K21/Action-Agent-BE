@@ -74,7 +74,7 @@ public class PaymentService : IPaymentService
                 PaymentIntentId = intent.Id,
                 UserId = userId,
                 AmountUsd = amountUsd,
-                Credits = amountUsd * _rateSettings.CreditsPerUsd,
+                Credits = (long)(amountUsd * _rateSettings.CreditsPerUsd),
                 Status = PaymentStatus.Created,
             };
             await _paymentCollection.InsertOneAsync(payment);
