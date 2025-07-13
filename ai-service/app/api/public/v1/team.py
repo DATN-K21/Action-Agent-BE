@@ -439,9 +439,11 @@ async def astream(
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:
-                    logger.info(
-                        f"[controlled_generator] Thread={thread_id}, User={x_user_id}, Usage={usage_callback.usage_metadata}, Others={usage_callback}"
+                    usage_log = "Token usage for:\n" + "\n".join(
+                        f"- model={model}: input_tokens={stats['input_tokens']}, output_tokens={stats['output_tokens']}, total_tokens={stats['total_tokens']}"
+                        for model, stats in usage_callback.usage_metadata.items()
                     )
+                    logger.info(f"[controlled_generator] Thread={thread_id}, User={x_user_id}, Usage={usage_log}")
                     await asyncio.wait_for(
                         acleanup_connection(x_user_id, thread_id),
                         timeout=15.0,  # 15 second timeout to prevent indefinite blocking
