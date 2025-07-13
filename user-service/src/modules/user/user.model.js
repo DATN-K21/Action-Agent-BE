@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
     google_id: { type: String, default: '' },
     facebook_id: { type: String, default: '' },
     owners: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    balance: { type: mongoose.Schema.Types.BigInt, default: 1000000 },
+    balance: { type: mongoose.Schema.Types.BigInt, default: 0 },
 }, {
     timestamps: true,
     collection: 'Users'

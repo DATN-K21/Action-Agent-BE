@@ -275,14 +275,42 @@ async def deposit_credits(session: SessionDep, user_id: str, credits: int):
 
         if db_user.credits < 0:
             db_user.credits = credits
+            await session.commit()
+            new_credits = credits
         else:
-            db_user.credits += credits
-        await session.commit()
-        await session.refresh(db_user)
+            # Use SQL for atomic update
+            update_stmt = (
+                update(User).where(User.id == user_id, User.is_deleted.is_(False)).values(credits=User.credits + credits).returning(User.credits)
+            )
+            result = await session.execute(update_stmt)
+            new_credits = result.scalar_one_or_none()
+            if new_credits is None:
+                return ResponseWrapper.wrap(status=404, message="User not found").to_response()
 
-        logger.info(f"Deposited {credits} credits to user {user_id}. New balance: {db_user.credits}")
+        logger.info(f"Deposited {credits} credits to user {user_id}. New balance: {new_credits}")
         return ResponseWrapper.wrap(status=200, message="Deposit successful")
 
     except Exception as e:
         await session.rollback()
         logger.exception(f"Has error: {str(e)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()
+
+
+@router.get("/{user_id}/credits", summary="Get user's credits.", response_model=ResponseWrapper)
+async def get_user_credits(session: SessionDep, user_id: str):
+    """
+    Get user's credit credits.
+    """
+    try:
+        stmt = select(User.credits).where(
+            User.id == user_id,
+            User.is_deleted.is_(False),
+        )
+        result = await session.execute(stmt)
+        credits = result.scalar_one_or_none()
+        if credits is None:
+            return ResponseWrapper.wrap(status=404, message="User not found").to_response()
+        return ResponseWrapper.wrap(status=200, data={"credits": credits}).to_response()
+    except Exception as e:
+        logger.exception(f"Has error: {str(e)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

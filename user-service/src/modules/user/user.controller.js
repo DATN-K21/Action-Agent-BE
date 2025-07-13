@@ -101,7 +101,7 @@ class UserController {
 		}
 	}
 
-	getUserBalance = async (req, res, next) => {
+	getUserCredits = async (req, res, next) => {
 		const validationResult = UserValidator.validateGetUserById(req);
 		if (validationResult?.error === true) {
 			throw new BadRequestResponse(validationResult?.message ?? "", validationResult?.code ?? -1);
@@ -109,10 +109,10 @@ class UserController {
 
 		const { userId } = validationResult?.data;
 		try {
-			const balance = await this.userService.getUserBalance(userId);
+			const credits = await this.userService.getUserCredits(userId);
 			return new OKSuccessResponse({
-				message: 'Get user balance success',
-				data: { balance },
+				message: 'Get user credits success',
+				data: { credits },
 				code: 1040600
 			}).send(res);
 			

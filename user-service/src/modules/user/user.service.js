@@ -6,6 +6,8 @@ const UserFilter = require("./user.filter");
 const MongooseUtil = require("../../utils/mongoose.util");
 const BcryptHelper = require("../../helpers/bcrypt.helper");
 const { generateRandomString, generateRSAKeysForAccess } = require("../../utils/crypto.util");
+require("dotenv").config();
+
 class UserService {
     constructor() {
         this.userModel = userModel;
@@ -135,12 +137,18 @@ class UserService {
         });
     }
 
-    async getUserBalance(userId) {
-        const foundUser = await this.userModel.findById(MongooseUtil.convertToMongooseObjectIdType(userId)).lean();
-        if (!foundUser) {
-            throw new ConflictResponse('User not found', 1040601);
+    async getUserCredits(userId) {
+        // Send GET AI_SERVICE_URL/private/user/{userId}/credits
+        const aiServiceUrl = process.env.AI_SERVICE_URL;
+        if (!aiServiceUrl) {
+            throw new ConflictResponse('AI service URL is not configured', 1040601);
         }
-        return foundUser.balance ?? 0;
+        const response = await fetch(`${aiServiceUrl}/private/user/${userId}/credits`);
+        if (!response.ok) {
+            throw new ConflictResponse('Failed to fetch user credits', 1040602);
+        }
+        const data = await response.json();
+        return data?.credits ?? 0;
     }
 
     async updateUser(userId, { username, password, fullname, role, email_verified, avatar, slug }) {

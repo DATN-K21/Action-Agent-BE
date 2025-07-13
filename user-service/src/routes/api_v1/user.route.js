@@ -28,6 +28,7 @@ router.use((req, res, next) => {
 
 router.get("/", handleAsync(userController.getUserList));
 router.get("/me", handleAsync(userController.getCurrentUser));
+router.get("/credits", handleAsync(userController.getUserCredits));
 
 router.get("/:id", handleAsync(userController.getUserById));
 
