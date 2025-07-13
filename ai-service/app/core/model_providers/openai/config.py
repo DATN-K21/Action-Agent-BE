@@ -66,6 +66,7 @@ def init_model(model: str, temperature: float, api_key: str, base_url: str, **kw
             temperature=temperature,
             api_key=SecretStr(api_key),
             base_url=base_url,
+            stream_usage=True,
             **kwargs,
         )
     else:

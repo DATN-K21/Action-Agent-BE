@@ -72,7 +72,6 @@ class BaseNode:
                 temperature=temperature,
                 api_key=self.model_info["api_key"],
                 base_url=self.model_info["base_url"],
-                stream_options={"include_usage": True},
             )  # Use temperature = 0 when initializing final_answer_model
             self.final_answer_model = model_provider_manager.init_model(
                 provider_name=provider,
@@ -80,7 +79,6 @@ class BaseNode:
                 temperature=0,
                 api_key=self.model_info["api_key"],
                 base_url=self.model_info["base_url"],
-                stream_options={"include_usage": True},
             )
 
         except ValueError:
