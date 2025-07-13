@@ -5,6 +5,7 @@ using payment_service.Dtos;
 using Stripe;
 using payment_service.Models;
 using payment_service.Dtos.Payment;
+using System.Net.Http;
 
 namespace payment_service.Services;
 
@@ -119,7 +120,8 @@ public class PaymentService : IPaymentService
             var creditsToAdd = (long)(amountUsd * _rateSettings.CreditsPerUsd);
 
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync($"{_serviceSettings.AiServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}");
+            var path = $"{_serviceSettings.AiServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}";
+            var response = await httpClient.PostAsync(path, new StringContent(""));
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("{Fn} => Failed to credit user {UserId}. StatusCode={StatusCode}",
