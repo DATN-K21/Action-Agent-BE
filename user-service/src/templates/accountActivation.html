@@ -11,6 +11,8 @@
             background: #fff;
             color: #222;
             margin: 0;
+            /* Use a subtle light gray background for the page */
+            background: #f7f7f7;
         }
         .container {
             max-width: 600px;
@@ -18,8 +20,8 @@
             background: #fff;
             padding: 32px 24px 24px 24px;
             border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.07);
-            border: 1px solid #e6e6e6;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+            border: 1px solid #d1d5db;
         }
         .banner {
             width: 100%;
@@ -27,11 +29,12 @@
             display: block;
             margin: 0 auto 24px auto;
             border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         h1 {
             font-size: 24px;
             text-align: center;
-            color: #222;
+            color: #111;
             margin-bottom: 8px;
             font-weight: 700;
         }
@@ -39,26 +42,38 @@
             display: inline-block;
             padding: 16px 40px;
             color: #fff;
-            background: #222;
+            background: #111;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 700;
             font-size: 18px;
             letter-spacing: 1.5px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-            border: 2px solid #222;
-            transition: background 0.2s, color 0.2s;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+            border: 2px solid #111;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
         }
         .btn:hover {
-            background: #444;
-            color: #ffe082;
-            border-color: #ffe082;
+            background: #333;
+            color: #fff;
+            border-color: #333;
         }
         .footer {
             font-size: 13px;
-            color: #888;
+            color: #666;
             margin-top: 32px;
             text-align: center;
+            border-top: 1px solid #e5e5e5;
+            padding-top: 16px;
+        }
+        p, a {
+            color: #222;
+        }
+        a {
+            word-break: break-all;
+        }
+        /* Subtle gray for less important text */
+        .container p:last-of-type, .container .footer {
+            color: #666;
         }
     </style>
 </head>
