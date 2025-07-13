@@ -11,28 +11,29 @@ namespace payment_service.Services;
 public class PaymentService : IPaymentService
 {
     private readonly ILogger<PaymentService> _logger;
-    private readonly IMongoCollection<User> _userCollection;
     private readonly IMongoCollection<Payment> _paymentCollection;
     private readonly PaymentIntentService _stripeIntentService;
     private readonly StripeSettings _stripeSettings;
     private readonly RateSettings _rateSettings;
+    private readonly ServiceSettings _serviceSettings;
     public PaymentService
     (
         ILogger<PaymentService> logger,
         IMongoDatabase db,
         IOptions<MongoSettings> mongoOptions,
         IOptions<StripeSettings> stripeOptions,
-        IOptions<RateSettings> rateOptions
+        IOptions<RateSettings> rateOptions,
+        IOptions<ServiceSettings> serviceOptions
     )
     {
         _logger = logger;
 
-        // collections: users & payments
-        _userCollection = db.GetCollection<User>(mongoOptions.Value.UserCollectionName);
+        // collections: payments
         _paymentCollection = db.GetCollection<Payment>(mongoOptions.Value.PaymentCollectionName);
 
         _stripeSettings = stripeOptions.Value;
         _rateSettings = rateOptions.Value;
+        _serviceSettings = serviceOptions.Value;
 
         StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
         _stripeIntentService = new PaymentIntentService();
@@ -118,7 +119,7 @@ public class PaymentService : IPaymentService
             var creditsToAdd = (long)(amountUsd * _rateSettings.CreditsPerUsd);
 
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync($"{_stripeSettings.UserServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}");
+            var response = await httpClient.PostAsync($"{_serviceSettings.AiServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}");
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("{Fn} => Failed to credit user {UserId}. StatusCode={StatusCode}",

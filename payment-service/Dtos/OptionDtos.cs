@@ -19,3 +19,8 @@ public class RateSettings
 {
     public decimal CreditsPerUsd { get; set; }
 }
+
+public class ServiceSettings
+{
+    public string AiServiceUrl { get; set; }
+}
