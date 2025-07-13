@@ -426,7 +426,9 @@ async def astream(
         await acreate_stop_event(x_user_id, thread_id)
 
         async def controlled_generator():
+            usage_callback = None
             try:
+                usage_callback = UsageMetadataCallbackHandler()
                 if not have_enough_credits:
                     from app.core.graph.messages import ChatResponse
 
@@ -439,7 +441,6 @@ async def astream(
                     logger.warning(f"User {x_user_id} has no credits left, stopping stream.")
                     yield f"data: {response.model_dump_json()}\n\n"
                 else:
-                    usage_callback = UsageMetadataCallbackHandler()
                     async for item in generator(usage_callback, team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
                         yield item
             except asyncio.CancelledError:
