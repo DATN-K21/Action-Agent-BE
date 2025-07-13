@@ -27,3 +27,5 @@ class Skill(BaseEntity):
     members = relationship("Member", secondary="member_skill_links", back_populates="skills")
     extension = relationship("ConnectedExtension", back_populates="skills")
     mcp = relationship("ConnectedMcp", back_populates="skills")
+
+    member_skill_links = relationship("MemberSkillLink", back_populates="skill", cascade="all, delete-orphan")
