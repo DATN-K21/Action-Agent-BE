@@ -91,6 +91,7 @@ class JobExecutionResponse(BaseResponse):
     completed_at: Optional[datetime] = Field(None, description="Completion timestamp")
     duration_seconds: Optional[float] = Field(None, description="Execution duration")
     prompt_sent: str = Field(..., description="Prompt that was sent")
+    thread_id: Optional[str] = Field(None, description="Thread ID for the execution")
     response_received: Optional[str] = Field(None, description="Response received")
     error_message: Optional[str] = Field(None, description="Error message if failed")
     retry_count: int = Field(..., description="Retry count")

@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Optional
 
-from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from croniter import croniter
@@ -52,9 +52,7 @@ class SchedulerManager:
         }
         
         # Configure executors
-        executors = {
-            'default': ThreadPoolExecutor(max_workers=env_settings.MAX_CONCURRENT_JOBS)
-        }
+        executors = {"default": AsyncIOExecutor()}
         
         # Job defaults
         job_defaults = {

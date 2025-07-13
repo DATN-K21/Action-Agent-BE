@@ -2,11 +2,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import JSON, String, Text, DateTime, Boolean
+from sqlalchemy import JSON, Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import BaseEntity
 from app.core.settings import env_settings
+from app.models.base import BaseEntity
 
 
 class JobStatus(str, Enum):
@@ -90,6 +90,7 @@ class JobExecution(BaseEntity):
     
     # Execution data
     prompt_sent: Mapped[str] = mapped_column(Text, nullable=False)
+    thread_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     response_received: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Error information

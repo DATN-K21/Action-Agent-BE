@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Dict
+from typing import Dict
 
 import httpx
 from sqlalchemy import select, update
@@ -59,6 +59,7 @@ class JobExecutor:
                 )
                 session.add(execution)
                 await session.commit()
+                await session.refresh(execution)
                 execution_id = execution.id
                 
                 # Update job status
@@ -81,9 +82,7 @@ class JobExecutor:
             
             # Mark execution as successful
             await self._update_execution_success(
-                execution_id,
-                response,
-                start_time
+                execution_id, thread_id, response, start_time
             )
             
             # Update job success stats
@@ -203,10 +202,7 @@ class JobExecutor:
             raise Exception(error_msg)
     
     async def _update_execution_success(
-        self,
-        execution_id: str,
-        response: str,
-        start_time: datetime
+        self, execution_id: str, thread_id: str, response: str, start_time: datetime
     ) -> None:
         """Update execution record with success."""
         end_time = datetime.utcnow()
@@ -220,7 +216,8 @@ class JobExecutor:
                     status=JobStatus.SUCCESS,
                     completed_at=end_time,
                     duration_seconds=duration,
-                    response_received=response
+                    thread_id=thread_id,
+                    response_received=response,
                 )
             )
             await session.commit()
@@ -324,81 +321,3 @@ class JobExecutor:
     async def close(self) -> None:
         """Close HTTP client."""
         await self.http_client.aclose()
-
-    async def diagnose_connection_issues(self) -> Dict[str, Any]:
-        """Diagnose connection issues with the AI service."""
-        diagnosis = {
-            "ai_service_url": env_settings.AI_SERVICE_URL,
-            "connection_successful": False,
-            "health_check_passed": False,
-            "response_time_ms": None,
-            "error_details": None,
-            "suggestions": [],
-        }
-
-        try:
-            import time
-
-            start_time = time.time()
-
-            # Try basic connectivity
-            health_url = f"{env_settings.AI_SERVICE_URL}/ping"
-            print(f"Checking AI service connectivity at: {health_url}")
-            response = await self.http_client.get(health_url, timeout=10.0)
-            print(f"Received response: {response.status_code} {response.text}")
-
-            end_time = time.time()
-            diagnosis["response_time_ms"] = (end_time - start_time) * 1000
-            diagnosis["connection_successful"] = True
-
-            if response.status_code == 200:
-                diagnosis["health_check_passed"] = True
-            else:
-                diagnosis["error_details"] = (
-                    f"Health check returned status {response.status_code}"
-                )
-                diagnosis["suggestions"].append(
-                    "AI service is reachable but health check failed"
-                )
-
-        except httpx.ConnectError as e:
-            diagnosis["error_details"] = f"Connection error: {str(e)}"
-            diagnosis["suggestions"].extend(
-                [
-                    "Check if the AI service is running",
-                    f"Verify the AI service URL: {env_settings.AI_SERVICE_URL}",
-                    "Check firewall settings and network connectivity",
-                    "Ensure the AI service is listening on the correct port",
-                ]
-            )
-        except httpx.TimeoutException as e:
-            diagnosis["error_details"] = f"Timeout error: {str(e)}"
-            diagnosis["suggestions"].extend(
-                [
-                    "AI service is reachable but responding slowly",
-                    "Check AI service performance and load",
-                    "Consider increasing the timeout value",
-                ]
-            )
-        except Exception as e:
-            diagnosis["error_details"] = f"Unexpected error: {str(e)}"
-            diagnosis["suggestions"].append("Check AI service logs for more details")
-
-        return diagnosis
-
-    async def validate_ai_service_connectivity(self) -> bool:
-        """Validate AI service connectivity during initialization."""
-        logger.info("Validating AI service connectivity...")
-        diagnosis = await self.diagnose_connection_issues()
-
-        if diagnosis["connection_successful"] and diagnosis["health_check_passed"]:
-            logger.info(
-                f"AI service validation successful (response time: {diagnosis['response_time_ms']:.2f}ms)"
-            )
-            return True
-        else:
-            logger.error(f"AI service validation failed: {diagnosis['error_details']}")
-            logger.error("Troubleshooting suggestions:")
-            for suggestion in diagnosis["suggestions"]:
-                logger.error(f"  - {suggestion}")
-            return False
