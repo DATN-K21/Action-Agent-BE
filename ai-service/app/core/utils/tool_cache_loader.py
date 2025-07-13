@@ -48,8 +48,6 @@ async def aload_tools_to_cache_by_skill(skill_id: str, member_id: str) -> None:
             if not skill:
                 raise ValueError(f"Skill with ID {skill_id} not found or is deleted")
 
-            logger.info(f"Found skill '{skill.name}' with reference_type: {skill.reference_type}")
-
             # Step 2: Load tools based on reference type
             if skill.reference_type == ConnectedServiceType.MCP:
                 if not skill.mcp_id:
@@ -92,7 +90,6 @@ async def _aload_mcp_tools_to_cache(session, mcp_id: str, member_id: str) -> Non
     if not connected_mcp:
         raise ValueError(f"Connected MCP with ID {mcp_id} not found or is deleted")
 
-    logger.info(f"Loading MCP tools for connection '{connected_mcp.mcp_name}'")
     # Prepare connection configuration for MCP service
     connections = {
         connected_mcp.mcp_name: {
@@ -102,7 +99,6 @@ async def _aload_mcp_tools_to_cache(session, mcp_id: str, member_id: str) -> Non
     }
     # Get tool information from MCP service
     tool_infos = await McpService.aget_mcp_tool_info(connections=connections)  # type: ignore
-    logger.info(f"Retrieved {len(tool_infos)} tools from MCP service")
 
     # Get all skills from member that have the same MCP reference
     related_skills = await _aget_related_skills_by_reference(session, member_id, ConnectedServiceType.MCP, mcp_id)
@@ -149,8 +145,6 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
     if not connected_extension:
         raise ValueError(f"Connected extension with ID {extension_id} not found or is deleted")
 
-    logger.info(f"Loading extension tools for '{connected_extension.extension_name}'")
-
     # Get extension service info
     extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
 
@@ -163,7 +157,6 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
 
     # Convert BaseTool instances to ToolInfo instances
     tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
-    logger.info(f"Retrieved {len(tool_infos)} tools from extension service")
 
     # Get all skills from member that have the same extension reference
     related_skills = await _aget_related_skills_by_reference(session, member_id, ConnectedServiceType.EXTENSION, extension_id)
@@ -236,8 +229,6 @@ async def _aget_related_skills_by_reference(session, member_id: str, reference_t
     result = await session.execute(skills_statement)
     skills = result.scalars().all()
 
-    logger.info(f"Found {len(skills)} related skills for member {member_id} with {reference_type} reference {reference_id}")
-
     return list(skills)
 
 
@@ -273,10 +264,7 @@ async def apreload_member_tools_cache(member_id: str) -> None:
             skills = result.scalars().all()
 
             if not skills:
-                logger.info(f"No MCP or extension skills found for member {member_id}")
                 return
-
-            logger.info(f"Found {len(skills)} MCP/extension skills for member {member_id}")
 
             # Group skills by reference type and reference ID
             mcp_groups = {}
@@ -294,12 +282,10 @@ async def apreload_member_tools_cache(member_id: str) -> None:
 
             # Load MCP tools
             for mcp_id in mcp_groups:
-                logger.info(f"Loading MCP tools for connection {mcp_id}")
                 await _aload_mcp_tools_to_cache(session, mcp_id, member_id)
 
             # Load extension tools
             for extension_id in extension_groups:
-                logger.info(f"Loading extension tools for connection {extension_id}")
                 await _aload_extension_tools_to_cache(session, extension_id, member_id)
 
             logger.info(f"Successfully preloaded all tools for member {member_id}")
