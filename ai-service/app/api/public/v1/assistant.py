@@ -323,7 +323,6 @@ async def _acreate_hierarchical_team(
         assistant_id=assistant.id,
     )
     session.add(hierarchical_team)
-    await session.flush()
 
     # Create root member (leader) for the hierarchical team
     root_member_id = str(uuid.uuid4())
@@ -343,7 +342,6 @@ async def _acreate_hierarchical_team(
         position_y=0.0,
     )
     session.add(root_member)
-    await session.flush()
 
     return hierarchical_team, root_member
 
@@ -1705,7 +1703,7 @@ async def acreate_advanced_assistant(
 
         # Prepare MCP members and their skills from database
         mcp_results: typing.Sequence[ConnectedMcp] = []
-        if request.mcp_ids and hierarchical_team and hierarchical_root_member:
+        if request.mcp_ids:
             mcp_statement = select(ConnectedMcp).where(
                 ConnectedMcp.id.in_(request.mcp_ids),
                 ConnectedMcp.user_id == x_user_id,
@@ -1716,7 +1714,7 @@ async def acreate_advanced_assistant(
 
         # Prepare extension members and their skills from database
         extension_results: typing.Sequence[ConnectedExtension] = []
-        if request.extension_ids and hierarchical_team and hierarchical_root_member:
+        if request.extension_ids:
             ext_statement = select(ConnectedExtension).where(
                 ConnectedExtension.id.in_(request.extension_ids),
                 ConnectedExtension.user_id == x_user_id,
