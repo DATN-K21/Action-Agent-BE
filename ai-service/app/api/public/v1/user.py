@@ -18,6 +18,7 @@ from app.schemas.user_api_key import (
     UpsertApiKeyRequest,
     UpsertApiKeyResponse,
 )
+from app.schemas.user import GetUserCreditsResponse
 
 logger = logging.get_logger(__name__)
 
@@ -252,7 +253,7 @@ async def delete_api_key(
         return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
-@router.get("/{user_id}/credits", summary="Get user's credits.", response_model=ResponseWrapper)
+@router.get("/{user_id}/credits", summary="Get user's credits.", response_model=ResponseWrapper[GetUserCreditsResponse])
 async def get_user_credits(
     session: SessionDep,
     user_id: str,
@@ -273,7 +274,8 @@ async def get_user_credits(
         credits = result.scalar_one_or_none()
         if credits is None:
             return ResponseWrapper.wrap(status=404, message="User not found").to_response()
-        return ResponseWrapper.wrap(status=200, data={"credits": credits}).to_response()
+        logger.info(f"User {user_id} has {credits} credits.")
+        return ResponseWrapper.wrap(status=200, data=GetUserCreditsResponse(credits=credits)).to_response()
 
     except Exception as e:
         logger.exception(f"Has error: {str(e)}")

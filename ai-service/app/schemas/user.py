@@ -47,6 +47,9 @@ class GetUserResponse(BaseResponse):
     first_name: Optional[str] = Field(None)
     last_name: Optional[str] = Field(None)
     created_at: Optional[datetime] = Field(None)
+    
+class GetUserCreditsResponse(BaseResponse):
+    credits: int = Field(0)
 
 
 class GetUsersResponse(PagingResponse):
