@@ -542,8 +542,9 @@ async def acreate_hierarchical_graph(
                 # Add HumanNode for tool review if interrupt is True
                 if team_root.assistant.interrupt:
                     # Add ToolEvaluationNode for intelligent tool assessment
-                    tool_evaluation_node = create_tool_evaluation_node(name)
-                    build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+                    if team_root.assistant.retrieval_interrupt_skip_enabled:
+                        tool_evaluation_node = create_tool_evaluation_node(name)
+                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                     # Add HumanNode for tool review if member.interrupt is True
                     human_tool_review_node = create_human_tool_review_node(name)
                     build.add_node(f"{name}-tool-review", human_tool_review_node.work)
@@ -557,11 +558,18 @@ async def acreate_hierarchical_graph(
             # Add conditional edges for the scheduler
             if team_root.assistant.interrupt:
                 # Route to tool evaluation node for intelligent assessment
-                build.add_conditional_edges(
-                    name,
-                    should_continue,
-                    create_tools_condition_with_tool_evaluation(name, leader_name, list(scheduler_tools)),
-                )
+                if team_root.assistant.retrieval_interrupt_skip_enabled:
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_tool_evaluation(name, leader_name, list(scheduler_tools)),
+                    )
+                else:
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_human_review(name, leader_name, list(scheduler_tools)),
+                    )
             else:
                 # Direct routing without human review
                 build.add_conditional_edges(
@@ -613,8 +621,9 @@ async def acreate_hierarchical_graph(
 
                     if member.interrupt:
                         # Add ToolEvaluationNode for intelligent tool assessment
-                        tool_evaluation_node = create_tool_evaluation_node(name)
-                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+                        if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
+                            tool_evaluation_node = create_tool_evaluation_node(name)
+                            build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                         # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
@@ -646,12 +655,20 @@ async def acreate_hierarchical_graph(
         # Create conditional edges with enhanced routing for HumanNode interrupts or tool evaluation
         if isinstance(member, GraphMember) and member.tools:
             if member.interrupt:
-                # Route to tool evaluation node for intelligent assessment
-                build.add_conditional_edges(
-                    name,
-                    should_continue,
-                    create_tools_condition_with_tool_evaluation(name, leader_name, list(member.tools)),
-                )
+                if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
+                    # Route to tool evaluation node for intelligent assessment
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_tool_evaluation(name, leader_name, list(member.tools)),
+                    )
+                else:
+                    # Route with human review
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_human_review(name, leader_name, list(member.tools)),
+                    )
             else:
                 # Direct routing without human review
                 build.add_conditional_edges(

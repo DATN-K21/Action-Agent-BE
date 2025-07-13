@@ -17,9 +17,6 @@ class AssistantBase(BaseModel):
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
-    provider: Optional[str] = Field(None, min_length=3, max_length=50, description="Provider of the assistant, e.g., 'openai', 'anthropic'")
-    model_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Name of the model to use with the assistant")
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Controls randomness of the output. Higher values mean more randomness")
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -29,8 +26,12 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
         description="Whether to interrupt the assistant's current task. If true, the assistant will stop its current task and return immediately.",
     )
     scheduler_enabled: Optional[bool] = Field(
-        False,
+        None,
         description="Whether scheduler functionality is enabled for this assistant. If true, the assistant can create and manage scheduled tasks.",
+    )
+    retrieval_interrupt_skip_enabled: Optional[bool] = Field(
+        None,
+        description="Whether to skip retrieval interrupt for this assistant. If true, the assistant will not interrupt the retrieval process.",
     )
     support_units: Optional[list[WorkflowType]] = Field(
         None,
@@ -51,9 +52,6 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=100)
     description: Optional[str] = Field(None, min_length=3, max_length=5000)
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
-    provider: Optional[str] = Field(None, min_length=3, max_length=50)
-    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -65,6 +63,10 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     scheduler_enabled: Optional[bool] = Field(
         None,
         description="Whether scheduler functionality is enabled for this assistant.",
+    )
+    retrieval_interrupt_skip_enabled: Optional[bool] = Field(
+        None,
+        description="Whether to skip retrieval interrupt for this assistant. If true, the assistant will not interrupt the retrieval process.",
     )
     support_units: Optional[list[WorkflowType]] = None
     mcp_ids: Optional[list[str]] = None
@@ -73,9 +75,6 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
 
 class UpdateAssistantConfigRequest(BaseRequest):
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=500)
-    provider: Optional[str] = Field(None, min_length=3, max_length=50)
-    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -87,6 +86,10 @@ class UpdateAssistantConfigRequest(BaseRequest):
     scheduler_enabled: Optional[bool] = Field(
         None,
         description="Whether scheduler functionality is enabled for this assistant.",
+    )
+    retrieval_interrupt_skip_enabled: Optional[bool] = Field(
+        None,
+        description="Whether to skip retrieval interrupt for this assistant. If true, the assistant will not interrupt the retrieval process.",
     )
 
 
@@ -102,9 +105,6 @@ class CreateAdvancedAssistantResponse(BaseResponse):
     assistant_type: AssistantType
     description: Optional[str]
     system_prompt: Optional[str]
-    provider: Optional[str]  # e.g., 'openai', 'anthropic'
-    model_name: Optional[str]
-    temperature: Optional[float]
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",
@@ -116,6 +116,10 @@ class CreateAdvancedAssistantResponse(BaseResponse):
     scheduler_enabled: Optional[bool] = Field(
         None,
         description="Whether scheduler functionality is enabled for this assistant.",
+    )
+    retrieval_interrupt_skip_enabled: Optional[bool] = Field(
+        None,
+        description="Whether to skip retrieval interrupt for this assistant. If true, the assistant will not interrupt the retrieval process.",
     )
     main_unit: WorkflowType
     support_units: Optional[list[WorkflowType]]  # unit alias team in this case
@@ -142,9 +146,6 @@ class GetGeneralAssistantResponse(BaseResponse):
     assistant_type: AssistantType
     description: Optional[str]
     system_prompt: Optional[str]
-    provider: str  # e.g., 'openai', 'anthropic'
-    model_name: Optional[str]
-    temperature: Optional[float]
     ask_human: Optional[bool] = Field(
         None,
         description="Whether to ask human for confirmation before executing the assistant's task. If true, the assistant will ask human for confirmation before executing its task.",

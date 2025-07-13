@@ -121,9 +121,6 @@ class GeneralAssistantHelpers:
             description=description,
             system_prompt=system_prompt,
             assistant_type=AssistantType.GENERAL_ASSISTANT,
-            provider=provider or env_settings.OPENAI_PROVIDER,
-            model_name=model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=temperature if temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=None,
             interrupt=None,
         )
@@ -511,9 +508,6 @@ class GeneralAssistantHelpers:
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
-            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=assistant.temperature or env_settings.BASIC_MODEL_TEMPERATURE,
             main_unit=WorkflowType.CHATBOT,
             support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             teams=teams_data,
@@ -626,8 +620,6 @@ class GeneralAssistantHelpers:
                 "member_count": member_count,
                 "main_unit": WorkflowType.CHATBOT.value,
                 "support_units": [unit.value for unit in [WorkflowType.RAGBOT, WorkflowType.SEARCHBOT]],
-                "provider": assistant.provider,
-                "model_name": assistant.model_name,
             }
 
         except Exception as e:
