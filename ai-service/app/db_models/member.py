@@ -24,7 +24,7 @@ class Member(BaseEntity):
     position_y: Mapped[Numeric | None] = mapped_column(Numeric, nullable=True)
 
     team = relationship("Team", back_populates="members")
-    skills = relationship("Skill", secondary="member_skill_links", back_populates="members")
+    skills = relationship("Skill", secondary="member_skill_links", back_populates="members", overlaps="member_skill_links,skill")
     uploads = relationship("Upload", secondary="member_upload_links", back_populates="members")
 
-    member_skill_links = relationship("MemberSkillLink", back_populates="member", cascade="all, delete-orphan")
+    member_skill_links = relationship("MemberSkillLink", back_populates="member", cascade="all, delete-orphan", overlaps="skills")

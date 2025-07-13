@@ -10,5 +10,13 @@ class MemberSkillLink(BaseEntity):
     member_id: Mapped[str] = mapped_column(ForeignKey("members.id"), primary_key=True)
     skill_id: Mapped[str] = mapped_column(ForeignKey("skills.id"), primary_key=True)
 
-    member = relationship("Member", back_populates="member_skill_links")
-    skill = relationship("Skill", back_populates="member_skill_links")
+    member = relationship(
+        "Member",
+        back_populates="member_skill_links",
+        overlaps="skills",  # <─ avoids warning
+    )
+    skill = relationship(
+        "Skill",
+        back_populates="member_skill_links",
+        overlaps="members",  # <─ avoids warning
+    )
