@@ -1055,7 +1055,7 @@ async def generator(
 
             formatted_output = f"data: {response.model_dump_json()}\n\n"
             yield formatted_output
-    except GraphRecursionError as e:
+    except GraphRecursionError:
         response = ChatResponse(
             type="stop",
             content="Graph recursion limit exceeded. Please try again with a simpler query.",

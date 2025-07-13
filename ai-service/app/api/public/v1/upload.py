@@ -558,7 +558,7 @@ async def atry_search_upload(
         retriever = create_search_client(user_id=x_user_id, thread_id=upload.thread_id or "global")
 
         # Perform search
-        documents = await retriever._perform_search(query, [upload_id])
+        documents = retriever._perform_search(query, upload_id)
 
         # Format results
         search_results = []
@@ -651,7 +651,7 @@ async def atry_search_thread(
             )
 
             # Perform search
-            documents = await retriever._aget_relevant_documents(query)
+            documents = retriever._get_relevant_documents(query)
 
             # Format results
             upload_search_results = []

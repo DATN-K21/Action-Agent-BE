@@ -3,7 +3,6 @@
 
 from dotenv import load_dotenv
 
-from .loader import load_yaml_config
 from .questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 from .tools import SELECTED_SEARCH_ENGINE, SearchEngine
 
