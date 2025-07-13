@@ -26,6 +26,7 @@ from app.core.state import (
 from app.core.tools.scheduler_tool import create_scheduler_tools
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.tools.tool_manager import extract_name
+from app.db_models.team import Team
 
 
 class GraphTeamState(TypedDict):
@@ -91,11 +92,14 @@ class BaseNode:
         ai_message.name = name
         return ai_message
 
-    def get_team_members_name(
-            self, team_members: Mapping[str, GraphMember | GraphLeader]
-    ) -> str:
+    def get_team_members_name(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
         """Get the names of all team members as a string"""
-        return ",".join(list(team_members))
+        team_members_name = ",".join(list(team_members))
+
+        if scheduler_enabled:
+            # If scheduler is enabled, append the scheduler name
+            team_members_name += ",hierarchical-scheduler"
+        return team_members_name
 
     async def _handle_messages(
         self,
@@ -325,13 +329,33 @@ class LeaderNode(BaseNode):
         ]
     )
 
-    def get_team_members_info(
-            self, team_members: Mapping[str, GraphMember | GraphLeader]
-    ) -> str:
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        team_root: Team | None,
+    ):
+        super().__init__(provider, model, temperature)
+        self.team_root = team_root
+
+    def get_team_members_info(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
         """Create a string containing team members name and role."""
         result = ""
         for member in team_members.values():
             result += f"name: {member.name}\nrole: {member.role}\n\n"
+
+        if scheduler_enabled:
+            # If scheduler is enabled, append the scheduler info
+            scheduler_role = (
+                "Scheduled Job Manager Role: Responsible for managing the lifecycle of scheduled jobs "
+                "that automate AI prompt execution. Grants ability to create, retrieve, inspect, update, "
+                "and delete both one-time and recurring jobs using cron expressions. Includes timezone-aware "
+                "execution, retry policies, and timeout configurations. Supports team-based and assistant-specific "
+                "job control for robust automation workflows."
+            )
+            result += f"name: hierarchical-scheduler\nrole: {scheduler_role}\n\n"
+
         return result
 
     def get_tool_definition(self, options: list[str]) -> dict[str, Any]:
@@ -379,8 +403,9 @@ class LeaderNode(BaseNode):
             self, state: GraphTeamState, config: RunnableConfig
     ) -> ReturnGraphTeamState:
         team = state["team"]  # This is the current node
-        team_members_name = self.get_team_members_name(team.members)
-        team_members_info = self.get_team_members_info(team.members)
+        scheduler_enabled = self.team_root.assistant.scheduler_enabled if self.team_root else False
+        team_members_name = self.get_team_members_name(team.members, scheduler_enabled)
+        team_members_info = self.get_team_members_info(team.members, scheduler_enabled)
         options = list(team.members) + ["FINISH"]
         tools = [self.get_tool_definition(options)]
 

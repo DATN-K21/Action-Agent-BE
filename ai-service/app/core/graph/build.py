@@ -499,6 +499,7 @@ async def acreate_hierarchical_graph(
                 provider=teams[leader_name].provider,
                 model=teams[leader_name].model,
                 temperature=teams[leader_name].temperature,
+                team_root=team_root,
             ).delegate  # type: ignore[arg-type]
         ),
     )
