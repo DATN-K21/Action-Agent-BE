@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any
 from uuid import uuid4
 
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.config import RunnableConfig
@@ -755,6 +756,7 @@ def convert_messages_and_tasks_to_dict(data: Any) -> Any:
 
 
 async def generator(
+    usage_callback: UsageMetadataCallbackHandler,
     team: Team,
     members: list[Member],
     messages: list[ChatMessage],
@@ -862,6 +864,7 @@ async def generator(
         config: RunnableConfig = {
             "configurable": {"thread_id": thread_id},
             "recursion_limit": env_settings.RECURSION_LIMIT,
+            "callbacks": [usage_callback],
         }
 
         # Handle interrupt logic by overriding state

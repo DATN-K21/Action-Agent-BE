@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -423,7 +424,8 @@ async def astream(
 
         async def controlled_generator():
             try:
-                async for item in generator(team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
+                usage_callback = UsageMetadataCallbackHandler()
+                async for item in generator(usage_callback, team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
                     yield item
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
@@ -437,6 +439,9 @@ async def astream(
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:
+                    logger.info(
+                        f"[controlled_generator] Thread={thread_id}, User={x_user_id}, Usage={usage_callback.usage_metadata}, Others={usage_callback}"
+                    )
                     await asyncio.wait_for(
                         acleanup_connection(x_user_id, thread_id),
                         timeout=15.0,  # 15 second timeout to prevent indefinite blocking
