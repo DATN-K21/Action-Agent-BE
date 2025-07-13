@@ -44,6 +44,9 @@ env:
 
   - name: RateSettings__CreditsPerUsd
     value: "1000000"
+  
+  - name: ServiceSettings__AiServiceUrl
+    value: "http://aiserviceprod:15200"
 
 ingress:
   enabled: true

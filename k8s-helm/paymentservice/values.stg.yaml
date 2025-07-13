@@ -45,6 +45,9 @@ env:
   - name: RateSettings__CreditsPerUsd
     value: "1000000"
 
+  - name: ServiceSettings__AiServiceUrl
+    value: "http://aiservicestg:15200"
+
 ingress:
   enabled: true
   className: "nginx"

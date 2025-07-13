@@ -12,7 +12,7 @@ public class Payment
     public string PaymentIntentId { get; set; } = null!;
     
     [BsonElement("user_id")]
-    public ObjectId UserId { get; set; }
+    public string UserId { get; set; } = null!;
         
     [BsonElement("amount_usd")]
     public decimal AmountUsd { get; set; }

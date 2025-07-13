@@ -1,5 +1,6 @@
 import asyncio
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,6 +12,7 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import WorkflowType
 from app.core.graph.build import generator
+from app.core.utils.database_utils import decrease_user_credits
 from app.db_models import Member, Team, Thread, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.team import ChatTeamRequest, CreateTeamRequest, TeamResponse, TeamsResponse, UpdateTeamRequest
@@ -351,6 +353,7 @@ async def astream(
                 selectinload(Team.graphs),
                 selectinload(Team.subgraphs),
                 selectinload(Team.members),
+                selectinload(Team.user),
             )
             .where(
                 Team.id == team_id,
@@ -379,8 +382,8 @@ async def astream(
         if thread.assistant_id != team.assistant.id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
 
-        # TODO: check remaning credits
-        # ...
+        # Check remaining credits
+        have_enough_credits = team.user.credits > 0
 
         # Populate the skills and accessible uploads for each member
         # Load members for this team
@@ -424,9 +427,21 @@ async def astream(
 
         async def controlled_generator():
             try:
-                usage_callback = UsageMetadataCallbackHandler()
-                async for item in generator(usage_callback, team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
-                    yield item
+                if not have_enough_credits:
+                    from app.core.graph.messages import ChatResponse
+
+                    response = ChatResponse(
+                        type="credits",
+                        content="You have no credits left. Please go to your profile and add credits to continue.",
+                        id=str(uuid4()),
+                        name="system",
+                    )
+                    logger.warning(f"User {x_user_id} has no credits left, stopping stream.")
+                    yield f"data: {response.model_dump_json()}\n\n"
+                else:
+                    usage_callback = UsageMetadataCallbackHandler()
+                    async for item in generator(usage_callback, team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
+                        yield item
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
                 logger.info(f"Stream cancelled for user {x_user_id}, thread {thread_id}")
@@ -439,11 +454,13 @@ async def astream(
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:
-                    usage_log = "Token usage for:\n" + "\n".join(
-                        f"- model={model}: input_tokens={stats['input_tokens']}, output_tokens={stats['output_tokens']}, total_tokens={stats['total_tokens']}"
-                        for model, stats in usage_callback.usage_metadata.items()
-                    )
-                    logger.info(f"[controlled_generator] Thread={thread_id}, User={x_user_id}, Usage={usage_log}")
+                    usage_log = "Token usage for:\n"
+                    for model, stats in usage_callback.usage_metadata.items():
+                        usage_log += f"- model={model}: input_tokens={stats['input_tokens']}, output_tokens={stats['output_tokens']}, total_tokens={stats['total_tokens']}\n"
+                        if team.user:
+                            user_id = team.user.id
+                            await decrease_user_credits(user_id, stats["total_tokens"])
+                    logger.info(f"[controlled_generator] Thread={thread_id}, User={x_user_id}, {usage_log}")
                     await asyncio.wait_for(
                         acleanup_connection(x_user_id, thread_id),
                         timeout=15.0,  # 15 second timeout to prevent indefinite blocking

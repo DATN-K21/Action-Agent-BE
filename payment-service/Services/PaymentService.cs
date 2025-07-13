@@ -70,9 +70,9 @@ public class PaymentService : IPaymentService
             var payment = new Payment
             {
                 PaymentIntentId = intent.Id,
-                UserId = ObjectId.Parse(userId),
+                UserId = userId,
                 AmountUsd = amountUsd,
-                Credits = 0,
+                Credits = amountUsd * _rateSettings.CreditsPerUsd,
                 Status = PaymentStatus.Created,
             };
             await _paymentCollection.InsertOneAsync(payment);
@@ -117,9 +117,14 @@ public class PaymentService : IPaymentService
             var amountUsd = intent.AmountReceived / 100m;
             var creditsToAdd = (long)(amountUsd * _rateSettings.CreditsPerUsd);
 
-            var userFilter = Builders<User>.Filter.Eq(u => u.Id, payment.UserId);
-            var userUpdate = Builders<User>.Update.Inc(u => u.Balance, creditsToAdd);
-            await _userCollection.UpdateOneAsync(userFilter, userUpdate);
+            using var httpClient = new HttpClient();
+            var response = await httpClient.PostAsync($"{_stripeSettings.UserServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("{Fn} => Failed to credit user {UserId}. StatusCode={StatusCode}",
+                    fn, payment.UserId, response.StatusCode);
+                return new ConfirmPaymentResponse(500, false, "Failed to credit user");
+            }
 
             // 4) update Payment doc
             var paymentFilter = Builders<Payment>.Filter.Eq(p => p.Id, payment.Id);
@@ -147,11 +152,6 @@ public class PaymentService : IPaymentService
             return new CreatePaymentIntentResponse(400, null, "UserId cannot be empty");
         if (amountUsd <= 0)
             return new CreatePaymentIntentResponse(400, null, "Amount must be > 0");
-        if (!ObjectId.TryParse(userId, out var oid))
-            return new CreatePaymentIntentResponse(400, null, "Invalid UserId format");
-        var user = await _userCollection.Find(u => u.Id == oid).FirstOrDefaultAsync();
-        if (user is null)
-            return new CreatePaymentIntentResponse(404, null, "User not found");
         return null;
     }
 
