@@ -184,7 +184,8 @@ class GraphTeam(BaseModel):
 
 
 def add_or_replace_messages(
-        messages: list[AnyMessage], new_messages: list[AnyMessage]
+    messages: list[AnyMessage],
+    new_messages: list[AnyMessage],
 ) -> list[AnyMessage]:
     """Add new messages to the state. If new_messages list is empty, clear messages instead."""
     if not new_messages:

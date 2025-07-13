@@ -4,13 +4,13 @@ from collections.abc import AsyncGenerator, Hashable, Mapping
 from functools import partial
 from typing import Any
 from uuid import uuid4
-from langgraph.errors import GraphRecursionError
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.config import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
@@ -37,8 +37,7 @@ from app.db_models import Member, Team
 from app.memory.checkpoint import get_checkpointer
 
 
-def convert_hierarchical_team_to_dict(members: list[Member]
-                                      ) -> dict[str, GraphTeam]:
+def convert_hierarchical_team_to_dict(members: list[Member]) -> dict[str, GraphTeam]:
     """
     Converts a team and its members into a dictionary representation.
 
@@ -61,7 +60,7 @@ def convert_hierarchical_team_to_dict(members: list[Member]
     members_lookup: dict[str, Member] = {}
 
     for member in members:
-        assert member.id is not None, "member.id is unexpectedly None"
+        assert member.id is not None, "[convert_hierarchical_team_to_dict] member.id is unexpectedly None"
         member_id = member.id
         if member.source is not None:
             source_id = member.source
@@ -80,6 +79,7 @@ def convert_hierarchical_team_to_dict(members: list[Member]
     while queue:
         member_id = queue.popleft()
         member = members_lookup[member_id]
+
         if member.type == "root" or member.type == "leader":
             leader_name = member.name
             # Create the team definitions
@@ -99,29 +99,29 @@ def convert_hierarchical_team_to_dict(members: list[Member]
             leader = members_lookup[source_id]
             leader_name = leader.name
             if member.type == "worker":
-                tools: list[GraphSkill | GraphUpload]
-                tools = [
+                tools: list[GraphSkill | GraphUpload] = []
+                tools.extend(
                     GraphSkill(
-                        skill_id=skill.id,
+                        skill_id=s.id,
                         member_id=member.id,
-                        display_name=skill.display_name,
+                        display_name=s.display_name,
                         user_id=member.team.user_id,
-                        name=skill.name,
-                        strategy=skill.strategy,
-                        definition=skill.tool_definition,
+                        name=s.name,
+                        strategy=s.strategy,
+                        definition=s.tool_definition,
                     )
-                    for skill in member.skills
-                ]
-                tools += [
+                    for s in member.skills or ()
+                )
+                tools.extend(
                     GraphUpload(
-                        name=upload.name,
-                        description=upload.description,
-                        user_id=upload.user_id,
-                        upload_id=upload.id,
+                        name=u.name,
+                        description=u.description,
+                        user_id=u.user_id,
+                        upload_id=u.id,
                     )
-                    for upload in member.uploads
-                    if upload.user_id is not None
-                ]
+                    for u in member.uploads or ()
+                    if u.user_id is not None
+                )
                 teams[leader_name].members[member_name] = GraphMember(
                     name=member_name,
                     backstory=member.backstory or "",
@@ -156,7 +156,7 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     out_counts: defaultdict[str, list[str]] = defaultdict(list[str])
     members_lookup: dict[str, Member] = {}
     for member in members:
-        assert member.id is not None, "member.id is unexpectedly None"
+        assert member.id is not None, "[convert_sequential_team_to_dict] member.id is unexpectedly None"
         member_id = member.id
         if member.source is not None:
             source_id = member.source
@@ -175,29 +175,29 @@ def convert_sequential_team_to_dict(members: list[Member]) -> dict[str, GraphMem
     while queue:
         member_id = queue.popleft()
         member = members_lookup[member_id]
-        tools: list[GraphSkill | GraphUpload]
-        tools = [
+        tools: list[GraphSkill | GraphUpload] = []
+        tools.extend(
             GraphSkill(
-                skill_id=skill.id,
+                skill_id=s.id,
                 member_id=member.id,
-                display_name=skill.display_name,
+                display_name=s.display_name,
                 user_id=member.team.user_id,
-                name=skill.name,
-                strategy=skill.strategy,
-                definition=skill.tool_definition,
+                name=s.name,
+                strategy=s.strategy,
+                definition=s.tool_definition,
             )
-            for skill in member.skills
-        ]
-        tools += [
+            for s in (member.skills or ())
+        )
+        tools.extend(
             GraphUpload(
-                name=upload.name,
-                description=upload.description,
-                user_id=upload.user_id,
-                upload_id=upload.id,
+                name=u.name,
+                description=u.description,
+                user_id=u.user_id,
+                upload_id=u.id,
             )
-            for upload in member.uploads
-            if upload.user_id is not None
-        ]
+            for u in (member.uploads or ())
+            if u.user_id is not None
+        )
         graph_member = GraphMember(
             name=member.name,
             backstory=member.backstory or "",
@@ -236,30 +236,8 @@ def convert_chatbot_ragbot_searchbot_team_to_dict(
                 user_id=upload.user_id,
                 upload_id=upload.id,
             )
-            for upload in member.uploads
+            for upload in (member.uploads or ())
             if upload.user_id is not None
-        ]
-    elif workflow_type == WorkflowType.CHATBOT:
-        tools = [
-            GraphUpload(
-                name=upload.name,
-                description=upload.description,
-                user_id=upload.user_id,
-                upload_id=upload.id,
-            )
-            for upload in member.uploads
-            if upload.user_id is not None
-        ] + [
-            GraphSkill(
-                skill_id=skill.id,
-                member_id=member.id,
-                display_name=skill.display_name,
-                user_id=member.team.user_id,
-                name=skill.name,
-                strategy=skill.strategy,
-                definition=skill.tool_definition,
-            )
-            for skill in member.skills
         ]
     elif workflow_type == WorkflowType.SEARCHBOT:
         tools = [
@@ -274,6 +252,30 @@ def convert_chatbot_ragbot_searchbot_team_to_dict(
             )
             for skill in member.skills
         ]
+    elif workflow_type == WorkflowType.CHATBOT:
+        tools = []
+        tools.extend(
+            GraphUpload(
+                name=upload.name,
+                description=upload.description,
+                user_id=upload.user_id,
+                upload_id=upload.id,
+            )
+            for upload in member.uploads or ()
+            if upload.user_id is not None
+        )
+        tools.extend(
+            GraphSkill(
+                skill_id=skill.id,
+                member_id=member.id,
+                display_name=skill.display_name,
+                user_id=member.team.user_id,
+                name=skill.name,
+                strategy=skill.strategy,
+                definition=skill.tool_definition,
+            )
+            for skill in member.skills or ()
+        )
 
     else:
         raise ValueError("Invalid workflow_type. Expected 'ragbot', 'searchbot' or 'chatbot'.")
@@ -333,9 +335,9 @@ def should_continue(state: GraphTeamState) -> str:
 
 
 def create_tools_condition(
-        current_member_name: str,
-        next_member_name: str,
-        tools: list[GraphSkill | GraphUpload],
+    current_member_name: str,
+    next_member_name: str,
+    tools: list[GraphSkill | GraphUpload],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges
     The tool node must be in format: '{current_member_name}-tools'
@@ -787,6 +789,8 @@ async def generator(
         graph_config: dict[str, Any] = {}
         response: Any = None
         interrupt_name = None
+
+        # HIERARCHICAL
         if team.workflow_type == WorkflowType.HIERARCHICAL:
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
@@ -799,6 +803,7 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
+        # SEQUENTIAL
         elif team.workflow_type == WorkflowType.SEQUENTIAL:
             member_dict = convert_sequential_team_to_dict(members)
             root = await acreate_sequential_graph(member_dict, checkpointer)
@@ -819,6 +824,7 @@ async def generator(
                 "all_messages": formatted_messages,
             }
 
+        # CHATBOT, RAGBOT, SEARCHBOT
         elif team.workflow_type == WorkflowType.CHATBOT or team.workflow_type == WorkflowType.RAGBOT or team.workflow_type == WorkflowType.SEARCHBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
             root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
@@ -838,6 +844,8 @@ async def generator(
                 "next": first_member.name,
                 "all_messages": formatted_messages,
             }
+
+        # WORKFLOW
         elif team.workflow_type == WorkflowType.WORKFLOW:
             graph_config = team.graphs[0].config
             root = initialize_graph(graph_config, checkpointer, save_graph_img=False)
@@ -846,6 +854,8 @@ async def generator(
                 "messages": [],
                 "all_messages": formatted_messages,
             }
+
+        # Not supported graph type
         else:
             raise ValueError("Unsupported graph type ")
 
@@ -883,11 +893,7 @@ async def generator(
             elif interrupt.decision == InterruptDecision.REPLIED:
                 current_values = await root.aget_state(config)
                 messages = current_values.values["messages"]
-                if (
-                        messages
-                        and isinstance(messages[-1], AIMessage)
-                        and interrupt.tool_message
-                ):
+                if messages and isinstance(messages[-1], AIMessage) and interrupt.tool_message:
                     tool_calls = messages[-1].tool_calls
                     state = {
                         "messages": [
@@ -909,18 +915,12 @@ async def generator(
 
                 elif interrupt.decision == InterruptDecision.REJECTED:
                     # Tool call rejected, add rejection message
-                    reject_message = (
-                        interrupt.tool_message if interrupt.tool_message else None
-                    )
-                    state = Command(
-                        resume={"action": "rejected", "data": reject_message}
-                    )
+                    reject_message = interrupt.tool_message if interrupt.tool_message else None
+                    state = Command(resume={"action": "rejected", "data": reject_message})
 
                 elif interrupt.decision == InterruptDecision.UPDATE:
                     # Update tool call parameters
-                    state = Command(
-                        resume={"action": "update", "data": interrupt.tool_message}
-                    )
+                    state = Command(resume={"action": "update", "data": interrupt.tool_message})
 
             elif interrupt.interaction_type == "output_review":
                 # Handle output review
@@ -929,18 +929,12 @@ async def generator(
                     state = Command(resume={"action": "approved"})
                 elif interrupt.decision == InterruptDecision.REVIEW:
                     # Output needs revision, add feedback
-                    state = Command(
-                        resume={"action": "review", "data": interrupt.tool_message}
-                    )
+                    state = Command(resume={"action": "review", "data": interrupt.tool_message})
                 elif interrupt.decision == InterruptDecision.EDIT:
                     # Directly edit output content
-                    state = Command(
-                        resume={"action": "edit", "data": interrupt.tool_message}
-                    )
+                    state = Command(resume={"action": "edit", "data": interrupt.tool_message})
                 else:
-                    raise ValueError(
-                        f"Unsupported decision for output review: {interrupt.decision}"
-                    )
+                    raise ValueError(f"Unsupported decision for output review: {interrupt.decision}")
 
             elif interrupt.interaction_type == "context_input":
                 # Handle context input, add extra information provided by user
@@ -952,9 +946,7 @@ async def generator(
                         }
                     )
                 else:
-                    raise ValueError(
-                        f"Unsupported decision for context input: {interrupt.decision}"
-                    )
+                    raise ValueError(f"Unsupported decision for context input: {interrupt.decision}")
 
             else:
                 raise ValueError(f"Unsupported interrupt type: {interrupt.interaction_type}")
@@ -1055,7 +1047,8 @@ async def generator(
 
             formatted_output = f"data: {response.model_dump_json()}\n\n"
             yield formatted_output
-    except GraphRecursionError as e:
+
+    except GraphRecursionError:
         response = ChatResponse(
             type="stop",
             content="Graph recursion limit exceeded. Please try again with a simpler query.",
@@ -1066,7 +1059,10 @@ async def generator(
         await asyncio.sleep(0.1)
     except Exception as e:
         response = ChatResponse(
-            type="error", content=str(e), id=str(uuid4()), name="error"
+            type="error",
+            content=str(e),
+            id=str(uuid4()),
+            name="error",
         )
         yield f"data: {response.model_dump_json()}\n\n"
         await asyncio.sleep(0.1)  # Add a small delay to ensure the message is sent
@@ -1075,11 +1071,11 @@ async def generator(
         # Clean up resources after generator completes
         if user_id:
             from app.core.stream_control import acleanup_connection
+
             await acleanup_connection(user_id, thread_id)
-        
+
         # Force cleanup of local variables to help garbage collection
         locals().clear()
-        
-        # Trigger garbage collection to release memory
         import gc
+
         gc.collect()

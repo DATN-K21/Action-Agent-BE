@@ -345,8 +345,16 @@ async def astream(
         # Get team and join members and skills
         statement = (
             select(Team)
-            .options(selectinload(Team.assistant), selectinload(Team.graphs), selectinload(Team.subgraphs), selectinload(Team.members))
-            .where(Team.id == team_id, Team.is_deleted.is_(False))
+            .options(
+                selectinload(Team.assistant),
+                selectinload(Team.graphs),
+                selectinload(Team.subgraphs),
+                selectinload(Team.members),
+            )
+            .where(
+                Team.id == team_id,
+                Team.is_deleted.is_(False),
+            )
         )
 
         result = await session.execute(statement)
@@ -355,46 +363,58 @@ async def astream(
         if not team:
             return ResponseWrapper(status=404, message="Team not found").to_response()
         if x_user_role not in ["admin", "super admin"] and (team.user_id != x_user_id):
-            return ResponseWrapper(
-                status=403, message="Not enough permissions"
-            ).to_response()
+            return ResponseWrapper(status=403, message="Not enough permissions").to_response()
 
         # Check if thread belongs to the team
-        statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+        statement = select(Thread).where(
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
         result = await session.execute(statement)
         thread = result.scalar_one_or_none()
 
         if not thread:
             return ResponseWrapper(status=404, message="Thread not found").to_response()
-
-        # Ensure the thread is associated with the requested assistant
         if thread.assistant_id != team.assistant.id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
+
+        # TODO: check remaning credits
+        # ...
 
         # Populate the skills and accessible uploads for each member
         # Load members for this team
         statement = (
             select(Member)
-            .options(selectinload(Member.skills), selectinload(Member.uploads), selectinload(Member.team))
-            .where(Member.team_id == team.id, Member.is_deleted.is_(False))
+            .options(
+                selectinload(Member.skills),
+                selectinload(Member.uploads),
+                selectinload(Member.team),
+            )
+            .where(
+                Member.team_id == team.id,
+                Member.is_deleted.is_(False),
+            )
         )
         result = await session.execute(statement)
         members = result.scalars().all()
-        for member in members:
-            member.skills = member.skills
-            member.uploads = member.uploads
-        graphs = team.graphs
-        for graph in graphs:
-            graph.config = graph.config
 
         # Load global uploads for this user
-        statement = select(Upload).where(Upload.user_id == x_user_id, Upload.is_deleted.is_(False), Upload.is_global.is_(True))
+        statement = select(Upload).where(
+            Upload.user_id == x_user_id,
+            Upload.is_deleted.is_(False),
+            Upload.is_global.is_(True),
+            Upload.thread_id.is_(None),
+        )
         result = await session.execute(statement)
         global_uploads = result.scalars().all()
 
-        # Append global uploads to the team members
+        # Early loads
         for member in members:
-            member.uploads.extend(global_uploads)
+            member.skills = member.skills
+            member.uploads = [upload for upload in member.uploads if upload.thread_id == thread_id] + list(global_uploads)
+        graphs = team.graphs
+        for graph in graphs:
+            graph.config = graph.config
 
         from app.core.stream_control import acleanup_connection, acreate_stop_event
 
@@ -426,10 +446,8 @@ async def astream(
                 except Exception as e:
                     logger.error(f"Error during cleanup connection: {e}", exc_info=True)
 
-        return StreamingResponse(
-            controlled_generator(),
-            media_type="text/event-stream",
-        )
+        return StreamingResponse(controlled_generator(), media_type="text/event-stream")
+
     except Exception as e:
         logger.error(f"Error streaming response: {e}", exc_info=True)
         return ResponseWrapper(status=500, message="Internal server error").to_response()

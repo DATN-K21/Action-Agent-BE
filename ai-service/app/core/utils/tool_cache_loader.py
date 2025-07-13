@@ -142,7 +142,6 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
     """
     # Get the extension connection details
     extension_statement = select(ConnectedExtension).where(ConnectedExtension.id == extension_id, ConnectedExtension.is_deleted.is_(False))
-
     result = await session.execute(extension_statement)
     connected_extension = result.scalar_one_or_none()
 

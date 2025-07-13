@@ -5,7 +5,7 @@ Fast and compact search client for ai-service to communicate with retrieval-serv
 import time
 from typing import List
 
-import grpc.aio
+import grpc
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
@@ -81,44 +81,38 @@ class CustomRetriever(BaseRetriever):
 
     def _perform_search(self, query: str, upload_id: str) -> List[Document]:
         """Perform the actual gRPC search."""
+        start_time = time.perf_counter()
 
-        try:
-            start_time = time.perf_counter()
+        channel_options = [
+            ("grpc.keepalive_time_ms", 30000),
+            ("grpc.keepalive_timeout_ms", 5000),
+            ("grpc.max_receive_message_length", 16 * 1024 * 1024),  # 16MB
+            ("grpc.max_send_message_length", 16 * 1024 * 1024),  # 16MB
+        ]
 
-            channel_options = [
-                ("grpc.keepalive_time_ms", 30000),
-                ("grpc.keepalive_timeout_ms", 5000),
-                ("grpc.max_receive_message_length", 16 * 1024 * 1024),  # 16MB
-                ("grpc.max_send_message_length", 16 * 1024 * 1024),  # 16MB
-            ]
+        channel = grpc.insecure_channel(env_settings.RETRIEVAL_SERVICE_GRPC_URL, options=channel_options)
+        stub = retrieval_pb2_grpc.RetrievalServiceStub(channel)
+        request = retrieval_pb2.SearchRequest(  # type: ignore
+            user_id=self.user_id,
+            upload_id=upload_id,
+            query=query,
+            top_k=self.top_k,
+            score_threshold=self.score_threshold,
+        )
 
-            channel = grpc.insecure_channel(env_settings.RETRIEVAL_SERVICE_GRPC_URL, options=channel_options)
-            stub = retrieval_pb2_grpc.RetrievalServiceStub(channel)
-            request = retrieval_pb2.SearchRequest(  # type: ignore
-                user_id=self.user_id,
-                upload_id=upload_id,
-                query=query,
-                top_k=self.top_k,
-                score_threshold=self.score_threshold,
-            )
+        TIMEOUT_SECONDS = 30.0
+        response = stub.Search(request, timeout=TIMEOUT_SECONDS)
+        channel.close()
 
-            TIMEOUT_SECONDS = 30.0
-            response = stub.Search(request, timeout=TIMEOUT_SECONDS)
-            channel.close()
+        # Convert to documents
+        documents = []
+        for result in response.results:
+            metadata = dict(result.metadata)
+            metadata.update({"score": result.score, "upload_id": upload_id})
+            documents.append(Document(page_content=result.content, metadata=metadata))
 
-            # Convert to documents
-            documents = []
-            for result in response.results:
-                metadata = dict(result.metadata)
-                metadata.update({"score": result.score, "upload_id": upload_id})
-                documents.append(Document(page_content=result.content, metadata=metadata))
-
-            logger.info(f"Retrieved {len(documents)} documents in {time.perf_counter() - start_time}s")
-            return documents
-
-        except grpc.aio.AioRpcError as e:
-            logger.error(f"[_perform_search] Has error: {e.code()} - {e.details()}")
-            raise
+        logger.info(f"[_perform_search] Retrieved {len(documents)} documents in {time.perf_counter() - start_time}s")
+        return documents
 
 
 # Simple factory function
