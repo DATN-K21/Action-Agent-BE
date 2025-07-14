@@ -276,6 +276,7 @@ class AccessService {
         try {
             const userInfo = await GoogleHelper.verifyIdToken(idToken);
             if (!userInfo) {
+                console.log("Invalid ID Token received from Google: ", idToken);
                 throw new BadRequestResponse('Invalid ID Token', 1010602);
             }
             const user = await this.userModel.findOne({ email: userInfo.email }).populate('role').lean();
@@ -303,7 +304,8 @@ class AccessService {
                 }
                 let response = await syncData('/private/user/create', userData);
                 if (response.error) {
-                    throw new BadRequestResponse("Something went sync data", 1010107);
+                    console.log("Failed to sync data with AI service: ", response.error);
+                    throw new BadRequestResponse("Something went wrong in sync data", 1010107);
                 }
 
                 const { privateKey, publicKey } = generateRSAKeysForAccess();
