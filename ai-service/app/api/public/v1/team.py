@@ -344,6 +344,12 @@ async def astream(
     Stream a response to a user's input.
     """
     try:
+        # Validation
+        if not x_user_id or not thread_id or not team_id:
+            return ResponseWrapper(status=400, message="User ID, thread ID, and team ID are required").to_response()
+        if team_chat.messages and any(not message.content.strip() for message in team_chat.messages):
+            return ResponseWrapper(status=400, message="Message cannot be empty").to_response()
+
         # Get team and join members and skills
         statement = (
             select(Team)
