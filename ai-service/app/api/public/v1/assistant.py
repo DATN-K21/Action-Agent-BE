@@ -1452,16 +1452,16 @@ async def _aremove_ask_human_skill_from_worker(
     skill_links = result.scalars().all()
 
     for skill_link in skill_links:
-        # Delete the skill link
-        await session.delete(skill_link)
-
-        # Get and soft delete the skill
         skill_statement = select(Skill).where(Skill.id == skill_link.skill_id)
         skill_result = await session.execute(skill_statement)
         skill = skill_result.scalar_one_or_none()
 
+        # Delete the skill link
+        await session.delete(skill_link)
+
+        # Get and hard delete the skill
         if skill:
-            skill.is_deleted = True
+            await session.delete(skill)
 
     await session.flush()
 
