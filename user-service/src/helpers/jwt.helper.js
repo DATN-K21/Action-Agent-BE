@@ -11,7 +11,7 @@ class JWTHelper {
             id: data?.id?.toString() ?? data?._id?.toString(),
             email: data?.email,
             username: data?.username,
-            role: data?.role?.name ?? data?.role_name,
+            role: data?.role?.name ?? "User",
             isActive: data?.email_verified ? true : false,
         }, privateKey, access_token_expire);
     }

@@ -291,9 +291,9 @@ class AccessService {
                     firstname: userInfo?.givenName,
                     lastname: userInfo?.familyName,
                     fullname: `${userInfo?.givenName} ${userInfo?.familyName}`,
-                    role: foundRole?._id,
-                    role_name: "User",
+                    role: foundRole,
                 });
+                console.log("New user created with Google login: ", newUser);
 
                 //Sync data with AI-service
                 const userData = {
