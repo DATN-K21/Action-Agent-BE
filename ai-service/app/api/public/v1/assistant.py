@@ -64,6 +64,15 @@ async def _aadd_ask_human_skill_to_worker(
         member_id: ID of the worker member to add the skill to
         user_id: User ID for the skill record
     """
+    # First, verify the member exists and is not deleted
+    member_statement = select(Member).where(Member.id == member_id, Member.is_deleted.is_(False))
+    result = await session.execute(member_statement)
+    member = result.scalar_one_or_none()
+
+    if not member:
+        logger.warning(f"Member with ID {member_id} not found or is deleted. Skipping ask_human skill addition.")
+        return
+
     # Get ask_human tool from global_tools
     ask_human_tool_info = global_tools.get("ask-human")
     if not ask_human_tool_info:
@@ -851,11 +860,11 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
         assistant: Assistant entity to update
         request: Update request data
     """
-    if request.name:
+    if request.name is not None:
         setattr(assistant, "name", request.name)
-    if request.description:
+    if request.description is not None:
         setattr(assistant, "description", request.description)
-    if request.system_prompt:
+    if request.system_prompt is not None:
         setattr(assistant, "system_prompt", request.system_prompt)
     if request.ask_human is not None:
         setattr(assistant, "ask_human", request.ask_human)
@@ -1195,17 +1204,34 @@ async def _aupdate_support_units(
                     await _acreate_search_skills(session, support_root_member.id, user_id)
 
 
-def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssistantRequest) -> UpdateAdvancedAssistantResponse:
+async def _format_update_response(session: AsyncSession, assistant: Assistant) -> UpdateAdvancedAssistantResponse:
     """
     Format the response data for updated assistant.
 
     Args:
+        session: Database session
         assistant: Updated assistant entity
-        request: Original update request    Returns:
+
+    Returns:
         Formatted response object
     """
     # Format teams data using existing helper
     teams_data = _format_team_data(assistant.teams)
+
+    # Extract MCP and extension IDs from hierarchical team
+    mcp_ids = None
+    extension_ids = None
+    
+    # Find the hierarchical team
+    hierarchical_team = None
+    for team in assistant.teams:
+        if team.workflow_type == WorkflowType.HIERARCHICAL:
+            hierarchical_team = team
+            break
+    
+    # If hierarchical team exists, extract service IDs
+    if hierarchical_team:
+        mcp_ids, extension_ids = await _aextract_service_ids_from_team(session, hierarchical_team)
 
     return UpdateAdvancedAssistantResponse(
         id=assistant.id,
@@ -1216,10 +1242,12 @@ def _format_update_response(assistant: Assistant, request: UpdateAdvancedAssista
         system_prompt=assistant.system_prompt,
         ask_human=assistant.ask_human,
         interrupt=assistant.interrupt,
+        scheduler_enabled=assistant.scheduler_enabled,
+        retrieval_interrupt_skip_enabled=assistant.retrieval_interrupt_skip_enabled,
         main_unit=WorkflowType.CHATBOT,
-        support_units=request.support_units or _extract_support_units(assistant),
-        mcp_ids=request.mcp_ids,
-        extension_ids=request.extension_ids,
+        support_units=_extract_support_units(assistant),
+        mcp_ids=mcp_ids,
+        extension_ids=extension_ids,
         teams=teams_data,
         created_at=assistant.created_at,  # type: ignore
     )
@@ -1385,24 +1413,28 @@ async def _aupdate_ask_human_skills_for_workers(
     if team.workflow_type != WorkflowType.HIERARCHICAL:
         return
 
-    for member in team.members:
-        if member.type == "worker":
-            if ask_human_enabled:
-                # Check if member already has ask_human skill
-                existing_skill_statement = (
-                    select(Skill)
-                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                    .where(MemberSkillLink.member_id == member.id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
-                )
-                result = await session.execute(existing_skill_statement)
-                existing_skill = result.scalar_one_or_none()
+    # Get only non-deleted worker members from the team
+    active_members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
+    result = await session.execute(active_members_statement)
+    active_worker_members = result.scalars().all()
 
-                if not existing_skill:
-                    # Add ask_human skill to worker
-                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
-            else:
-                # Remove ask_human skill from worker
-                await _aremove_ask_human_skill_from_worker(session, member.id)
+    for member in active_worker_members:
+        if ask_human_enabled:
+            # Check if member already has ask_human skill
+            existing_skill_statement = (
+                select(Skill)
+                .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                .where(MemberSkillLink.member_id == member.id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
+            )
+            result = await session.execute(existing_skill_statement)
+            existing_skill = result.scalar_one_or_none()
+
+            if not existing_skill:
+                # Add ask_human skill to worker
+                await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+        else:
+            # Remove ask_human skill from worker
+            await _aremove_ask_human_skill_from_worker(session, member.id)
 
 
 async def _aremove_ask_human_skill_from_worker(
@@ -1864,6 +1896,7 @@ async def aupdate_advanced_assistant(
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()  # Update the assistant table
 
         _update_assistant_basic_info(assistant, request)
+        await session.flush()
 
         # Handle hierarchical team for MCPs and extensions
         hierarchical_team = None
@@ -1914,34 +1947,35 @@ async def aupdate_advanced_assistant(
 
             # Update extension members of the hierarchical team
             await _aupdate_extension_members(session, assistant, hierarchical_team, request, x_user_id)
-        else:
-            # If no MCPs or extensions, remove hierarchical team if it exists
-            if hierarchical_team:
-                # Delete hierarchical team and all its members
-                member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
-                member_result = await session.execute(member_statement)
-                member_ids = member_result.scalars().all()
 
-                if member_ids:
-                    # Delete skills and links
-                    skills_statement = (
-                        select(Skill.id)
-                        .select_from(Skill)
-                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                        .where(MemberSkillLink.member_id.in_(member_ids))
-                    )
-                    skills_result = await session.execute(skills_statement)
-                    skill_ids = skills_result.scalars().all()
+        # If no MCPs or extensions, remove hierarchical team if it exists
+        if hierarchical_team and request.mcp_ids and len(request.mcp_ids) == 0 and request.extension_ids and len(request.extension_ids) == 0:
+            # Delete hierarchical team and all its members
+            member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
+            member_result = await session.execute(member_statement)
+            member_ids = member_result.scalars().all()
 
-                    await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
-                    await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
+            if member_ids:
+                # Delete skills and links
+                skills_statement = (
+                    select(Skill.id)
+                    .select_from(Skill)
+                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                    .where(MemberSkillLink.member_id.in_(member_ids))
+                )
+                skills_result = await session.execute(skills_statement)
+                skill_ids = skills_result.scalars().all()
 
-                    if skill_ids:
-                        await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
+                await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+                await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
 
-                    await session.execute(delete(Member).where(Member.id.in_(member_ids)))
+                if skill_ids:
+                    await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
 
-                await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+                await session.execute(delete(Member).where(Member.id.in_(member_ids)))
+
+            await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+            hierarchical_team = None
 
         # Update ask-human
         if request.ask_human is not None and hierarchical_team is not None:
@@ -1958,7 +1992,7 @@ async def aupdate_advanced_assistant(
         await session.commit()
 
         # Format and return the response
-        response = _format_update_response(assistant, request)
+        response = await _format_update_response(session, assistant)
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:
