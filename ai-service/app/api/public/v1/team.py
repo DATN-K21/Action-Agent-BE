@@ -1,6 +1,5 @@
 import asyncio
 from typing import Any
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
@@ -429,20 +428,18 @@ async def astream(
             usage_callback = None
             try:
                 usage_callback = UsageMetadataCallbackHandler()
-                if not have_enough_credits:
-                    from app.core.graph.messages import ChatResponse
+                async for item in generator(
+                    have_enough_credits,
+                    usage_callback,
+                    team,
+                    list(members),
+                    team_chat.messages,
+                    thread_id,
+                    team_chat.interrupt,
+                    x_user_id,
+                ):
+                    yield item
 
-                    response = ChatResponse(
-                        type="error",
-                        content="You have no credits left. Please go to your profile and add credits to continue.",
-                        id=str(uuid4()),
-                        name="system",
-                    )
-                    logger.warning(f"User {x_user_id} has no credits left, stopping stream.")
-                    yield f"data: {response.model_dump_json()}\n\n"
-                else:
-                    async for item in generator(usage_callback, team, list(members), team_chat.messages, thread_id, team_chat.interrupt, x_user_id):
-                        yield item
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
                 logger.info(f"Stream cancelled for user {x_user_id}, thread {thread_id}")
@@ -451,7 +448,7 @@ async def astream(
                 # Log the error and yield an error event
                 logger.error(f"Error in stream generator for user {x_user_id}, thread {thread_id}: {e}", exc_info=True)
                 # Yield a server-sent event with error information
-                yield f"event: error\ndata: {{\"error\": \"An error occurred during streaming\", \"details\": \"{str(e)}\"}}\n\n"
+                yield f'event: error\ndata: {{"error": "An error occurred during streaming", "details": "{str(e)}"}}\n\n'
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:

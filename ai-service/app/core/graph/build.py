@@ -17,6 +17,7 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 
+from app.core import logging
 from app.core.enums import InterruptDecision, InterruptType, WorkflowType
 from app.core.graph.members import (
     GraphLeader,
@@ -36,6 +37,8 @@ from app.core.workflow.build_workflow import initialize_graph
 from app.core.workflow.node.human_node import HumanNode
 from app.db_models import Member, Team
 from app.memory.checkpoint import get_checkpointer
+
+logger = logging.get_logger(__name__)
 
 
 def convert_hierarchical_team_to_dict(members: list[Member]) -> dict[str, GraphTeam]:
@@ -756,6 +759,7 @@ def convert_messages_and_tasks_to_dict(data: Any) -> Any:
 
 
 async def generator(
+    have_enough_credits: bool,
     usage_callback: UsageMetadataCallbackHandler,
     team: Team,
     members: list[Member],
@@ -957,6 +961,18 @@ async def generator(
         async for event in root.astream_events(state, version="v2", config=config):
             # Check if stop has been requested for this user and thread
             if user_id:
+                if not have_enough_credits:
+                    response = ChatResponse(
+                        type="error",
+                        content="You have no credits left. Please go to your profile and add credits to continue.",
+                        id=str(uuid4()),
+                        name="system",
+                    )
+                    logger.warning(f"User {user_id} has no credits left, stopping stream.")
+                    formatted_output = f"data: {response.model_dump_json()}\n\n"
+                    yield formatted_output
+                    break
+
                 from app.core.stream_control import ais_stop_requested
 
                 is_stopped = await ais_stop_requested(user_id, thread_id)
@@ -990,6 +1006,7 @@ async def generator(
             if team.workflow_type != WorkflowType.WORKFLOW and team.workflow_type != WorkflowType.HIERARCHICAL:
                 if not isinstance(message, AIMessage):
                     return
+
                 for tool_call in message.tool_calls:
                     if tool_call["name"] == "ask-human":
                         response = ChatResponse(
@@ -1051,7 +1068,7 @@ async def generator(
             formatted_output = f"data: {response.model_dump_json()}\n\n"
             yield formatted_output
 
-    except GraphRecursionError:
+    except GraphRecursionError as e:
         response = ChatResponse(
             type="error",
             content="Graph recursion limit exceeded. Please try again with a simpler query.",
@@ -1060,6 +1077,8 @@ async def generator(
         )
         yield f"data: {response.model_dump_json()}\n\n"
         await asyncio.sleep(0.1)
+        raise e
+
     except Exception as e:
         response = ChatResponse(
             type="error",
