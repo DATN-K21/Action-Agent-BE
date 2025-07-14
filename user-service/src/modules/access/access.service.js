@@ -291,7 +291,8 @@ class AccessService {
                     firstname: userInfo?.givenName,
                     lastname: userInfo?.familyName,
                     fullname: `${userInfo?.givenName} ${userInfo?.familyName}`,
-                    role: foundRole?._id
+                    role: foundRole?._id,
+                    role_name: foundRole?.name,
                 });
 
                 //Sync data with AI-service
