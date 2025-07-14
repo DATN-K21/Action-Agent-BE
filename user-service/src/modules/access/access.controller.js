@@ -151,6 +151,7 @@ class AccessController {
     handleLoginWithGoogle = async (req, res, next) => {
         const validationResult = AccessValidator.validateGoogleLogin(req);
         if (validationResult.error) {
+            console.log("Google login validation failed: ", validationResult);
             throw new BadRequestResponse(validationResult.message, validationResult.code);
         }
 
@@ -165,6 +166,7 @@ class AccessController {
             }).send(res);
         } catch (error) {
             if (MongooseUtil.isMongooseError(error)) {
+                console.log("Mongoose error during Google login: ", error);
                 throw new BadRequestResponse("Something went wrong", 1010606);
             }
             throw error;
