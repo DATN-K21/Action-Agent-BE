@@ -51,3 +51,7 @@ app.log
 # cert
 localhost.pem
 localhost-key.pem
+
+# test
+.benchmarks/
+.coverage

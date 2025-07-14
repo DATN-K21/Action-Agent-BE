@@ -39,18 +39,20 @@ class TestThreadApiEndpoints:
     @pytest.fixture
     def sample_assistant(self, sample_assistant_id, sample_user_id) -> Assistant:
         """Create sample assistant for testing."""
-        return Assistant(
+        assistant = Assistant(
             id=sample_assistant_id,
             user_id=sample_user_id,
             name="Test Assistant",
             description="Test assistant description",
             system_prompt="You are a helpful assistant",
-            provider="openai",
-            model_name="gpt-4",
-            temperature=0.7,
             created_at=datetime.utcnow(),
             is_deleted=False,
         )
+        # Add missing fields that the API expects
+        assistant.provider = "openai"
+        assistant.model_name = "gpt-3.5-turbo"
+        assistant.temperature = 0.1
+        return assistant
 
     @pytest.fixture
     def sample_thread(self, sample_thread_id, sample_user_id, sample_assistant_id) -> Thread:
