@@ -22,9 +22,9 @@ class TestTeamApiEndpoints:
     """Test class for team API endpoints."""
 
     @pytest.fixture
-    def sample_team_id(self) -> int:
+    def sample_team_id(self) -> str:
         """Generate sample team ID."""
-        return 123
+        return "123"
 
     @pytest.fixture
     def sample_user_id(self) -> str:
@@ -32,22 +32,19 @@ class TestTeamApiEndpoints:
         return "456"
 
     @pytest.fixture
-    def sample_thread_id(self) -> int:
+    def sample_thread_id(self) -> str:
         """Generate sample thread ID."""
-        return 321
+        return "321"
 
     @pytest.fixture
     def sample_assistant(self) -> Assistant:
         """Create sample assistant for testing."""
         return Assistant(
-            id=789,
-            user_id="456",  # Changed to string to match the header format
+            id="789",  # Changed to string to match BaseEntity ID type
+            user_id="456",
             name="Test_Assistant",
             description="Test assistant description",
             system_prompt="You are a helpful assistant",
-            provider="openai",
-            model_name="gpt-4",
-            temperature=0.7,
             created_at=datetime.utcnow(),
             is_deleted=False,
         )
@@ -56,7 +53,7 @@ class TestTeamApiEndpoints:
     def sample_team(self, sample_assistant) -> Team:
         """Create sample team for testing."""
         team = Team(
-            id=123,  # Change to integer ID
+            id="123",  # Changed to string to match BaseEntity ID type
             name="Test_Team",  # Changed to match pattern
             description="Test team description",
             workflow_type=WorkflowType.HIERARCHICAL,
@@ -85,7 +82,7 @@ class TestTeamApiEndpoints:
     def sample_member(self, sample_team) -> Member:
         """Create sample member for testing."""
         return Member(
-            id=654,
+            id="654",  # Changed to string to match BaseEntity ID type
             name="Test_Member",
             team_id=sample_team.id,
             backstory="Test member backstory",
@@ -447,7 +444,7 @@ class TestTeamApiEndpoints:
 
         # Create a mock TeamResponse object
         mock_team_response = TeamResponse(
-            id=123, name="Test_Team", description="Test team description", workflow_type=WorkflowType.HIERARCHICAL, user_id=456, icon=None
+            id="123", name="Test_Team", description="Test team description", workflow_type=WorkflowType.HIERARCHICAL, user_id="456", icon=None
         )
 
         try:

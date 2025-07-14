@@ -90,12 +90,7 @@ class TestExtensionApiEndpoints:
         mock_service_info = MagicMock(spec=ExtensionServiceInfo)
         mock_service_info.service_object = mock_service
 
-        # Setup session behavior for successful database operations
-        mock_session.add = AsyncMock()
-        mock_session.commit = AsyncMock()
-        mock_session.refresh = AsyncMock()
-
-        # Override the database session dependency
+        # Override the database session dependency (not used by this endpoint)
         from app.core.db_session import get_async_session
 
         async def mock_get_async_session():
@@ -129,13 +124,8 @@ class TestExtensionApiEndpoints:
                 assert data["isExisted"] is False
                 assert data["redirectUrl"] == "https://github.com/login/oauth/authorize"
 
-                # Verify all expected database operations were performed
-                mock_session.add.assert_called_once()
-                mock_session.commit.assert_called_once()
-                mock_session.refresh.assert_called_once()
-
                 # Verify service was properly initialized
-                mock_service.initialize_connection.assert_called_once()
+                mock_service.initialize_connection.assert_called_once_with(user_id=sample_user_id)
                 mock_get_service_info.assert_called_once_with(extension_enum)
 
             finally:
@@ -170,12 +160,7 @@ class TestExtensionApiEndpoints:
         mock_service_info = MagicMock(spec=ExtensionServiceInfo)
         mock_service_info.service_object = mock_service
 
-        # Setup session behavior
-        mock_session.add = AsyncMock()
-        mock_session.commit = AsyncMock()
-        mock_session.refresh = AsyncMock()
-
-        # Override the dependency
+        # Override the dependency (not used by this endpoint)
         from app.core.db_session import get_async_session
 
         async def mock_get_async_session():
@@ -209,11 +194,8 @@ class TestExtensionApiEndpoints:
                 assert data["isExisted"] is True
                 assert data["redirectUrl"] is None
 
-                # Verify mock calls
-                mock_session.add.assert_called_once()
-                mock_session.commit.assert_called_once()
-                mock_session.refresh.assert_called_once()
-                mock_service.initialize_connection.assert_called_once()
+                # Verify service was properly called
+                mock_service.initialize_connection.assert_called_once_with(user_id=sample_user_id)
 
             finally:
                 app.dependency_overrides.clear()
@@ -266,16 +248,16 @@ class TestExtensionApiEndpoints:
             finally:
                 app.dependency_overrides.clear()
 
-    async def test_active_extension_database_error(
+    async def test_active_extension_service_error(
         self,
         client: TestClient,
         mock_session: AsyncMock,
         sample_user_id: str,
     ):
-        """Test activating an extension when a database error occurs.
+        """Test activating an extension when the extension service raises an error.
 
-        This test verifies that when a database error occurs during extension activation,
-        the API properly handles the error, returns a 500 response, and rolls back the transaction.
+        This test verifies that when the extension service raises an error during initialization,
+        the API properly handles the error and returns a 500 response.
         """
         # Setup mock for extension service manager
         from unittest.mock import patch
@@ -287,19 +269,12 @@ class TestExtensionApiEndpoints:
         mock_service.get_app_enum.return_value = "github"
         mock_service.get_name.return_value = "GitHub"
 
-        # Setup connection request to simulate successful initialization
-        mock_connection_request = MagicMock()
-        mock_connection_request.redirectUrl = "https://github.com/login/oauth/authorize"
-        mock_service.initialize_connection.return_value = mock_connection_request
+        # Setup initialize_connection to raise an error
+        mock_service.initialize_connection.side_effect = Exception("Extension service error")
 
         # Mock service info
         mock_service_info = MagicMock(spec=ExtensionServiceInfo)
         mock_service_info.service_object = mock_service
-
-        # Setup session to raise an error during commit
-        mock_session.add = AsyncMock()
-        mock_session.commit = AsyncMock(side_effect=SQLAlchemyError("Database error"))
-        mock_session.rollback = AsyncMock()
 
         # Override the dependency
         from app.core.db_session import get_async_session
@@ -330,14 +305,11 @@ class TestExtensionApiEndpoints:
                 assert response_data["status"] == 500
                 assert response_data["message"] == "Internal server error"
 
-                # Verify session operations but not the initialize_connection
-                # since the exception happens before initialize_connection is called
-                mock_session.add.assert_called_once()
-                mock_session.commit.assert_called_once()
-                mock_session.rollback.assert_called_once()
+                # Verify the service method was called
+                mock_service.initialize_connection.assert_called_once_with(user_id=sample_user_id)
 
-                # The initialize_connection should not be called because the exception occurs during commit
-                mock_service.initialize_connection.assert_not_called()
+                # Verify session rollback was called (even though no DB operations happened)
+                mock_session.rollback.assert_called_once()
 
             finally:
                 app.dependency_overrides.clear()
@@ -398,7 +370,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.post(
-                    f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/disconnect?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": sample_user_id, "x-user-role": "user"},
                 )
 
@@ -475,7 +447,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.post(
-                    f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/disconnect?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": "admin-123", "x-user-role": "admin"},
                 )
 
@@ -526,7 +498,7 @@ class TestExtensionApiEndpoints:
 
         try:
             response = client.post(
-                f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                f"/api/v1/extension/disconnect?extension_enum=nonexistent",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 
@@ -576,7 +548,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.post(
-                    f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/disconnect?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": sample_user_id, "x-user-role": "user"},
                 )
 
@@ -648,7 +620,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.post(
-                    f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/disconnect?extension_enum={connected_extension.extension_enum}",
                     headers={"x-user-id": sample_user_id, "x-user-role": "user"},
                 )
 
@@ -685,7 +657,7 @@ class TestExtensionApiEndpoints:
 
         try:
             response = client.post(
-                f"/api/v1/extension/disconnect?connected_extension_id={sample_connected_extension_id}",
+                f"/api/v1/extension/disconnect?extension_enum=github",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 
@@ -754,7 +726,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.get(
-                    f"/api/v1/extension/check-active?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/check-active?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": sample_user_id, "x-user-role": "user"},
                 )
 
@@ -823,7 +795,7 @@ class TestExtensionApiEndpoints:
             try:
                 admin_user_id = "admin-123"
                 response = client.get(
-                    f"/api/v1/extension/check-active?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/check-active?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": admin_user_id, "x-user-role": "admin"},
                 )
 
@@ -870,7 +842,7 @@ class TestExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/extension/check-active?connected_extension_id={sample_connected_extension_id}",
+                f"/api/v1/extension/check-active?extension_enum=nonexistent",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 
@@ -920,7 +892,7 @@ class TestExtensionApiEndpoints:
 
             try:
                 response = client.get(
-                    f"/api/v1/extension/check-active?connected_extension_id={sample_connected_extension_id}",
+                    f"/api/v1/extension/check-active?extension_enum={sample_connected_extension.extension_enum}",
                     headers={"x-user-id": sample_user_id, "x-user-role": "user"},
                 )
 
@@ -956,7 +928,7 @@ class TestExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/extension/check-active?connected_extension_id={sample_connected_extension_id}",
+                f"/api/v1/extension/check-active?extension_enum=github",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 

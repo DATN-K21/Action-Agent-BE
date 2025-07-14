@@ -57,11 +57,14 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test successful connection callback with valid parameters."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
-
+        # Mock the extension service manager
+        from app.services.extensions import extension_service_manager
+        
+        mock_service_info = AsyncMock()
+        mock_service_info.service_object = AsyncMock()
+        mock_service_info.service_object.get_app_enum.return_value = "github"
+        mock_service_info.service_object.get_name.return_value = "GitHub"
+        
         # Override the dependency
         from app.core.db_session import get_async_session
 
@@ -71,9 +74,10 @@ class TestCallbackApiEndpoints:
         app.dependency_overrides[get_async_session] = mock_get_async_session
 
         try:
-            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
+            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"), \
+                 patch.object(extension_service_manager, "aget_service_info", return_value=mock_service_info):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "success",
                         "connectedAccountId": "github-account-123",
@@ -86,6 +90,9 @@ class TestCallbackApiEndpoints:
             assert "http://localhost:3000/callback?success=true&message=successfully%20connected" in response.headers["location"]
 
             # Verify that the database was updated correctly
+            mock_session.add.assert_called()
+            mock_session.flush.assert_called()
+            mock_session.refresh.assert_called()
             mock_session.execute.assert_called()
             mock_session.commit.assert_called_once()
 
@@ -101,11 +108,6 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback with missing parameters."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
-
         # Override the dependency
         from app.core.db_session import get_async_session
 
@@ -117,19 +119,15 @@ class TestCallbackApiEndpoints:
         try:
             with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "success",
                         # Missing connectedAccountId and appName
                     },
                 )
 
-            assert response.status_code == 307  # RedirectResponse status code
-            assert "http://localhost:3000/callback?success=false&message=missing%20parameters" in response.headers["location"]
-
-            # Verify that the database was updated to FAILED status
-            mock_session.execute.assert_called()
-            mock_session.commit.assert_called_once()
+            assert response.status_code == 400  # Bad Request when app_name is missing
+            assert response.json()["message"] == "App name is missed"
 
         finally:
             app.dependency_overrides.clear()
@@ -143,10 +141,13 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback with failed status."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
+        # Mock the extension service manager
+        from app.services.extensions import extension_service_manager
+        
+        mock_service_info = AsyncMock()
+        mock_service_info.service_object = AsyncMock()
+        mock_service_info.service_object.get_app_enum.return_value = "github"
+        mock_service_info.service_object.get_name.return_value = "GitHub"
 
         # Override the dependency
         from app.core.db_session import get_async_session
@@ -157,9 +158,10 @@ class TestCallbackApiEndpoints:
         app.dependency_overrides[get_async_session] = mock_get_async_session
 
         try:
-            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
+            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"), \
+                 patch.object(extension_service_manager, "aget_service_info", return_value=mock_service_info):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "failed",
                         "connectedAccountId": "github-account-123",
@@ -173,6 +175,9 @@ class TestCallbackApiEndpoints:
             )
 
             # Verify that the database was updated to FAILED status
+            mock_session.add.assert_called()
+            mock_session.flush.assert_called()
+            mock_session.refresh.assert_called()
             mock_session.execute.assert_called()
             mock_session.commit.assert_called_once()
 
@@ -188,10 +193,13 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback with pending status."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
+        # Mock the extension service manager
+        from app.services.extensions import extension_service_manager
+        
+        mock_service_info = AsyncMock()
+        mock_service_info.service_object = AsyncMock()
+        mock_service_info.service_object.get_app_enum.return_value = "github"
+        mock_service_info.service_object.get_name.return_value = "GitHub"
 
         # Override the dependency
         from app.core.db_session import get_async_session
@@ -202,9 +210,10 @@ class TestCallbackApiEndpoints:
         app.dependency_overrides[get_async_session] = mock_get_async_session
 
         try:
-            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
+            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"), \
+                 patch.object(extension_service_manager, "aget_service_info", return_value=mock_service_info):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "pending",
                         "connectedAccountId": "github-account-123",
@@ -218,6 +227,9 @@ class TestCallbackApiEndpoints:
             )
 
             # Verify that the database was updated to FAILED status
+            mock_session.add.assert_called()
+            mock_session.flush.assert_called()
+            mock_session.refresh.assert_called()
             mock_session.execute.assert_called()
             mock_session.commit.assert_called_once()
 
@@ -233,12 +245,16 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback with database error."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
+        # Mock the extension service manager
+        from app.services.extensions import extension_service_manager
+        
+        mock_service_info = AsyncMock()
+        mock_service_info.service_object = AsyncMock()
+        mock_service_info.service_object.get_app_enum.return_value = "github"
+        mock_service_info.service_object.get_name.return_value = "GitHub"
 
         # Mock database error on execute
-        mock_session.execute.side_effect = [mock_result, SQLAlchemyError("Database connection failed")]
+        mock_session.execute.side_effect = SQLAlchemyError("Database connection failed")
 
         # Override the dependency
         from app.core.db_session import get_async_session
@@ -249,9 +265,10 @@ class TestCallbackApiEndpoints:
         app.dependency_overrides[get_async_session] = mock_get_async_session
 
         try:
-            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
+            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"), \
+                 patch.object(extension_service_manager, "aget_service_info", return_value=mock_service_info):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "success",
                         "connectedAccountId": "github-account-123",
@@ -277,11 +294,6 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback without any query parameters."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
-
         # Override the dependency
         from app.core.db_session import get_async_session
 
@@ -292,14 +304,10 @@ class TestCallbackApiEndpoints:
 
         try:
             with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
-                response = client.get(f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}")
+                response = client.get(f"/api/v1/callback/extension/{sample_user_id}")
 
-            assert response.status_code == 307  # RedirectResponse status code
-            assert "http://localhost:3000/callback?success=false&message=missing%20parameters" in response.headers["location"]
-
-            # Verify that the database was updated to FAILED status
-            mock_session.execute.assert_called()
-            mock_session.commit.assert_called_once()
+            assert response.status_code == 400  # Bad Request when app_name is missing
+            assert response.json()["message"] == "App name is missed"
 
         finally:
             app.dependency_overrides.clear()
@@ -313,11 +321,6 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test connection callback with only some required parameters."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
-
         # Override the dependency
         from app.core.db_session import get_async_session
 
@@ -329,7 +332,7 @@ class TestCallbackApiEndpoints:
         try:
             with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "success",
                         "connectedAccountId": "github-account-123",
@@ -337,12 +340,8 @@ class TestCallbackApiEndpoints:
                     },
                 )
 
-            assert response.status_code == 307  # RedirectResponse status code
-            assert "http://localhost:3000/callback?success=false&message=missing%20parameters" in response.headers["location"]
-
-            # Verify that the database was updated to FAILED status
-            mock_session.execute.assert_called()
-            mock_session.commit.assert_called_once()
+            assert response.status_code == 400  # Bad Request when app_name is missing
+            assert response.json()["message"] == "App name is missed"
 
         finally:
             app.dependency_overrides.clear()
@@ -356,10 +355,13 @@ class TestCallbackApiEndpoints:
         sample_connected_extension: ConnectedExtension,
     ):
         """Test that URL parameters are properly encoded in redirect URLs."""
-        # Mock the scalar_one_or_none result for finding the connected extension
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = sample_connected_extension
-        mock_session.execute.return_value = mock_result
+        # Mock the extension service manager
+        from app.services.extensions import extension_service_manager
+        
+        mock_service_info = AsyncMock()
+        mock_service_info.service_object = AsyncMock()
+        mock_service_info.service_object.get_app_enum.return_value = "github"
+        mock_service_info.service_object.get_name.return_value = "GitHub"
 
         # Override the dependency
         from app.core.db_session import get_async_session
@@ -370,9 +372,10 @@ class TestCallbackApiEndpoints:
         app.dependency_overrides[get_async_session] = mock_get_async_session
 
         try:
-            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"):
+            with patch("app.core.settings.env_settings.FRONTEND_REDIRECT_URL", "http://localhost:3000/callback"), \
+                 patch.object(extension_service_manager, "aget_service_info", return_value=mock_service_info):
                 response = client.get(
-                    f"/api/v1/callback/extension/{sample_user_id}/{sample_connected_extension_id}",
+                    f"/api/v1/callback/extension/{sample_user_id}",
                     params={
                         "status": "success",
                         "connectedAccountId": "github-account-123",
