@@ -63,10 +63,10 @@ class ModelProviderManager:
 
         # If model not found, return an default configuration
         return {
-            "provider": env_settings.OPENAI_PROVIDER,
+            "provider": env_settings.BASIC_LLM_PROVIDER,
             "model_name": env_settings.LLM_BASIC_MODEL,
-            "base_url": env_settings.OPENAI_API_BASE_URL,
-            "api_key": env_settings.OPENAI_API_KEY,
+            "base_url": env_settings.BASIC_MODEL_API_BASE_URL,
+            "api_key": env_settings.BASIC_MODEL_API_KEY,
         }
 
     def init_model(

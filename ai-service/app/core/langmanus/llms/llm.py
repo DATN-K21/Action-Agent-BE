@@ -35,10 +35,10 @@ def _create_llm_from_settings(llm_type: LLMType) -> Union[ChatOpenAI, ChatAnthro
     if model_name.startswith("claude") or model_name.startswith("anthropic"):
         # Anthropic model
         return ChatAnthropic(
-            api_key=SecretStr(env_settings.ANTHROPIC_API_KEY),
+            api_key=SecretStr(env_settings.REASONING_LLM_PROVIDER),
             model_name=model_name,
             temperature=temperature,
-            base_url=env_settings.ANTHROPIC_API_BASE_URL,
+            base_url=env_settings.REASONING_LLM_PROVIDER,
             timeout=60.0,  # Default timeout
             stop=None,  # Default stop sequences
         )

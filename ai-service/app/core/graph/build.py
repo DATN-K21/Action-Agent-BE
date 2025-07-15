@@ -463,7 +463,7 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
 def create_tool_evaluation_node(member_name: str) -> ToolEvaluationNode:
     """Create a ToolEvaluationNode for intelligent tool call evaluation"""
     return ToolEvaluationNode(
-        provider=env_settings.ANTHROPIC_PROVIDER,
+        provider=env_settings.REASONING_LLM_PROVIDER,
         model=env_settings.LLM_REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         routes={
@@ -513,7 +513,7 @@ async def acreate_hierarchical_graph(
     # Add the scheduler node if enabled
     if team_root and team_root.assistant.scheduler_enabled:
         scheduler_node = SchedulerNode(
-            provider=env_settings.ANTHROPIC_PROVIDER,
+            provider=env_settings.REASONING_LLM_PROVIDER,
             model=env_settings.LLM_REASONING_MODEL,
             temperature=env_settings.REASONING_MODEL_TEMPERATURE,
             user_id=user_id,
@@ -593,7 +593,7 @@ async def acreate_hierarchical_graph(
         "hierarchical-final-answer",
         RunnableLambda(
             SummariserNode(
-                provider=env_settings.OPENAI_PROVIDER,
+                provider=env_settings.BASIC_LLM_PROVIDER,
                 model=env_settings.LLM_BASIC_MODEL,
                 temperature=env_settings.BASIC_MODEL_TEMPERATURE,
             ).summarise

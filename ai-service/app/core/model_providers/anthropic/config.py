@@ -68,7 +68,7 @@ def init_model(model: str, temperature: float, api_key: str, base_url: str, **kw
         ).with_fallbacks(
             [
                 ChatOpenAI(
-                    model="gpt-4o-mini",  # Fallback to OpenAI's gpt-4o-mini
+                    model="gpt-4.1-mini",  # Fallback to OpenAI's gpt-4.1-mini
                     temperature=temperature,
                     api_key=SecretStr(env_settings.OPENAI_API_KEY),
                     base_url=env_settings.OPENAI_API_BASE_URL,

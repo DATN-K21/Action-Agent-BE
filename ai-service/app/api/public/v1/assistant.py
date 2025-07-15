@@ -333,7 +333,7 @@ async def _acreate_hierarchical_team(
         backstory="Leader of the hierarchical team for advanced assistant.",
         role="Gather inputs, outputs from your team and answer the question.",
         type="root",
-        provider=env_settings.ANTHROPIC_PROVIDER,
+        provider=env_settings.REASONING_LLM_PROVIDER,
         model=env_settings.LLM_REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=False,
@@ -384,7 +384,7 @@ async def _acreate_main_team(
         backstory="A friendly chatbot assistant specialized in natural conversation and general assistance. Provides helpful responses to greetings, engages in meaningful small talk, and answers user questions using available tools. Focuses on being conversational and supportive without trying to take over the conversation flow.",
         role="Respond naturally to greetings and small talk. Answer user questions directly using available search and knowledge tools when needed. Provide helpful information and maintain a friendly conversational tone. Do not ask users what they want - simply respond to what they've said.",
         type="chatbot",
-        provider=env_settings.OPENAI_PROVIDER,
+        provider=env_settings.BASIC_LLM_PROVIDER,
         model=env_settings.LLM_BASIC_MODEL,
         temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
@@ -429,7 +429,7 @@ async def _acreate_mcp_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=env_settings.ANTHROPIC_PROVIDER,
+        provider=env_settings.REASONING_LLM_PROVIDER,
         model=env_settings.LLM_REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=request.interrupt if request.interrupt is not None else True,
@@ -521,7 +521,7 @@ async def _acreate_extension_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=env_settings.ANTHROPIC_PROVIDER,
+        provider=env_settings.REASONING_LLM_PROVIDER,
         model=env_settings.LLM_REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=request.interrupt if request.interrupt is not None else True,
@@ -615,7 +615,7 @@ async def _acreate_support_team(
         backstory=f"Unit for advanced assistant: {str_workflow_type}.",
         role="Answer the user's question.",
         type=f"{str_workflow_type}",
-        provider=env_settings.OPENAI_PROVIDER,
+        provider=env_settings.BASIC_LLM_PROVIDER,
         model=env_settings.LLM_BASIC_MODEL,
         temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
@@ -920,7 +920,7 @@ async def _aupdate_mcp_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=env_settings.ANTHROPIC_PROVIDER,
+                    provider=env_settings.REASONING_LLM_PROVIDER,
                     model=env_settings.LLM_REASONING_MODEL,
                     temperature=env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
@@ -1038,7 +1038,7 @@ async def _aupdate_extension_members(
                     role="Execute actions based on provided tasks using binding tools and return the results",
                     type="worker",
                     source=root_member_id,
-                    provider=env_settings.ANTHROPIC_PROVIDER,
+                    provider=env_settings.REASONING_LLM_PROVIDER,
                     model=env_settings.LLM_REASONING_MODEL,
                     temperature=env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
@@ -1176,7 +1176,7 @@ async def _aupdate_support_units(
                     backstory=f"Unit for advanced assistant: {unit}.",
                     role="Answer the user's question.",
                     type=f"{unit}",
-                    provider=env_settings.OPENAI_PROVIDER,
+                    provider=env_settings.BASIC_LLM_PROVIDER,
                     model=env_settings.LLM_BASIC_MODEL,
                     temperature=env_settings.BASIC_MODEL_TEMPERATURE,
                     interrupt=False,
@@ -1922,7 +1922,7 @@ async def aupdate_advanced_assistant(
                     backstory="Leader of the hierarchical team for advanced assistant.",
                     role="Gather inputs from your team and answer the question.",
                     type="root",
-                    provider=env_settings.ANTHROPIC_PROVIDER,
+                    provider=env_settings.REASONING_LLM_PROVIDER,
                     model=env_settings.LLM_REASONING_MODEL,
                     temperature=env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=False,
@@ -1945,26 +1945,26 @@ async def aupdate_advanced_assistant(
                 member_result = await session.execute(member_statement)
                 member_ids = member_result.scalars().all()
 
-            if member_ids:
-                # Delete skills and links
-                skills_statement = (
-                    select(Skill.id)
-                    .select_from(Skill)
-                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                    .where(MemberSkillLink.member_id.in_(member_ids))
-                )
-                skills_result = await session.execute(skills_statement)
-                skill_ids = skills_result.scalars().all()
+                if member_ids:
+                    # Delete skills and links
+                    skills_statement = (
+                        select(Skill.id)
+                        .select_from(Skill)
+                        .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                        .where(MemberSkillLink.member_id.in_(member_ids))
+                    )
+                    skills_result = await session.execute(skills_statement)
+                    skill_ids = skills_result.scalars().all()
 
-                await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
-                await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
+                    await session.execute(delete(MemberSkillLink).where(MemberSkillLink.member_id.in_(member_ids)))
+                    await session.execute(delete(MemberUploadLink).where(MemberUploadLink.member_id.in_(member_ids)))
 
-                if skill_ids:
-                    await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
+                    if skill_ids:
+                        await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
 
-                await session.execute(delete(Member).where(Member.id.in_(member_ids)))
+                    await session.execute(delete(Member).where(Member.id.in_(member_ids)))
 
-                await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+                    await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
 
         # Update ask-human
         if request.ask_human is not None and hierarchical_team is not None:
