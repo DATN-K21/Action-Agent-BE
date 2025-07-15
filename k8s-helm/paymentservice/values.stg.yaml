@@ -25,7 +25,7 @@ env:
         name: env-secret
         key: mongodbconnectionstring
   - name: MongoSettings__DatabaseName
-    value: "user-service"
+    value: "test"
   - name: MongoSettings__UserCollectionName
     value: "Users"
   - name: MongoSettings__PaymentCollectionName
@@ -45,5 +45,33 @@ env:
   - name: RateSettings__CreditsPerUsd
     value: "1000000"
 
+  - name: ServiceSettings__AiServiceUrl
+    value: "http://aiservicestg:15200"
+
 ingress:
-  enabled: false
+  enabled: true
+  className: "nginx"
+  annotations:
+    spec.ingressClassName: "nginx"
+    nginx.org/websocket-services: "paymentservicestg"
+    nginx.ingress.kubernetes.io/client-max-body-size: "30m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: pay-stg.action-agent.software
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: paymentservicestg
+              port:
+                number: 15700
+  tls:
+    - secretName: pay-stg-tls
+      hosts:
+        - pay-stg.action-agent.software

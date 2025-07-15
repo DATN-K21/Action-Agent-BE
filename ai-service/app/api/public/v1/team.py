@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -10,6 +11,7 @@ from app.api.deps import SessionDep
 from app.core import logging
 from app.core.enums import WorkflowType
 from app.core.graph.build import generator
+from app.core.utils.database_utils import decrease_user_credits
 from app.db_models import Member, Team, Thread, Upload
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.team import ChatTeamRequest, CreateTeamRequest, TeamResponse, TeamsResponse, UpdateTeamRequest
@@ -67,10 +69,7 @@ async def aread_teams(
             result = await session.execute(statement)
             teams = result.scalars().all()
 
-        converted_teams = [
-            TeamResponse.model_validate(team)
-            for team in teams
-        ]
+        converted_teams = [TeamResponse.model_validate(team) for team in teams]
         return ResponseWrapper(status=200, data=TeamsResponse(teams=converted_teams, count=count)).to_response()
 
     except Exception as e:
@@ -342,13 +341,26 @@ async def astream(
     Stream a response to a user's input.
     """
     try:
-        print("[astream] - Timezone:", x_user_timezone)
+        # Validation
+        if not x_user_id or not thread_id or not team_id:
+            return ResponseWrapper(status=400, message="User ID, thread ID, and team ID are required").to_response()
+        if team_chat.messages and any(not message.content.strip() for message in team_chat.messages):
+            return ResponseWrapper(status=400, message="Message cannot be empty").to_response()
 
         # Get team and join members and skills
         statement = (
             select(Team)
-            .options(selectinload(Team.assistant), selectinload(Team.graphs), selectinload(Team.subgraphs), selectinload(Team.members))
-            .where(Team.id == team_id, Team.is_deleted.is_(False))
+            .options(
+                selectinload(Team.assistant),
+                selectinload(Team.graphs),
+                selectinload(Team.subgraphs),
+                selectinload(Team.members),
+                selectinload(Team.user),
+            )
+            .where(
+                Team.id == team_id,
+                Team.is_deleted.is_(False),
+            )
         )
 
         result = await session.execute(statement)
@@ -360,41 +372,55 @@ async def astream(
             return ResponseWrapper(status=403, message="You do not have permission to access this team").to_response()
 
         # Check if thread belongs to the team
-        statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
+        statement = select(Thread).where(
+            Thread.id == thread_id,
+            Thread.is_deleted.is_(False),
+        )
         result = await session.execute(statement)
         thread = result.scalar_one_or_none()
 
         if not thread:
             return ResponseWrapper(status=404, message="Thread not found").to_response()
-
-        # Ensure the thread is associated with the requested assistant
         if thread.assistant_id != team.assistant.id:
             return ResponseWrapper(status=400, message="Thread does not belong to this assistant").to_response()
+
+        # Check remaining credits
+        have_enough_credits = team.user.credits > 0
 
         # Populate the skills and accessible uploads for each member
         # Load members for this team
         statement = (
             select(Member)
-            .options(selectinload(Member.skills), selectinload(Member.uploads), selectinload(Member.team))
-            .where(Member.team_id == team.id, Member.is_deleted.is_(False))
+            .options(
+                selectinload(Member.skills),
+                selectinload(Member.uploads),
+                selectinload(Member.team),
+            )
+            .where(
+                Member.team_id == team.id,
+                Member.is_deleted.is_(False),
+            )
         )
         result = await session.execute(statement)
         members = result.scalars().all()
-        for member in members:
-            member.skills = member.skills
-            member.uploads = member.uploads
-        graphs = team.graphs
-        for graph in graphs:
-            graph.config = graph.config
 
         # Load global uploads for this user
-        statement = select(Upload).where(Upload.user_id == x_user_id, Upload.is_deleted.is_(False), Upload.is_global.is_(True))
+        statement = select(Upload).where(
+            Upload.user_id == x_user_id,
+            Upload.is_deleted.is_(False),
+            Upload.is_global.is_(True),
+            Upload.thread_id.is_(None),
+        )
         result = await session.execute(statement)
         global_uploads = result.scalars().all()
 
-        # Append global uploads to the team members
+        # Early loads
         for member in members:
-            member.uploads.extend(global_uploads)
+            member.skills = member.skills
+            member.uploads = [upload for upload in member.uploads if upload.thread_id == thread_id] + list(global_uploads)
+        graphs = team.graphs
+        for graph in graphs:
+            graph.config = graph.config
 
         from app.core.stream_control import acleanup_connection, acreate_stop_event
 
@@ -402,17 +428,22 @@ async def astream(
         await acreate_stop_event(x_user_id, thread_id)
 
         async def controlled_generator():
+            usage_callback = None
             try:
+                usage_callback = UsageMetadataCallbackHandler()
                 async for item in generator(
+                    have_enough_credits,
+                    usage_callback,
                     team,
                     list(members),
                     team_chat.messages,
                     thread_id,
                     team_chat.interrupt,
-                    user_id=x_user_id,
+                    x_user_id,
                     timezone=x_user_timezone,
                 ):
                     yield item
+
             except asyncio.CancelledError:
                 # Handle cancellation gracefully
                 logger.info(f"Stream cancelled for user {x_user_id}, thread {thread_id}")
@@ -421,10 +452,18 @@ async def astream(
                 # Log the error and yield an error event
                 logger.error(f"Error in stream generator for user {x_user_id}, thread {thread_id}: {e}", exc_info=True)
                 # Yield a server-sent event with error information
-                yield f"event: error\ndata: {{\"error\": \"An error occurred during streaming\", \"details\": \"{str(e)}\"}}\n\n"
+                yield f'event: error\ndata: {{"error": "An error occurred during streaming", "details": "{str(e)}"}}\n\n'
             finally:
                 # Clean up the connection when streaming ends with timeout protection
                 try:
+                    if usage_callback and usage_callback.usage_metadata:
+                        usage_log = "Token usage for:\n"
+                        for model, stats in usage_callback.usage_metadata.items():
+                            usage_log += f"- model={model}: input_tokens={stats['input_tokens']}, output_tokens={stats['output_tokens']}, total_tokens={stats['total_tokens']}\n"
+                            if team.user:
+                                user_id = team.user.id
+                                await decrease_user_credits(user_id, stats["total_tokens"])
+                        logger.info(f"[controlled_generator] Thread={thread_id}, User={x_user_id}, {usage_log}")
                     await asyncio.wait_for(
                         acleanup_connection(x_user_id, thread_id),
                         timeout=15.0,  # 15 second timeout to prevent indefinite blocking
@@ -434,10 +473,8 @@ async def astream(
                 except Exception as e:
                     logger.error(f"Error during cleanup connection: {e}", exc_info=True)
 
-        return StreamingResponse(
-            controlled_generator(),
-            media_type="text/event-stream",
-        )
+        return StreamingResponse(controlled_generator(), media_type="text/event-stream")
+
     except Exception as e:
         logger.error(f"Error streaming response: {e}", exc_info=True)
         return ResponseWrapper(status=500, message="Internal server error").to_response()

@@ -5,34 +5,36 @@ using payment_service.Dtos;
 using Stripe;
 using payment_service.Models;
 using payment_service.Dtos.Payment;
+using System.Net.Http;
 
 namespace payment_service.Services;
 
 public class PaymentService : IPaymentService
 {
     private readonly ILogger<PaymentService> _logger;
-    private readonly IMongoCollection<User> _userCollection;
     private readonly IMongoCollection<Payment> _paymentCollection;
     private readonly PaymentIntentService _stripeIntentService;
     private readonly StripeSettings _stripeSettings;
     private readonly RateSettings _rateSettings;
+    private readonly ServiceSettings _serviceSettings;
     public PaymentService
     (
         ILogger<PaymentService> logger,
         IMongoDatabase db,
         IOptions<MongoSettings> mongoOptions,
         IOptions<StripeSettings> stripeOptions,
-        IOptions<RateSettings> rateOptions
+        IOptions<RateSettings> rateOptions,
+        IOptions<ServiceSettings> serviceOptions
     )
     {
         _logger = logger;
 
-        // collections: users & payments
-        _userCollection = db.GetCollection<User>(mongoOptions.Value.UserCollectionName);
+        // collections: payments
         _paymentCollection = db.GetCollection<Payment>(mongoOptions.Value.PaymentCollectionName);
 
         _stripeSettings = stripeOptions.Value;
         _rateSettings = rateOptions.Value;
+        _serviceSettings = serviceOptions.Value;
 
         StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
         _stripeIntentService = new PaymentIntentService();
@@ -49,7 +51,7 @@ public class PaymentService : IPaymentService
         try
         {
             var validation = await ValidateUserExistsAsync(userId, amountUsd);
-            if (validation is not null) 
+            if (validation is not null)
                 return validation;
 
             // 1) create Stripe PaymentIntent
@@ -57,7 +59,7 @@ public class PaymentService : IPaymentService
             {
                 Amount = (long)(amountUsd * 100),
                 Currency = _stripeSettings.Currency,
-                AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true }
+                PaymentMethodTypes = new List<string> { "card" }
             };
 
             var idempotencyKey = $"{userId}-{Guid.NewGuid()}";
@@ -70,9 +72,9 @@ public class PaymentService : IPaymentService
             var payment = new Payment
             {
                 PaymentIntentId = intent.Id,
-                UserId = ObjectId.Parse(userId),
+                UserId = userId,
                 AmountUsd = amountUsd,
-                Credits = 0,
+                Credits = (long)(amountUsd * _rateSettings.CreditsPerUsd),
                 Status = PaymentStatus.Created,
             };
             await _paymentCollection.InsertOneAsync(payment);
@@ -105,8 +107,8 @@ public class PaymentService : IPaymentService
             if (payment is null)
                 return new ConfirmPaymentResponse(404, false, "Payment record not found");
 
-            if (payment.Status == PaymentStatus.Created)
-                return new ConfirmPaymentResponse(200, true, "Already processed");
+            if (payment.Status == PaymentStatus.Confirmed || payment.Status == PaymentStatus.Refunded)
+                return new ConfirmPaymentResponse(200, true, "Already confirmed or refunded");
 
             // 2) retrieve intent from Stripe
             var intent = await _stripeIntentService.GetAsync(paymentIntentId);
@@ -117,9 +119,15 @@ public class PaymentService : IPaymentService
             var amountUsd = intent.AmountReceived / 100m;
             var creditsToAdd = (long)(amountUsd * _rateSettings.CreditsPerUsd);
 
-            var userFilter = Builders<User>.Filter.Eq(u => u.Id, payment.UserId);
-            var userUpdate = Builders<User>.Update.Inc(u => u.Balance, creditsToAdd);
-            await _userCollection.UpdateOneAsync(userFilter, userUpdate);
+            using var httpClient = new HttpClient();
+            var path = $"{_serviceSettings.AiServiceUrl}/private/user/{payment.UserId}/deposit?credits={creditsToAdd}";
+            var response = await httpClient.PostAsync(path, new StringContent(""));
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("{Fn} => Failed to credit user {UserId}. StatusCode={StatusCode}",
+                    fn, payment.UserId, response.StatusCode);
+                return new ConfirmPaymentResponse(500, false, "Failed to credit user");
+            }
 
             // 4) update Payment doc
             var paymentFilter = Builders<Payment>.Filter.Eq(p => p.Id, payment.Id);
@@ -147,11 +155,6 @@ public class PaymentService : IPaymentService
             return new CreatePaymentIntentResponse(400, null, "UserId cannot be empty");
         if (amountUsd <= 0)
             return new CreatePaymentIntentResponse(400, null, "Amount must be > 0");
-        if (!ObjectId.TryParse(userId, out var oid))
-            return new CreatePaymentIntentResponse(400, null, "Invalid UserId format");
-        var user = await _userCollection.Find(u => u.Id == oid).FirstOrDefaultAsync();
-        if (user is null)
-            return new CreatePaymentIntentResponse(404, null, "User not found");
         return null;
     }
 

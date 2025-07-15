@@ -79,3 +79,9 @@ env:
     
   - name: CLIENT_URL
     value: "https://action-agent.software"
+
+  - name: ACCESS_TOKEN_EXPIRE
+    value: "3d"
+
+  - name: REFRESH_TOKEN_EXPIRE
+    value: "30d"

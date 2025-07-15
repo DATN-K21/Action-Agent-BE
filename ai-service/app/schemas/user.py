@@ -13,8 +13,8 @@ class CreateUserRequest(BaseRequest):
     id: Optional[str] = None
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr = Field(..., max_length=50)
-    first_name: str = Field(..., min_length=1, max_length=50)
-    last_name: str = Field(..., min_length=1, max_length=50)
+    first_name: str = Field(..., min_length=0, max_length=50)
+    last_name: str = Field(..., min_length=0, max_length=50)
 
     @field_validator("email")
     def normalize_email(cls, v: str) -> str:
@@ -24,8 +24,8 @@ class CreateUserRequest(BaseRequest):
 class UpdateUserRequest(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = Field(None, max_length=50)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    first_name: Optional[str] = Field(None, min_length=0, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=0, max_length=50)
 
 
 ##################################################
@@ -47,6 +47,9 @@ class GetUserResponse(BaseResponse):
     first_name: Optional[str] = Field(None)
     last_name: Optional[str] = Field(None)
     created_at: Optional[datetime] = Field(None)
+    
+class GetUserCreditsResponse(BaseResponse):
+    credits: int = Field(0)
 
 
 class GetUsersResponse(PagingResponse):

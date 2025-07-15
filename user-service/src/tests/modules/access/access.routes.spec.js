@@ -18,6 +18,16 @@ jest.mock('../../../middlewares/permission.middleware', () => ({
 	checkPermission: jest.fn(() => (req, res, next) => next())
 }));
 
+jest.mock('jsonwebtoken', () => ({
+	...jest.requireActual('jsonwebtoken'),
+	decode: jest.fn((token) => {
+		if (token === 'jest-access-token') {
+			return { id: 'jest-client-id' };
+		}
+		return null;
+	})
+}));
+
 jest.mock('passport', () => ({
 	authenticate: jest.fn(() => (req, res, next) => {
 		if (req.path === '/facebook/auth') {
@@ -51,11 +61,13 @@ jest.mock('../../../modules/access/access.controller', () => ({
 		});
 	}),
 	handleInvokeNewTokens: jest.fn(async (req, res) => {
+		const token = req.headers['authorization']?.split(' ')[1];
+		const decoded = jwt.decode(token);
 		return res.status(200).json({
 			data: {
-				user: { id: req.headers['x-client-id'] },
+				user: { id: decoded?.id || 'default-id' },
 				refreshToken: req.body.refreshToken,
-				accessToken: req.headers['authorization'].split(' ')[1],
+				accessToken: token,
 			}
 		});
 	}),
@@ -70,7 +82,7 @@ jest.mock('../../../modules/access/access.controller', () => ({
 		return res.status(200).json({ data: { email: 'jest@tester.com' } });
 	}),
 	handleLogout: jest.fn(async (req, res) => {
-		if (!req.headers.authorization || !req.headers['x-client-id']) {
+		if (!req.headers.authorization) {
 			return res.status(401).json({ error: 'Authentication credential is required' });
 		}
 		return res.status(200).json({});
@@ -82,7 +94,7 @@ jest.mock('../../../modules/access/access.controller', () => ({
 		return res.status(200).json({ data: { email: req.body.email } });
 	}),
 	handleResetPassword: jest.fn(async (req, res) => {
-		if (!req.headers.authorization || !req.headers['x-client-id']) {
+		if (!req.headers.authorization) {
 			return res.status(401).json({ error: 'Authentication credential is required' });
 		}
 		return res.status(200).json({
@@ -298,7 +310,6 @@ describe('Access Routes', () => {
 		it('should invoke new tokens successfully', async () => {
 			const response = await request(app)
 				.post('/api/access/invoke-new-tokens')
-				.set('x-client-id', 'jest-client-id')
 				.set('authorization', 'Bearer jest-access-token')
 				.send({ refreshToken: 'jest-refresh-token' });
 
@@ -318,7 +329,6 @@ describe('Access Routes', () => {
 
 			const response = await request(app)
 				.post('/api/access/invoke-new-tokens')
-				.set('x-client-id', 'jest-client-id')
 				.set('authorization', 'Bearer jest-access-token')
 				.send({ refreshToken: 'jest-refresh-token' });
 
@@ -331,7 +341,6 @@ describe('Access Routes', () => {
 		it('should reset password successfully', async () => {
 			const response = await request(app)
 				.post('/api/access/reset-password')
-				.set('x-client-id', 'jest-client-id')
 				.set('authorization', 'Bearer jest-access-token')
 				.send({ email: 'jest@tester.com', newPassword: '123456', confirmNewPassword: '123456' });
 
@@ -356,7 +365,6 @@ describe('Access Routes', () => {
 
 			const response = await request(app)
 				.post('/api/access/reset-password')
-				.set('x-client-id', 'jest-client-id')
 				.set('authorization', 'Bearer jest-access-token')
 				.send({ email: 'jest@tester.com', newPassword: '123456', confirmNewPassword: '123456' });
 
@@ -369,7 +377,6 @@ describe('Access Routes', () => {
 		it('should logout successfully', async () => {
 			const response = await request(app)
 				.post('/api/access/logout')
-				.set('x-client-id', 'jest-client-id')
 				.set('authorization', `Bearer ${mockToken}`);
 
 			expect(response.statusCode).toBe(200);

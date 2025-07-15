@@ -28,7 +28,7 @@ env:
         name: env-secret
         key: mongodbconnectionstring
   - name: MongoSettings__DatabaseName
-    value: "user-service"
+    value: "test"
   - name: MongoSettings__UserCollectionName
     value: "Users"
   - name: MongoSettings__PaymentCollectionName
@@ -47,6 +47,9 @@ env:
 
   - name: RateSettings__CreditsPerUsd
     value: "1000000"
+
+  - name: ServiceSettings__AiServiceUrl
+    value: "http://aiservicedev:15200"
 
 ingress:
   enabled: false

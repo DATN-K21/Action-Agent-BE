@@ -1,43 +1,24 @@
 """
 Fast and compact search client for ai-service to communicate with retrieval-service via gRPC.
-
-Features:
-- Native async gRPC with connection pooling
-- Simple retry logic and timeout management
-
-Usage:
-    # Basic search
-    client = APIRetriever("user123", ["upload1", "upload2"])
-    results = await client.search("query")
-
-    # With context manager
-    async with RetrieverContext(client) as search_client:
-        results = await search_client.search("query")
 """
 
-import asyncio
 import time
 from typing import List
 
-import grpc.aio
+import grpc
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
 
 from app.core import logging
-from app.core.grpc_pool import close_grpc_connections, get_grpc_channel
 from app.core.settings import env_settings
+from generated import retrieval_pb2, retrieval_pb2_grpc
 
 logger = logging.get_logger(__name__)
 
 
-class SearchError(Exception):
-    """Search operation failed."""
-    pass
-
-
 class CustomRetriever(BaseRetriever):
-    """Fast, compact search client with async gRPC and connection pooling."""
+    """Fast, compact search client using direct gRPC calls."""
 
     user_id: str = Field(description="User ID for the search")
     upload_id: str = Field(description="Upload ID for the search context")
@@ -75,24 +56,10 @@ class CustomRetriever(BaseRetriever):
         return cls(user_id=user_id, upload_id=upload_id, top_k=top_k, score_threshold=score_threshold, **kwargs)
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
-        """Sync method - runs async version in event loop with proper cleanup."""
-
-        async def _run_with_cleanup():
-            try:
-                return await self._aget_relevant_documents(query)
-            except Exception as e:
-                logger.error(f"Error in async retrieval: {e}")
-                return []
-
-        # Use asyncio.run() but with explicit cleanup
-        try:
-            return asyncio.run(_run_with_cleanup())
-        except Exception as e:
-            logger.error(f"Error in sync retrieval bridge: {e}")
-            return []
-
-    async def _aget_relevant_documents(self, query: str) -> List[Document]:
-        """Main async search method."""
+        """
+        Synchronous method to get relevant documents.
+        """
+        logger.info(f"[_get_relevant_documents] Query={query}")
         if not query.strip():
             return []
 
@@ -102,69 +69,50 @@ class CustomRetriever(BaseRetriever):
                 if not self.upload_id:
                     logger.warning("No upload_id provided, skipping search.")
                     return []
-                return await self._perform_search(query, self.upload_id)
-            except SearchError:
-                # SearchError is already properly handled, re-raise it
-                raise
+                return self._perform_search(query, self.upload_id)
             except Exception as e:
                 if attempt == MAX_RETRIES - 1:
                     logger.error(f"Search failed after {MAX_RETRIES} attempts: {e}")
                     return []
-                await asyncio.sleep(0.5 * (attempt + 1))  # Simple backoff
+                logger.warning(f"Search attempt {attempt + 1} failed: {e}, retrying...")
+                time.sleep(1)
 
-        return []  # Explicit return for type safety
+        return []
 
-    async def _perform_search(self, query: str, upload_id: str) -> List[Document]:
+    def _perform_search(self, query: str, upload_id: str) -> List[Document]:
         """Perform the actual gRPC search."""
-        start_time = time.time()
+        start_time = time.perf_counter()
 
-        try:
-            from generated import retrieval_pb2, retrieval_pb2_grpc
+        channel_options = [
+            ("grpc.keepalive_time_ms", 30000),
+            ("grpc.keepalive_timeout_ms", 5000),
+            ("grpc.max_receive_message_length", 16 * 1024 * 1024),  # 16MB
+            ("grpc.max_send_message_length", 16 * 1024 * 1024),  # 16MB
+        ]
 
-            # Get channel from pool with optimized options
-            channel_options = [
-                ("grpc.keepalive_time_ms", 30000),
-                ("grpc.keepalive_timeout_ms", 5000),
-                ("grpc.max_receive_message_length", 16 * 1024 * 1024),  # 16MB
-                ("grpc.max_send_message_length", 16 * 1024 * 1024),  # 16MB
-            ]
+        channel = grpc.insecure_channel(env_settings.RETRIEVAL_SERVICE_GRPC_URL, options=channel_options)
+        stub = retrieval_pb2_grpc.RetrievalServiceStub(channel)
+        request = retrieval_pb2.SearchRequest(  # type: ignore
+            user_id=self.user_id,
+            upload_id=upload_id,
+            query=query,
+            top_k=self.top_k,
+            score_threshold=self.score_threshold,
+        )
 
-            channel = await get_grpc_channel(env_settings.RETRIEVAL_SERVICE_GRPC_URL, channel_options)
-            stub = retrieval_pb2_grpc.RetrievalServiceStub(channel)
+        TIMEOUT_SECONDS = 30.0
+        response = stub.Search(request, timeout=TIMEOUT_SECONDS)
+        channel.close()
 
-            # Create and send request
-            request = retrieval_pb2.SearchRequest(  # type: ignore
-                user_id=self.user_id,
-                upload_id=upload_id,
-                query=query,
-                top_k=self.top_k,
-                score_threshold=self.score_threshold,
-            )
+        # Convert to documents
+        documents = []
+        for result in response.results:
+            metadata = dict(result.metadata)
+            metadata.update({"score": result.score, "upload_id": upload_id})
+            documents.append(Document(page_content=result.content, metadata=metadata))
 
-            TIMEOUT_SECONDS = 30.0  # Timeout for gRPC call
-
-            # Make the gRPC call
-            response = await stub.Search(request, timeout=TIMEOUT_SECONDS)
-
-            # Convert to documents
-            documents = []
-            for result in response.results:
-                metadata = dict(result.metadata)
-                metadata.update({"score": result.score, "upload_id": upload_id})
-                documents.append(Document(page_content=result.content, metadata=metadata))
-
-            elapsed = time.time() - start_time
-            logger.info(f"Retrieved {len(documents)} documents in {elapsed:.2f}s")
-            return documents
-
-        except grpc.aio.AioRpcError as e:
-            raise SearchError(f"gRPC error: {e.code()} - {e.details()}")
-        except Exception as e:
-            raise SearchError(f"Search error: {e}")
-
-    async def close(self):
-        """Close connections (for compatibility)."""
-        await close_grpc_connections()
+        logger.info(f"[_perform_search] Retrieved {len(documents)} documents in {time.perf_counter() - start_time}s")
+        return documents
 
 
 # Simple factory function

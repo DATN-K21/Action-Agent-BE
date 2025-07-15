@@ -1,7 +1,9 @@
+import typing
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+import anyio
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,7 +95,6 @@ async def _aadd_ask_human_skill_to_worker(
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(ask_human_skill)
-    await session.flush()
 
     # Link skill to member
     member_skill_link = MemberSkillLink(
@@ -101,7 +102,6 @@ async def _aadd_ask_human_skill_to_worker(
         skill_id=ask_human_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
 
 def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
@@ -322,7 +322,6 @@ async def _acreate_hierarchical_team(
         assistant_id=assistant.id,
     )
     session.add(hierarchical_team)
-    await session.flush()
 
     # Create root member (leader) for the hierarchical team
     root_member_id = str(uuid.uuid4())
@@ -342,7 +341,6 @@ async def _acreate_hierarchical_team(
         position_y=0.0,
     )
     session.add(root_member)
-    await session.flush()
 
     return hierarchical_team, root_member
 
@@ -439,7 +437,6 @@ async def _acreate_mcp_member_with_skills(
         position_y=0.0,
     )
     session.add(member)
-    await session.flush()
 
     # Load MCP tools and create skills using proper connection format
     connections = {}
@@ -449,7 +446,10 @@ async def _acreate_mcp_member_with_skills(
     }
 
     # Use the existing MCP service to get tool info
+    start_time = datetime.now()
     tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
+    elapsed_time = datetime.now() - start_time
+    logger.info(f"[_acreate_mcp_member_with_skills] Fetched {len(tool_infos)} tools in {elapsed_time.total_seconds()} seconds.")
 
     # Create skills and links
     for tool_info in tool_infos:
@@ -468,7 +468,6 @@ async def _acreate_mcp_member_with_skills(
             mcp_id=connected_mcp.id,
         )
         session.add(skill)
-        await session.flush()
 
         # Link skill to member
         member_skill_link = MemberSkillLink(
@@ -476,7 +475,6 @@ async def _acreate_mcp_member_with_skills(
             skill_id=skill.id,
         )
         session.add(member_skill_link)
-        await session.flush()
 
         # Add tool to cache
         await tool_manager.aadd_personal_tool(
@@ -531,7 +529,6 @@ async def _acreate_extension_member_with_skills(
         position_y=0.0,
     )
     session.add(member)
-    await session.flush()
 
     extension_service = extension_service_info.service_object
     tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
@@ -554,7 +551,6 @@ async def _acreate_extension_member_with_skills(
             extension_id=connected_extension.id,
         )
         session.add(skill)
-        await session.flush()
 
         # Link skill to member
         member_skill_link = MemberSkillLink(
@@ -562,7 +558,6 @@ async def _acreate_extension_member_with_skills(
             skill_id=skill.id,
         )
         session.add(member_skill_link)
-        await session.flush()
 
         # Add tool to cache
         await tool_manager.aadd_personal_tool(
@@ -609,7 +604,6 @@ async def _acreate_support_team(
         assistant_id=assistant.id,
     )
     session.add(support_team)
-    await session.flush()
 
     # Create root member for the support team
     support_root_member_id = str(uuid.uuid4())
@@ -629,7 +623,6 @@ async def _acreate_support_team(
         position_y=0.0,
     )
     session.add(support_root_member)
-    await session.flush()
 
     if workflow_type == WorkflowType.SEARCHBOT:
         await _acreate_search_skills(session, support_root_member.id, user_id)
@@ -637,7 +630,7 @@ async def _acreate_support_team(
     return support_team
 
 
-async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: str) -> None:
+async def _acreate_search_skills(session: AsyncSession, member_id: str, user_id: str) -> None:
     """Create search skills for SEARCHBOT workflow type."""
     # DuckDuckGo search skill
     # ddg_tool_info = global_tools.get("duckduckgo-search")
@@ -671,9 +664,8 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
     if not tavily_tool_info:
         raise ValueError("Tavily search tool not found in global tools.")
 
-    tavily_skill_id = str(uuid.uuid4())
     tavily_skill = Skill(
-        id=tavily_skill_id,
+        id=str(uuid.uuid4()),
         name="tavily-search",
         user_id=user_id,
         description=tavily_tool_info.description,
@@ -684,23 +676,20 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(tavily_skill)
-    await session.flush()
 
     member_skill_link = MemberSkillLink(
         member_id=member_id,
         skill_id=tavily_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
     # Wikipedia search skill
     wikipedia_tool_info = global_tools.get("wikipedia")
     if not wikipedia_tool_info:
         raise ValueError("Wikipedia tool not found in global tools.")
 
-    wikipedia_skill_id = str(uuid.uuid4())
     wikipedia_skill = Skill(
-        id=wikipedia_skill_id,
+        id=str(uuid.uuid4()),
         name="wikipedia",
         user_id=user_id,
         description=wikipedia_tool_info.description,
@@ -711,14 +700,12 @@ async def _acreate_search_skills(session: SessionDep, member_id: str, user_id: s
         reference_type=ConnectedServiceType.NONE,
     )
     session.add(wikipedia_skill)
-    await session.flush()
 
     member_skill_link = MemberSkillLink(
         member_id=member_id,
         skill_id=wikipedia_skill.id,
     )
     session.add(member_skill_link)
-    await session.flush()
 
 
 async def _adelete_members_with_service_type(session: AsyncSession, team: Team, service_type: ConnectedServiceType) -> None:
@@ -1204,7 +1191,7 @@ async def _aupdate_support_units(
                     await _acreate_search_skills(session, support_root_member.id, user_id)
 
 
-async def _format_update_response(session: AsyncSession, assistant: Assistant) -> UpdateAdvancedAssistantResponse:
+async def _aformat_update_response(session: AsyncSession, assistant: Assistant) -> UpdateAdvancedAssistantResponse:
     """
     Format the response data for updated assistant.
 
@@ -1221,14 +1208,14 @@ async def _format_update_response(session: AsyncSession, assistant: Assistant) -
     # Extract MCP and extension IDs from hierarchical team
     mcp_ids = None
     extension_ids = None
-    
+
     # Find the hierarchical team
     hierarchical_team = None
     for team in assistant.teams:
         if team.workflow_type == WorkflowType.HIERARCHICAL:
             hierarchical_team = team
             break
-    
+
     # If hierarchical team exists, extract service IDs
     if hierarchical_team:
         mcp_ids, extension_ids = await _aextract_service_ids_from_team(session, hierarchical_team)
@@ -1458,16 +1445,16 @@ async def _aremove_ask_human_skill_from_worker(
     skill_links = result.scalars().all()
 
     for skill_link in skill_links:
-        # Delete the skill link
-        await session.delete(skill_link)
-
-        # Get and soft delete the skill
         skill_statement = select(Skill).where(Skill.id == skill_link.skill_id)
         skill_result = await session.execute(skill_statement)
         skill = skill_result.scalar_one_or_none()
 
+        # Delete the skill link
+        await session.delete(skill_link)
+
+        # Get and hard delete the skill
         if skill:
-            skill.is_deleted = True
+            await session.delete(skill)
 
     await session.flush()
 
@@ -1633,7 +1620,7 @@ async def aget_or_create_general_assistant(
                 user_id=x_user_id,
                 name="General Assistant",
                 description="A helpful general assistant for everyday tasks and conversations.",
-                system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Use your available tools when needed to provide accurate and helpful information.",
+                system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Always leverage to use your available tools when needed to provide accurate and helpful information.",
             )
 
             # Commit the creation
@@ -1672,8 +1659,8 @@ async def acreate_advanced_assistant(
     1. A new assistant instance
     2. A main chatbot team with root member
     3. A hierarchical team with root member (An advanced assistant always has a hierarchical team - support unit)
-    4. MCP members and their skills (if specified)
-    5. Extension members and their skills (if specified)
+    4. MCP members and their skills (if specified)       -> SLOW
+    5. Extension members and their skills (if specified) -> SLOW
     6. Support teams for different workflow types (if specified)
 
     Args:
@@ -1714,50 +1701,53 @@ async def acreate_advanced_assistant(
             if not hierarchical_team or not hierarchical_root_member:
                 raise ValueError("Failed to create hierarchical team or root member")
 
-        # Create MCP members and their skills using helper function
-        if request.mcp_ids and hierarchical_team and hierarchical_root_member:
-            for mcp_id in request.mcp_ids:
-                # Load connected MCP
-                mcp_statement = select(ConnectedMcp).where(
-                    ConnectedMcp.id == mcp_id, ConnectedMcp.user_id == x_user_id, ConnectedMcp.is_deleted.is_(False)
-                )
-                mcp_result = await session.execute(mcp_statement)
-                connected_mcp = mcp_result.scalar_one_or_none()
+        # Prepare MCP members and their skills from database
+        mcp_results: typing.Sequence[ConnectedMcp] = []
+        if request.mcp_ids:
+            mcp_statement = select(ConnectedMcp).where(
+                ConnectedMcp.id.in_(request.mcp_ids),
+                ConnectedMcp.user_id == x_user_id,
+                ConnectedMcp.is_deleted.is_(False),
+            )
+            statement_result = await session.execute(mcp_statement)
+            mcp_results = statement_result.scalars().all()
 
+        # Prepare extension members and their skills from database
+        extension_results: typing.Sequence[ConnectedExtension] = []
+        if request.extension_ids:
+            ext_statement = select(ConnectedExtension).where(
+                ConnectedExtension.id.in_(request.extension_ids),
+                ConnectedExtension.user_id == x_user_id,
+                ConnectedExtension.is_deleted.is_(False),
+            )
+            ext_result = await session.execute(ext_statement)
+            extension_results = ext_result.scalars().all()
+
+        async with anyio.create_task_group() as tg:
+            for connected_mcp in mcp_results:
                 if connected_mcp:
-                    await _acreate_mcp_member_with_skills(
+                    tg.start_soon(
+                        _acreate_mcp_member_with_skills,
                         session,
                         connected_mcp,
-                        hierarchical_team.id,
-                        hierarchical_root_member.id,
+                        hierarchical_team.id,  # type: ignore
+                        hierarchical_root_member.id,  # type: ignore
                         request,
                     )
-
-        # Create extension members and their skills using helper function
-        if request.extension_ids and hierarchical_team and hierarchical_root_member:
-            for extension_id in request.extension_ids:
-                # Load connected extension
-                ext_statement = select(ConnectedExtension).where(
-                    ConnectedExtension.id == extension_id,
-                    ConnectedExtension.user_id == x_user_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                ext_result = await session.execute(ext_statement)
-                connected_extension = ext_result.scalar_one_or_none()
-
+            for connected_extension in extension_results:
                 if connected_extension:
-                    await _acreate_extension_member_with_skills(
+                    tg.start_soon(
+                        _acreate_extension_member_with_skills,
                         session,
                         connected_extension,
-                        hierarchical_team.id,
-                        hierarchical_root_member.id,
+                        hierarchical_team.id,  # type: ignore
+                        hierarchical_root_member.id,  # type: ignore
                         request,
                     )
-
-        # Create another support teams for each workflow type using helper function
-        if request.support_units:
-            for workflow_type in request.support_units:
-                await _acreate_support_team(session, new_assistant, workflow_type, request, x_user_id)
+            # Create another support teams for each workflow type using helper function
+            if request.support_units:
+                for workflow_type in request.support_units:
+                    tg.start_soon(_acreate_support_team, session, new_assistant, workflow_type, request, x_user_id)
 
         # Commit all changes
         await session.commit()
@@ -1947,13 +1937,13 @@ async def aupdate_advanced_assistant(
 
             # Update extension members of the hierarchical team
             await _aupdate_extension_members(session, assistant, hierarchical_team, request, x_user_id)
-
-        # If no MCPs or extensions, remove hierarchical team if it exists
-        if hierarchical_team and request.mcp_ids and len(request.mcp_ids) == 0 and request.extension_ids and len(request.extension_ids) == 0:
-            # Delete hierarchical team and all its members
-            member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
-            member_result = await session.execute(member_statement)
-            member_ids = member_result.scalars().all()
+        else:
+            # If no MCPs or extensions, remove hierarchical team if it exists
+            if hierarchical_team:
+                # Delete hierarchical team and all its members
+                member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
+                member_result = await session.execute(member_statement)
+                member_ids = member_result.scalars().all()
 
             if member_ids:
                 # Delete skills and links
@@ -1974,8 +1964,7 @@ async def aupdate_advanced_assistant(
 
                 await session.execute(delete(Member).where(Member.id.in_(member_ids)))
 
-            await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
-            hierarchical_team = None
+                await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
 
         # Update ask-human
         if request.ask_human is not None and hierarchical_team is not None:
@@ -1992,7 +1981,7 @@ async def aupdate_advanced_assistant(
         await session.commit()
 
         # Format and return the response
-        response = await _format_update_response(session, assistant)
+        response = await _aformat_update_response(session, assistant)
 
         return ResponseWrapper.wrap(status=200, data=response).to_response()
     except Exception as e:

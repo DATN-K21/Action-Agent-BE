@@ -1,4 +1,3 @@
-import asyncio
 import socket
 from contextlib import asynccontextmanager
 
@@ -10,7 +9,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.core import logging
 from app.core.cache.memory_cache_manager import global_cache_manager
 from app.core.db_session import async_engine
-from app.core.grpc_pool import close_grpc_connections, configure_grpc_pool
 from app.core.settings import env_settings
 from app.db_models import Base
 from app.memory.checkpoint import AsyncPostgresPool
@@ -27,12 +25,9 @@ async def lifespan(app: FastAPI):
         # Force IPv4: increase the speed when fetching data from Composio server
         urllib3_conn.allowed_gai_family = lambda: socket.AF_INET
 
-        # Setup database, PostgreSQL connection pool, and gRPC pool in parallel
-        await asyncio.gather(
-            _setup_database(),
-            AsyncPostgresPool.asetup(),
-            configure_grpc_pool(max_channels=20, channel_ttl=600.0),
-        )
+        # Setup database, PostgreSQL connection pool
+        await _setup_database()
+        await AsyncPostgresPool.asetup()
 
         # Manually resolve dependencies at startup
         # checkpointer = await get_checkpointer()
@@ -43,7 +38,6 @@ async def lifespan(app: FastAPI):
         await global_cache_manager.shutdown()
 
         # Then shutdown database connections
-        await close_grpc_connections()
         await AsyncPostgresPool.atear_down()
 
 

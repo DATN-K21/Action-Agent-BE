@@ -21,6 +21,8 @@ class User(BaseEntity):
     default_api_key_id: Mapped[str | None] = mapped_column(String, ForeignKey("user_api_keys.id", ondelete="SET NULL"), nullable=True)
     remain_trial_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    credits = mapped_column(Integer, nullable=False, default=1000000)
+
     assistants = relationship("Assistant", back_populates="user")
     teams = relationship("Team", back_populates="user")
     skills = relationship("Skill", back_populates="user")

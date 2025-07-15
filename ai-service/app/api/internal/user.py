@@ -5,7 +5,7 @@ from sqlalchemy import func, select, update
 
 from app.api.deps import SessionDep
 from app.core import logging
-from app.core.constants import SYSTEM, TRIAL_TOKENS
+from app.core.constants import DEFAULT_CREDITS, SYSTEM, TRIAL_TOKENS
 from app.core.utils.general_assistant_helpers import GeneralAssistantHelpers
 from app.db_models.user import User
 from app.schemas.base import PagingRequest, ResponseWrapper
@@ -53,6 +53,7 @@ async def create_new_user(
             **request.model_dump(),
             default_api_key_id=None,
             remain_trial_tokens=TRIAL_TOKENS,
+            credits=DEFAULT_CREDITS,
             created_by=SYSTEM,
         )
 
@@ -251,3 +252,45 @@ async def get_user_by_user_id(session: SessionDep, user_id: str):
     except Exception as e:
         logger.exception(f"Has error: {str(e)}")
         return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+@router.post("/{user_id}/deposit", summary="Deposit credits for the given user.", response_model=ResponseWrapper)
+async def deposit_credits(session: SessionDep, user_id: str, credits: int):
+    """
+    Deposit credits for the given user.
+    """
+    try:
+        if credits <= 0:
+            return ResponseWrapper.wrap(status=400, message="Amount must be greater than 0").to_response()
+
+        stmt = select(User).where(
+            User.id == user_id,
+            User.is_deleted.is_(False),
+        )
+
+        result = await session.execute(stmt)
+        db_user = result.scalar_one_or_none()
+        if not db_user:
+            return ResponseWrapper.wrap(status=404, message="User not found")
+
+        if db_user.credits < 0:
+            db_user.credits = credits
+            await session.commit()
+            new_credits = credits
+        else:
+            # Use SQL for atomic update
+            update_stmt = (
+                update(User).where(User.id == user_id, User.is_deleted.is_(False)).values(credits=User.credits + credits).returning(User.credits)
+            )
+            result = await session.execute(update_stmt)
+            new_credits = result.scalar_one_or_none()
+            if new_credits is None:
+                return ResponseWrapper.wrap(status=404, message="User not found").to_response()
+
+        logger.info(f"Deposited {credits} credits to user {user_id}. New balance: {new_credits}")
+        return ResponseWrapper.wrap(status=200, message="Deposit successful")
+
+    except Exception as e:
+        await session.rollback()
+        logger.exception(f"Has error: {str(e)}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error").to_response()

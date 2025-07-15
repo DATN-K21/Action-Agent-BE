@@ -12,6 +12,7 @@ public static class ServiceExtensions
         services.Configure<MongoSettings>(configuration.GetSection(nameof(MongoSettings)));
         services.Configure<StripeSettings>(configuration.GetSection(nameof(StripeSettings)));
         services.Configure<RateSettings>(configuration.GetSection(nameof(RateSettings)));
+        services.Configure<ServiceSettings>(configuration.GetSection(nameof(ServiceSettings)));
         return services;
     }
     

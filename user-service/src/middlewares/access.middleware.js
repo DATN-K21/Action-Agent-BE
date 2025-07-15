@@ -5,22 +5,6 @@ const { UnauthorizedResponse, ConflictResponse, BadRequestResponse } = require("
 
 class AccessMiddleware {
 	static async checkAccess(req, res, next) {
-		const clientId = req.headers['x-client-id'];
-		if (!clientId) {
-			throw new UnauthorizedResponse('Unauthorized', 1000101);
-		}
-
-		const foundUser = await userModel.findById(clientId);
-		if (!foundUser) {
-			throw new ConflictResponse('User not found', 1000102);
-		}
-		const foundAccess = await accessModel.findOne({ user_id: foundUser?._id });
-		if (!foundAccess) {
-			throw new ConflictResponse('Invalid access to account', 1000103);
-		} else if (!foundAccess.private_key || !foundAccess.public_key) {
-			throw new ConflictResponse('Something went wrong', 1000104);
-		}
-
 		const token = req.headers['authorization'];
 		if (!token) {
 			throw new UnauthorizedResponse('Unauthorized', 1000105);
@@ -30,6 +14,24 @@ class AccessMiddleware {
 			throw new BadRequestResponse('Unauthorized', 1000106);
 		}
 		const accessToken = token.split(' ')[1];
+
+		// First decode token to get user ID without verification
+		const decodedTokenWithoutVerification = JWTHelper.decodeToken(accessToken);
+		if (!decodedTokenWithoutVerification || !decodedTokenWithoutVerification.id) {
+			throw new UnauthorizedResponse('Invalid token payload', 1000101);
+		}
+		const userId = decodedTokenWithoutVerification.id;
+
+		const foundUser = await userModel.findById(userId);
+		if (!foundUser) {
+			throw new ConflictResponse('User not found', 1000102);
+		}
+		const foundAccess = await accessModel.findOne({ user_id: foundUser?._id });
+		if (!foundAccess) {
+			throw new ConflictResponse('Invalid access to account', 1000103);
+		} else if (!foundAccess.private_key || !foundAccess.public_key) {
+			throw new ConflictResponse('Something went wrong', 1000104);
+		}
 
 		try {
 			const decodedToken = JWTHelper.verifyToken(accessToken, foundAccess.public_key);

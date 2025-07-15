@@ -143,7 +143,7 @@ def event_to_response(
         node_id = event.get("name", "")
         name = get_node_label(node_id, nodes) if nodes else node_id
 
-        # 只处理 AnswerNode 的输出
+        # AnswerNode
         if node_id and node_id.startswith("answer"):
             if isinstance(output, dict):
                 if "messages" in output and output["messages"]:

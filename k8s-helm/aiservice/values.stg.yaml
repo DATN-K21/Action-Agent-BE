@@ -232,7 +232,7 @@ ingress:
             service:
               name: aiservicestg
               port:
-                number: 15000
+                number: 15200
   tls:
     - secretName: ai-stg-tls
       hosts:

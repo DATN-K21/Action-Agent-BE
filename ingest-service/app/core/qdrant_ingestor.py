@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
@@ -12,7 +11,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as rest
 
 from app.core import logging as log_mod
-from app.core.document_processor import aload_and_split_document
+from app.core.document_processor import load_and_split_document
 from app.core.settings import env_settings
 
 log = log_mod.get_logger(__name__)
@@ -27,12 +26,11 @@ SPARSE_EMB = FastEmbedSparse(model_name="Qdrant/bm42-all-minilm-l6-v2-attentions
 POOL = ThreadPoolExecutor(max_workers=4)
 
 
-# ── helper to off-load sync work
-async def _run(fn, *a, **kw):
-    return await asyncio.get_running_loop().run_in_executor(POOL, lambda: fn(*a, **kw))
+def _run(fn, *a, **kw):
+    return fn(*a, **kw)
 
 
-async def create_collection_if_not_exists(collection_name: str | None = None) -> bool:
+def create_collection_if_not_exists(collection_name: str | None = None) -> bool:
     """
     Creates a Qdrant collection with hybrid (dense + sparse) vector configuration if it doesn't exist.
     """
@@ -41,7 +39,7 @@ async def create_collection_if_not_exists(collection_name: str | None = None) ->
 
     try:
         # Check if collection already exists
-        collections = await _run(CLIENT.get_collections)
+        collections = _run(CLIENT.get_collections)
         existing_collections = [col.name for col in collections.collections]
 
         if collection_name in existing_collections:
@@ -51,11 +49,11 @@ async def create_collection_if_not_exists(collection_name: str | None = None) ->
         log.info(f"Creating collection '{collection_name}' with hybrid vector configuration")
 
         # Get embedding dimensions for dense vectors
-        dense_vector = await _run(DENSE_EMB.embed_query, "sample text")
+        dense_vector = _run(DENSE_EMB.embed_query, "sample text")
         dense_dim = len(dense_vector)
 
         # Create collection with both dense and sparse vector configurations
-        await _run(
+        _run(
             CLIENT.create_collection,
             collection_name=collection_name,
             vectors_config={
@@ -82,7 +80,7 @@ async def create_collection_if_not_exists(collection_name: str | None = None) ->
 
 
 class LCQdrantIngestor:
-    """Async façade around LangChain Qdrant HYBRID store."""
+    """Sync façade around LangChain Qdrant HYBRID store."""
 
     def __init__(self) -> None:
         self._vs: QdrantVectorStore | None = None
@@ -101,40 +99,47 @@ class LCQdrantIngestor:
         return self._vs
 
     # ───────────────── ingest
-    async def add_upload(
+    def add_upload(
         self, blob_url: str, upload_id: str, user_id: str, *, chunk_size: int = 500, chunk_overlap: int = 50
     ) -> int:
         # Ensure collection exists before ingesting
-        await create_collection_if_not_exists()
+        create_collection_if_not_exists()
 
-        docs: List[Document] = await aload_and_split_document(
+        docs: List[Document] = load_and_split_document(
             blob_url, user_id, upload_id, chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         if not docs:
             raise ValueError("File produced 0 chunks")
 
-        await _run(self._vs_lazy().add_documents, docs)
+        _run(self._vs_lazy().add_documents, docs)
         log.info("Ingested %s chunks (dense+SPLADE) upload=%s user=%s", len(docs), upload_id, user_id)
         return len(docs)
 
     # ───────────────── delete
-    async def delete_upload(self, upload_id: str, user_id: str) -> bool:
+    def delete_upload(self, upload_id: str, user_id: str) -> bool:
         filt = rest.Filter(
             must=[
-                rest.FieldCondition(key="user_id", match=rest.MatchValue(value=user_id)),
-                rest.FieldCondition(key="upload_id", match=rest.MatchValue(value=upload_id)),
+                rest.FieldCondition(key="metadata.user_id", match=rest.MatchValue(value=user_id)),
+                rest.FieldCondition(key="metadata.upload_id", match=rest.MatchValue(value=upload_id)),
             ]
         )
-        await _run(self._vs_lazy().delete, filter=filt)
-        log.info("Deleted upload=%s user=%s", upload_id, user_id)
+        # Find all matching documents and collect their IDs
+        docs = _run(self._vs_lazy().similarity_search, query="", k=1000, filter=filt)
+        ids = [doc.metadata.get("_id") for doc in docs if doc.metadata.get("_id")]
+        if not ids:
+            log.warning("No documents found to delete for upload=%s user=%s", upload_id, user_id)
+            return False
+        # Delete by IDs
+        _run(self._vs_lazy().delete, ids=ids)
+        log.info("Deleted upload=%s user=%s (deleted %d docs)", upload_id, user_id, len(ids))
         return True
 
     # ───────────────── context mgmt
-    async def aclose(self):
+    def close(self):
         POOL.shutdown(wait=False)
 
-    async def __aenter__(self):
+    def __enter__(self):
         return self
 
-    async def __aexit__(self, *_):
-        await self.aclose()
+    def __exit__(self, *_):
+        self.close()

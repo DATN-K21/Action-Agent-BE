@@ -138,14 +138,14 @@ describe('AccessValidator', () => {
 			expect(result).toEqual(validInvokeNewTokenResult);
 		});
 
-		it('should validate invoke new token with empty client ID', async () => {
-			const req = { ...validInvokeNewTokenRequest, headers: { ...validInvokeNewTokenRequest.headers, 'x-client-id': '' } };
+		it('should validate invoke new token with invalid token payload', async () => {
+			const req = { ...validInvokeNewTokenRequest, headers: { ...validInvokeNewTokenRequest.headers, 'authorization': 'Bearer invalid-token' } };
 			const result = AccessValidator.validateInvokeNewToken(req);
 
 			expect(result).toEqual({
 				error: true,
 				code: 1010301,
-				message: 'Client ID is required'
+				message: 'Invalid token payload: missing user ID'
 			});
 		});
 
@@ -191,14 +191,14 @@ describe('AccessValidator', () => {
 			expect(result).toEqual(validResetPasswordResult);
 		});
 
-		it('should validate reset password with empty client ID', async () => {
-			const req = { ...validateResetPasswordRequest, headers: { ...validateResetPasswordRequest.headers, 'x-client-id': '' } };
+		it('should validate reset password with invalid token payload', async () => {
+			const req = { ...validateResetPasswordRequest, headers: { ...validateResetPasswordRequest.headers, 'authorization': 'Bearer invalid-token' } };
 			const result = AccessValidator.validateResetPassword(req);
 
 			expect(result).toEqual({
 				error: true,
 				code: 1011401,
-				message: 'Client ID is required'
+				message: 'Invalid token payload: missing user ID'
 			});
 		});
 

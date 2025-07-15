@@ -192,8 +192,8 @@ class GeneralAssistantHelpers:
             id=chatbot_member_id,
             name=chatbot_member_name,
             team_id=team_id,
-            backstory="A friendly and helpful general assistant designed to handle conversations, answer questions, and assist users with various tasks using available tools and knowledge.",
-            role="Handle general conversations, answer user questions, provide assistance with various tasks, and coordinate with support units when needed. Use search and knowledge tools when appropriate.",
+            backstory="A friendly and helpful general assistant designed to handle conversations, answer questions, and assist users with various tasks. Always leverage to use your available tools (search and knowledge retriever) when needed to provide accurate and helpful information.",
+            role="Handle general conversations, answer user questions, provide assistance with various tasks, and coordinate with support units when needed. Always leverage to use search and knowledge tools when appropriate.",
             type="chatbot",
             provider=provider,
             model=model_name,
@@ -248,14 +248,14 @@ class GeneralAssistantHelpers:
 
         # Set backstory and role based on workflow type
         if workflow_type == WorkflowType.RAGBOT:
-            backstory = "Specialized in retrieving and processing information from knowledge bases and documents."
-            role = "Search through uploaded documents and knowledge bases to find relevant information for user queries."
+            backstory = "Specialized in retrieving and processing information from user's knowledge bases, uploaded files and documents."
+            role = "Search through user's uploaded files, documents and knowledge bases to find relevant information for user queries."
         elif workflow_type == WorkflowType.SEARCHBOT:
             backstory = "Specialized in searching the internet and external sources for information."
             role = "Search the internet and external sources to find relevant and up-to-date information for user queries."
         else:
             backstory = f"Support unit for {workflow_type} functionality."
-            role = "Provide specialized support for user queries."
+            role = "Provide specialized support for user queries. Always leverage to use available tools when needed."
 
         support_member = Member(
             id=support_member_id,

@@ -373,7 +373,7 @@ describe('AccessController', () => {
 		const req = validateResetPasswordRequest;
 
 		it('should reset password successfully', async () => {
-			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: req.headers['x-client-id'] }, error: false });
+			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: 'jest-client-id' }, error: false });
 			accessService.resetPassword.mockResolvedValue(validResetPasswordResult.data);
 
 			await AccessController.handleResetPassword(req, res);
@@ -399,7 +399,7 @@ describe('AccessController', () => {
 		});
 
 		it('should throw BadRequestResponse if a MongooseError is occurred', async () => {
-			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: req.headers['x-client-id'] }, error: false });
+			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: 'jest-client-id' }, error: false });
 			accessService.resetPassword.mockRejectedValue(new MongooseError('MongooseError'));
 
 			try {
@@ -412,7 +412,7 @@ describe('AccessController', () => {
 		});
 
 		it('should throw error if an unexpected error is occurred', async () => {
-			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: req.headers['x-client-id'] }, error: false });
+			AccessValidator.validateResetPassword.mockReturnValue({ data: { ...req.body, userId: 'jest-client-id' }, error: false });
 			accessService.resetPassword.mockRejectedValue(new Error('Unexpected error'));
 
 			try {

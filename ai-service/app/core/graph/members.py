@@ -111,17 +111,11 @@ class BaseNode:
         all_messages = state.get("all_messages", [])
 
         if (
-                all_messages
-                and isinstance(all_messages[-1].content, list)
-                and any(
-            isinstance(item, dict)
-            and "type" in item
-            and item["type"] in ["text", "image_url"]
-            for item in all_messages[-1].content
-        )
+            all_messages
+            and isinstance(all_messages[-1].content, list)
+            and any(isinstance(item, dict) and "type" in item and item["type"] in ["text", "image_url"] for item in all_messages[-1].content)
         ):
             from langchain_core.messages import HumanMessage
-
             temp_state = [HumanMessage(content=all_messages[-1].content, name="user")]
             result = await self.model.ainvoke(temp_state, config)
         else:
@@ -400,7 +394,9 @@ class LeaderNode(BaseNode):
         }
 
     async def delegate(
-            self, state: GraphTeamState, config: RunnableConfig
+        self,
+        state: GraphTeamState,
+        config: RunnableConfig,
     ) -> ReturnGraphTeamState:
         team = state["team"]  # This is the current node
         scheduler_enabled = self.team_root.assistant.scheduler_enabled if self.team_root else False

@@ -70,6 +70,7 @@ class AccessService {
     async handleLogin(email, password) {
         const foundUser = await this.userModel.findOne({ email, type_login: 'local' }).populate('role').lean();
         if (!foundUser) {
+            console.log('User not found with email: ', email);
             throw new ConflictResponse('Email or password is incorrect', 1010205);
         }
         if (foundUser?.email_verified === false) {
@@ -148,6 +149,7 @@ class AccessService {
                     throw new BadRequestResponse('Invalid refresh token', 1010312);
                 }
             } else if (foundAccess.refresh_token !== refreshToken) {
+                console.log('Refresh token does not match with the one in database. Refresh token: ', refreshToken, ' - Found access: ', foundAccess);
                 throw new BadRequestResponse('Invalid refresh token', 1010313);
             }
         } catch (error) {
@@ -274,6 +276,7 @@ class AccessService {
         try {
             const userInfo = await GoogleHelper.verifyIdToken(idToken);
             if (!userInfo) {
+                console.log("Invalid ID Token received from Google: ", idToken);
                 throw new BadRequestResponse('Invalid ID Token', 1010602);
             }
             const user = await this.userModel.findOne({ email: userInfo.email }).populate('role').lean();
@@ -288,8 +291,9 @@ class AccessService {
                     firstname: userInfo?.givenName,
                     lastname: userInfo?.familyName,
                     fullname: `${userInfo?.givenName} ${userInfo?.familyName}`,
-                    role: foundRole?._id
+                    role: foundRole,
                 });
+                console.log("New user created with Google login: ", newUser);
 
                 //Sync data with AI-service
                 const userData = {
@@ -301,7 +305,8 @@ class AccessService {
                 }
                 let response = await syncData('/private/user/create', userData);
                 if (response.error) {
-                    throw new BadRequestResponse("Something went sync data", 1010107);
+                    console.log("Failed to sync data with AI service: ", response.error);
+                    throw new BadRequestResponse("Something went wrong in sync data", 1010107);
                 }
 
                 const { privateKey, publicKey } = generateRSAKeysForAccess();
@@ -544,7 +549,8 @@ class AccessService {
 
             const templatePath = path.join(__dirname, "../..", "templates", "accountActivation.html");
             let activationMessage = await fs.readFile(templatePath, "utf8");
-            activationMessage = activationMessage.replace("{{activationLink}}", `${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}`);
+            const realActivationLink = `${process.env.CLIENT_URL}/callback/account-activation?token=${activationToken}`;
+            activationMessage = activationMessage.replace(/\{\{activationLink\}\}/g, realActivationLink);
 
             const sendEmailResult = await emailHelper.sendEmail({
                 from: emailConfig.user,

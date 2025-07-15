@@ -175,10 +175,17 @@ async def ainitiate_upload(
         # Debug: Log the upload_info to see what's being returned
         logger.info(f"Upload info from blob service: {upload_info}")
 
-        # Create Upload record in database
         # Set is_global based on whether thread_id is provided
         is_global = request.thread_id is None
 
+        if not is_global:
+            thread_statement = select(Thread).where(Thread.id == request.thread_id, Thread.is_deleted.is_(False))
+            thread_result = await session.execute(thread_statement)
+            thread = thread_result.scalar_one_or_none()
+            if not thread:
+                raise HTTPException(status_code=404, detail="Thread not found")
+
+        # Create Upload record in database
         upload = Upload(
             id=str(unique_id),
             name=request.name,
@@ -196,15 +203,13 @@ async def ainitiate_upload(
         session.add(upload)
         await session.flush()
         await session.refresh(upload)
-
         if upload.id is None:
             raise HTTPException(status_code=500, detail="Failed to create upload record")
 
         # Handle upload-thread relationships based on global/private nature
-        if request.thread_id is not None:
+        if not is_global:
             # Private upload: validate thread exists and link to assistant members
-            await _validate_thread_exists(session, request.thread_id)
-            await _alink_upload_to_assistant_members(session, upload.id, request.thread_id, x_user_id)
+            await _alink_upload_to_assistant_members(session, upload.id, request.thread_id, x_user_id)  # type: ignore
 
         await session.commit()
 
@@ -517,26 +522,6 @@ async def are_initiate_upload(
 # =============================================================================
 # Private Helper Methods
 # =============================================================================
-
-
-async def _validate_thread_exists(session: SessionDep, thread_id: str) -> None:
-    """
-    Validate that the thread exists.
-
-    Args:
-        session: Database session
-        thread_id: ID of the thread
-
-    Raises:
-        HTTPException: If thread not found
-    """
-    thread_statement = select(Thread).where(Thread.id == thread_id, Thread.is_deleted.is_(False))
-    thread_result = await session.execute(thread_statement)
-    thread = thread_result.scalar_one_or_none()
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
-
-
 async def _alink_upload_to_assistant_members(session: SessionDep, upload_id: str, thread_id: str, user_id: str) -> None:
     """
     Link upload to appropriate assistant members based on assistant type.
