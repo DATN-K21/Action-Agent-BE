@@ -68,11 +68,11 @@ def get_context_limit_for_model(model_name: str, provider: Optional[LlmProvider]
         limit = MODEL_CONTEXT_LIMITS["default"]
 
     # Use X% of the limit for context to leave room for response
-    if model_name == env_settings.LLM_BASIC_MODEL:
+    if model_name == env_settings.BASIC_MODEL:
         ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_REASONING_MODEL:
+    elif model_name == env_settings.REASONING_MODEL:
         ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_VISION_MODEL:
+    elif model_name == env_settings.VISION_MODEL:
         ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO
@@ -154,11 +154,11 @@ def get_optimized_format_messages_for_model(
         Optimized formatted message string
     """
 
-    if model_name == env_settings.LLM_BASIC_MODEL:
+    if model_name == env_settings.BASIC_MODEL:
         ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_REASONING_MODEL:
+    elif model_name == env_settings.REASONING_MODEL:
         ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_VISION_MODEL:
+    elif model_name == env_settings.VISION_MODEL:
         ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO

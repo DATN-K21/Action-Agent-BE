@@ -32,8 +32,8 @@ class SuggestionService:
         """Get the LLM model for suggestion generation"""
         if self._llm_model is None:
             self._llm_model = get_llm_chat_model(
-                provider=env_settings.SUGGESTION_LLM_PROVIDER,
-                model=env_settings.LLM_SUGGESTION_MODEL,
+                provider=env_settings.SUGGESTION_MODEL_PROVIDER,
+                model=env_settings.SUGGESTION_MODEL,
                 api_key=env_settings.SUGGESTION_MODEL_API_KEY,
                 base_url=env_settings.SUGGESTION_MODEL_API_BASE_URL,
                 temperature=env_settings.SUGGESTION_MODEL_TEMPERATURE,

@@ -32,8 +32,8 @@ def _get_openai_model(
 
 def get_llm_chat_model(
     *,
-    provider: LlmProvider = env_settings.BASIC_LLM_PROVIDER,
-    model: str = env_settings.LLM_BASIC_MODEL,
+    provider: LlmProvider = env_settings.BASIC_MODEL_PROVIDER,
+    model: str = env_settings.BASIC_MODEL,
     api_key: str = env_settings.BASIC_MODEL_API_KEY,
     temperature: float = 0,
     **kwargs,

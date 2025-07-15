@@ -62,8 +62,8 @@ class BaseNode:
     ):
         try:
             if provider is None or model is None:
-                provider = env_settings.BASIC_LLM_PROVIDER
-                model = env_settings.LLM_BASIC_MODEL
+                provider = env_settings.BASIC_MODEL_PROVIDER
+                model = env_settings.BASIC_MODEL
 
             if temperature is None:
                 temperature = env_settings.BASIC_MODEL_TEMPERATURE

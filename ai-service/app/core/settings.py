@@ -26,31 +26,31 @@ class Settings(BaseSettings):
     USER_AGENT: str = "Action-LLM-AI-Service/1.0 (Educational Project)"
 
     # LLM
-    BASIC_LLM_PROVIDER: LlmProvider = LlmProvider.OPENAI
-    REASONING_LLM_PROVIDER: LlmProvider = LlmProvider.DEEPSEEK
-    VISION_LLM_PROVIDER: LlmProvider = LlmProvider.OPENAI
-    SUGGESTION_LLM_PROVIDER: LlmProvider = LlmProvider.OPENAI
+    BASIC_MODEL_PROVIDER: LlmProvider = LlmProvider.OPENAI
+    REASONING_MODEL_PROVIDER: LlmProvider = LlmProvider.DEEPSEEK
+    VISION_MODEL_PROVIDER: LlmProvider = LlmProvider.OPENAI
+    SUGGESTION_MODEL_PROVIDER: LlmProvider = LlmProvider.OPENAI
 
-    LLM_BASIC_MODEL: str = "gpt-4.1-mini"
+    BASIC_MODEL: str = "gpt-4o-mini"
     BASIC_MODEL_TEMPERATURE: float = 0.5
     BASIC_MODEL_CONTEXT_RATIO: float = 0.05
     BASIC_MODEL_API_KEY: str = "<YOUR-API-KEY>"
     BASIC_MODEL_API_BASE_URL: str = "https://api.openai.com/v1"
 
-    LLM_REASONING_MODEL: str = "deepseek-chat"
+    REASONING_MODEL: str = "deepseek-chat"
     REASONING_MODEL_TEMPERATURE: float = 0
     REASONING_MODEL_CONTEXT_RATIO: float = 0.2
     REASONING_MODEL_API_KEY: str = "<YOUR-API-KEY>"
-    REASONING_MODEL_API_BASE_URL: str = "https://api.deepseek.com/v1"
+    REASONING_MODEL_API_BASE_URL: str = "https://api.deepseek.com"
 
-    LLM_VISION_MODEL: str = "gpt-4o-mini"
+    VISION_MODEL: str = "gpt-4o-mini"
     VISION_MODEL_TEMPERATURE: float = 0.5
     VISION_MODEL_CONTEXT_RATIO: float = 0.2
     VISION_MODEL_API_KEY: str = "<YOUR-API-KEY>"
     VISION_MODEL_API_BASE_URL: str = "https://api.openai.com/v1"
 
     # Suggestion service LLM settings
-    LLM_SUGGESTION_MODEL: str = "gpt-4.1-mini"
+    SUGGESTION_MODEL: str = "gpt-4o-mini"
     SUGGESTION_MODEL_TEMPERATURE: float = 0.3
     SUGGESTION_MODEL_MAX_TOKENS: int = 5000
     SUGGESTION_MODEL_API_KEY: str = "<YOUR-API-KEY>"
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_BASE_URL: str = "https://api.anthropic.com"
 
     DEEPSEEK_API_KEY: str = "<YOUR-API-KEY>"
-    DEEPSEEK_API_BASE_URL: str = "https://api.deepseek.com/v1"
+    DEEPSEEK_API_BASE_URL: str = "https://api.deepseek.com"
 
     DEFAULT_CONTEXT_LIMIT: int = 100000  # Default context limit in tokens
     DEFAULT_CONTEXT_RATIO: float = 0.2  # Ratio of context to response tokens
