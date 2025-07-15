@@ -60,6 +60,7 @@ class ModelCapability(str, Enum):
 class LlmProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    DEEPSEEK = "deepseek"
     GOOGLE = "google"
     MISTRAL = "mistral"
     COHERE = "cohere"

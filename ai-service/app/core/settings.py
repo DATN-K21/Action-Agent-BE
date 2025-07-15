@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # LLM
     OPENAI_PROVIDER: LlmProvider = LlmProvider.OPENAI
     ANTHROPIC_PROVIDER: LlmProvider = LlmProvider.ANTHROPIC
+    DEEPSEEK_PROVIDER: LlmProvider = LlmProvider.DEEPSEEK
 
     LLM_BASIC_MODEL: str = "gpt-4o-mini"
     BASIC_MODEL_TEMPERATURE: float = 0.5
@@ -51,6 +52,9 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str = "<YOUR-API-KEY>"
     ANTHROPIC_API_BASE_URL: str = "https://api.anthropic.com"
+
+    DEEPSEEK_API_KEY: str = "<YOUR-API-KEY>"
+    DEEPSEEK_API_BASE_URL: str = "https://api.deepseek.com/v1"
 
     DEFAULT_CONTEXT_LIMIT: int = 100000  # Default context limit in tokens
     DEFAULT_CONTEXT_RATIO: float = 0.2  # Ratio of context to response tokens

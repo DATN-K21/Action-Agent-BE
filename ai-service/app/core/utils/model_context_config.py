@@ -25,6 +25,9 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-3-sonnet": 200000,
     "claude-3-haiku": 200000,
     "claude-3-5-sonnet": 200000,
+    # DeepSeek Models
+    "deepseek-chat": 128000,
+    "deepseek-reasoner": 128000,
     # Google Models
     "gemini-pro": 30720,
     "gemini-1.5-pro": 1000000,
@@ -37,6 +40,7 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
 PROVIDER_DEFAULT_LIMITS: Dict[LlmProvider, int] = {
     LlmProvider.OPENAI: 16384,
     LlmProvider.ANTHROPIC: 200000,
+    LlmProvider.DEEPSEEK: 128000,
     LlmProvider.GOOGLE: 30720,
     LlmProvider.MISTRAL: 8192,
     LlmProvider.COHERE: 4096,
