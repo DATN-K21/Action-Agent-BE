@@ -367,7 +367,7 @@ class ExtensionClient:
 
     def _is_valid_action(self, action_data: Dict) -> bool:
         """
-        Check if an action has valid parameters (no Python reserved keywords as parameter names).
+        Check if an action has valid parameters (no Python reserved keywords and valid Python identifiers as parameter names).
 
         Args:
             action_data: Dictionary containing action data
@@ -424,10 +424,16 @@ class ExtensionClient:
         if not properties:
             return True
 
-        # Check each property name against reserved keywords
+        # Check each property name against reserved keywords and valid Python identifiers
         for param_name in properties.keys():
+            # Check if parameter name is a Python reserved keyword
             if param_name in python_reserved_keywords:
-                logger.warning(f"Action {action_data.get('enum', 'unknown')} has invalid parameter name: {param_name}")
+                logger.warning(f"Action {action_data.get('enum', 'unknown')} has reserved keyword as parameter name: {param_name}")
+                return False
+            
+            # Check if parameter name is a valid Python identifier
+            if not param_name.isidentifier():
+                logger.warning(f"Action {action_data.get('enum', 'unknown')} has invalid Python identifier as parameter name: {param_name}")
                 return False
 
         return True
