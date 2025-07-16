@@ -32,7 +32,7 @@ async def active(
         extension_service = extension_service_info.service_object
 
         # Initialize the connection
-        connection_request = extension_service.initialize_connection(user_id=x_user_id)
+        connection_request = await extension_service.ainitialize_connection(user_id=x_user_id)
 
         if connection_request is None:
             response_data = ActiveAccountResponse(is_existed=True, redirect_url=None)
@@ -87,7 +87,7 @@ async def disconnect(
         account_id = connected_extension.connected_account_id
 
         # Disconnect the account
-        result = extension_service.disconnect(account_id)
+        result = await extension_service.adisconnect(account_id)
 
         # Delete the account from the database
         if result.status == "success":
@@ -150,7 +150,7 @@ async def check_active(
         extension_service = extension_service_info.service_object
 
         # Check the connection
-        result = extension_service.check_connection(user_id=x_user_id)
+        result = await extension_service.acheck_connection(user_id=x_user_id)
 
         response_data = CheckConnectionResponse(is_connected=result)
         return ResponseWrapper.wrap(status=200, data=response_data).to_response()

@@ -158,7 +158,7 @@ async def _aload_extension_tools_to_cache(session, extension_id: str, member_id:
 
     # Get authenticated tools from extension service
     extension_service = extension_service_info.service_object
-    tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
+    tools = await extension_service.aget_authed_tools(user_id=connected_extension.user_id)
 
     # Convert BaseTool instances to ToolInfo instances
     tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]

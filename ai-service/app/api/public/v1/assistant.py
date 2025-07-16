@@ -537,7 +537,7 @@ async def _acreate_extension_member_with_skills(
     session.add(member)
 
     extension_service = extension_service_info.service_object
-    tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
+    tools = await extension_service.aget_authed_tools(user_id=connected_extension.user_id)
     tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
 
     # Create skills and links
@@ -1057,7 +1057,7 @@ async def _aupdate_extension_members(
                 await session.flush()
 
                 extension_service = extension_service_info.service_object
-                tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
+                tools = await extension_service.aget_authed_tools(user_id=connected_extension.user_id)
                 tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
 
                 # Create skills and link them to the member

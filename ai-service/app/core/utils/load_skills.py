@@ -100,7 +100,7 @@ async def aload_skills(member_id: str, mcp: str | ConnectedMcp | None, extension
                     raise ValueError(f"Extension service info for {extension.extension_enum} not found or service object is None.")
 
                 extension_service = extension_service_info.service_object
-                tools = extension_service.get_authed_tools(user_id=str(extension.user_id))
+                tools = await extension_service.aget_authed_tools(user_id=str(extension.user_id))
 
                 tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
 
