@@ -1,6 +1,7 @@
 
 const axiosInstance = require('../configs/axios.config');
 const ENDPOINT_CONFIGS = require('../configs/endpoint.config');
+const globalUserCache = require('../utils/userCache.utils');
 
 const PUBLIC_ENDPOINTS = [
   // Ping endpoints
@@ -34,9 +35,7 @@ const PUBLIC_ENDPOINTS = [
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
-  req.headers['x-user-id'] = "";
-  req.headers['x-user-email'] = "";
-  req.headers['x-user-role'] = "";
+  setAuthHeaderFromData(req, {});
 
   if (PUBLIC_ENDPOINTS.includes(req.path)|| req.path.startsWith('/ai/api/v1/callback/extension')) {
     console.log(`Skip auth middleware public endpoint: ${req.path}`);
@@ -52,6 +51,13 @@ const currentUserMiddleware = async (req, res, next) => {
       data: null,
     });
   }
+  const authUserKey = authHeader.split(' ')[1];
+
+  const cachedUserData = globalUserCache.get(authUserKey);
+  if (cachedUserData) {
+    setAuthHeaderFromData(req, cachedUserData);
+    return next();
+  }
 
   try {
     const response = await axiosInstance.get(`${ENDPOINT_CONFIGS.USER_SERVICE_URL}/api/v1/user/me`, {
@@ -59,13 +65,23 @@ const currentUserMiddleware = async (req, res, next) => {
     });
 
     const userData = response.data;
-    req.headers['x-user-id'] = userData.id ?? "";
-    req.headers['x-user-email'] = userData.email ?? "";
-    req.headers['x-user-role'] = userData.role ?? "";
+    setAuthHeaderFromData(req, userData);
+
+    globalUserCache.set(authUserKey, {
+      id: userData.id,
+      email: userData.email,
+      role: userData.role,
+    });
 
     next();
   } catch (error) {
     console.error('Failed to get current user data: ', error);
+    // Delete cache for unauthorized access
+    if (error.response && [401, 403].includes(+error.response.status)) {
+      globalUserCache.delete(authUserKey);
+    }
+
+    // Handle error response
     if (error.status && error?.message && error?.errorStack) {
       const sanitizedError = { ...error };
       if (process.env.NODE_ENV !== "development") {
@@ -76,6 +92,12 @@ const currentUserMiddleware = async (req, res, next) => {
       res.status(500).json({ error: `Failed to get current user data.` });
     }
   }
+};
+
+const setAuthHeaderFromData = (req, data) => {
+  req.headers['x-user-id'] = data.id || "";
+  req.headers['x-user-email'] = data.email || "";
+  req.headers['x-user-role'] = data.role || "";
 };
 
 module.exports = currentUserMiddleware;
