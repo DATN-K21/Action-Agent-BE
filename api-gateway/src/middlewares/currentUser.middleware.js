@@ -51,8 +51,9 @@ const currentUserMiddleware = async (req, res, next) => {
       data: null,
     });
   }
+  const authUserKey = authHeader.split(' ')[1];
 
-  const cachedUserData = globalUserCache.get(authHeader);
+  const cachedUserData = globalUserCache.get(authUserKey);
   if (cachedUserData) {
     setAuthHeaderFromData(req, cachedUserData);
     return next();
@@ -66,7 +67,7 @@ const currentUserMiddleware = async (req, res, next) => {
     const userData = response.data;
     setAuthHeaderFromData(req, userData);
 
-    globalUserCache.set(authHeader, {
+    globalUserCache.set(authUserKey, {
       id: userData.id,
       email: userData.email,
       role: userData.role,
@@ -77,7 +78,7 @@ const currentUserMiddleware = async (req, res, next) => {
     console.error('Failed to get current user data: ', error);
     // Delete cache for unauthorized access
     if (error.response && [401, 403].includes(+error.response.status)) {
-      globalUserCache.delete(authHeader);
+      globalUserCache.delete(authUserKey);
     }
 
     // Handle error response

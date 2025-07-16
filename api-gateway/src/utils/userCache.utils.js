@@ -1,5 +1,12 @@
 const DEFAULT_TIME_TO_LIVE = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
+function simplifyCacheKey(key) {
+	if(key.length <= 20) {
+		return key;
+	}
+	return key.substring(0, 10) + '...' + key.substring(key.length - 10);
+}
+
 // User cache implementation with TTL
 class UserCache {
   	constructor() {
@@ -8,16 +15,18 @@ class UserCache {
 
 	get(cacheKey) {
 		const cachedData = this.cache.get(cacheKey);
+		const simplifiedKey = simplifyCacheKey(cacheKey);
 		if(!cachedData) {
-			console.info("[CACHE] Cache MISSED for user: ", cacheKey)
+			console.info("[CACHE] Cache MISSED for user with token: ", simplifiedKey)
 			return null;
 		}
-		if(Date.now() > this.cachedData.expiredAt) {
-			console.info("[CACHE] Cache EXPIRED for user: ", cacheKey)
-			this.cache.delete(cacheKey);
+		if(this.cachedData?.expiredAt && Date.now() > this.cachedData?.expiredAt) {
+			console.info("[CACHE] Cache EXPIRED for user with token: ", simplifiedKey)
+			this.cache.delete(simplifiedKey);
 			return null;
 		}
-		console.info("[CACHE] HIT for user: ", cacheKey)
+		console.info("[CACHE] HIT for user with token: ", simplifiedKey);
+		return cachedData;
 	}
 
 	set(cacheKey, userData) {
@@ -27,15 +36,17 @@ class UserCache {
 			expiredAt,
 			createdAt: Date.now()
 		});
-		console.info("[CACHE] SET for user: ", cacheKey, ", expired at: ", new Date(expiredAt).toISOString());
+		const simplifiedKey = simplifyCacheKey(cacheKey);
+		console.info("[CACHE] SET for user with token: ", simplifiedKey, ", expired at: ", new Date(expiredAt).toISOString());
 	}
 
 	delete(cacheKey) {
+		const simplifiedKey = simplifyCacheKey(cacheKey);
 		if(this.cache.has(cacheKey)) {
 			this.cache.delete(cacheKey);
-			console.info("[CACHE] DELETED for user: ", cacheKey);
+			console.info("[CACHE] DELETED for user with token: ", simplifiedKey);
 		} else {
-			console.warn("[CACHE] No cache entry found to delete for user: ", cacheKey);
+			console.warn("[CACHE] No cache entry found to delete for user with token: ", simplifiedKey);
 		}
 	}
 
