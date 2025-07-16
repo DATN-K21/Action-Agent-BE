@@ -104,6 +104,12 @@ const currentUserMiddleware = async (req, res, next) => {
     }
 
     // Handle error response
+    // Delete cache for unauthorized access
+    if (error.response && [401, 403].includes(+error.response.status)) {
+      globalUserCache.delete(authUserKey);
+    }
+
+    // Handle error response
     if (error.status && error?.message && error?.errorStack) {
       const sanitizedError = { ...error };
       if (process.env.NODE_ENV !== "development") {
