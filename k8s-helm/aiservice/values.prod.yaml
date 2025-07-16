@@ -40,21 +40,21 @@ env:
   - name: BASIC_MODEL_TEMPERATURE
     value: "0.5"
   - name: BASIC_MODEL_CONTEXT_RATIO
-    value: "0.2"
+    value: "0.6"
 
   - name: LLM_REASONING_MODEL
-    value: "claude-3-5-haiku-20241022"
+    value: "claude-3-5-sonnet-20241022"
   - name: REASONING_MODEL_TEMPERATURE
     value: "0"
   - name: REASONING_MODEL_CONTEXT_RATIO
-    value: "0.1"
+    value: "0.25"
 
   - name: LLM_VISION_MODEL
     value: "gpt-4o-mini"
   - name: VISION_MODEL_TEMPERATURE
     value: "0.5"
   - name: VISION_MODEL_CONTEXT_RATIO
-    value: "0.2"
+    value: "0.5"
 
   - name: LLM_SUGGESTION_MODEL
     value: "gpt-4.1-mini"
