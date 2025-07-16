@@ -20,13 +20,13 @@ class UserCache {
 			console.info("[CACHE] Cache MISSED for user with token: ", simplifiedKey)
 			return null;
 		}
-		if(this.cachedData?.expiredAt && Date.now() > this.cachedData?.expiredAt) {
+		if(cachedData?.expiredAt && Date.now() > cachedData?.expiredAt) {
 			console.info("[CACHE] Cache EXPIRED for user with token: ", simplifiedKey)
-			this.cache.delete(simplifiedKey);
+			this.cache.delete(cacheKey);
 			return null;
 		}
 		console.info("[CACHE] HIT for user with token: ", simplifiedKey);
-		return cachedData;
+		return cachedData.userData;
 	}
 
 	set(cacheKey, userData) {
@@ -52,7 +52,7 @@ class UserCache {
 
 	cleanup() {
 		const now = Date.now();
-		const clearCount = 0;
+		let clearCount = 0;
 		for (const [key, value] of this.cache.entries()) {
 			if (value.expiredAt < now) {
 				this.cache.delete(key);

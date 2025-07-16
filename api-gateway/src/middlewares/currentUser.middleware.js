@@ -35,7 +35,9 @@ const PUBLIC_ENDPOINTS = [
 ]
 
 const currentUserMiddleware = async (req, res, next) => {
-  setAuthHeaderFromData(req, {});
+  req.headers['x-user-id'] = null;
+  req.headers['x-user-email'] = null;
+  req.headers['x-user-role'] = null;
 
   if (PUBLIC_ENDPOINTS.includes(req.path)|| req.path.startsWith('/ai/api/v1/callback/extension')) {
     console.log(`Skip auth middleware public endpoint: ${req.path}`);
@@ -52,20 +54,40 @@ const currentUserMiddleware = async (req, res, next) => {
     });
   }
   const authUserKey = authHeader.split(' ')[1];
-
-  const cachedUserData = globalUserCache.get(authUserKey);
-  if (cachedUserData) {
-    setAuthHeaderFromData(req, cachedUserData);
-    return next();
+  if (!authUserKey) {
+    return res.status(401).json({
+      status: 401,
+      message: 'Invalid authorization header format.',
+      data: null,
+    });
   }
 
+  
   try {
+    const cachedUserData = globalUserCache.get(authUserKey);
+    if (cachedUserData && cachedUserData.id && cachedUserData.email && cachedUserData.role) {
+      setAuthHeaderFromData(req, cachedUserData);
+      return next();
+    }
+
     const response = await axiosInstance.get(`${ENDPOINT_CONFIGS.USER_SERVICE_URL}/api/v1/user/me`, {
       headers: { Authorization: authHeader },
     });
 
     const userData = response.data;
-    setAuthHeaderFromData(req, userData);
+    if(!userData || !userData.id || !userData.email || !userData.role) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid user data received from service.',
+        data: null,
+      });
+    } else {
+      setAuthHeaderFromData(req, {
+        id: userData.id,
+        email: userData.email,
+        role: userData.role,
+      })
+    }
 
     globalUserCache.set(authUserKey, {
       id: userData.id,
@@ -89,15 +111,19 @@ const currentUserMiddleware = async (req, res, next) => {
       }
       res.status(error.status).json(sanitizedError);
     } else {
-      res.status(500).json({ error: `Failed to get current user data.` });
+      res.status(500).json({ error: `Failed to get current user data: ${error.message}` });
     }
   }
 };
 
-const setAuthHeaderFromData = (req, data) => {
-  req.headers['x-user-id'] = data.id || "";
-  req.headers['x-user-email'] = data.email || "";
-  req.headers['x-user-role'] = data.role || "";
+const setAuthHeaderFromData = (req, data = {}) => {
+  const {  id, email, role } = data;
+  if (!id || !email || !role) {
+    throw new Error("Invalid user data provided");
+  }
+  req.headers['x-user-id'] = id;
+  req.headers['x-user-email'] = email;
+  req.headers['x-user-role'] = role;
 };
 
 module.exports = currentUserMiddleware;
