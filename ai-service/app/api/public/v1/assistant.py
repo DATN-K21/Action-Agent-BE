@@ -52,7 +52,7 @@ router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
 async def _aadd_ask_human_skill_to_worker(
     session: AsyncSession,
-    member_id: str,
+    member: Member,
     user_id: str,
 ) -> None:
     """
@@ -66,6 +66,11 @@ async def _aadd_ask_human_skill_to_worker(
         member_id: ID of the worker member to add the skill to
         user_id: User ID for the skill record
     """
+
+    if not member.id:
+        logger.warning("Member ID is None. Skipping ask_human skill addition.")
+        return
+
     # Get ask_human tool from global_tools
     ask_human_tool_info = global_tools.get("ask-human")
     if not ask_human_tool_info:
@@ -89,7 +94,7 @@ async def _aadd_ask_human_skill_to_worker(
 
     # Link skill to member
     member_skill_link = MemberSkillLink(
-        member_id=member_id,
+        member_id=member.id,
         skill_id=ask_human_skill.id,
     )
     session.add(member_skill_link)
@@ -486,7 +491,7 @@ async def _acreate_mcp_member_with_skills(
 
     # Add ask_human skill to worker if ask_human is enabled
     if request.ask_human:
-        await _aadd_ask_human_skill_to_worker(session, member.id, connected_mcp.user_id)
+        await _aadd_ask_human_skill_to_worker(session, member, connected_mcp.user_id)
 
 
 async def _acreate_extension_member_with_skills(
@@ -569,7 +574,7 @@ async def _acreate_extension_member_with_skills(
 
     # Add ask_human skill to worker if ask_human is enabled
     if request.ask_human:
-        await _aadd_ask_human_skill_to_worker(session, member.id, connected_extension.user_id)
+        await _aadd_ask_human_skill_to_worker(session, member, connected_extension.user_id)
 
 
 async def _acreate_support_team(
@@ -977,7 +982,7 @@ async def _aupdate_mcp_members(
 
                 # Add ask_human skill to worker if ask_human is enabled
                 if request.ask_human:
-                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
 
 
 async def _aupdate_extension_members(
@@ -1091,7 +1096,7 @@ async def _aupdate_extension_members(
 
                 # Add ask_human skill to worker if ask_human is enabled
                 if request.ask_human:
-                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
 
 
 # Not included chatbot and hierarchical team
@@ -1425,7 +1430,7 @@ async def _aupdate_ask_human_skills_for_workers(
 
                 if not existing_skill:
                     # Add ask_human skill to worker
-                    await _aadd_ask_human_skill_to_worker(session, member.id, user_id)
+                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
             else:
                 # Remove ask_human skill from worker
                 await _aremove_ask_human_skill_from_worker(session, member.id)
@@ -1986,6 +1991,9 @@ async def aupdate_advanced_assistant(
 
                 await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
                 hierarchical_team = None
+
+        # Flush data to ensure all changes are applied
+        await session.flush()
 
         # Refresh hierarchical team's members collection after delete/recreate operations
         if hierarchical_team is not None:
