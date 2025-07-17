@@ -219,7 +219,7 @@ env:
     value: "1"
     
 autoscaling:
-  enabled: true
+  enabled: false
   minReplicas: 1
   maxReplicas: 2
   targetCPUUtilizationPercentage: 90
