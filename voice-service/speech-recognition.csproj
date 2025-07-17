@@ -14,8 +14,9 @@
         <PackageReference Include="AudioWorks.Extensibility" Version="2.0.1" />
         <PackageReference Include="FluentValidation" Version="12.0.0" />
         <PackageReference Include="Google.Cloud.Speech.V1" Version="3.8.0" />
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.16"/>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.16" />
+        <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     </ItemGroup>
 
     <ItemGroup>

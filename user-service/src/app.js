@@ -14,6 +14,10 @@ const morgan = require('morgan');
 const { default: helmet } = require('helmet');
 const compression = require('compression');
 
+const client = require('prom-client');
+client.collectDefaultMetrics();
+const register = client.register;
+
 //init middlewares
 app.use(morgan("dev"))
 app.use(express.json())
@@ -27,6 +31,11 @@ require('./db/mongo.db')();
 
 //init routing
 app.use('/', require('./routes/index'));
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 //handle errors
 app.use((req, res, next) => {

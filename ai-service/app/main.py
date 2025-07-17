@@ -4,6 +4,7 @@ logging.configure_logging()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.base import router
 from app.core import exceptions, swagger
@@ -24,6 +25,8 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,  # type: ignore
 )
+
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
