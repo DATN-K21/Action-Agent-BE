@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "croniter>=2.0.5",
     "orjson>=3.10.18",
+    "prometheus-fastapi-instrumentator>=7.1.0",
 ]
 
 [dependency-groups]
