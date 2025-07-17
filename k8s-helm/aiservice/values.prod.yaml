@@ -218,3 +218,9 @@ env:
   - name: MAX_WORKERS
     value: "1"
     
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

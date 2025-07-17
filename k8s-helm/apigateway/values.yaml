@@ -54,8 +54,8 @@ resources:
     cpu: "10m"
     memory: "100Mi"
   limits:
-    cpu: "100m"
-    memory: "300Mi"
+    cpu: "500m"
+    memory: "700Mi"
 
 autoscaling:
   enabled: false
