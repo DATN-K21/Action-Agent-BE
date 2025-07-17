@@ -31,7 +31,7 @@ class UploadInitiateRequest(BaseModel):
     file_size_bytes: int = Field(..., description="File size in bytes")
     name: str = Field(..., description="Display name for the upload")
     description: str = Field(..., description="Description of the upload")
-    chunk_size: int = Field(default=1000, description="Chunk size for processing")
+    chunk_size: int = Field(default=2000, description="Chunk size for processing")
     chunk_overlap: int = Field(default=200, description="Chunk overlap for processing")
     thread_id: str | None = Field(None, description="Optional thread ID to link the upload")
 

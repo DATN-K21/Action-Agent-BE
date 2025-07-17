@@ -80,7 +80,7 @@ def create_collection_if_not_exists(collection_name: str | None = None) -> bool:
 
 
 class LCQdrantIngestor:
-    """Sync façade around LangChain Qdrant HYBRID store."""
+    """Sync facade around LangChain Qdrant HYBRID store."""
 
     def __init__(self) -> None:
         self._vs: QdrantVectorStore | None = None
@@ -100,7 +100,7 @@ class LCQdrantIngestor:
 
     # ───────────────── ingest
     def add_upload(
-        self, blob_url: str, upload_id: str, user_id: str, *, chunk_size: int = 500, chunk_overlap: int = 50
+        self, blob_url: str, upload_id: str, user_id: str, *, chunk_size: int = 2000, chunk_overlap: int = 200
     ) -> int:
         # Ensure collection exists before ingesting
         create_collection_if_not_exists()

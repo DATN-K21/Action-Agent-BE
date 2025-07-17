@@ -68,8 +68,8 @@ def load_and_split_document(
     user_id: str,
     upload_id: str,
     *,
-    chunk_size: int = 500,
-    chunk_overlap: int = 50,
+    chunk_size: int = 2000,
+    chunk_overlap: int = 200,
 ) -> List[Document]:
     """Returns document chunks ready for embedding."""
     if "blob.core.windows.net" not in file_path:

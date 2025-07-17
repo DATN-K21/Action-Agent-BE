@@ -11,8 +11,8 @@ def ingest_add_upload(
     blob_url: str,
     upload_id: str,
     user_id: str,
-    chunk_size: int = 500,
-    chunk_overlap: int = 50,
+    chunk_size: int = 2000,
+    chunk_overlap: int = 200,
 ) -> None:
     """Download → chunk → embed → upsert into Qdrant."""
     try:
