@@ -14,4 +14,4 @@ RUN uv sync --frozen --no-cache --no-dev
 COPY . .
 
 EXPOSE 15200
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "15200", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "15200", "--reload"]
