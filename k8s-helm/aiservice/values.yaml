@@ -26,8 +26,8 @@ service:
 
 podAnnotations:
   prometheus.io/scrape: "true"
-  prometheus.io/port:   "9100"
-  prometheus.io/path:   "/metrics"
+  prometheus.io/port: "15200"
+  prometheus.io/path: "/metrics"
 
 ingress:
   enabled: false
