@@ -46,7 +46,7 @@ resources:
     cpu: "10m"
     memory: "100Mi"
   limits:
-    cpu: "700m"
+    cpu: "500m"
     memory: "1000Mi"
 
 autoscaling:
