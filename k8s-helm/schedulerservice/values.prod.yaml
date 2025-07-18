@@ -12,6 +12,19 @@ nameOverride: "schedulerserviceprod"
 fullnameOverride: "schedulerserviceprod"
 
 env:
+# ===================== HOST AND PORT =====================
+  - name: HOST
+    value: "0.0.0.0"
+  - name: PORT
+    value: "15800"
+
+# ===================== DEBUG MODES =====================
+  - name: DEBUG_SERVER
+    value: "false"
+  - name: LOG_LEVEL
+    value: "INFO"
+
+# ===================== DATABASE CONNECTION =====================
   - name: POSTGRES_URL_PATH
     valueFrom:
       secretKeyRef:
@@ -22,18 +35,13 @@ env:
   - name: DEBUG_SQLALCHEMY
     value: "false"
 
+# ===================== URL SETTINGS =====================
   - name: AI_SERVICE_URL
     value: "http://aiserviceprod:15200"
+  - name: API_V1_PREFIX
+    value: "/api/v1"
 
-  - name: HOST
-    value: "0.0.0.0"
-  - name: PORT
-    value: "15800"
-  - name: DEBUG_SERVER
-    value: "false"
-  - name: LOG_LEVEL
-    value: "INFO"
-
+# ===================== SCHEDULER SETTINGS =====================
   - name: SCHEDULER_TIMEZONE
     value: "UTC"
   - name: MAX_CONCURRENT_JOBS
@@ -42,7 +50,3 @@ env:
     value: "300"
   - name: MAX_RETRIES
     value: "3"
-
-  - name: API_V1_PREFIX
-    value: "/api/v1"
-  

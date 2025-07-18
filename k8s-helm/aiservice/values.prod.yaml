@@ -226,7 +226,7 @@ env:
   # ===================== CACHE SETTINGS =====================
   # Memory and Cache settings
   - name: SYSTEM_MEMORY_THRESHOLD
-    value: "92.0"
+    value: "99.0"
   - name: CACHE_MEMORY_THRESHOLD
     value: "0.92"
   - name: CACHE_STARTUP_GRACE_PERIOD
