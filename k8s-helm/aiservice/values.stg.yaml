@@ -31,37 +31,73 @@ env:
   # ===================== LLM PROVIDERS =====================
   - name: OPENAI_PROVIDER
     value: "openai"
-  - name: ANTHROPIC_PROVIDER
-    value: "anthropic"
+  - name: REASONING_MODEL_PROVIDER
+    value: "deepseek"
+  - name: VISION_MODEL_PROVIDER
+    value: "openai"
+  - name: SUGGESTION_MODEL_PROVIDER
+    value: "openai"
 
   # ===================== LLM MODELS =====================
-  - name: LLM_BASIC_MODEL
+  # Basic LLM model
+  - name: BASIC_MODEL
     value: "gpt-4o-mini"
   - name: BASIC_MODEL_TEMPERATURE
     value: "0.5"
   - name: BASIC_MODEL_CONTEXT_RATIO
     value: "0.2"
+  - name: BASIC_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: BASIC_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: basicmodelapikey
 
-  - name: LLM_REASONING_MODEL
-    value: "claude-3-5-haiku-20241022"
+  # Reasoning LLM model
+  - name: REASONING_MODEL
+    value: "deepseek-chat"
   - name: REASONING_MODEL_TEMPERATURE
     value: "0"
   - name: REASONING_MODEL_CONTEXT_RATIO
-    value: "0.1"
+    value: "0.2"
+  - name: REASONING_MODEL_API_BASE_URL
+    value: "https://api.deepseek.com"
+  - name: REASONING_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: reasoningmodelapikey
 
-  - name: LLM_VISION_MODEL
+  # Vision LLM model
+  - name: VISION_MODEL
     value: "gpt-4o-mini"
   - name: VISION_MODEL_TEMPERATURE
     value: "0.5"
   - name: VISION_MODEL_CONTEXT_RATIO
     value: "0.2"
+  - name: VISION_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: VISION_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: visionmodelapikey
 
-  - name: LLM_SUGGESTION_MODEL
-    value: "gpt-4.1-mini"
+  # Suggestion LLM model
+  - name: SUGGESTION_MODEL
+    value: "gpt-4o-mini"
   - name: SUGGESTION_MODEL_TEMPERATURE
     value: "0.3"
   - name: SUGGESTION_MODEL_MAX_TOKENS
-    value: "500"
+    value: "5000"
+  - name: SUGGESTION_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: SUGGESTION_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: suggestionmodelapikey
 
   # ===================== OPENAI API =====================
   - name: OPENAI_API_KEY
@@ -78,6 +114,18 @@ env:
       secretKeyRef:
         name: env-secret
         key: anthropicapikey
+  - name: ANTHROPIC_API_BASE_URL
+    value: "https://api.anthropic.com"
+
+  # ===================== DEEPSEEK API =====================
+  - name: DEEPSEEK_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: deepseekapikey
+  - name: DEEPSEEK_API_BASE_URL
+    value: "https://api.deepseek.com"
+
   - name: ANTHROPIC_API_BASE_URL
     value: "https://api.anthropic.com"
 
@@ -170,6 +218,8 @@ env:
     value: "retrievalservicestg:15600"
   - name: EXTENSION_SERVICE_URL
     value: "http://extensionservicestg:15300"
+  - name: SCHEDULER_SERVICE_URL
+    value: "http://schedulerservicestg:15800"
   - name: FRONTEND_REDIRECT_URL
     value: "http://localhost:3000/callback/extension"
 
@@ -209,6 +259,10 @@ env:
     value: "400"
   - name: EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB
     value: "256.0"
+
+  # Number of processors
+  - name: MAX_WORKERS
+    value: "1"
 
 ingress:
   enabled: true

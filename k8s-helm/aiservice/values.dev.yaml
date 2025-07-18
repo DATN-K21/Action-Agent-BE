@@ -31,37 +31,73 @@ env:
   # ===================== LLM PROVIDERS =====================
   - name: OPENAI_PROVIDER
     value: "openai"
-  - name: ANTHROPIC_PROVIDER
-    value: "anthropic"
+  - name: REASONING_MODEL_PROVIDER
+    value: "deepseek"
+  - name: VISION_MODEL_PROVIDER
+    value: "openai"
+  - name: SUGGESTION_MODEL_PROVIDER
+    value: "openai"
 
   # ===================== LLM MODELS =====================
-  - name: LLM_BASIC_MODEL
+  # Basic LLM model
+  - name: BASIC_MODEL
     value: "gpt-4o-mini"
   - name: BASIC_MODEL_TEMPERATURE
     value: "0.5"
   - name: BASIC_MODEL_CONTEXT_RATIO
     value: "0.2"
+  - name: BASIC_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: BASIC_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: basicmodelapikey
 
-  - name: LLM_REASONING_MODEL
-    value: "claude-3-5-haiku-20241022"
+  # Reasoning LLM model
+  - name: REASONING_MODEL
+    value: "deepseek-chat"
   - name: REASONING_MODEL_TEMPERATURE
     value: "0"
   - name: REASONING_MODEL_CONTEXT_RATIO
-    value: "0.1"
+    value: "0.2"
+  - name: REASONING_MODEL_API_BASE_URL
+    value: "https://api.deepseek.com"
+  - name: REASONING_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: reasoningmodelapikey
 
-  - name: LLM_VISION_MODEL
+  # Vision LLM model
+  - name: VISION_MODEL
     value: "gpt-4o-mini"
   - name: VISION_MODEL_TEMPERATURE
     value: "0.5"
   - name: VISION_MODEL_CONTEXT_RATIO
     value: "0.2"
+  - name: VISION_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: VISION_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: visionmodelapikey
 
-  - name: LLM_SUGGESTION_MODEL
-    value: "gpt-4.1-mini"
+  # Suggestion LLM model
+  - name: SUGGESTION_MODEL
+    value: "gpt-4o-mini"
   - name: SUGGESTION_MODEL_TEMPERATURE
     value: "0.3"
   - name: SUGGESTION_MODEL_MAX_TOKENS
-    value: "500"
+    value: "5000"
+  - name: SUGGESTION_MODEL_API_BASE_URL
+    value: "https://api.openai.com/v1"
+  - name: SUGGESTION_MODEL_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: suggestionmodelapikey
 
   # ===================== OPENAI API =====================
   - name: OPENAI_API_KEY
@@ -78,6 +114,18 @@ env:
       secretKeyRef:
         name: env-secret
         key: anthropicapikey
+  - name: ANTHROPIC_API_BASE_URL
+    value: "https://api.anthropic.com"
+
+  # ===================== DEEPSEEK API =====================
+  - name: DEEPSEEK_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: deepseekapikey
+  - name: DEEPSEEK_API_BASE_URL
+    value: "https://api.deepseek.com"
+
   - name: ANTHROPIC_API_BASE_URL
     value: "https://api.anthropic.com"
 
@@ -170,5 +218,48 @@ env:
     value: "retrievalservicedev:15600"
   - name: EXTENSION_SERVICE_URL
     value: "http://extensionservicedev:15300"
+  - name: SCHEDULER_SERVICE_URL
+    value: "http://schedulerservicedev:15800"
   - name: FRONTEND_REDIRECT_URL
-    value: "https://dev.action-agent.software/callback/extension"
+    value: "http://localhost:3000/callback/extension"
+
+  # ===================== CACHE SETTINGS =====================
+  # Memory and Cache settings
+  - name: SYSTEM_MEMORY_THRESHOLD
+    value: "92.0"
+  - name: CACHE_MEMORY_THRESHOLD
+    value: "0.92"
+  - name: CACHE_STARTUP_GRACE_PERIOD
+    value: "60.0"
+  - name: CACHE_CLEANUP_RATIO
+    value: "0.2"
+  - name: CACHE_ENABLE_MEMORY_LOGGING
+    value: "True"
+  - name: CACHE_DETAILED_LOGGING_INTERVAL
+    value: "300.0"
+  - name: CACHE_MEMORY_CHECK_INTERVAL
+    value: "120.0"
+  - name: CACHE_TTL_SECONDS
+    value: "3600.0"
+
+  # Cache for streaming connections
+  - name: STREAMING_CONNECTIONS_CACHE_MAX_ENTRIES
+    value: "1000"
+  - name: STREAMING_CONNECTIONS_CACHE_MAX_MEMORY_MB
+    value: "64.0"
+
+  # Cache for tools
+  - name: TOOLS_CACHE_MAX_ENTRIES
+    value: "1000"
+  - name: TOOLS_CACHE_MAX_MEMORY_MB
+    value: "512.0"
+
+  # Cache for extension services
+  - name: EXTENSION_SERVICES_CACHE_MAX_ENTRIES
+    value: "400"
+  - name: EXTENSION_SERVICES_CACHE_MAX_MEMORY_MB
+    value: "256.0"
+
+  # Number of processors
+  - name: MAX_WORKERS
+    value: "1"

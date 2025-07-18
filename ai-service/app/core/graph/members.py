@@ -9,9 +9,10 @@ from langchain_core.runnables import (
     RunnableLambda,
     RunnableSerializable,
 )
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import add_messages
+from langgraph.types import Command
 from typing_extensions import NotRequired, TypedDict
 
 from app.core.model_providers.model_provider_manager import model_provider_manager
@@ -22,8 +23,10 @@ from app.core.state import (
     GraphTeam,
     add_or_replace_messages,
 )
+from app.core.tools.scheduler_tool import create_scheduler_tools
 from app.core.tools.tool_args_sanitizer import sanitize_tool_calls_list
 from app.core.tools.tool_manager import extract_name
+from app.db_models.team import Team
 
 
 class GraphTeamState(TypedDict):
@@ -59,8 +62,8 @@ class BaseNode:
     ):
         try:
             if provider is None or model is None:
-                provider = env_settings.OPENAI_PROVIDER
-                model = env_settings.LLM_BASIC_MODEL
+                provider = env_settings.BASIC_MODEL_PROVIDER
+                model = env_settings.BASIC_MODEL
 
             if temperature is None:
                 temperature = env_settings.BASIC_MODEL_TEMPERATURE
@@ -89,11 +92,14 @@ class BaseNode:
         ai_message.name = name
         return ai_message
 
-    def get_team_members_name(
-            self, team_members: Mapping[str, GraphMember | GraphLeader]
-    ) -> str:
+    def get_team_members_name(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
         """Get the names of all team members as a string"""
-        return ",".join(list(team_members))
+        team_members_name = ",".join(list(team_members))
+
+        if scheduler_enabled:
+            # If scheduler is enabled, append the scheduler name
+            team_members_name += ",hierarchical-scheduler"
+        return team_members_name
 
     async def _handle_messages(
         self,
@@ -317,13 +323,33 @@ class LeaderNode(BaseNode):
         ]
     )
 
-    def get_team_members_info(
-            self, team_members: Mapping[str, GraphMember | GraphLeader]
-    ) -> str:
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        team_root: Team | None,
+    ):
+        super().__init__(provider, model, temperature)
+        self.team_root = team_root
+
+    def get_team_members_info(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
         """Create a string containing team members name and role."""
         result = ""
         for member in team_members.values():
             result += f"name: {member.name}\nrole: {member.role}\n\n"
+
+        if scheduler_enabled:
+            # If scheduler is enabled, append the scheduler info
+            scheduler_role = (
+                "Scheduled Job Manager Role: Responsible for managing the lifecycle of scheduled jobs "
+                "that automate AI prompt execution. Grants ability to create, retrieve, inspect, update, "
+                "and delete both one-time and recurring jobs using cron expressions. Includes timezone-aware "
+                "execution, retry policies, and timeout configurations. Supports team-based and assistant-specific "
+                "job control for robust automation workflows."
+            )
+            result += f"name: hierarchical-scheduler\nrole: {scheduler_role}\n\n"
+
         return result
 
     def get_tool_definition(self, options: list[str]) -> dict[str, Any]:
@@ -373,9 +399,15 @@ class LeaderNode(BaseNode):
         config: RunnableConfig,
     ) -> ReturnGraphTeamState:
         team = state["team"]  # This is the current node
-        team_members_name = self.get_team_members_name(team.members)
-        team_members_info = self.get_team_members_info(team.members)
+        scheduler_enabled = self.team_root.assistant.scheduler_enabled if self.team_root else False
+        team_members_name = self.get_team_members_name(team.members, scheduler_enabled)
+        team_members_info = self.get_team_members_info(team.members, scheduler_enabled)
         options = list(team.members) + ["FINISH"]
+        
+        # Add scheduler to options if enabled
+        if scheduler_enabled:
+            options.insert(-1, "hierarchical-scheduler")  # Insert before FINISH
+        
         tools = [self.get_tool_definition(options)]
 
         # Disable default parallel tool calls from ChatOpenAI
@@ -432,6 +464,120 @@ class LeaderNode(BaseNode):
     ) -> ReturnGraphTeamState:
         # This method should contain the logic of the delegate method.
         return await self.delegate(state, config)
+
+# Create SchedulerNode here
+
+
+class SchedulerNode(BaseNode):
+    scheduler_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You are a scheduler specialist and team member of {team_name} with the following team members: {team_members_name}. "
+                    "Your role is to handle scheduling tasks including creating, managing, and executing automated jobs.\n"
+                    "You can create jobs that automatically send prompts and execute tasks at scheduled times.\n"
+                    "You can also perform CRUD operations (Create, Read, Update, Delete) on these jobs.\n\n"
+                    "Available scheduling capabilities:\n"
+                    "- Create new scheduled jobs with specific timing\n"
+                    "- List and view existing jobs\n"
+                    "- Get job details and status\n"
+                    "- Update job schedules and configurations\n"
+                    "- Delete jobs when no longer needed\n"
+                    "Stay true to your persona and role:\n{persona}\n"
+                ),
+            ),
+            (
+                "human",
+                "Here is the scheduling task: \n\n {task_string} \n\n Here is the previous conversation: \n\n {history_string} \n\n "
+                "Use your scheduler tools to handle this request. Provide your response with the appropriate scheduling action.",
+            ),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
+
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        user_id: str | None = None,
+        user_role: str | None = None,
+        timezone: str | None = None,
+        assistant_id: str | None = None,
+        team_id: str | None = None,
+        ask_human: bool = False,
+    ):
+        super().__init__(provider, model, temperature)
+
+        self.user_id = user_id
+        self.user_role = user_role
+        self.timezone = timezone
+        self.assistant_id = assistant_id
+        self.team_id = team_id
+        self.ask_human = ask_human
+
+    def get_scheduler_tools(self) -> list[StructuredTool]:
+        """Create and return the scheduler tools for the current user."""
+        result = create_scheduler_tools(
+            user_id=self.user_id,  # type: ignore[arg-type]
+            timezone=self.timezone,  # type: ignore[arg-type]
+            user_role=self.user_role,  # type: ignore[arg-type]
+            assistant_id=self.assistant_id,  # type: ignore[arg-type]
+            team_id=self.team_id,  # type: ignore[arg-type]
+        )
+
+        tools = [value for key, value in result.items()]
+
+        if self.ask_human:
+            from app.core.tools.ask_human.ask_human import ask_human
+
+            tools.append(ask_human)
+
+        return tools
+
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> ReturnGraphTeamState:
+        team_members_name = self.get_team_members_name(state["team"].members)
+        
+        # The scheduler has a default persona
+        scheduler_persona = (
+            "You are a specialized scheduling assistant that manages automated job execution. "
+            "You help create, monitor, update, and delete scheduled tasks that run AI prompts at specified times. "
+            "You understand cron expressions, timezone handling, and job lifecycle management."
+        )
+
+        prompt = self.scheduler_prompt.partial(
+            team_name=state["team"].name,
+            team_members_name=team_members_name,
+            persona=scheduler_persona,
+            history_string=self.get_optimized_context_string(state["history"]),
+            task_string=self.get_optimized_context_string(state["task"]),
+        )
+
+        # Scheduler node should always have scheduler tools
+        tools = self.get_scheduler_tools()
+        if tools:
+            chain = prompt | self.model.bind_tools(tools)
+        else:
+            # Fallback to regular model if no tools available
+            chain: RunnableSerializable[dict[str, Any], AnyMessage] = (  # type: ignore[no-redef]
+                prompt | self.model
+            )
+
+        work_chain: RunnableSerializable[dict[str, Any], Any] = chain | RunnableLambda(
+            self.tag_with_name  # type: ignore[arg-type]
+        ).bind(name="hierarchical-scheduler")
+
+        result: AIMessage = await self._handle_messages(state, config, work_chain)
+
+        if result.tool_calls:
+            return {"messages": [result]}
+        else:
+            return {
+                "history": [result],
+                "messages": [],
+                "all_messages": state["messages"] + [result],
+            }
 
 
 class SummariserNode(BaseNode):
@@ -592,3 +738,153 @@ class RAGBotNode(BaseNode):
                 "messages": [],
                 "all_messages": state["messages"] + [result],
             }
+
+
+class ToolEvaluationNode(BaseNode):
+    """Node that intelligently evaluates tool calls to determine if they require human-in-loop intervention"""
+
+    evaluation_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You are a tool evaluation specialist. Your job is to analyze tool calls and determine if they require human approval or can be executed directly.\n"
+                    "Consider the following criteria:\n"
+                    "- Information retrieval tools (search, lookup, get data, read files, query databases) can usually be executed directly\n"
+                    "- Tools that modify data, send communications, make purchases, or perform irreversible actions should require human approval\n"
+                    "- Tools that access sensitive information or perform administrative tasks should require human approval\n"
+                    "- Consider the context and potential impact of the tool call\n\n"
+                    "Available options for your decision:\n"
+                    "- EXECUTE_DIRECTLY: The tool is safe to execute without human intervention (typically retrieval/read operations)\n"
+                    "- REQUIRE_HUMAN_APPROVAL: The tool requires human review before execution (typically write/modify/send operations)\n"
+                ),
+            ),
+            (
+                "human",
+                (
+                    "Please analyze this tool call and determine if it requires human approval:\n\n"
+                    "Tool Name: {tool_name}\n"
+                    "Tool Description: {tool_description}\n"
+                    "Tool Arguments: {tool_args}\n"
+                    "Make your decision based on the safety and reversibility of the operation. "
+                    "Select one of: EXECUTE_DIRECTLY or REQUIRE_HUMAN_APPROVAL"
+                ),
+            ),
+        ]
+    )
+
+    def __init__(
+        self,
+        provider: str | None,
+        model: str | None,
+        temperature: float | None,
+        routes: dict[str, str] | None = None,
+    ):
+        super().__init__(provider, model, temperature)
+        self.routes = routes or {
+            "execute_directly": "run_tool",
+            "require_human_approval": "human_review",
+        }
+
+    def get_tool_evaluation_definition(self) -> dict[str, Any]:
+        """Return the tool definition for evaluating tool calls"""
+        return {
+            "type": "function",
+            "function": {
+                "name": "evaluate",
+                "description": (
+                    "Evaluate whether a tool call requires human approval or can be executed directly."
+                    "\n'decision' - Your evaluation decision (EXECUTE_DIRECTLY or REQUIRE_HUMAN_APPROVAL)"
+                    "\n'reasoning' - Brief explanation of your decision"
+                    "\n\nExamples:"
+                    "\nTool: search_web, Args: {'query': 'latest news'}"
+                    '\n{"decision": "EXECUTE_DIRECTLY", "reasoning": "Information retrieval tool with no side effects"}'
+                    "\nTool: send_email, Args: {'to': 'user@example.com', 'subject': 'Hello'}"
+                    '\n{"decision": "REQUIRE_HUMAN_APPROVAL", "reasoning": "Communication tool that sends external messages"}'
+                    "\nTool: delete_file, Args: {'file_path': '/important/document.txt'}"
+                    '\n{"decision": "REQUIRE_HUMAN_APPROVAL", "reasoning": "Destructive operation that cannot be undone"}'
+                ),
+                "parameters": {
+                    "title": "toolEvaluationSchema",
+                    "type": "object",
+                    "properties": {
+                        "decision": {
+                            "title": "decision",
+                            "description": "The evaluation decision",
+                            "enum": ["EXECUTE_DIRECTLY", "REQUIRE_HUMAN_APPROVAL"],
+                        },
+                        "reasoning": {
+                            "title": "reasoning",
+                            "description": "Brief explanation of the decision",
+                            "type": "string",
+                        },
+                    },
+                    "required": ["decision", "reasoning"],
+                },
+            },
+        }
+
+    async def evaluate_tool_call(self, state: GraphTeamState, config: RunnableConfig) -> Command[str]:
+        """Evaluate if a tool call requires human approval"""
+
+        # Get the last message which should contain the tool call
+        last_message = state["messages"][-1] if state["messages"] else None
+
+        if not last_message or not isinstance(last_message, AIMessage) or not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+            # No tool call to evaluate, continue to direct execution
+            next_node = self.routes.get("execute_directly", "run_tool")
+            return Command(goto=next_node)
+
+        tool_call = last_message.tool_calls[-1]  # Evaluate the first tool call
+        tool_name = tool_call.get("name", "unknown")
+        tool_args = str(tool_call.get("args", {}))
+
+        # Get tool description if available
+        tool_description = "No description available"
+
+        # Create the evaluation tool
+        evaluation_tool = self.get_tool_evaluation_definition()
+
+        # Disable default parallel tool calls from ChatOpenAI
+        if isinstance(self.model, ChatOpenAI):
+            bind_tool = self.model.bind_tools(tools=[evaluation_tool], parallel_tool_calls=False)
+        else:
+            bind_tool = self.model.bind_tools(tools=[evaluation_tool])
+
+        evaluation_chain: RunnableSerializable[Any, Any] = (
+            self.evaluation_prompt.partial(
+                tool_name=tool_name,
+                tool_description=tool_description,
+                tool_args=tool_args,
+            )
+            | bind_tool
+            | JsonOutputKeyToolsParser(key_name="evaluate", first_tool_only=True)
+        )
+
+        try:
+            result = await evaluation_chain.ainvoke(state, config)
+        except Exception:
+            # If evaluation fails, default to requiring human approval for safety
+            next_node = self.routes.get("require_human_approval", "human_review")
+            return Command(goto=next_node)
+
+        # Handle the evaluation result
+        if not isinstance(result, dict):
+            if result is not None and hasattr(result, "model_dump"):
+                result = result.model_dump()
+            else:
+                result = {"decision": "REQUIRE_HUMAN_APPROVAL"}
+
+        decision = result.get("decision", "REQUIRE_HUMAN_APPROVAL")
+
+        # Route based on decision
+        if decision == "EXECUTE_DIRECTLY":
+            next_node = self.routes.get("execute_directly", "run_tool")
+        else:
+            next_node = self.routes.get("require_human_approval", "human_review")
+
+        return Command(goto=next_node)
+
+    async def work(self, state: GraphTeamState, config: RunnableConfig) -> Command[str]:
+        """Main work method that delegates to evaluate_tool_call"""
+        return await self.evaluate_tool_call(state, config)

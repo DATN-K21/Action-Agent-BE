@@ -101,11 +101,11 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the count result
         from unittest.mock import MagicMock
 
-        count_result = AsyncMock()
+        count_result = MagicMock()
         count_result.scalar_one = MagicMock(return_value=len(sample_connected_extensions))
 
         # Mock the extensions result
-        extensions_result = AsyncMock()
+        extensions_result = MagicMock()
         scalars_mock = MagicMock()
         scalars_mock.all = MagicMock(return_value=sample_connected_extensions)
         extensions_result.scalars = MagicMock(return_value=scalars_mock)
@@ -162,11 +162,11 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the count result
         from unittest.mock import MagicMock
 
-        count_result = AsyncMock()
+        count_result = MagicMock()
         count_result.scalar_one = MagicMock(return_value=len(sample_connected_extensions))
 
         # Mock the extensions result
-        extensions_result = AsyncMock()
+        extensions_result = MagicMock()
         scalars_mock = MagicMock()
         scalars_mock.all = MagicMock(return_value=sample_connected_extensions)
         extensions_result.scalars = MagicMock(return_value=scalars_mock)
@@ -217,7 +217,7 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the count result
         from unittest.mock import MagicMock
 
-        count_result = AsyncMock()
+        count_result = MagicMock()
         count_result.scalar_one = MagicMock(return_value=0)
 
         # Configure mock session
@@ -311,8 +311,8 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the extension result
         from unittest.mock import MagicMock
 
-        extension_result = AsyncMock()
-        extension_result.scalar_one = MagicMock(return_value=sample_connected_extension)
+        extension_result = MagicMock()
+        extension_result.scalar_one_or_none = MagicMock(return_value=sample_connected_extension)
 
         # Configure mock session
         mock_session.execute = AsyncMock(return_value=extension_result)
@@ -327,7 +327,7 @@ class TestConnectedExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail",
+                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail-by-id",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 
@@ -364,8 +364,8 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the extension result
         from unittest.mock import MagicMock
 
-        extension_result = AsyncMock()
-        extension_result.scalar_one = MagicMock(return_value=sample_connected_extension)
+        extension_result = MagicMock()
+        extension_result.scalar_one_or_none = MagicMock(return_value=sample_connected_extension)
 
         # Configure mock session
         mock_session.execute = AsyncMock(return_value=extension_result)
@@ -380,7 +380,7 @@ class TestConnectedExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail",
+                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail-by-id",
                 headers={"x-user-id": "admin-user", "x-user-role": "admin"},
             )
 
@@ -411,8 +411,8 @@ class TestConnectedExtensionApiEndpoints:
         # Mock the extension result (not found)
         from unittest.mock import MagicMock
 
-        extension_result = AsyncMock()
-        extension_result.scalar_one = MagicMock(side_effect=Exception("Item not found"))
+        extension_result = MagicMock()
+        extension_result.scalar_one_or_none = MagicMock(return_value=None)
 
         # Configure mock session
         mock_session.execute = AsyncMock(return_value=extension_result)
@@ -427,17 +427,17 @@ class TestConnectedExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail",
+                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail-by-id",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 
             # Check for error response
-            assert response.status_code == 500  # API returns 500 for not found errors
+            assert response.status_code == 404  # API returns 404 for not found errors
             response_data = response.json()
 
             # Verify the response structure indicates an error
-            assert response_data["status"] == 500
-            assert response_data["message"] == "Internal server error"
+            assert response_data["status"] == 404
+            assert response_data["message"] == "Connected extension not found"
 
         finally:
             app.dependency_overrides.clear()
@@ -463,7 +463,7 @@ class TestConnectedExtensionApiEndpoints:
 
         try:
             response = client.get(
-                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail",
+                f"/api/v1/connected-extension/{sample_connected_extension_id}/get-detail-by-id",
                 headers={"x-user-id": sample_user_id, "x-user-role": "user"},
             )
 

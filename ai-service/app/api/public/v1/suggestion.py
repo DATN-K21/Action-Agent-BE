@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.core import logging
-from app.core.enums import LlmProvider, SuggestionContextType
+from app.core.enums import SuggestionContextType
 from app.core.settings import env_settings
 from app.schemas.base import MessageResponse, ResponseWrapper
 from app.schemas.suggestion import (
@@ -32,9 +32,10 @@ class SuggestionService:
         """Get the LLM model for suggestion generation"""
         if self._llm_model is None:
             self._llm_model = get_llm_chat_model(
-                provider=LlmProvider.OPENAI,
-                model=env_settings.LLM_SUGGESTION_MODEL,
-                api_key=env_settings.OPENAI_API_KEY,
+                provider=env_settings.SUGGESTION_MODEL_PROVIDER,
+                model=env_settings.SUGGESTION_MODEL,
+                api_key=env_settings.SUGGESTION_MODEL_API_KEY,
+                base_url=env_settings.SUGGESTION_MODEL_API_BASE_URL,
                 temperature=env_settings.SUGGESTION_MODEL_TEMPERATURE,
                 max_tokens=env_settings.SUGGESTION_MODEL_MAX_TOKENS,
             )

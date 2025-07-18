@@ -19,42 +19,26 @@ async def aget_all(
     session: SessionDep,
     paging: PagingRequest = Depends(),
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
         page_number = paging.page_number if paging else 1
         max_per_page = paging.max_per_page if paging else 10
+      
+        count_stmt = select(func.count(ConnectedExtension.id)).where(
+            ConnectedExtension.user_id == x_user_id,
+            ConnectedExtension.is_deleted.is_(False),
+        )
 
-        if x_user_role == "admin" or x_user_role == "super_admin":
-            # COUNT total connected apps
-            count_stmt = select(func.count(ConnectedExtension.id)).where(
-                ConnectedExtension.is_deleted.is_(False),
-            )
-
-            statement = (
-                select(ConnectedExtension)
-                .where(ConnectedExtension.is_deleted.is_(False))
-                .offset((page_number - 1) * max_per_page)
-                .limit(max_per_page)
-                .order_by(ConnectedExtension.created_at.desc())
-            )
-
-        else:
-            count_stmt = select(func.count(ConnectedExtension.id)).where(
+        statement = (
+            select(ConnectedExtension)
+            .where(
                 ConnectedExtension.user_id == x_user_id,
                 ConnectedExtension.is_deleted.is_(False),
             )
-
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.user_id == x_user_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .offset((page_number - 1) * max_per_page)
-                .limit(max_per_page)
-                .order_by(ConnectedExtension.created_at.desc())
-            )
+            .offset((page_number - 1) * max_per_page)
+            .limit(max_per_page)
+            .order_by(ConnectedExtension.created_at.desc())
+        )
 
         count_result = await session.execute(count_stmt)
         count = count_result.scalar_one()
@@ -101,28 +85,17 @@ async def aget_detail_by_id(
     session: SessionDep,
     connected_extension_id: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
-        if x_user_role == "admin" or x_user_role == "super_admin":
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.id == connected_extension_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .limit(1)
+        statement = (
+            select(ConnectedExtension)
+            .where(
+                ConnectedExtension.user_id == x_user_id,
+                ConnectedExtension.id == connected_extension_id,
+                ConnectedExtension.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.user_id == x_user_id,
-                    ConnectedExtension.id == connected_extension_id,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_extension = result.scalar_one_or_none()
@@ -150,30 +123,19 @@ async def aget_detail_by_enum(
     session: SessionDep,
     extension_enum: str,
     x_user_id: str = Header(None),
-    x_user_role: str = Header(None),
 ):
     try:
-        if x_user_role == "admin" or x_user_role == "super_admin":
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
-                    ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .limit(1)
+       
+        statement = (
+            select(ConnectedExtension)
+            .where(
+                ConnectedExtension.user_id == x_user_id,
+                func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
+                ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
+                ConnectedExtension.is_deleted.is_(False),
             )
-        else:
-            statement = (
-                select(ConnectedExtension)
-                .where(
-                    ConnectedExtension.user_id == x_user_id,
-                    func.lower(ConnectedExtension.extension_enum) == extension_enum.lower(),
-                    ConnectedExtension.connection_status == ConnectionStatus.SUCCESS,
-                    ConnectedExtension.is_deleted.is_(False),
-                )
-                .limit(1)
-            )
+            .limit(1)
+        )
 
         result = await session.execute(statement)
         connected_extension = result.scalar_one_or_none()

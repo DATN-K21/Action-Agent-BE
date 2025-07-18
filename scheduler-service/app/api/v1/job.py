@@ -1,0 +1,429 @@
+from datetime import datetime
+from typing import Optional
+
+from croniter import croniter
+from fastapi import APIRouter, Header, HTTPException, Path, Query
+
+from app.core import logging
+from app.core.scheduler import scheduler_manager
+from app.models.job import JobStatus, JobType
+from app.schemas.base import MessageResponse, ResponseWrapper
+from app.schemas.job import (
+    CronValidationRequest,
+    CronValidationResponse,
+    JobCreate,
+    JobExecutionsResponse,
+    JobRunResponse,
+    JobsResponse,
+    JobStats,
+    JobUpdate,
+)
+from app.services.job_service import job_service
+
+logger = logging.get_logger(__name__)
+router = APIRouter()
+
+
+def validate_user_headers(
+    x_user_id: Optional[str], x_user_role: Optional[str], x_user_timezone: Optional[str]
+):
+    if not x_user_id:
+        raise HTTPException(
+            status_code=400, detail="User ID is required (x_user_id header)"
+        )
+    if not x_user_role:
+        raise HTTPException(
+            status_code=400, detail="User role is required (x_user_role header)"
+        )
+    if not x_user_timezone:
+        raise HTTPException(
+            status_code=400, detail="User timezone is required (x_user_timezone header)"
+        )
+
+
+@router.post("/create", summary="Create Job")
+async def create_job(
+    job_data: JobCreate,
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Create a new scheduled job.
+
+    - **name**: Job name
+    - **description**: Optional job description
+    - **job_type**: Type of job (one_time or recurring)
+    - **cron_expression**: Cron expression for recurring jobs
+    - **prompt**: Prompt to send to AI service
+    - **team_id**: Team ID for the job
+    - **assistant_id**: Assistant ID for the job
+    - **max_retries**: Maximum number of retries (default: 3)
+    - **timeout_seconds**: Job timeout in seconds (default: 300)
+    - **is_active**: Whether the job is active (default: True)
+    - **job_config**: Additional job configuration
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        # Validate cron expression for recurring jobs
+        if job_data.job_type == JobType.RECURRING:
+            if not job_data.cron_expression:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cron expression is required for recurring jobs",
+                )
+
+            if not scheduler_manager.is_valid_cron(job_data.cron_expression):
+                raise HTTPException(status_code=400, detail="Invalid cron expression")
+
+        job = await job_service.create_job(
+            job_data, x_user_id, x_user_role, x_user_timezone
+        )
+        logger.info(f"Job created: {job.id}")
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to create job: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/get-jobs", summary="List Jobs")
+async def list_jobs(
+    skip: int = Query(0, ge=0, description="Number of jobs to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of jobs to return"),
+    status: Optional[JobStatus] = Query(None, description="Filter by job status"),
+    job_type: Optional[JobType] = Query(None, description="Filter by job type"),
+    assistant_id: Optional[str] = Query(None, description="Filter by assistant ID"),
+    team_id: Optional[str] = Query(None, description="Filter by team ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Get list of scheduled jobs with optional filtering.
+
+    - **skip**: Number of jobs to skip for pagination
+    - **limit**: Maximum number of jobs to return
+    - **status**: Filter by job status
+    - **job_type**: Filter by job type
+    - **assistant_id**: Filter by assistant ID (optional)
+    - **team_id**: Filter by team ID (optional)
+
+    Users can only see their own jobs unless they are admin or super admin.
+    If assistant_id or team_id are provided, jobs will be filtered by these values.
+    If they are empty, all jobs for the user will be returned.
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        jobs = await job_service.get_jobs(
+            skip=skip,
+            limit=limit,
+            status=status,
+            job_type=job_type,
+            user_id=x_user_id,
+            assistant_id=assistant_id,
+            team_id=team_id,
+        )
+        return ResponseWrapper.wrap(
+            status=200, data=JobsResponse(jobs=jobs)
+        ).to_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to list jobs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{job_id}", summary="Get Job")
+async def get_job(
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Get details of a specific job.
+
+    - **job_id**: Unique job identifier
+
+    Users can only access their own jobs unless they are admin or super admin.
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        job = await job_service.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        if job.user_id != x_user_id:
+            raise HTTPException(status_code=403, detail="Access denied to this job")
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to get job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{job_id}/update", summary="Update Job")
+async def update_job(
+    job_update: JobUpdate,
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Update an existing job.
+
+    - **job_id**: Unique job identifier
+    - **job_update**: Updated job data
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        # Validate cron expression if provided
+        if job_update.cron_expression:
+            if not scheduler_manager.is_valid_cron(job_update.cron_expression):
+                raise HTTPException(status_code=400, detail="Invalid cron expression")
+
+        job = await job_service.update_job(job_id, job_update)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        logger.info(f"Job updated: {job_id}")
+
+        return ResponseWrapper.wrap(status=200, data=job).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to update job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{job_id}/remove", summary="Delete Job")
+async def delete_job(
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Delete a job (soft delete).
+
+    - **job_id**: Unique job identifier
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        success = await job_service.delete_job(job_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        logger.info(f"Job deleted: {job_id}")
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job deleted successfully")
+        ).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to delete job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{job_id}/run", summary="Run Job Now")
+async def run_job_now(
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+    x_user_timezone=Header(None),
+):
+    """
+    Manually trigger a job execution.
+
+    - **job_id**: Unique job identifier
+    - **run_request**: Optional reason for manual execution
+    """
+    try:
+        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+
+        execution_result = await job_service.run_job_now(job_id)
+        if not execution_result:
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be executed"
+            )
+
+        logger.info(f"Job triggered manually: {job_id}")
+
+        job_run_response = JobRunResponse(
+            success=True,
+            message="Job execution triggered successfully",
+            execution_id=execution_result.get("execution_id")
+            if isinstance(execution_result, dict)
+            else str(execution_result),
+        )
+
+        return ResponseWrapper.wrap(status=200, data=job_run_response).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to run job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{job_id}/pause", summary="Pause Job")
+async def pause_job(job_id: str = Path(..., description="Job ID")):
+    """
+    Pause a running job.
+
+    - **job_id**: Unique job identifier
+    """
+    try:
+        success = await job_service.pause_job(job_id)
+        if not success:
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be paused"
+            )
+
+        logger.info(f"Job paused: {job_id}")
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job paused successfully")
+        ).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to pause job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{job_id}/resume", summary="Resume Job")
+async def resume_job(job_id: str = Path(..., description="Job ID")):
+    """
+    Resume a paused job.
+
+    - **job_id**: Unique job identifier
+    """
+    try:
+        success = await job_service.resume_job(job_id)
+        if not success:
+            raise HTTPException(
+                status_code=404, detail="Job not found or could not be resumed"
+            )
+
+        logger.info(f"Job resumed: {job_id}")
+
+        return ResponseWrapper.wrap(
+            status=200, data=MessageResponse(message="Job resumed successfully")
+        ).to_response()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to resume job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{job_id}/executions", summary="Get Job Executions")
+async def get_job_executions(
+    job_id: str = Path(..., description="Job ID"),
+    skip: int = Query(0, ge=0, description="Number of executions to skip"),
+    limit: int = Query(
+        100, ge=1, le=1000, description="Number of executions to return"
+    ),
+):
+    """
+    Get execution history for a job.
+
+    - **job_id**: Unique job identifier
+    - **skip**: Number of executions to skip for pagination
+    - **limit**: Maximum number of executions to return
+    """
+    try:
+        executions = await job_service.get_job_executions(job_id, skip, limit)
+        
+        # Wrap the executions list in the proper response schema
+        executions_response = JobExecutionsResponse(executions=executions)
+        
+        return ResponseWrapper.wrap(status=200, data=executions_response).to_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to get executions for job {job_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/validate-cron", summary="Validate Cron Expression")
+async def validate_cron(request: CronValidationRequest):
+    """
+    Validate a cron expression and get next run times.
+
+    - **cron_expression**: Cron expression to validate
+    - **timezone**: Timezone for validation (default: UTC)
+    """
+    try:
+        is_valid = scheduler_manager.is_valid_cron(request.cron_expression)
+
+        if not is_valid:
+            validation_response = CronValidationResponse(
+                is_valid=False,
+                error_message="Invalid cron expression format",
+                next_run_times=[],
+            )
+
+            return ResponseWrapper.wrap(
+                status=400,
+                message="Cron expression validation failed",
+            ).to_response()
+
+        # Get next 5 run times
+        next_runs = []
+        try:
+            cron = croniter(request.cron_expression, datetime.now())
+            for _ in range(5):
+                next_runs.append(cron.get_next(datetime))
+        except Exception:
+            pass
+
+        validation_response = CronValidationResponse(
+            is_valid=True, error_message=None, next_run_times=next_runs
+        )
+
+        return ResponseWrapper.wrap(status=200, data=validation_response).to_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to validate cron expression: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stats/overview", summary="Get Job Statistics")
+async def get_job_stats():
+    """
+    Get overview statistics for all jobs.
+    """
+    try:
+        # This would be implemented with proper database queries
+        # For now, returning mock data
+        stats = JobStats(
+            total_jobs=0,
+            active_jobs=0,
+            paused_jobs=0,
+            failed_jobs=0,
+            total_executions=0,
+            successful_executions=0,
+            failed_executions=0,
+        )
+
+        return ResponseWrapper.wrap(status=200, data=stats).to_response()
+
+    except Exception as e:
+        logger.exception(f"Failed to get job stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

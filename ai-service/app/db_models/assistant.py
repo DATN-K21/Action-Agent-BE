@@ -1,4 +1,4 @@
-from sqlalchemy import Enum, Float, ForeignKey, String
+from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import AssistantType
@@ -16,16 +16,17 @@ class Assistant(BaseEntity):
     # Only have one general assistant per user
     assistant_type: Mapped[AssistantType] = mapped_column(Enum(AssistantType), nullable=False, default=AssistantType.ADVANCED_ASSISTANT)
 
-    # Configuration for the assistant
-    provider: Mapped[str | None] = mapped_column(String, nullable=True)  # e.g., 'openai', 'anthropic'
-    model_name: Mapped[str | None] = mapped_column(String, nullable=True)  # Name of the model to use with the assistant
-    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)  # Controls randomness of the output, e.g., '0.7'
-
     # Confiugration actions for the advanced assistant (Only for advanced assistants - hierarchical units)
     ask_human: Mapped[bool | None] = mapped_column(
         default=False, nullable=True
     )  # Whether to ask human for confirmation before executing the assistant's task
     interrupt: Mapped[bool | None] = mapped_column(default=False, nullable=True)  # Whether to interrupt the assistant's current task
+    scheduler_enabled: Mapped[bool | None] = mapped_column(
+        default=False, nullable=True
+    )  # Whether scheduler functionality is enabled for this assistant
+    retrieval_interrupt_skip_enabled: Mapped[bool | None] = mapped_column(
+        default=False, nullable=True
+    )  # Whether to skip retrieval interrupt for this assistant
 
     # Relationships
     user = relationship("User", back_populates="assistants")

@@ -80,10 +80,10 @@ def get_model_info(model_name: str) -> dict[str, str]:
     Get model information from all available models.
     """
     return {
-        "model_name": env_settings.LLM_BASIC_MODEL,
-        "provider": env_settings.OPENAI_PROVIDER,
-        "base_url": env_settings.OPENAI_API_KEY,
-        "api_key": env_settings.OPENAI_API_BASE_URL,
+        "model_name": env_settings.BASIC_MODEL,
+        "provider": env_settings.BASIC_MODEL_PROVIDER,
+        "base_url": env_settings.BASIC_MODEL_API_BASE_URL,
+        "api_key": env_settings.BASIC_MODEL_API_KEY,
     }
 
     # def _get_info(session: Session) -> dict[str, str]:

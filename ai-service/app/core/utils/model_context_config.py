@@ -25,6 +25,9 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-3-sonnet": 200000,
     "claude-3-haiku": 200000,
     "claude-3-5-sonnet": 200000,
+    # DeepSeek Models
+    "deepseek-chat": 128000,
+    "deepseek-reasoner": 128000,
     # Google Models
     "gemini-pro": 30720,
     "gemini-1.5-pro": 1000000,
@@ -37,6 +40,7 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
 PROVIDER_DEFAULT_LIMITS: Dict[LlmProvider, int] = {
     LlmProvider.OPENAI: 16384,
     LlmProvider.ANTHROPIC: 200000,
+    LlmProvider.DEEPSEEK: 128000,
     LlmProvider.GOOGLE: 30720,
     LlmProvider.MISTRAL: 8192,
     LlmProvider.COHERE: 4096,
@@ -64,11 +68,11 @@ def get_context_limit_for_model(model_name: str, provider: Optional[LlmProvider]
         limit = MODEL_CONTEXT_LIMITS["default"]
 
     # Use X% of the limit for context to leave room for response
-    if model_name == env_settings.LLM_BASIC_MODEL:
+    if model_name == env_settings.BASIC_MODEL:
         ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_REASONING_MODEL:
+    elif model_name == env_settings.REASONING_MODEL:
         ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_VISION_MODEL:
+    elif model_name == env_settings.VISION_MODEL:
         ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO
@@ -150,11 +154,11 @@ def get_optimized_format_messages_for_model(
         Optimized formatted message string
     """
 
-    if model_name == env_settings.LLM_BASIC_MODEL:
+    if model_name == env_settings.BASIC_MODEL:
         ratio = env_settings.BASIC_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_REASONING_MODEL:
+    elif model_name == env_settings.REASONING_MODEL:
         ratio = env_settings.REASONING_MODEL_CONTEXT_RATIO
-    elif model_name == env_settings.LLM_VISION_MODEL:
+    elif model_name == env_settings.VISION_MODEL:
         ratio = env_settings.VISION_MODEL_CONTEXT_RATIO
     else:
         ratio = env_settings.DEFAULT_CONTEXT_RATIO

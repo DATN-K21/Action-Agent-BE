@@ -79,8 +79,8 @@ class GeneralAssistantHelpers:
         name: str,
         description: Optional[str] = None,
         system_prompt: Optional[str] = None,
-        provider: str = env_settings.OPENAI_PROVIDER,
-        model_name: str = env_settings.LLM_BASIC_MODEL,
+        provider: str = env_settings.BASIC_MODEL_PROVIDER,
+        model_name: str = env_settings.BASIC_MODEL,
         temperature: float = env_settings.BASIC_MODEL_TEMPERATURE,
         support_units: Optional[List[WorkflowType]] = None,
     ) -> Assistant:
@@ -121,9 +121,6 @@ class GeneralAssistantHelpers:
             description=description,
             system_prompt=system_prompt,
             assistant_type=AssistantType.GENERAL_ASSISTANT,
-            provider=provider or env_settings.OPENAI_PROVIDER,
-            model_name=model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=temperature if temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=None,
             interrupt=None,
         )
@@ -418,8 +415,8 @@ class GeneralAssistantHelpers:
                 name=f"{user_name}'s General Assistant",
                 description="A helpful general assistant for everyday tasks and conversations.",
                 system_prompt="You are a helpful, friendly, and knowledgeable general assistant. Help users with their questions, tasks, and conversations. Use your available tools when needed to provide accurate and helpful information.",
-                provider=env_settings.OPENAI_PROVIDER,
-                model_name=env_settings.LLM_BASIC_MODEL,
+                provider=env_settings.BASIC_MODEL_PROVIDER,
+                model_name=env_settings.BASIC_MODEL,
                 temperature=env_settings.BASIC_MODEL_TEMPERATURE,
                 support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             )
@@ -511,9 +508,6 @@ class GeneralAssistantHelpers:
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
-            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=assistant.temperature or env_settings.BASIC_MODEL_TEMPERATURE,
             main_unit=WorkflowType.CHATBOT,
             support_units=[WorkflowType.RAGBOT, WorkflowType.SEARCHBOT],
             teams=teams_data,
@@ -626,8 +620,6 @@ class GeneralAssistantHelpers:
                 "member_count": member_count,
                 "main_unit": WorkflowType.CHATBOT.value,
                 "support_units": [unit.value for unit in [WorkflowType.RAGBOT, WorkflowType.SEARCHBOT]],
-                "provider": assistant.provider,
-                "model_name": assistant.model_name,
             }
 
         except Exception as e:

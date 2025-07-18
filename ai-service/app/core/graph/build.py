@@ -9,7 +9,7 @@ from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.config import RunnableConfig
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, StateGraph
@@ -25,8 +25,10 @@ from app.core.graph.members import (
     GraphTeam,
     GraphTeamState,
     LeaderNode,
+    SchedulerNode,
     SequentialWorkerNode,
     SummariserNode,
+    ToolEvaluationNode,
     WorkerNode,
 )
 from app.core.graph.messages import ChatResponse, event_to_response
@@ -341,7 +343,7 @@ def should_continue(state: GraphTeamState) -> str:
 def create_tools_condition(
     current_member_name: str,
     next_member_name: str,
-    tools: list[GraphSkill | GraphUpload],
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges
     The tool node must be in format: '{current_member_name}-tools'
@@ -367,7 +369,7 @@ def create_tools_condition(
 def create_tools_condition_with_human_review(
     current_member_name: str,
     next_member_name: str,
-    tools: list[GraphSkill | GraphUpload],
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
 ) -> dict[Hashable, str]:
     """Creates the mapping for conditional edges with human review capabilities
     The tool review node must be in format: '{current_member_name}-tool-review'
@@ -389,6 +391,34 @@ def create_tools_condition_with_human_review(
         else:
             # Route to human review node for tool approval
             mapping["call_tools"] = f"{current_member_name}-tool-review"
+    return mapping
+
+
+def create_tools_condition_with_tool_evaluation(
+    current_member_name: str,
+    next_member_name: str,
+    tools: list[GraphSkill | GraphUpload | StructuredTool],
+) -> dict[Hashable, str]:
+    """Creates the mapping for conditional edges with intelligent tool evaluation
+    The tool evaluation node must be in format: '{current_member_name}-tool-evaluation'
+    The tool node must be in format: '{current_member_name}-tools'
+
+    Args:
+        current_member_name (str): The name of the member that is calling the tool
+        next_member_name (str): The name of the next member after tool processing. Can be END.
+        tools: List of tools that the agent has.
+    """
+    mapping: dict[Hashable, str] = {
+        # Else continue to the next node
+        "continue": next_member_name,
+    }
+
+    for tool in tools:
+        if tool.name == "ask-human":
+            mapping["call_human"] = f"{current_member_name}-ask-human-tool"
+        else:
+            # Route to tool evaluation node for intelligent assessment
+            mapping["call_tools"] = f"{current_member_name}-tool-evaluation"
     return mapping
 
 
@@ -430,9 +460,25 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
     return create_human_review_node(member_name, "output_review", routes)
 
 
+def create_tool_evaluation_node(member_name: str) -> ToolEvaluationNode:
+    """Create a ToolEvaluationNode for intelligent tool call evaluation"""
+    return ToolEvaluationNode(
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        routes={
+            "execute_directly": f"{member_name}-tools",
+            "require_human_approval": f"{member_name}-tool-review",
+        },
+    )
+
+
 async def acreate_hierarchical_graph(
     teams: dict[str, GraphTeam],
+    team_root: Team | None,
     leader_name: str,
+    user_id: str | None = None,
+    timezone: str | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph:
     """Create the team's graph with manual interrupt capabilities using HumanNode.
@@ -460,17 +506,97 @@ async def acreate_hierarchical_graph(
                 provider=teams[leader_name].provider,
                 model=teams[leader_name].model,
                 temperature=teams[leader_name].temperature,
+                team_root=team_root,
             ).delegate  # type: ignore[arg-type]
         ),
     )
+    # Add the scheduler node if enabled
+    if team_root and team_root.assistant.scheduler_enabled:
+        scheduler_node = SchedulerNode(
+            provider=env_settings.REASONING_MODEL_PROVIDER,
+            model=env_settings.REASONING_MODEL,
+            temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+            user_id=user_id,
+            user_role="user",
+            timezone=timezone,
+            assistant_id=team_root.assistant_id,
+            team_id=team_root.id,
+            ask_human=team_root.assistant.ask_human,
+        )
+
+        scheduler_tools = scheduler_node.get_scheduler_tools()
+        build.add_node(
+            "hierarchical-scheduler",
+            RunnableLambda(scheduler_node.work),
+        )
+
+        name = "hierarchical-scheduler"
+        if scheduler_tools:
+            normal_tools: list[BaseTool] = []
+
+            for tool in scheduler_tools:
+                if tool.name == "ask-human":
+                    # Handling Ask-Human tool with HumanNode for context input
+                    human_context_node = create_human_review_node(name, "context_input", {"continue": name})
+                    build.add_node(f"{name}-ask-human-tool", human_context_node.work)
+                    build.add_edge(f"{name}-ask-human-tool", name)
+                else:
+                    normal_tools.append(tool)
+
+            if normal_tools:
+                # Add node for normal tools
+                build.add_node(f"{name}-tools", ToolNode(normal_tools))
+
+                # Add HumanNode for tool review if interrupt is True
+                if team_root.assistant.interrupt:
+                    # Add ToolEvaluationNode for intelligent tool assessment
+                    if team_root.assistant.retrieval_interrupt_skip_enabled:
+                        tool_evaluation_node = create_tool_evaluation_node(name)
+                        build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+                    # Add HumanNode for tool review if member.interrupt is True
+                    human_tool_review_node = create_human_tool_review_node(name)
+                    build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+                    # No conditional edge needed - ToolEvaluationNode uses Command(goto=...) for routing
+                    # No direct edge - HumanNode uses Command(goto=...) for routing
+                    build.add_edge(f"{name}-tools", name)
+                else:
+                    # Direct connection without review
+                    build.add_edge(f"{name}-tools", name)
+
+            # Add conditional edges for the scheduler
+            if team_root.assistant.interrupt:
+                # Route to tool evaluation node for intelligent assessment
+                if team_root.assistant.retrieval_interrupt_skip_enabled:
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_tool_evaluation(name, leader_name, list(scheduler_tools)),
+                    )
+                else:
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_human_review(name, leader_name, list(scheduler_tools)),
+                    )
+            else:
+                # Direct routing without human review
+                build.add_conditional_edges(
+                    name,
+                    should_continue,
+                    create_tools_condition(name, leader_name, list(scheduler_tools)),
+                )
+        else:
+            # If scheduler has no tools, add direct edge back to leader
+            build.add_edge(name, leader_name)
+    # Add the final answer node
     build.add_node(
         "hierarchical-final-answer",
         RunnableLambda(
             SummariserNode(
-                provider=env_settings.OPENAI_PROVIDER,
-                model=env_settings.LLM_BASIC_MODEL,
+                provider=env_settings.BASIC_MODEL_PROVIDER,
+                model=env_settings.BASIC_MODEL,
                 temperature=env_settings.BASIC_MODEL_TEMPERATURE,
-            ).summarise  # type: ignore[arg-type]
+            ).summarise
         ),
     )
 
@@ -504,10 +630,16 @@ async def acreate_hierarchical_graph(
                     # Add node for normal tools
                     build.add_node(f"{name}-tools", ToolNode(normal_tools))
 
-                    # Add HumanNode for tool review if member.interrupt is True
                     if member.interrupt:
+                        # Add ToolEvaluationNode for intelligent tool assessment
+                        if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
+                            tool_evaluation_node = create_tool_evaluation_node(name)
+                            build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
+                        # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
                         build.add_node(f"{name}-tool-review", human_tool_review_node.work)
+
+                        # No conditional edge needed - ToolEvaluationNode uses Command(goto=...) for routing
                         # No direct edge - HumanNode uses Command(goto=...) for routing
                         build.add_edge(f"{name}-tools", name)
                     else:
@@ -515,7 +647,14 @@ async def acreate_hierarchical_graph(
                         build.add_edge(f"{name}-tools", name)
 
         elif isinstance(member, GraphLeader):
-            subgraph = await acreate_hierarchical_graph(teams, leader_name=name, checkpointer=checkpointer)
+            subgraph = await acreate_hierarchical_graph(
+                teams,
+                team_root=None,
+                leader_name=name,
+                user_id=user_id,
+                timezone=timezone,
+                checkpointer=checkpointer,
+            )
             enter = partial(enter_chain, team=teams[name])
             build.add_node(
                 name,
@@ -524,27 +663,40 @@ async def acreate_hierarchical_graph(
         else:
             continue
 
-        # Create conditional edges with enhanced routing for HumanNode interrupts
+        # Create conditional edges with enhanced routing for HumanNode interrupts or tool evaluation
         if isinstance(member, GraphMember) and member.tools:
             if member.interrupt:
-                # Route to human review node first, then to tools
-                build.add_conditional_edges(
-                    name,
-                    should_continue,
-                    create_tools_condition_with_human_review(name, leader_name, member.tools),
-                )
+                if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
+                    # Route to tool evaluation node for intelligent assessment
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_tool_evaluation(name, leader_name, list(member.tools)),
+                    )
+                else:
+                    # Route with human review
+                    build.add_conditional_edges(
+                        name,
+                        should_continue,
+                        create_tools_condition_with_human_review(name, leader_name, list(member.tools)),
+                    )
             else:
                 # Direct routing without human review
                 build.add_conditional_edges(
                     name,
                     should_continue,
-                    create_tools_condition(name, leader_name, member.tools),
+                    create_tools_condition(name, leader_name, list(member.tools)),
                 )
         else:
             build.add_edge(name, leader_name)
 
     conditional_mapping: dict[Hashable, str] = {v: v for v in members}
     conditional_mapping["FINISH"] = "hierarchical-final-answer"
+
+    # Add scheduler to conditional mapping if enabled
+    if team_root and team_root.assistant.scheduler_enabled:
+        conditional_mapping["hierarchical-scheduler"] = "hierarchical-scheduler"
+
     build.add_conditional_edges(leader_name, router, conditional_mapping)
 
     build.set_entry_point(leader_name)
@@ -619,14 +771,14 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                     graph.add_conditional_edges(
                         previous_member.name,
                         should_continue,
-                        create_tools_condition_with_human_review(previous_member.name, member.name, previous_member.tools),
+                        create_tools_condition_with_human_review(previous_member.name, member.name, list(previous_member.tools)),
                     )
                 else:
                     # Direct routing without human review
                     graph.add_conditional_edges(
                         previous_member.name,
                         should_continue,
-                        create_tools_condition(previous_member.name, member.name, previous_member.tools),
+                        create_tools_condition(previous_member.name, member.name, list(previous_member.tools)),
                     )
             else:
                 graph.add_edge(previous_member.name, member.name)
@@ -639,14 +791,14 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
             graph.add_conditional_edges(
                 final_member.name,
                 should_continue,
-                create_tools_condition_with_human_review(final_member.name, END, final_member.tools),
+                create_tools_condition_with_human_review(final_member.name, END, list(final_member.tools)),
             )
         else:
             # Direct routing without human review
             graph.add_conditional_edges(
                 final_member.name,
                 should_continue,
-                create_tools_condition(final_member.name, END, final_member.tools),
+                create_tools_condition(final_member.name, END, list(final_member.tools)),
             )
     else:
         graph.add_edge(final_member.name, END)
@@ -723,14 +875,14 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
             graph.add_conditional_edges(
                 member.name,
                 should_continue,
-                create_tools_condition_with_human_review(member.name, END, member.tools),
+                create_tools_condition_with_human_review(member.name, END, list(member.tools)),
             )
         else:
             # Direct routing without human review
             graph.add_conditional_edges(
                 member.name,
                 should_continue,
-                create_tools_condition(member.name, END, member.tools),
+                create_tools_condition(member.name, END, list(member.tools)),
             )
     else:
         graph.add_edge(member.name, END)
@@ -767,6 +919,7 @@ async def generator(
     thread_id: str,
     interrupt: Interrupt | None = None,
     user_id: str | None = None,
+    timezone: str | None = None,
 ) -> AsyncGenerator[Any, Any]:
     """Create the graph and stream responses as JSON."""
 
@@ -800,7 +953,14 @@ async def generator(
         if team.workflow_type == WorkflowType.HIERARCHICAL:
             teams = convert_hierarchical_team_to_dict(members)
             team_leader = list(teams.keys())[0]
-            root = await acreate_hierarchical_graph(teams, leader_name=team_leader, checkpointer=checkpointer)
+            root = await acreate_hierarchical_graph(
+                teams,
+                team_root=team,
+                leader_name=team_leader,
+                user_id=user_id,
+                timezone=timezone,
+                checkpointer=checkpointer,
+            )
             state = {
                 "history": formatted_messages,
                 "messages": [],

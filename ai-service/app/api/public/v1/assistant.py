@@ -1,7 +1,7 @@
 import typing
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import anyio
 from fastapi import APIRouter, Depends, Header
@@ -128,7 +128,6 @@ def _extract_support_units(assistant: Assistant) -> List[WorkflowType]:
 async def _abuild_assistant_query(
     session: AsyncSession,
     user_id: Optional[str] = None,
-    user_role: Optional[str] = None,
     assistant_type: Optional[AssistantType] = None,
     assistant_id: Optional[str] = None,
     page_number: int = 1,
@@ -140,7 +139,6 @@ async def _abuild_assistant_query(
     Args:
         session: Database session
         user_id: User ID for filtering (None for admin users)
-        user_role: User role for access control
         assistant_type: Filter by assistant type
         assistant_id: Specific assistant ID to query
         page_number: Page number for pagination
@@ -164,7 +162,7 @@ async def _abuild_assistant_query(
         query = query.where(Assistant.id == assistant_id)
         count_query = count_query.where(Assistant.id == assistant_id)
 
-    if user_role not in ["admin", "superuser"] and user_id:
+    if user_id:
         query = query.where(Assistant.user_id == user_id)
         count_query = count_query.where(Assistant.user_id == user_id)
 
@@ -240,7 +238,6 @@ def _format_assistant_response(
     Returns:
         GetGeneralAssistantResponse for general assistants or GetAdvancedAssistantResponse for advanced assistants
     """  # Import here to avoid circular imports
-    from app.core.settings import env_settings
 
     if assistant.assistant_type == AssistantType.GENERAL_ASSISTANT:
         return GetGeneralAssistantResponse(
@@ -250,9 +247,6 @@ def _format_assistant_response(
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
-            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=assistant.temperature if assistant.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=None,
             interrupt=None,
             main_unit=WorkflowType.CHATBOT,
@@ -268,11 +262,10 @@ def _format_assistant_response(
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
-            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=assistant.temperature if assistant.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=assistant.ask_human,
             interrupt=assistant.interrupt,
+            scheduler_enabled=assistant.scheduler_enabled,
+            retrieval_interrupt_skip_enabled=assistant.retrieval_interrupt_skip_enabled,
             main_unit=WorkflowType.CHATBOT,
             support_units=_extract_support_units(assistant),
             teams=teams_data,
@@ -289,9 +282,6 @@ def _format_assistant_response(
             assistant_type=assistant.assistant_type,
             description=assistant.description,
             system_prompt=assistant.system_prompt,
-            provider=assistant.provider or env_settings.OPENAI_PROVIDER,
-            model_name=assistant.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=assistant.temperature if assistant.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=None,
             interrupt=None,
             main_unit=WorkflowType.CHATBOT,
@@ -339,8 +329,8 @@ async def _acreate_hierarchical_team(
         backstory="Leader of the hierarchical team for advanced assistant.",
         role="Gather inputs, outputs from your team and answer the question.",
         type="root",
-        provider=env_settings.ANTHROPIC_PROVIDER,
-        model=env_settings.LLM_REASONING_MODEL,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
@@ -378,7 +368,6 @@ async def _acreate_main_team(
         assistant_id=assistant.id,
     )
     session.add(main_team)
-    await session.flush()
 
     # Create root member (chatbot) for the main team
     root_member_id = str(uuid.uuid4())
@@ -390,8 +379,8 @@ async def _acreate_main_team(
         backstory="A friendly chatbot assistant specialized in natural conversation and general assistance. Provides helpful responses to greetings, engages in meaningful small talk, and answers user questions using available tools. Focuses on being conversational and supportive without trying to take over the conversation flow.",
         role="Respond naturally to greetings and small talk. Answer user questions directly using available search and knowledge tools when needed. Provide helpful information and maintain a friendly conversational tone. Do not ask users what they want - simply respond to what they've said.",
         type="chatbot",
-        provider=env_settings.OPENAI_PROVIDER,
-        model=env_settings.LLM_BASIC_MODEL,
+        provider=env_settings.BASIC_MODEL_PROVIDER,
+        model=env_settings.BASIC_MODEL,
         temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
@@ -399,7 +388,6 @@ async def _acreate_main_team(
         created_by=SYSTEM,
     )
     session.add(root_member)
-    await session.flush()
 
     # Create search skills for the chatbot
     await _acreate_search_skills(session, root_member.id, user_id)
@@ -412,7 +400,8 @@ async def _acreate_mcp_member_with_skills(
     connected_mcp: ConnectedMcp,
     team_id: str,
     root_member_id: str,
-    request: CreateAdvancedAssistantRequest,
+    request: Union[CreateAdvancedAssistantRequest, UpdateAdvancedAssistantRequest],
+    assistant: Optional[Assistant] = None,
 ) -> None:
     """
     Create a member with MCP skills for a team.
@@ -423,10 +412,19 @@ async def _acreate_mcp_member_with_skills(
         team_id: Team ID to add member to
         root_member_id: Root member ID for source reference
         request: Request data containing provider/model info
+        assistant: Assistant object (required for update operations)
     """
     # Create member
     member_id = str(uuid.uuid4())
     member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
+
+    # Determine interrupt value based on request type
+    interrupt_value = True  # default value
+    if request.interrupt is not None:
+        interrupt_value = request.interrupt
+    elif assistant is not None:
+        interrupt_value = assistant.interrupt
+
     member = Member(
         id=member_id,
         name=member_name,
@@ -435,10 +433,10 @@ async def _acreate_mcp_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=env_settings.ANTHROPIC_PROVIDER,
-        model=env_settings.LLM_REASONING_MODEL,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
-        interrupt=request.interrupt if request.interrupt is not None else True,
+        interrupt=interrupt_value,
         position_x=0.0,
         position_y=0.0,
     )
@@ -499,7 +497,8 @@ async def _acreate_extension_member_with_skills(
     connected_extension: ConnectedExtension,
     team_id: str,
     root_member_id: str,
-    request: CreateAdvancedAssistantRequest,
+    request: Union[CreateAdvancedAssistantRequest, UpdateAdvancedAssistantRequest],
+    assistant: Optional[Assistant] = None,
 ) -> None:
     """
     Create a member with extension skills for a team.
@@ -510,6 +509,7 @@ async def _acreate_extension_member_with_skills(
         team_id: Team ID to add member to
         root_member_id: Root member ID for source reference
         request: Request data containing provider/model info
+        assistant: Assistant object (required for update operations)
     """
     # Load extension tools and create skills
     extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
@@ -519,6 +519,14 @@ async def _acreate_extension_member_with_skills(
     # Create member
     member_id = str(uuid.uuid4())
     member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
+
+    # Determine interrupt value based on request type
+    interrupt_value = True  # default value
+    if request.interrupt is not None:
+        interrupt_value = request.interrupt
+    elif assistant is not None:
+        interrupt_value = assistant.interrupt
+
     member = Member(
         id=member_id,
         name=member_name,
@@ -527,10 +535,10 @@ async def _acreate_extension_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=env_settings.ANTHROPIC_PROVIDER,
-        model=env_settings.LLM_REASONING_MODEL,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
-        interrupt=request.interrupt if request.interrupt is not None else True,
+        interrupt=interrupt_value,
         position_x=0.0,
         position_y=0.0,
     )
@@ -581,7 +589,6 @@ async def _acreate_support_team(
     session: AsyncSession,
     assistant: Assistant,
     workflow_type: WorkflowType,
-    request: CreateAdvancedAssistantRequest,
     user_id: str,
 ) -> Team:
     """
@@ -621,9 +628,9 @@ async def _acreate_support_team(
         backstory=f"Unit for advanced assistant: {str_workflow_type}.",
         role="Answer the user's question.",
         type=f"{str_workflow_type}",
-        provider=env_settings.OPENAI_PROVIDER,
-        model=env_settings.LLM_BASIC_MODEL,
-        temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
+        provider=env_settings.BASIC_MODEL_PROVIDER,
+        model=env_settings.BASIC_MODEL,
+        temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -853,22 +860,20 @@ def _update_assistant_basic_info(assistant: Assistant, request: UpdateAdvancedAs
         assistant: Assistant entity to update
         request: Update request data
     """
-    if request.name:
+    if request.name is not None:
         setattr(assistant, "name", request.name)
-    if request.description:
+    if request.description is not None:
         setattr(assistant, "description", request.description)
-    if request.system_prompt:
+    if request.system_prompt is not None:
         setattr(assistant, "system_prompt", request.system_prompt)
-    if request.provider:
-        setattr(assistant, "provider", request.provider)
-    if request.model_name:
-        setattr(assistant, "model_name", request.model_name)
-    if request.temperature is not None:
-        setattr(assistant, "temperature", request.temperature)
     if request.ask_human is not None:
         setattr(assistant, "ask_human", request.ask_human)
     if request.interrupt is not None:
         setattr(assistant, "interrupt", request.interrupt)
+    if request.scheduler_enabled is not None:
+        setattr(assistant, "scheduler_enabled", request.scheduler_enabled)
+    if request.retrieval_interrupt_skip_enabled is not None:
+        setattr(assistant, "retrieval_interrupt_skip_enabled", request.retrieval_interrupt_skip_enabled)
 
 
 async def _aupdate_mcp_members(
@@ -879,10 +884,11 @@ async def _aupdate_mcp_members(
     user_id: str,
 ) -> None:
     """
-    Update MCP members for the hierarchical team by deleting existing ones and creating new ones.
+    Update MCP members for the hierarchical team by deleting existing ones and creating new ones in parallel.
 
     Args:
         session: Database session
+        assistant: Assistant being updated
         hierarchical_team: Hierarchical team to update members for
         request: Update request containing new MCP IDs
         user_id: User ID
@@ -905,84 +911,28 @@ async def _aupdate_mcp_members(
         if not root_member_id:
             raise ValueError("Root member not found in hierarchical team")
 
-        # Create new MCP members and their skills
-        for mcp_id in request.mcp_ids:
-            statement = select(ConnectedMcp).where(
-                ConnectedMcp.id == mcp_id,
-                ConnectedMcp.user_id == user_id,
-                ConnectedMcp.is_deleted.is_(False),
-            )
+        # Fetch all MCP objects first
+        mcp_statement = select(ConnectedMcp).where(
+            ConnectedMcp.id.in_(request.mcp_ids),
+            ConnectedMcp.user_id == user_id,
+            ConnectedMcp.is_deleted.is_(False),
+        )
+        mcp_result = await session.execute(mcp_statement)
+        mcp_results = mcp_result.scalars().all()
 
-            result = await session.execute(statement)
-            connected_mcp = result.scalar_one_or_none()
-
-            if connected_mcp:
-                # Create member
-                member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_mcp.mcp_name}")
-                member = Member(
-                    id=member_id,
-                    name=member_name,
-                    team_id=hierarchical_team.id,
-                    backstory=connected_mcp.description if connected_mcp.description is not None else None,
-                    role="Execute actions based on provided tasks using binding tools and return the results",
-                    type="worker",
-                    source=root_member_id,
-                    provider=env_settings.ANTHROPIC_PROVIDER,
-                    model=env_settings.LLM_REASONING_MODEL,
-                    temperature=env_settings.REASONING_MODEL_TEMPERATURE,
-                    interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
-                    position_x=0.0,
-                    position_y=0.0,
-                )
-                session.add(member)
-                await session.flush()
-
-                # Create MCP skills using proper connection format
-                connections = {}
-                connections[connected_mcp.mcp_name] = {
-                    "url": connected_mcp.url,
-                    "transport": connected_mcp.transport,
-                }
-                tool_infos = await McpService.aget_mcp_tool_info(connections=connections)
-
-                # Create skills and link them to the member
-                for tool_info in tool_infos:
-                    skill_id = str(uuid.uuid4())
-                    skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
-                    skill = Skill(
-                        id=skill_id,
-                        name=skill_name,
-                        user_id=user_id,
-                        description=tool_info.description,
-                        icon="",
-                        display_name=tool_info.display_name,
-                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
-                        input_parameters=tool_info.input_parameters,
-                        reference_type=ConnectedServiceType.MCP,
-                        mcp_id=connected_mcp.id,
+        # Create MCP members and their skills in parallel
+        async with anyio.create_task_group() as tg:
+            for connected_mcp in mcp_results:
+                if connected_mcp:
+                    tg.start_soon(
+                        _acreate_mcp_member_with_skills,
+                        session,
+                        connected_mcp,
+                        hierarchical_team.id,
+                        root_member_id,
+                        request,
+                        assistant,
                     )
-                    session.add(skill)
-                    await session.flush()
-
-                    # Link skill to member
-                    member_skill_link = MemberSkillLink(
-                        member_id=member.id,
-                        skill_id=skill.id,
-                    )
-                    session.add(member_skill_link)
-                    await session.flush()
-
-                    # Add tool to cache
-                    await tool_manager.aadd_personal_tool(
-                        user_id=user_id,
-                        tool_key=skill_name,
-                        tool_info=tool_info,
-                    )
-
-                # Add ask_human skill to worker if ask_human is enabled
-                if request.ask_human:
-                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
 
 
 async def _aupdate_extension_members(
@@ -993,10 +943,11 @@ async def _aupdate_extension_members(
     user_id: str,
 ) -> None:
     """
-    Update extension members for the hierarchical team by deleting existing ones and creating new ones.
+    Update extension members for the hierarchical team by deleting existing ones and creating new ones in parallel.
 
     Args:
         session: Database session
+        assistant: Assistant being updated
         hierarchical_team: Hierarchical team to update members for
         request: Update request containing new extension IDs
         user_id: User ID
@@ -1019,84 +970,28 @@ async def _aupdate_extension_members(
         if not root_member_id:
             raise ValueError("Root member not found in hierarchical team")
 
-        # Create new extension members and their skills
-        for extension_id in request.extension_ids:
-            statement = select(ConnectedExtension).where(
-                ConnectedExtension.id == extension_id,
-                ConnectedExtension.user_id == user_id,
-                ConnectedExtension.is_deleted.is_(False),
-            )
-            result = await session.execute(statement)
-            connected_extension = result.scalar_one_or_none()
+        # Fetch all extension objects first
+        ext_statement = select(ConnectedExtension).where(
+            ConnectedExtension.id.in_(request.extension_ids),
+            ConnectedExtension.user_id == user_id,
+            ConnectedExtension.is_deleted.is_(False),
+        )
+        ext_result = await session.execute(ext_statement)
+        extension_results = ext_result.scalars().all()
 
-            if connected_extension:
-                # Create extension skills
-                extension_service_info = await extension_service_manager.aget_service_info(service_enum=connected_extension.extension_enum)
-                if not extension_service_info or not extension_service_info.service_object:
-                    raise ValueError(f"Extension service info for {connected_extension.extension_enum} not found or service object is None.")
-
-                # Create member
-                member_id = str(uuid.uuid4())
-                member_name = create_unique_key(id_=member_id, name=f"Hierarchical-{connected_extension.extension_name}")
-                member = Member(
-                    id=member_id,
-                    name=member_name,
-                    team_id=hierarchical_team.id,
-                    backstory=extension_service_info.description,
-                    role="Execute actions based on provided tasks using binding tools and return the results",
-                    type="worker",
-                    source=root_member_id,
-                    provider=env_settings.ANTHROPIC_PROVIDER,
-                    model=env_settings.LLM_REASONING_MODEL,
-                    temperature=env_settings.REASONING_MODEL_TEMPERATURE,
-                    interrupt=request.interrupt if request.interrupt is not None else assistant.interrupt,
-                    position_x=0.0,
-                    position_y=0.0,
-                )
-                session.add(member)
-                await session.flush()
-
-                extension_service = extension_service_info.service_object
-                tools = await extension_service.aget_authed_tools(user_id=connected_extension.user_id)
-                tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
-
-                # Create skills and link them to the member
-                for tool_info in tool_infos:
-                    skill_id = str(uuid.uuid4())
-                    skill_name = create_unique_key(id_=skill_id, name=tool_info.display_name)
-                    skill = Skill(
-                        id=skill_id,
-                        name=skill_name,
-                        user_id=user_id,
-                        description=tool_info.description,
-                        icon="",
-                        display_name=tool_info.display_name,
-                        strategy=StorageStrategy.PERSONAL_TOOL_CACHE,
-                        input_parameters=tool_info.input_parameters,
-                        reference_type=ConnectedServiceType.EXTENSION,
-                        extension_id=connected_extension.id,
+        # Create extension members and their skills in parallel
+        async with anyio.create_task_group() as tg:
+            for connected_extension in extension_results:
+                if connected_extension:
+                    tg.start_soon(
+                        _acreate_extension_member_with_skills,
+                        session,
+                        connected_extension,
+                        hierarchical_team.id,
+                        root_member_id,
+                        request,
+                        assistant,
                     )
-                    session.add(skill)
-                    await session.flush()
-
-                    # Link skill to member
-                    member_skill_link = MemberSkillLink(
-                        member_id=member.id,
-                        skill_id=skill.id,
-                    )
-                    session.add(member_skill_link)
-                    await session.flush()
-
-                    # Add tool to cache
-                    await tool_manager.aadd_personal_tool(
-                        user_id=user_id,
-                        tool_key=skill_name,
-                        tool_info=tool_info,
-                    )
-
-                # Add ask_human skill to worker if ask_human is enabled
-                if request.ask_human:
-                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
 
 
 # Not included chatbot and hierarchical team
@@ -1115,9 +1010,6 @@ async def _aupdate_support_units(
         request: Update request containing new support units
         user_id: User ID
     """  # Only update support units if they are provided in the request
-    if request.support_units is None and (request.provider or request.model_name or request.temperature) is None:
-        request.support_units = _extract_support_units(assistant)
-
     if request.support_units is not None:
         # Delete all support teams (except chatbot team and hierarchical team)
         all_teams_statement = select(Team).select_from(Team).where(Team.assistant_id == assistant.id)
@@ -1175,7 +1067,6 @@ async def _aupdate_support_units(
                     assistant_id=assistant.id,
                 )
                 session.add(support_team)
-                await session.flush()
 
                 # Create root member for the support team
                 support_root_member_id = str(uuid.uuid4())
@@ -1187,15 +1078,14 @@ async def _aupdate_support_units(
                     backstory=f"Unit for advanced assistant: {unit}.",
                     role="Answer the user's question.",
                     type=f"{unit}",
-                    provider=env_settings.OPENAI_PROVIDER,
-                    model=env_settings.LLM_BASIC_MODEL,
+                    provider=env_settings.BASIC_MODEL_PROVIDER,
+                    model=env_settings.BASIC_MODEL,
                     temperature=env_settings.BASIC_MODEL_TEMPERATURE,
                     interrupt=False,
                     position_x=0.0,
                     position_y=0.0,
                 )
                 session.add(support_root_member)
-                await session.flush()
 
                 # Load skill for SEARCHBOT unit
                 if unit == WorkflowType.SEARCHBOT:
@@ -1223,7 +1113,7 @@ async def _aformat_update_response(session: AsyncSession, assistant: Assistant) 
     # Find the hierarchical team
     hierarchical_team = None
     for team in assistant.teams:
-        if team.workflow_type == WorkflowType.HIERARCHICAL:
+        if team.workflow_type == WorkflowType.HIERARCHICAL and not team.is_deleted:
             hierarchical_team = team
             break
 
@@ -1240,9 +1130,8 @@ async def _aformat_update_response(session: AsyncSession, assistant: Assistant) 
         system_prompt=assistant.system_prompt,
         ask_human=assistant.ask_human,
         interrupt=assistant.interrupt,
-        provider=assistant.provider,
-        model_name=assistant.model_name,
-        temperature=assistant.temperature,
+        scheduler_enabled=assistant.scheduler_enabled,
+        retrieval_interrupt_skip_enabled=assistant.retrieval_interrupt_skip_enabled,
         main_unit=WorkflowType.CHATBOT,
         support_units=_extract_support_units(assistant),
         mcp_ids=mcp_ids,
@@ -1270,7 +1159,7 @@ async def _aextract_service_ids_from_team(session: AsyncSession, team: Team) -> 
     extension_ids = []
 
     # Get all worker members (MCPs and extensions are created as worker members)
-    worker_members = [member for member in team.members if member.type == "worker"]
+    worker_members = [member for member in team.members if member.type == "worker" and not member.is_deleted]
 
     if not worker_members:
         return mcp_ids, extension_ids
@@ -1384,18 +1273,14 @@ def _update_assistant_config_info(assistant: Assistant, request: UpdateAssistant
         assistant: Assistant entity to update
         request: Update request data containing configuration fields
     """
-    if request.system_prompt is not None:
-        setattr(assistant, "system_prompt", request.system_prompt)
-    if request.provider is not None:
-        setattr(assistant, "provider", request.provider)
-    if request.model_name is not None:
-        setattr(assistant, "model_name", request.model_name)
-    if request.temperature is not None:
-        setattr(assistant, "temperature", request.temperature)
     if request.ask_human is not None:
         setattr(assistant, "ask_human", request.ask_human)
     if request.interrupt is not None:
         setattr(assistant, "interrupt", request.interrupt)
+    if request.scheduler_enabled is not None:
+        setattr(assistant, "scheduler_enabled", request.scheduler_enabled)
+    if request.retrieval_interrupt_skip_enabled is not None:
+        setattr(assistant, "retrieval_interrupt_skip_enabled", request.retrieval_interrupt_skip_enabled)
 
 
 async def _aupdate_ask_human_skills_for_workers(
@@ -1468,8 +1353,6 @@ async def _aremove_ask_human_skill_from_worker(
         if skill:
             await session.delete(skill)
 
-    await session.flush()
-
 
 async def _aupdate_interrupt_for_workers(
     session: AsyncSession,
@@ -1493,8 +1376,6 @@ async def _aupdate_interrupt_for_workers(
             member.interrupt = interrupt_enabled
             member.updated_at = datetime.now()
 
-    await session.flush()
-
 
 async def _aupdate_member_configurations(
     session: AsyncSession,
@@ -1515,28 +1396,15 @@ async def _aupdate_member_configurations(
         request: Update request containing configuration changes
     """
     # Get the updated configuration values
-    updated_provider = request.provider or assistant.provider
-    updated_model_name = request.model_name or assistant.model_name
-    updated_temperature = request.temperature if request.temperature is not None else assistant.temperature
     updated_interrupt = request.interrupt if request.interrupt is not None else assistant.interrupt
 
     # Update configuration for all worker members
     for member in team.members:
-        # Update member configuration fields
-        if updated_provider:
-            member.provider = updated_provider
-        if updated_model_name:
-            member.model = updated_model_name
-        if updated_temperature is not None:
-            member.temperature = updated_temperature
         if updated_interrupt is not None and team.workflow_type == WorkflowType.HIERARCHICAL:
             member.interrupt = updated_interrupt
 
         # Mark member as modified
         member.updated_at = datetime.now()
-
-    # Commit the changes to the session
-    await session.flush()
 
 
 # ================================
@@ -1550,7 +1418,6 @@ async def aget_assistants(
     assistant_type: AssistantType | None = None,
     paging: PagingRequest = Depends(),
     x_user_id: str = Header(),
-    x_user_role: str = Header(None),
 ):
     """
     List all assistants for a user with pagination.
@@ -1562,7 +1429,6 @@ async def aget_assistants(
         result, count, total_pages = await _abuild_assistant_query(
             session=session,
             user_id=x_user_id,
-            user_role=x_user_role,
             assistant_type=assistant_type,
             page_number=page_number,
             max_per_page=max_per_page,
@@ -1704,11 +1570,12 @@ async def acreate_advanced_assistant(
             description=request.description,
             system_prompt=request.system_prompt,
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
-            provider=request.provider or env_settings.OPENAI_PROVIDER,
-            model_name=request.model_name or env_settings.LLM_BASIC_MODEL,
-            temperature=request.temperature if request.temperature is not None else env_settings.BASIC_MODEL_TEMPERATURE,
             ask_human=request.ask_human if request.ask_human is not None else True,
             interrupt=request.interrupt if request.interrupt is not None else True,
+            scheduler_enabled=request.scheduler_enabled if request.scheduler_enabled is not None else False,
+            retrieval_interrupt_skip_enabled=request.retrieval_interrupt_skip_enabled
+            if request.retrieval_interrupt_skip_enabled is not None
+            else False,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1756,6 +1623,7 @@ async def acreate_advanced_assistant(
                         hierarchical_team.id,  # type: ignore
                         hierarchical_root_member.id,  # type: ignore
                         request,
+                        None,  # assistant parameter (None for create operations)
                     )
             for connected_extension in extension_results:
                 if connected_extension:
@@ -1766,11 +1634,12 @@ async def acreate_advanced_assistant(
                         hierarchical_team.id,  # type: ignore
                         hierarchical_root_member.id,  # type: ignore
                         request,
+                        None,  # assistant parameter (None for create operations)
                     )
             # Create another support teams for each workflow type using helper function
             if request.support_units:
                 for workflow_type in request.support_units:
-                    tg.start_soon(_acreate_support_team, session, new_assistant, workflow_type, request, x_user_id)
+                    tg.start_soon(_acreate_support_team, session, new_assistant, workflow_type, x_user_id)
 
         # Commit all changes
         await session.commit()
@@ -1793,11 +1662,10 @@ async def acreate_advanced_assistant(
             assistant_type=AssistantType.ADVANCED_ASSISTANT,
             description=request.description,
             system_prompt=request.system_prompt,
-            provider=request.provider,
-            model_name=request.model_name,
-            temperature=request.temperature,
             ask_human=request.ask_human,
             interrupt=request.interrupt,
+            scheduler_enabled=request.scheduler_enabled,
+            retrieval_interrupt_skip_enabled=request.retrieval_interrupt_skip_enabled,
             main_unit=WorkflowType.CHATBOT,
             support_units=request.support_units,
             mcp_ids=request.mcp_ids,
@@ -1823,7 +1691,6 @@ async def aget_assistant_by_id(
     session: SessionDep,
     assistant_id: str,
     x_user_id: str = Header(),
-    x_user_role: str = Header(None),
 ):
     """
     Get details of an assistant by its ID using helper functions.
@@ -1839,9 +1706,7 @@ async def aget_assistant_by_id(
     """
     try:
         # Use helper function to build and execute query for single assistant
-        result, count, _ = await _abuild_assistant_query(
-            session=session, user_id=x_user_id, user_role=x_user_role, assistant_id=assistant_id, page_number=1, max_per_page=1
-        )
+        result, count, _ = await _abuild_assistant_query(session=session, user_id=x_user_id, assistant_id=assistant_id, page_number=1, max_per_page=1)
 
         if count == 0:
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()
@@ -1911,7 +1776,9 @@ async def aupdate_advanced_assistant(
 
         if not assistant:
             return ResponseWrapper.wrap(status=404, message="Assistant not found").to_response()  # Update the assistant table
+
         _update_assistant_basic_info(assistant, request)
+        await session.flush()
 
         # Handle hierarchical team for MCPs and extensions
         hierarchical_team = None
@@ -1947,8 +1814,8 @@ async def aupdate_advanced_assistant(
                     backstory="Leader of the hierarchical team for advanced assistant.",
                     role="Gather inputs from your team and answer the question.",
                     type="root",
-                    provider=env_settings.ANTHROPIC_PROVIDER,
-                    model=env_settings.LLM_REASONING_MODEL,
+                    provider=env_settings.REASONING_MODEL_PROVIDER,
+                    model=env_settings.REASONING_MODEL,
                     temperature=env_settings.REASONING_MODEL_TEMPERATURE,
                     interrupt=False,
                     position_x=0.0,
@@ -1964,7 +1831,7 @@ async def aupdate_advanced_assistant(
             await _aupdate_extension_members(session, assistant, hierarchical_team, request, x_user_id)
         else:
             # If no MCPs or extensions, remove hierarchical team if it exists
-            if hierarchical_team and request.mcp_ids and len(request.mcp_ids) == 0 and request.extension_ids and len(request.extension_ids) == 0:
+            if hierarchical_team:
                 # Delete hierarchical team and all its members
                 member_statement = select(Member.id).where(Member.team_id == hierarchical_team.id)
                 member_result = await session.execute(member_statement)
@@ -1997,7 +1864,7 @@ async def aupdate_advanced_assistant(
 
         # Refresh hierarchical team's members collection after delete/recreate operations
         if hierarchical_team is not None:
-            await session.refresh(hierarchical_team, ['members'])
+            await session.refresh(hierarchical_team, ["members"])
 
         # Update ask-human
         if request.ask_human is not None and hierarchical_team is not None:
@@ -2012,6 +1879,13 @@ async def aupdate_advanced_assistant(
 
         # Commit the transaction
         await session.commit()
+
+        # Fetch the updated assistant with teams for response
+        await session.refresh(assistant)  # refresh the base assistant
+        for team in assistant.teams:
+            await session.refresh(team)
+            for member in team.members:
+                await session.refresh(member)
 
         # Format and return the response
         response = await _aformat_update_response(session, assistant)
@@ -2169,7 +2043,6 @@ async def aupdate_assistant_config(
 
         # Update the assistant configuration fields
         _update_assistant_config_info(assistant, request)
-        await session.flush()  # Ensure changes are applied before proceeding
 
         # Update configuration for all teams
         for team in assistant.teams:

@@ -60,6 +60,7 @@ class ModelCapability(str, Enum):
 class LlmProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    DEEPSEEK = "deepseek"
     GOOGLE = "google"
     MISTRAL = "mistral"
     COHERE = "cohere"
@@ -136,6 +137,15 @@ class GenerationType(str, Enum):
     PROMPT = "prompt"
     TOOL_USAGE = "tool_usage"
     GENERAL = "general"
+
+    @classmethod
+    def supported_values(cls) -> list[str]:
+        return [member for member in cls]
+
+
+class SchedulerType(str, Enum):
+    RECURRING = "recurring"
+    ONE_TIME = "one_time"
 
     @classmethod
     def supported_values(cls) -> list[str]:

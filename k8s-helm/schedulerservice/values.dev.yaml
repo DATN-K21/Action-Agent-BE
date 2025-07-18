@@ -1,0 +1,48 @@
+# Default values for schedulerservice.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: myaagent.azurecr.io/schedulerservicedev
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: BuildID
+
+nameOverride: "schedulerservicedev"
+fullnameOverride: "schedulerservicedev"
+
+env:
+  - name: POSTGRES_URL_PATH
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: postgresurlpath
+  - name: POSTGRES_SCHEMA
+    value: "schedulerservice"
+  - name: DEBUG_SQLALCHEMY
+    value: "false"
+
+  - name: AI_SERVICE_URL
+    value: "http://aiservicedev:15200"
+
+  - name: HOST
+    value: "0.0.0.0"
+  - name: PORT
+    value: "15800"
+  - name: DEBUG_SERVER
+    value: "false"
+  - name: LOG_LEVEL
+    value: "INFO"
+
+  - name: SCHEDULER_TIMEZONE
+    value: "UTC"
+  - name: MAX_CONCURRENT_JOBS
+    value: "10"
+  - name: JOB_TIMEOUT
+    value: "300"
+  - name: MAX_RETRIES
+    value: "3"
+
+  - name: API_V1_PREFIX
+    value: "/api/v1"
+  

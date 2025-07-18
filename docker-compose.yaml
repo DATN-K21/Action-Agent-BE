@@ -14,6 +14,7 @@ services:
       EXTENSION_SERVICE_URL: http://extension-service:15300
       VOICE_SERVICE_URL: http://voice-service:15400
       PAYMENT_SERVICE_URL: http://payment-service:15700
+      SCHEDULER_SERVICE_URL: http://scheduler-service:15800
       ELASTICSEARCH_URL: http://elasticsearch:9200
       RABBITMQ_URL: amqp://root:root@rabbitmq:5672
       REDIS_URL: redis://root:root@redis:6379
@@ -193,6 +194,29 @@ services:
       - "15700:15700"
     restart: always
 
+  scheduler-service:
+    image: myaagent.azurecr.io/schedulerservicedev
+    container_name: scheduler-service
+    environment:
+      DEBUG_SERVER: False
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql://postgres:123456@ai-database:5432/ai-database
+      REDIS_URL: redis://root:root@redis:6379/1
+      AI_SERVICE_URL: http://ai-service:15200
+      SCHEDULER_TIMEZONE: UTC
+      MAX_CONCURRENT_JOBS: 10
+      JOB_TIMEOUT: 300
+      MAX_RETRIES: 3
+      API_V1_PREFIX: /api/v1
+      HOST: 0.0.0.0
+      PORT: 15800
+    ports:
+      - "15800:15800"
+    restart: always
+    depends_on:
+      - ai-database
+      - redis
+      - ai-service
 
   flower:
     image: mher/flower:latest

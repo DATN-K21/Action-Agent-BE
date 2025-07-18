@@ -309,16 +309,6 @@ class MemoryCacheManager:
 
         # Get detailed memory information
         cache_memory_mb = self._get_cache_memory_usage_mb()
-        process_memory_mb = self._get_current_memory_usage_mb()
-
-        # Use memory monitor for logging and tracking
-        await global_memory_monitor.log_memory_check(
-            cache_name=self.name,
-            cache_entries=len(self.cache),
-            cache_memory_mb=cache_memory_mb,
-            max_cache_memory_mb=self.config.max_memory_mb,
-            process_memory_mb=process_memory_mb,
-        )
 
         # Check cache memory usage
         cache_threshold_mb = self.config.max_memory_mb * self.config.memory_threshold
@@ -391,9 +381,6 @@ class MemoryCacheManager:
         for key in invalid_keys:
             if key in self.cache:
                 del self.cache[key]
-
-        if invalid_keys:
-            logger.info(f"Removed {len(invalid_keys)} invalid entries from cache '{self.name}'")
 
         return len(invalid_keys)
 
