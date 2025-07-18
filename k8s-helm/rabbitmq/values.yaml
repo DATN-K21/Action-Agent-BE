@@ -15,6 +15,9 @@ service:
   amqpPort: 5672
   managementPort: 15672
 
+nodeSelector:
+  beta.kubernetes.io/arch: arm64
+
 persistence:
   enabled: false
   createStorageClass: true
