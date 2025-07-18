@@ -66,6 +66,7 @@ jobs:
       - name: Docker Build & Push for Development
         uses: ./.github/actions/docker-build-push
         with:
+          platform: 'linux/arm64'
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'extensionservicedev'
@@ -98,7 +99,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.dev.yaml -n dev --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.dev.yaml -n dev --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}" --set nodeSelector."beta\.kubernetes\.io/arch"="arm64"
 
       - name: Send notification to Discord (Deploy Development)
         uses: ./.github/actions/notify-discord
@@ -123,6 +124,7 @@ jobs:
       - name: Docker Build & Push for Staging
         uses: ./.github/actions/docker-build-push
         with:
+          platform: 'linux/arm64'
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'extensionservicestg'
@@ -155,7 +157,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.stg.yaml -n stg --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.stg.yaml -n stg --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}" --set nodeSelector."beta\.kubernetes\.io/arch"="arm64"
 
       - name: Send notification to Discord (Deploy Staging)
         uses: ./.github/actions/notify-discord
@@ -180,6 +182,7 @@ jobs:
       - name: Docker Build & Push for Production
         uses: ./.github/actions/docker-build-push
         with:
+          platform: 'linux/arm64'
           acr_username: ${{ secrets.ACR_USERNAME }}
           acr_password: ${{ secrets.ACR_PASSWORD }}
           image_name: 'extensionserviceprod'
@@ -212,7 +215,7 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           cd k8s-helm
-          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.prod.yaml -n prod --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}"
+          helm upgrade --install extensionservice ./extensionservice -f ./extensionservice/values.prod.yaml -n prod --set image.tag=latest --set-string podAnnotations.gitCommit="${{ github.sha }}" --set nodeSelector."beta\.kubernetes\.io/arch"="arm64"
 
       - name: Send notification to Discord (Deploy Production)
         uses: ./.github/actions/notify-discord

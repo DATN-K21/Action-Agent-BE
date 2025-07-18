@@ -17,10 +17,23 @@ inputs:
   folder:
     description: 'The folder containing the Dockerfile and build context'
     required: true
+  platform:
+    description: |
+      Target platform(s) for the build.
+      E.g. `linux/amd64` or `linux/arm64`.
+      You can also comma-separate (`linux/amd64,linux/arm64`) for multi-arch.
+    required: false
+    default: 'linux/amd64'
 
 runs:
   using: 'composite'
   steps:
+    - name: Set up QEMU (for cross-build)
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
     - name: Login to ACR
       shell: bash
       run: echo "${{ inputs.acr_password }}" | docker login myaagent.azurecr.io -u "${{ inputs.acr_username }}" --password-stdin
@@ -28,5 +41,8 @@ runs:
     - name: Build & Push Docker Image
       shell: bash
       run: |
-        docker build -t myaagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} ${{ inputs.folder }}
-        docker push myaagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }}
+        docker buildx build \
+          --platform ${{ inputs.platform }} \
+          -t myaagent.azurecr.io/${{ inputs.image_name }}:${{ inputs.tag }} \
+          --push \
+          ${{ inputs.folder }}
