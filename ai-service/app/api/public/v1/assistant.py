@@ -545,7 +545,7 @@ async def _acreate_extension_member_with_skills(
     session.add(member)
 
     extension_service = extension_service_info.service_object
-    tools = extension_service.get_authed_tools(user_id=connected_extension.user_id)
+    tools = await extension_service.aget_authed_tools(user_id=connected_extension.user_id)
     tool_infos = [convert_base_tool_to_tool_info(tool) for tool in tools]
 
     # Create skills and links
@@ -1860,7 +1860,15 @@ async def aupdate_advanced_assistant(
 
                     await session.execute(delete(Member).where(Member.id.in_(member_ids)))
 
-                    await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+                await session.execute(delete(Team).where(Team.id == hierarchical_team.id))
+                hierarchical_team = None
+
+        # Flush data to ensure all changes are applied
+        await session.flush()
+
+        # Refresh hierarchical team's members collection after delete/recreate operations
+        if hierarchical_team is not None:
+            await session.refresh(hierarchical_team, ["members"])
 
         # Update ask-human
         if request.ask_human is not None and hierarchical_team is not None:

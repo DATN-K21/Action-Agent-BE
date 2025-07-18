@@ -24,6 +24,11 @@ service:
   port: 15100
   targetport: 15100
 
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "15100"
+  prometheus.io/path: "/metrics"
+
 ingress:
   enabled: false
   className: ""
@@ -46,8 +51,8 @@ resources:
     cpu: "10m"
     memory: "100Mi"
   limits:
-    cpu: "200m"
-    memory: "300Mi"
+    cpu: "500m"
+    memory: "700Mi"
 
 autoscaling:
   enabled: false
@@ -56,7 +61,8 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
 
-nodeSelector: {}
+nodeSelector:
+  beta.kubernetes.io/arch: amd64
 
 tolerations: []
 

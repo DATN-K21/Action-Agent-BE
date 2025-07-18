@@ -1,3 +1,4 @@
+using Prometheus;
 using speech_recognition.Exceptions.Handler;
 using speech_recognition.Options;
 using speech_recognition.Services;
@@ -17,12 +18,20 @@ builder.Services.AddScoped<ISpeechRecognition, SpeechRecognition>();
 
 builder.Services.AddExceptionHandler<CustomExceptionHandler>();
 
+builder.Services.AddMetricServer(options =>
+{
+    options.Port = 9090; // Default port for Prometheus metrics
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseMetricServer();
+app.UseHttpMetrics();
 
 //Add ping route to check if the service is running
 app.MapGet("/ping", () => new { message = "pong" })
