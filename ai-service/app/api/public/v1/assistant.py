@@ -1301,28 +1301,24 @@ async def _aupdate_ask_human_skills_for_workers(
     if team.workflow_type != WorkflowType.HIERARCHICAL:
         return
 
-    # Get only non-deleted worker members from the team
-    active_members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
-    result = await session.execute(active_members_statement)
-    active_worker_members = result.scalars().all()
+    for member in team.members:
+        if member.type == "worker":
+            if ask_human_enabled:
+                # Check if member already has ask_human skill
+                existing_skill_statement = (
+                    select(Skill)
+                    .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+                    .where(MemberSkillLink.member_id == member.id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
+                )
+                result = await session.execute(existing_skill_statement)
+                existing_skill = result.scalar_one_or_none()
 
-    for member in active_worker_members:
-        if ask_human_enabled:
-            # Check if member already has ask_human skill
-            existing_skill_statement = (
-                select(Skill)
-                .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                .where(MemberSkillLink.member_id == member.id, Skill.name == "ask-human", Skill.is_deleted.is_(False))
-            )
-            result = await session.execute(existing_skill_statement)
-            existing_skill = result.scalar_one_or_none()
-
-            if not existing_skill:
-                # Add ask_human skill to worker
-                await _aadd_ask_human_skill_to_worker(session, member, user_id)
-        else:
-            # Remove ask_human skill from worker
-            await _aremove_ask_human_skill_from_worker(session, member.id)
+                if not existing_skill:
+                    # Add ask_human skill to worker
+                    await _aadd_ask_human_skill_to_worker(session, member, user_id)
+            else:
+                # Remove ask_human skill from worker
+                await _aremove_ask_human_skill_from_worker(session, member.id)
 
 
 async def _aremove_ask_human_skill_from_worker(
