@@ -1,0 +1,19 @@
+# Ignore unnecessary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.md
+
+.vscode/
+.idea/
+.git/
+.venv/
+.ruff_cache/
+
+ruff.toml
+.env.example
+.env
