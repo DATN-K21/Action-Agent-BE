@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.enums import WorkflowType
@@ -36,6 +38,7 @@ class UpdateTeamRequest(TeamBase, BaseRequest):
 class ChatTeamRequest(BaseModel):
     messages: list[ChatMessage] = Field(..., description="List of chat messages in the team chat.")
     interrupt: Interrupt | None = Field(None, description="Interrupt associated with the team.")
+    timezone: Optional[str] = Field(None, description="Timezone of the user, used for scheduling and time-related functionalities.")
 
 
 class ChatTeamPublicRequest(BaseModel):

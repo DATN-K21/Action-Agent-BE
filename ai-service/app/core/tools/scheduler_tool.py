@@ -63,6 +63,7 @@ class UpdateJobInput(BaseModel):
     max_retries: Optional[int] = Field(None, description="New maximum number of retries")
     timeout_seconds: Optional[int] = Field(None, description="New timeout in seconds")
     is_active: Optional[bool] = Field(None, description="Whether the job should be active")
+    timezone: Optional[str] = Field(None, description="Timezone for the job")
 
 
 class ValidateCronInput(BaseModel):
@@ -76,7 +77,6 @@ async def _make_scheduler_request(
     endpoint: str,
     user_id: str,
     user_role: str,
-    user_timezone: str,
     data: Optional[Dict[str, Any]] = None,
     params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -88,7 +88,6 @@ async def _make_scheduler_request(
         "Accept": "application/json",
         "X-User-ID": user_id,
         "X-User-Role": user_role,
-        "X-User-Timezone": user_timezone,
     }
     
     try:
@@ -154,6 +153,7 @@ async def create_scheduled_job(
             "max_retries": job_data.max_retries,
             "timeout_seconds": job_data.timeout_seconds,
             "is_active": job_data.is_active,
+            "timezone": user_timezone,
         }
 
         result = await _make_scheduler_request(
@@ -161,7 +161,6 @@ async def create_scheduled_job(
             "/create",
             user_id=user_id,
             user_role=user_role,
-            user_timezone=user_timezone,
             data=payload,
         )
 
@@ -208,7 +207,6 @@ async def get_scheduled_jobs(
             "/get-jobs",
             user_id=user_id,
             user_role=user_role,
-            user_timezone=user_timezone,
             params=params,
         )
 
@@ -242,7 +240,6 @@ async def get_job_details(
             f"/{input_data.job_id}",
             user_id=user_id,
             user_role=user_role,
-            user_timezone=user_timezone,
         )
 
         if "error" in result:
@@ -294,6 +291,8 @@ async def update_scheduled_job(
             payload["timeout_seconds"] = input_data.timeout_seconds
         if input_data.is_active is not None:
             payload["is_active"] = input_data.is_active
+        if input_data.timezone is not None:
+            payload["timezone"] = input_data.timezone
 
         if not payload:
             return json.dumps({"success": False, "error": "No fields to update"}, indent=2)
@@ -303,7 +302,6 @@ async def update_scheduled_job(
             f"/{input_data.job_id}/update",
             user_id=user_id,
             user_role=user_role,
-            user_timezone=user_timezone,
             data=payload,
         )
 
@@ -336,7 +334,6 @@ async def delete_scheduled_job(
             f"/{input_data.job_id}/remove",
             user_id=user_id,
             user_role=user_role,
-            user_timezone=user_timezone,
         )
 
         if "error" in result:

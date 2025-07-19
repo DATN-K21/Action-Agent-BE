@@ -72,11 +72,10 @@ async def aget_all_threads(session: SessionDep, paging: CursorPagingRequest = De
                     "description": thread.assistant.description,
                     "system_prompt": thread.assistant.system_prompt,
                     "assistant_type": thread.assistant.assistant_type,
-                    "provider": thread.assistant.provider,
-                    "model_name": thread.assistant.model_name,
-                    "temperature": thread.assistant.temperature,
                     "ask_human": thread.assistant.ask_human,
                     "interrupt": thread.assistant.interrupt,
+                    "scheduler_enabled": thread.assistant.scheduler_enabled,
+                    "retrieval_interrupt_skip_enabled": thread.assistant.retrieval_interrupt_skip_enabled,
                     "created_at": thread.assistant.created_at,
                 }
 
@@ -155,11 +154,10 @@ async def aget_thread_by_id(session: SessionDep, thread_id: str, x_user_id: str 
                 "description": thread.assistant.description,
                 "system_prompt": thread.assistant.system_prompt,
                 "assistant_type": thread.assistant.assistant_type,
-                "provider": thread.assistant.provider,
-                "model_name": thread.assistant.model_name,
-                "temperature": thread.assistant.temperature,
                 "ask_human": thread.assistant.ask_human,
                 "interrupt": thread.assistant.interrupt,
+                "scheduler_enabled": thread.assistant.scheduler_enabled,
+                "retrieval_interrupt_skip_enabled": thread.assistant.retrieval_interrupt_skip_enabled,
                 "created_at": thread.assistant.created_at,
             }
 

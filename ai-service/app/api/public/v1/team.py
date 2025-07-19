@@ -335,7 +335,6 @@ async def astream(
     thread_id: str,
     team_chat: ChatTeamRequest,
     x_user_id=Header(None),
-    x_user_timezone=Header(None),
 ) -> Any:
     """
     Stream a response to a user's input.
@@ -440,7 +439,7 @@ async def astream(
                     thread_id,
                     team_chat.interrupt,
                     x_user_id,
-                    timezone=x_user_timezone,
+                    timezone=team_chat.timezone,
                 ):
                     yield item
 
