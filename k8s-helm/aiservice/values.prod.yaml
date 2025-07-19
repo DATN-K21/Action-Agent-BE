@@ -199,7 +199,7 @@ env:
         name: env-secret
         key: azureblobconnectionstring
   - name: AZURE_BLOB_CONTAINER_NAME
-    value: "
+    value: "uploadingprod"
 
   # ===================== CELERY SETTINGS =====================
   - name: RABBITMQ_URL
@@ -215,13 +215,13 @@ env:
 
   # ===================== URLS =====================
   - name: RETRIEVAL_SERVICE_GRPC_URL
-    value: :15600"
+    value: "retrievalserviceprod:15600"
   - name: EXTENSION_SERVICE_URL
-    value: "http:/:15300"
+    value: "http://extensionserviceprod:15300"
   - name: SCHEDULER_SERVICE_URL
-    value: "http:/:15800"
+    value: "http://schedulerserviceprod:15800"
   - name: FRONTEND_REDIRECT_URL
-    value: "http://localhost:3000/callback/extension"
+    value: "https://action-agent.software/callback/extension"
 
   # ===================== CACHE SETTINGS =====================
   # Memory and Cache settings
