@@ -165,11 +165,11 @@ class JobExecutor:
                 "Accept": "application/json",
                 "X-User-Id": job_data.get("user_id", ""),
                 "X-User-Role": job_data.get("user_role", ""),
-                "X-User-Timezone": job_data.get("user_timezone", ""),
             }
 
             payload = {
-                "messages": [{"type": "human", "content": job_data.get("prompt", "")}]
+                "messages": [{"type": "human", "content": job_data.get("prompt", "")}],
+                "timezone": job_data.get("timezone", env_settings.SCHEDULER_TIMEZONE),
             }
 
             logger.debug(f"Sending prompt to AI service with thread ID: {thread_id}")

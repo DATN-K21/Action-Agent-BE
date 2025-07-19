@@ -25,7 +25,8 @@ router = APIRouter()
 
 
 def validate_user_headers(
-    x_user_id: Optional[str], x_user_role: Optional[str], x_user_timezone: Optional[str]
+    x_user_id: Optional[str],
+    x_user_role: Optional[str],
 ):
     if not x_user_id:
         raise HTTPException(
@@ -35,10 +36,6 @@ def validate_user_headers(
         raise HTTPException(
             status_code=400, detail="User role is required (x_user_role header)"
         )
-    if not x_user_timezone:
-        raise HTTPException(
-            status_code=400, detail="User timezone is required (x_user_timezone header)"
-        )
 
 
 @router.post("/create", summary="Create Job")
@@ -46,7 +43,6 @@ async def create_job(
     job_data: JobCreate,
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Create a new scheduled job.
@@ -62,9 +58,10 @@ async def create_job(
     - **timeout_seconds**: Job timeout in seconds (default: 300)
     - **is_active**: Whether the job is active (default: True)
     - **job_config**: Additional job configuration
+    - **timezone**: Timezone for the job
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         # Validate cron expression for recurring jobs
         if job_data.job_type == JobType.RECURRING:
@@ -77,9 +74,7 @@ async def create_job(
             if not scheduler_manager.is_valid_cron(job_data.cron_expression):
                 raise HTTPException(status_code=400, detail="Invalid cron expression")
 
-        job = await job_service.create_job(
-            job_data, x_user_id, x_user_role, x_user_timezone
-        )
+        job = await job_service.create_job(job_data, x_user_id, x_user_role)
         logger.info(f"Job created: {job.id}")
 
         return ResponseWrapper.wrap(status=200, data=job).to_response()
@@ -99,7 +94,6 @@ async def list_jobs(
     team_id: Optional[str] = Query(None, description="Filter by team ID"),
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Get list of scheduled jobs with optional filtering.
@@ -116,7 +110,7 @@ async def list_jobs(
     If they are empty, all jobs for the user will be returned.
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         jobs = await job_service.get_jobs(
             skip=skip,
@@ -141,7 +135,6 @@ async def get_job(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Get details of a specific job.
@@ -151,7 +144,7 @@ async def get_job(
     Users can only access their own jobs unless they are admin or super admin.
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         job = await job_service.get_job(job_id)
         if not job:
@@ -175,7 +168,6 @@ async def update_job(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Update an existing job.
@@ -184,7 +176,7 @@ async def update_job(
     - **job_update**: Updated job data
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         # Validate cron expression if provided
         if job_update.cron_expression:
@@ -211,7 +203,6 @@ async def delete_job(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Delete a job (soft delete).
@@ -219,7 +210,7 @@ async def delete_job(
     - **job_id**: Unique job identifier
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         success = await job_service.delete_job(job_id)
         if not success:
@@ -243,7 +234,6 @@ async def run_job_now(
     job_id: str = Path(..., description="Job ID"),
     x_user_id=Header(None),
     x_user_role=Header(None),
-    x_user_timezone=Header(None),
 ):
     """
     Manually trigger a job execution.
@@ -252,7 +242,7 @@ async def run_job_now(
     - **run_request**: Optional reason for manual execution
     """
     try:
-        validate_user_headers(x_user_id, x_user_role, x_user_timezone)
+        validate_user_headers(x_user_id, x_user_role)
 
         execution_result = await job_service.run_job_now(job_id)
         if not execution_result:
@@ -280,13 +270,19 @@ async def run_job_now(
 
 
 @router.post("/{job_id}/pause", summary="Pause Job")
-async def pause_job(job_id: str = Path(..., description="Job ID")):
+async def pause_job(
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+):
     """
     Pause a running job.
 
     - **job_id**: Unique job identifier
     """
     try:
+        validate_user_headers(x_user_id, x_user_role)
+
         success = await job_service.pause_job(job_id)
         if not success:
             raise HTTPException(
@@ -307,13 +303,19 @@ async def pause_job(job_id: str = Path(..., description="Job ID")):
 
 
 @router.post("/{job_id}/resume", summary="Resume Job")
-async def resume_job(job_id: str = Path(..., description="Job ID")):
+async def resume_job(
+    job_id: str = Path(..., description="Job ID"),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
+):
     """
     Resume a paused job.
 
     - **job_id**: Unique job identifier
     """
     try:
+        validate_user_headers(x_user_id, x_user_role)
+
         success = await job_service.resume_job(job_id)
         if not success:
             raise HTTPException(
@@ -340,6 +342,8 @@ async def get_job_executions(
     limit: int = Query(
         100, ge=1, le=1000, description="Number of executions to return"
     ),
+    x_user_id=Header(None),
+    x_user_role=Header(None),
 ):
     """
     Get execution history for a job.
@@ -349,6 +353,9 @@ async def get_job_executions(
     - **limit**: Maximum number of executions to return
     """
     try:
+        validate_user_headers(x_user_id, x_user_role)
+
+        # Get executions for the specified job
         executions = await job_service.get_job_executions(job_id, skip, limit)
         
         # Wrap the executions list in the proper response schema

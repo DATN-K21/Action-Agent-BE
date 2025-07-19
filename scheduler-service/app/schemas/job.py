@@ -17,6 +17,9 @@ class JobBase(BaseModel):
     job_config: Optional[Dict] = Field(None, description="Additional job configuration")
     max_retries: int = Field(default=3, description="Maximum number of retries")
     timeout_seconds: int = Field(default=300, description="Job timeout in seconds")
+    timezone: Optional[str] = Field(
+        default="Asia/Ho_Chi_Minh", description="Timezone for job scheduling"
+    )
 
 
 class JobCreate(JobBase, BaseRequest):
@@ -39,6 +42,7 @@ class JobCreate(JobBase, BaseRequest):
                 "timeout_seconds": 300,
                 "is_active": True,
                 "job_config": {"format": "markdown", "include_metrics": True},
+                "timezone": "Asia/Ho_Chi_Minh",
             }
         }
     )
@@ -56,6 +60,7 @@ class JobUpdate(BaseRequest):
     max_retries: Optional[int] = Field(None, description="Maximum retries")
     timeout_seconds: Optional[int] = Field(None, description="Timeout in seconds")
     is_active: Optional[bool] = Field(None, description="Whether job is active")
+    timezone: Optional[str] = Field(None, description="Timezone for job scheduling")
 
 
 class JobResponse(JobBase, BaseResponse):

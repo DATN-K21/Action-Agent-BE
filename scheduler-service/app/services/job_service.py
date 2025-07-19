@@ -5,6 +5,7 @@ from sqlalchemy import and_, select, update
 from app.core import logging
 from app.core.database import AsyncSessionLocal
 from app.core.scheduler import scheduler_manager
+from app.core.settings import env_settings
 from app.models.job import JobExecution, JobStatus, JobType, ScheduledJob
 from app.schemas.job import JobCreate, JobExecutionResponse, JobResponse, JobUpdate
 
@@ -19,7 +20,6 @@ class JobService:
         job_data: JobCreate,
         user_id: str,
         user_role: str,
-        user_timezone: str,
     ) -> JobResponse:
         """Create a new scheduled job."""
         try:
@@ -44,7 +44,7 @@ class JobService:
                     else None,
                     user_id=user_id,
                     user_role=user_role,
-                    timezone=user_timezone,
+                    timezone=job_data.timezone or env_settings.SCHEDULER_TIMEZONE,
                 )
                 
                 session.add(job)
