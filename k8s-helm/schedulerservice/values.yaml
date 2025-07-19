@@ -51,8 +51,11 @@ resources:
     cpu: "10m"
     memory: "100Mi"
   limits:
-    cpu: "500m"
-    memory: "700Mi"
+    cpu: "300m"
+    memory: "500Mi"
+
+nodeSelector:
+  beta.kubernetes.io/arch: amd64
 
 autoscaling:
   enabled: false
@@ -60,8 +63,6 @@ autoscaling:
   maxReplicas: 1
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
-
-nodeSelector: {}
 
 tolerations: []
 
