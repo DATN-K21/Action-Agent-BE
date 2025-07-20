@@ -51,6 +51,9 @@ env:
   - name: PAYMENT_SERVICE_URL
     value: "http://paymentserviceprod:15700"
 
+  - name: SCHEDULER_SERVICE_URL
+    value: "http://schedulerprod:15800"
+
 ingress:
   enabled: true
   className: "nginx"
