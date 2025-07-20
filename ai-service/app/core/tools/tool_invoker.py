@@ -1,10 +1,10 @@
 import uuid
 
 from langchain_core.messages import AIMessage
+from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
 
 from app.core.tools.tool_args_sanitizer import sanitize_tool_args
-from app.core.workflow.node.tool_node_with_limit import ToolNodeWithOutputLimit
 from app.core.workflow.utils.tools_utils import get_tool
 
 
@@ -42,8 +42,8 @@ def invoke_tool(tool_name: str, args: dict) -> ToolInvokeResponse:
     )
 
     try:
-        # Create a ToolNode with output limiting
-        tool_node = ToolNodeWithOutputLimit(tools=[get_tool(tool_name)])
+        # Create a ToolNode with the specified tool
+        tool_node = ToolNode(tools=[get_tool(tool_name)])
         result = tool_node.invoke({"messages": [message_with_tool_call]})
 
         messages = [
