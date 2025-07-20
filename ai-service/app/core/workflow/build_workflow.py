@@ -6,11 +6,11 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.graph import CompiledGraph
-from langgraph.prebuilt import ToolNode
 
 from app.core.enums import InterruptType
 from app.core.workflow.node.parameter_extractor_node import ParameterExtractorNode
 from app.core.workflow.node.plugin_node import PluginNode
+from app.core.workflow.node.tool_node_with_limit import ToolNodeWithOutputLimit
 from app.core.workflow.utils.tools_utils import get_retrieval_tool, get_tool
 
 from ..state import WorkflowTeamState
@@ -41,7 +41,6 @@ def should_continue_tools(state: WorkflowTeamState) -> str:
     messages: list[AnyMessage] = state["messages"]
     if messages and isinstance(messages[-1], AIMessage) and messages[-1].tool_calls:
         for tool_call in messages[-1].tool_calls:
-
             tool_name = tool_call["name"].lower()
             for node_id, tools in tool_name_to_node_id.items():
                 if tool_name in tools:
@@ -79,19 +78,13 @@ def _add_tools_conditional_edges(graph_builder, conditional_edges, nodes):
             edges_dict["ask-human"] = next(iter(conditions["ask-human"].values()))
 
         if edges_dict != {"default": END}:
-            graph_builder.add_conditional_edges(
-                node_id, should_continue_tools, edges_dict
-            )
+            graph_builder.add_conditional_edges(node_id, should_continue_tools, edges_dict)
 
 
-def _add_classifier_conditional_edges(
-        graph_builder, classifier_node_id: str, nodes: list, edges: list
-):
+def _add_classifier_conditional_edges(graph_builder, classifier_node_id: str, nodes: list, edges: list):
     """Handle conditional edges for classifier nodes"""
     # Get classifier node configuration
-    classifier_node = next(
-        (node for node in nodes if node["id"] == classifier_node_id), None
-    )
+    classifier_node = next((node for node in nodes if node["id"] == classifier_node_id), None)
     if not classifier_node:
         return
 
@@ -103,9 +96,7 @@ def _add_classifier_conditional_edges(
 
     # Create conditional edges for each classification category
     for edge in classifier_edges:
-        target_node = next(
-            (node for node in nodes if node["id"] == edge["target"]), None
-        )
+        target_node = next((node for node in nodes if node["id"] == edge["target"]), None)
         if target_node:
             # Check if the edge's sourceHandle matches any category_id
             source_handle = edge.get("sourceHandle")
@@ -113,16 +104,12 @@ def _add_classifier_conditional_edges(
             edges_dict[source_handle] = edge["target"]
 
     # Add default path
-    default_edge = next(
-        (edge for edge in classifier_edges if edge.get("type") == "default"), None
-    )
+    default_edge = next((edge for edge in classifier_edges if edge.get("type") == "default"), None)
     edges_dict["default"] = default_edge["target"] if default_edge else END
 
     # Add conditional edges to graph
     if edges_dict:
-        graph_builder.add_conditional_edges(
-            classifier_node_id, should_continue_classifier, edges_dict
-        )
+        graph_builder.add_conditional_edges(classifier_node_id, should_continue_classifier, edges_dict)
 
 
 def _add_ifelse_conditional_edges(graph_builder, ifelse_node_id: str, nodes: list, edges: list):
@@ -140,9 +127,7 @@ def _add_ifelse_conditional_edges(graph_builder, ifelse_node_id: str, nodes: lis
 
     # Create conditional edges for each case
     for edge in ifelse_edges:
-        target_node = next(
-            (node for node in nodes if node["id"] == edge["target"]), None
-        )
+        target_node = next((node for node in nodes if node["id"] == edge["target"]), None)
         if target_node:
             source_handle = edge.get("sourceHandle")
             if source_handle:  # If there is sourceHandle, use it as routing key
@@ -154,9 +139,7 @@ def _add_ifelse_conditional_edges(graph_builder, ifelse_node_id: str, nodes: lis
 
     # Add conditional edges to graph
     if edges_dict:
-        graph_builder.add_conditional_edges(
-            ifelse_node_id, should_continue_ifelse, edges_dict
-        )
+        graph_builder.add_conditional_edges(ifelse_node_id, should_continue_ifelse, edges_dict)
 
 
 def initialize_graph(
@@ -238,14 +221,10 @@ def initialize_graph(
         _add_tools_conditional_edges(graph_builder, conditional_edges, nodes)
 
         # Add conditional edges for classifier nodes
-        classifier_nodes = [
-            node["id"] for node in nodes if node["type"] == "classifier"
-        ]
+        classifier_nodes = [node["id"] for node in nodes if node["type"] == "classifier"]
 
         for classifier_node_id in classifier_nodes:
-            _add_classifier_conditional_edges(
-                graph_builder, classifier_node_id, nodes, edges
-            )
+            _add_classifier_conditional_edges(graph_builder, classifier_node_id, nodes, edges)
 
         if_else_nodes = [node["id"] for node in nodes if node["type"] == "ifelse"]
         for if_else_node_id in if_else_nodes:
@@ -288,23 +267,16 @@ def _create_tool_name_mapping(nodes):
     tool_name_to_node_id = {}
     for node in nodes:
         if node["type"] == "tool":
-            tool_name_to_node_id[node["id"]] = [
-                tool.lower() for tool in node["data"]["tools"]
-            ]
+            tool_name_to_node_id[node["id"]] = [tool.lower() for tool in node["data"]["tools"]]
         if node["type"] == "toolretrieval":
-            tool_name_to_node_id[node["id"]] = [
-                tool["name"].lower() for tool in node["data"]["tools"]
-            ]
+            tool_name_to_node_id[node["id"]] = [tool["name"].lower() for tool in node["data"]["tools"]]
     return tool_name_to_node_id
 
 
 def _determine_graph_type(nodes, edges):
     llm_nodes = [node for node in nodes if node["type"] == "llm"]
     is_sequential = len(llm_nodes) > 1 and all(
-        any(
-            edge["source"] == node["id"] and edge["target"] == next_node["id"]
-            for edge in edges
-        )
+        any(edge["source"] == node["id"] and edge["target"] == next_node["id"] for edge in edges)
         for node, next_node in zip(llm_nodes[:-1], llm_nodes[1:], strict=False)
     )
     is_hierarchical = len(llm_nodes) > 1 and not is_sequential
@@ -323,11 +295,7 @@ def _create_llm_children_dict(nodes, edges):
 
 
 def _create_conditional_edges_dict(nodes):
-    return {
-        node["id"]: {"default": {}, "call_tools": {}, "ask-human": {}}
-        for node in nodes
-        if node["type"] == "llm"
-    }
+    return {node["id"]: {"default": {}, "call_tools": {}, "ask-human": {}} for node in nodes if node["type"] == "llm"}
 
 
 def _add_answer_node(graph_builder, node_id, node_data):
@@ -357,14 +325,14 @@ def _add_retrieval_node(graph_builder, node_id, node_data):
 
 
 def _add_llm_node(
-        graph_builder,
-        node_id,
-        node_data,
-        nodes,
-        edges,
-        is_sequential,
-        is_hierarchical,
-        llm_children,
+    graph_builder,
+    node_id,
+    node_data,
+    nodes,
+    edges,
+    is_sequential,
+    is_hierarchical,
+    llm_children,
 ):
     model_name = node_data["model"]
 
@@ -410,18 +378,11 @@ def _get_tools_to_bind(node_id, edges, nodes):
 
         for edge in edges:
             if edge["source"] == current_node_id:
-                target_node = next(
-                    (n for n in nodes if n["id"] == edge["target"]), None
-                )
+                target_node = next((n for n in nodes if n["id"] == edge["target"]), None)
                 if target_node:
                     # If it's a tool node, add tools
                     if target_node["type"] == "tool":
-                        tools_to_bind.extend(
-                            [
-                                get_tool(tool_name)
-                                for tool_name in target_node["data"]["tools"]
-                            ]
-                        )
+                        tools_to_bind.extend([get_tool(tool_name) for tool_name in target_node["data"]["tools"]])
                     elif target_node["type"] == "toolretrieval":
                         tools_to_bind.extend(
                             [
@@ -456,7 +417,7 @@ def _add_tool_node(graph_builder, node_id, node_type, node_data):
             )
             for tool in node_data["tools"]
         ]
-    graph_builder.add_node(node_id, ToolNode(tools))
+    graph_builder.add_node(node_id, ToolNodeWithOutputLimit(tools))
 
 
 def _add_edge(graph_builder, edge, nodes, conditional_edges):
@@ -474,9 +435,7 @@ def _add_edge(graph_builder, edge, nodes, conditional_edges):
             if edge["type"] == "default":
                 graph_builder.add_edge(edge["source"], edge["target"])
             else:
-                conditional_edges[source_node["id"]]["call_tools"][
-                    target_node["id"]
-                ] = target_node["id"]
+                conditional_edges[source_node["id"]]["call_tools"][target_node["id"]] = target_node["id"]
         elif target_node["type"] == "end":
             if edge["type"] == "default":
                 graph_builder.add_edge(edge["source"], END)
@@ -486,16 +445,12 @@ def _add_edge(graph_builder, edge, nodes, conditional_edges):
             if edge["type"] == "default":
                 graph_builder.add_edge(edge["source"], edge["target"])
             else:
-                conditional_edges[source_node["id"]]["default"][target_node["id"]] = (
-                    target_node["id"]
-                )
+                conditional_edges[source_node["id"]]["default"][target_node["id"]] = target_node["id"]
         else:
             if edge["type"] == "default":
                 graph_builder.add_edge(edge["source"], edge["target"])
             else:
-                conditional_edges[source_node["id"]]["default"][target_node["id"]] = (
-                    target_node["id"]
-                )
+                conditional_edges[source_node["id"]]["default"][target_node["id"]] = target_node["id"]
     elif source_node["type"].startswith("tool") and target_node["type"] == "llm":
         graph_builder.add_edge(edge["source"], edge["target"])
 
@@ -587,9 +542,7 @@ def _add_crewai_node(graph_builder, node_id, node_data):
     graph_builder.add_node(node_id, crewai_node.work)
 
     # If it's hierarchical mode, ensure there is manager configuration
-    if process_type == "hierarchical" and not node_data.get("manager_config", {}).get(
-            "agent"
-    ):
+    if process_type == "hierarchical" and not node_data.get("manager_config", {}).get("agent"):
         raise ValueError("Hierarchical process requires manager agent configuration")
 
 
@@ -617,9 +570,7 @@ def _add_code_node(graph_builder, node_id, node_data):
                 code=node_data["code"],
                 libraries=node_data.get("libraries", []),  # Optional libraries list
                 timeout=node_data.get("timeout", 30),  # Default timeout 30 seconds
-                memory_limit=node_data.get(
-                    "memory_limit", "256m"
-                ),  # Default memory limit
+                memory_limit=node_data.get("memory_limit", "256m"),  # Default memory limit
             ).work
         ),
     )
@@ -644,9 +595,7 @@ def _add_human_node(graph_builder, node_id: str, node_data: dict[str, Any]):
             node_id=node_id,
             routes=node_data.get("routes", {}),
             title=node_data.get("title"),
-            interaction_type=node_data.get(
-                "interaction_type", InterruptType.TOOL_REVIEW
-            ),
+            interaction_type=node_data.get("interaction_type", InterruptType.TOOL_REVIEW),
         ).work,
     )
 
@@ -677,9 +626,7 @@ def _add_parameter_extractor_node(graph_builder, node_id, node_data):
 
 
 def _add_plugin_node(graph_builder, node_id, node_data):
-    graph_builder.add_node(
-        node_id, PluginNode(node_id, node_data["toolName"], node_data["args"]).work
-    )
+    graph_builder.add_node(node_id, PluginNode(node_id, node_data["toolName"], node_data["args"]).work)
 
 
 def _add_mcp_node(graph_builder, node_id, node_data):
