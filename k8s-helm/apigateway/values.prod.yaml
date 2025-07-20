@@ -52,7 +52,7 @@ env:
     value: "http://paymentserviceprod:15700"
 
   - name: SCHEDULER_SERVICE_URL
-    value: "http://schedulerprod:15800"
+    value: "http://schedulerserviceprod:15800"
 
 ingress:
   enabled: true
