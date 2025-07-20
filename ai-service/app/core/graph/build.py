@@ -15,6 +15,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
+from app.core.workflow.node.tool_node_with_limit import ToolNodeWithOutputLimit
 from langgraph.types import Command
 
 from app.core import logging
@@ -544,8 +545,8 @@ async def acreate_hierarchical_graph(
                     normal_tools.append(tool)
 
             if normal_tools:
-                # Add node for normal tools
-                build.add_node(f"{name}-tools", ToolNode(normal_tools))
+                # Add node for normal tools with output limiting
+                build.add_node(f"{name}-tools", ToolNodeWithOutputLimit(normal_tools))
 
                 # Add HumanNode for tool review if interrupt is True
                 if team_root.assistant.interrupt:
@@ -627,8 +628,8 @@ async def acreate_hierarchical_graph(
                         normal_tools.append(tool_object)
 
                 if normal_tools:
-                    # Add node for normal tools
-                    build.add_node(f"{name}-tools", ToolNode(normal_tools))
+                    # Add node for normal tools with output limiting
+                    build.add_node(f"{name}-tools", ToolNodeWithOutputLimit(normal_tools))
 
                     if member.interrupt:
                         # Add ToolEvaluationNode for intelligent tool assessment
@@ -750,8 +751,8 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                     normal_tools.append(tool_object)
 
             if normal_tools:
-                # Add node for normal tools
-                graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
+                # Add node for normal tools with output limiting
+                graph.add_node(f"{member.name}-tools", ToolNodeWithOutputLimit(normal_tools))
 
                 # Add HumanNode for tool review if member.interrupt is True
                 if member.interrupt:
@@ -856,8 +857,8 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
                 normal_tools.append(tool_object)
 
         if normal_tools:
-            # Add node for normal tools
-            graph.add_node(f"{member.name}-tools", ToolNode(normal_tools))
+            # Add node for normal tools with output limiting
+            graph.add_node(f"{member.name}-tools", ToolNodeWithOutputLimit(normal_tools))
 
             # Add HumanNode for tool review if member.interrupt is True
             if member.interrupt:
