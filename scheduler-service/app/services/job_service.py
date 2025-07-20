@@ -24,6 +24,7 @@ class JobService:
         """Create a new scheduled job."""
         try:
             async with AsyncSessionLocal() as session:
+                timezone = job_data.timezone or env_settings.SCHEDULER_TIMEZONE
                 # Create job record
                 job = ScheduledJob(
                     name=job_data.name,
@@ -38,13 +39,14 @@ class JobService:
                     job_config=job_data.job_config,
                     is_active=job_data.is_active,
                     next_run_at=scheduler_manager.get_next_run_time(
-                        job_data.cron_expression
+                        job_data.cron_expression,
+                        timezone,
                     )
                     if job_data.cron_expression
                     else None,
                     user_id=user_id,
                     user_role=user_role,
-                    timezone=job_data.timezone or env_settings.SCHEDULER_TIMEZONE,
+                    timezone=timezone,
                 )
                 
                 session.add(job)

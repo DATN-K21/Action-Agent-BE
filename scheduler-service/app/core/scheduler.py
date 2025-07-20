@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo
 
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -196,12 +197,20 @@ class SchedulerManager:
             'month': parts[3],
             'day_of_week': parts[4]
         }
-    
-    def get_next_run_time(self, cron_expression: str) -> Optional[datetime]:
-        """Get the next run time for a cron expression."""
+
+    def get_next_run_time(
+        self, cron_expression: str, timezone_str: str
+    ) -> Optional[datetime]:
+        """Get the next run time (naive datetime in local time) for a cron expression."""
         try:
-            cron = croniter(cron_expression, datetime.now())
-            return datetime.fromtimestamp(cron.get_next())
+            tzinfo = ZoneInfo(timezone_str)
+            base_time = datetime.now(tzinfo)  # offset-aware
+            cron = croniter(cron_expression, base_time)
+            next_time_aware = datetime.fromtimestamp(cron.get_next(), tz=tzinfo)
+            next_time_naive = next_time_aware.replace(
+                tzinfo=None
+            )  # convert to naive datetime
+            return next_time_naive
         except Exception:
             return None
     
