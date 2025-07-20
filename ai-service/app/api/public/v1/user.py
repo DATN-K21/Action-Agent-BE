@@ -9,6 +9,7 @@ from app.core.enums import LlmProvider
 from app.db_models.user import User
 from app.db_models.user_api_key import UserApiKey
 from app.schemas.base import ResponseWrapper
+from app.schemas.user import GetUserCreditsResponse, GetUserSettingsResponse, SetUserSettingsRequest
 from app.schemas.user_api_key import (
     DeleteApiKeyRequest,
     DeleteApiKeyResponse,
@@ -18,11 +19,99 @@ from app.schemas.user_api_key import (
     UpsertApiKeyRequest,
     UpsertApiKeyResponse,
 )
-from app.schemas.user import GetUserCreditsResponse
 
 logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/user", tags=["User"])
+
+
+@router.get("/local-llm/get", summary="Get local LLM settings.", response_model=ResponseWrapper[GetUserSettingsResponse])
+async def get_local_llm_settings(
+    session: SessionDep,
+    x_user_id: str = Header(None),
+):
+    try:
+        # Fetch user data with local LLM settings
+        stmt = select(
+            User.id.label("user_id"),
+            User.basic_model_provider,
+            User.basic_model_name,
+            User.basic_model_api_key,
+            User.basic_model_temperature,
+            User.basic_model_base_url,
+            User.reasoning_model_provider,
+            User.reasoning_model_name,
+            User.reasoning_model_api_key,
+            User.reasoning_model_temperature,
+            User.reasoning_model_base_url,
+            User.embedding_model_provider,
+            User.embedding_model_name,
+            User.embedding_model_api_key,
+            User.embedding_model_base_url,
+        ).where(
+            User.id == x_user_id,
+            User.is_deleted.is_(False),
+        )
+
+        result = await session.execute(stmt)
+        record = result.mappings().one_or_none()
+
+        if not record:
+            return ResponseWrapper.wrap(status=404, message="User not found")
+
+        response_data = GetUserSettingsResponse.model_validate(record)
+        return ResponseWrapper.wrap(status=200, data=response_data)
+
+    except Exception as e:
+        logger.error(f"Error fetching local LLM settings: {e}")
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
+
+
+@router.post("/local-llm/set", summary="Set Local LLM Settings.", response_model=ResponseWrapper[GetUserSettingsResponse])
+async def set_local_llm_settings(
+    session: SessionDep,
+    request: SetUserSettingsRequest,
+    x_user_id: str = Header(None),
+):
+    try:
+        # Update user settings with local LLM configurations
+        update_stmt = (
+            update(User)
+            .values(
+                basic_model_provider=request.basic_model_provider,
+                basic_model_name=request.basic_model_name,
+                basic_model_api_key=request.basic_model_api_key,
+                basic_model_temperature=request.basic_model_temperature,
+                basic_model_base_url=request.basic_model_base_url,
+                reasoning_model_provider=request.reasoning_model_provider,
+                reasoning_model_name=request.reasoning_model_name,
+                reasoning_model_api_key=request.reasoning_model_api_key,
+                reasoning_model_temperature=request.reasoning_model_temperature,
+                reasoning_model_base_url=request.reasoning_model_base_url,
+                embedding_model_provider=request.embedding_model_provider,
+                embedding_model_name=request.embedding_model_name,
+                embedding_model_api_key=request.embedding_model_api_key,
+                embedding_model_base_url=request.embedding_model_base_url,
+            )
+            .where(
+                User.id == x_user_id,
+                User.is_deleted.is_(False),
+            )
+        )
+
+        result = await session.execute(update_stmt)
+        if result.rowcount == 0:
+            return ResponseWrapper.wrap(status=404, message="User not found")
+
+        await session.commit()
+
+        # Fetch updated settings to return
+        return await get_local_llm_settings(session, x_user_id=x_user_id)
+
+    except Exception as e:
+        logger.error(f"Error setting local LLM settings: {e}")
+        await session.rollback()
+        return ResponseWrapper.wrap(status=500, message="Internal server error")
 
 
 @router.get("/key/get-all", summary="Get API Keys.", response_model=ResponseWrapper[GetApiKeysResponse])

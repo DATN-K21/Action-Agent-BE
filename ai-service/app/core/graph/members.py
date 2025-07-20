@@ -59,16 +59,22 @@ class BaseNode:
         provider: str | None,
         model: str | None,
         temperature: float | None,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ):
         try:
             if provider is None or model is None:
                 provider = env_settings.BASIC_MODEL_PROVIDER
                 model = env_settings.BASIC_MODEL
-
             if temperature is None:
                 temperature = env_settings.BASIC_MODEL_TEMPERATURE
 
-            self.model_info = model_provider_manager.get_model_info(model)
+            # Initialize model and final_answer_model
+            # Below is temp code to handle local LLM for user -> TODO: Refactor the code
+            if provider == "ollama" and base_url is not None and api_key is not None:
+                self.model_info = model_provider_manager.get_local_model_info_by_user(model, base_url, api_key)
+            else:
+                self.model_info = model_provider_manager.get_model_info(model)
             self.model = model_provider_manager.init_model(
                 provider_name=provider,
                 model=model,
@@ -330,7 +336,13 @@ class LeaderNode(BaseNode):
         temperature: float | None,
         team_root: Team | None,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(
+            provider,
+            model,
+            temperature,
+            team_root.user.reasoning_model_base_url if team_root else None,
+            team_root.user.reasoning_model_api_key if team_root else None,
+        )
         self.team_root = team_root
 
     def get_team_members_info(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
@@ -508,7 +520,11 @@ class SchedulerNode(BaseNode):
         team_id: str | None = None,
         ask_human: bool = False,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(
+            provider,
+            model,
+            temperature,
+        )
 
         self.user_id = user_id
         self.user_role = user_role
@@ -778,9 +794,17 @@ class ToolEvaluationNode(BaseNode):
         provider: str | None,
         model: str | None,
         temperature: float | None,
+        base_url: str | None,
+        api_key: str | None,
         routes: dict[str, str] | None = None,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(
+            provider,
+            model,
+            temperature,
+            base_url,
+            api_key,
+        )
         self.routes = routes or {
             "execute_directly": "run_tool",
             "require_human_approval": "human_review",
