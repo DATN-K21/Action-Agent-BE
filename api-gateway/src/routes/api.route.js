@@ -11,6 +11,7 @@ const serviceRegistry = {
     'extension': ENDPOINT_CONFIGS.EXTENSION_SERVICE_URL,
     'voice': ENDPOINT_CONFIGS.VOICE_SERVICE_URL,
     'payment': ENDPOINT_CONFIGS.PAYMENT_SERVICE_URL,
+    'scheduler': ENDPOINT_CONFIGS.SCHEDULER_SERVICE_URL,
 };
 
 // Validate that all service URLs are configured
