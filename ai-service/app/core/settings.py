@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     TOOLS_CACHE_MAX_MEMORY_MB: float = 512.0  # 512MB for tool tracking
 
     # Tool output limits
-    MAX_TOOL_OUTPUT_TOKENS: int = 60000  # Maximum tokens for tool output to prevent context overflow
+    MAX_TOOL_OUTPUT_TOKENS: int = 20000  # Maximum tokens for tool output to prevent context overflow
     TOOL_OUTPUT_TRUNCATE_STRATEGY: str = "smart"  # Strategy for truncating tool output: "smart", "prefix", "suffix", "middle"
 
     # Cache for extension services
