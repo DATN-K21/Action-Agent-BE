@@ -169,10 +169,17 @@ class JobService:
                 
                 # Update job fields
                 update_data = job_update.model_dump(exclude_unset=True)
-                
-                # Handle scheduler updates
+
+                if job_update.cron_expression:
+                    update_data["next_run_at"] = scheduler_manager.get_next_run_time(
+                        job_update.cron_expression,
+                        job_update.timezone or job.timezone,
+                    )
+
+                # Handle scheduler updates - save old values before update
                 old_cron = job.cron_expression
                 old_active = job.is_active
+                old_job_type = job.job_type  # 🔥 FIX: Save old job type
                 
                 # Update job record
                 await session.execute(
@@ -185,30 +192,30 @@ class JobService:
                 # Refresh job to get updated values
                 await session.refresh(job)
                 
-                # Update scheduler if needed
-                if job.job_type == JobType.RECURRING:
-                    # Remove old job from scheduler
-                    if old_cron and old_active:
-                        await scheduler_manager.remove_job(job_id)
+                # Update scheduler - always remove old job if it was recurring
+                if old_job_type == JobType.RECURRING and old_cron and old_active:
+                    logger.info(f"Removing job {job_id} from scheduler (was recurring)")
+                    await scheduler_manager.remove_job(job_id)
+                
+                # Add job to scheduler only if current job is recurring and active
+                if job.job_type == JobType.RECURRING and job.cron_expression and job.is_active:
+                    logger.info(f"Adding job {job_id} to scheduler (now recurring)")
+                    job_execution_data = {
+                        "prompt": job.prompt,
+                        "user_id": job.user_id,
+                        "user_role": job.user_role,
+                        "user_timezone": job.timezone,
+                        "assistant_id": job.assistant_id,
+                        "team_id": job.team_id,
+                        "job_config": job.job_config or {},
+                    }
                     
-                    # Add updated job to scheduler
-                    if job.cron_expression and job.is_active:
-                        job_execution_data = {
-                            "prompt": job.prompt,
-                            "user_id": job.user_id,
-                            "user_role": job.user_role,
-                            "user_timezone": job.timezone,
-                            "assistant_id": job.assistant_id,
-                            "team_id": job.team_id,
-                            "job_config": job.job_config or {},
-                        }
-                        
-                        await scheduler_manager.add_job(
-                            job_id=job.id,
-                            cron_expression=job.cron_expression,
-                            job_data=job_execution_data,
-                            timezone=job.timezone
-                        )
+                    await scheduler_manager.add_job(
+                        job_id=job.id,
+                        cron_expression=job.cron_expression,
+                        job_data=job_execution_data,
+                        timezone=job.timezone
+                    )
                 
                 logger.info(f"Successfully updated job: {job_id}")
                 return JobResponse.from_orm(job)

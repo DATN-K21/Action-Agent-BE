@@ -52,6 +52,9 @@ class JobUpdate(BaseRequest):
     """Schema for updating a job."""
     name: Optional[str] = Field(None, description="Job name")
     description: Optional[str] = Field(None, description="Job description")
+    job_type: Optional[JobType] = Field(
+        None, description="Job type (one_time or recurring)"
+    )
     cron_expression: Optional[str] = Field(None, description="Cron expression")
     prompt: Optional[str] = Field(None, description="Prompt to send to AI service")
     team_id: Optional[str] = Field(None, description="Team ID")
