@@ -12,6 +12,7 @@ const PUBLIC_ENDPOINTS = [
   "/extension/ping",
   "/voice/ping",
   "/payment/ping",
+  '/scheduler/ping',
 
   // User service public endpoints
   "/user/api/v1/access/login",
