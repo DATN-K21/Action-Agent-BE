@@ -18,15 +18,22 @@ class Assistant(BaseEntity):
 
     # Confiugration actions for the advanced assistant (Only for advanced assistants - hierarchical units)
     ask_human: Mapped[bool | None] = mapped_column(
-        default=False, nullable=True
+        default=False,
+        nullable=True,
     )  # Whether to ask human for confirmation before executing the assistant's task
     interrupt: Mapped[bool | None] = mapped_column(default=False, nullable=True)  # Whether to interrupt the assistant's current task
     scheduler_enabled: Mapped[bool | None] = mapped_column(
-        default=False, nullable=True
+        default=False,
+        nullable=True,
     )  # Whether scheduler functionality is enabled for this assistant
     retrieval_interrupt_skip_enabled: Mapped[bool | None] = mapped_column(
-        default=False, nullable=True
+        default=False,
+        nullable=True,
     )  # Whether to skip retrieval interrupt for this assistant
+    local_llm_enabled: Mapped[bool | None] = mapped_column(
+        default=False,
+        nullable=True,
+    )  # Whether to use local LLM for this assistant
 
     # Relationships
     user = relationship("User", back_populates="assistants")
