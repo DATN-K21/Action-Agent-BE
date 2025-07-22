@@ -730,23 +730,27 @@ async def _adelete_members_with_service_type(session: AsyncSession, team: Team, 
         team: Team object containing members
         service_type: Type of service to filter members by
     """
+    # Fetch worker members explicitly to avoid lazy loading issues
+    members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
+    members_result = await session.execute(members_statement)
+    worker_members = members_result.scalars().all()
+
     member_ids_to_delete = []
 
-    for member in team.members:
-        if member.type == "worker":
-            # Check if this member has skills of the specified service type
-            statement = (
-                select(Skill)
-                .select_from(Skill)
-                .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
-                .where(MemberSkillLink.member_id == member.id, Skill.reference_type == service_type)
-            )
+    for member in worker_members:
+        # Check if this member has skills of the specified service type
+        statement = (
+            select(Skill)
+            .select_from(Skill)
+            .join(MemberSkillLink, Skill.id == MemberSkillLink.skill_id)
+            .where(MemberSkillLink.member_id == member.id, Skill.reference_type == service_type)
+        )
 
-            skill_result = await session.execute(statement)
-            skills = skill_result.scalars().all()
+        skill_result = await session.execute(statement)
+        skills = skill_result.scalars().all()
 
-            if skills:
-                member_ids_to_delete.append(member.id)
+        if skills:
+            member_ids_to_delete.append(member.id)
 
     # Delete member skills and skills first, then members
     if member_ids_to_delete:
@@ -1158,8 +1162,10 @@ async def _aextract_service_ids_from_team(session: AsyncSession, team: Team) -> 
     mcp_ids = []
     extension_ids = []
 
-    # Get all worker members (MCPs and extensions are created as worker members)
-    worker_members = [member for member in team.members if member.type == "worker" and not member.is_deleted]
+    # Get all worker members explicitly to avoid lazy loading issues
+    members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
+    members_result = await session.execute(members_statement)
+    worker_members = members_result.scalars().all()
 
     if not worker_members:
         return mcp_ids, extension_ids
@@ -1301,8 +1307,12 @@ async def _aupdate_ask_human_skills_for_workers(
     if team.workflow_type != WorkflowType.HIERARCHICAL:
         return
 
-    for member in team.members:
-        if member.type == "worker":
+    # Fetch worker members explicitly to avoid lazy loading issues
+    members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
+    members_result = await session.execute(members_statement)
+    worker_members = members_result.scalars().all()
+
+    for member in worker_members:
             if ask_human_enabled:
                 # Check if member already has ask_human skill
                 existing_skill_statement = (
@@ -1371,10 +1381,13 @@ async def _aupdate_interrupt_for_workers(
     if team.workflow_type != WorkflowType.HIERARCHICAL:
         return
 
-    for member in team.members:
-        if member.type == "worker":
-            member.interrupt = interrupt_enabled
-            member.updated_at = datetime.now()
+    # Fetch worker members explicitly to avoid lazy loading issues
+    members_statement = select(Member).where(Member.team_id == team.id, Member.type == "worker", Member.is_deleted.is_(False))
+    members_result = await session.execute(members_statement)
+    worker_members = members_result.scalars().all()
+
+    for member in worker_members:
+        member.interrupt = interrupt_enabled
 
 
 async def _aupdate_member_configurations(
@@ -1398,13 +1411,15 @@ async def _aupdate_member_configurations(
     # Get the updated configuration values
     updated_interrupt = request.interrupt if request.interrupt is not None else assistant.interrupt
 
+    # Fetch members explicitly to avoid lazy loading issues
+    members_statement = select(Member).where(Member.team_id == team.id, Member.is_deleted.is_(False))
+    members_result = await session.execute(members_statement)
+    team_members = members_result.scalars().all()
+
     # Update configuration for all worker members
-    for member in team.members:
+    for member in team_members:
         if updated_interrupt is not None and team.workflow_type == WorkflowType.HIERARCHICAL:
             member.interrupt = updated_interrupt
-
-        # Mark member as modified
-        member.updated_at = datetime.now()
 
 
 # ================================
@@ -1787,6 +1802,10 @@ async def aupdate_advanced_assistant(
                 hierarchical_team = team
                 break
 
+        # Ensure hierarchical team members are properly loaded if it exists
+        if hierarchical_team:
+            await session.refresh(hierarchical_team, ["members"])
+
         # Create or update hierarchical team based on MCP/extension IDs
         if request.mcp_ids or request.extension_ids:
             # If hierarchical team doesn't exist, create it
@@ -1823,6 +1842,9 @@ async def aupdate_advanced_assistant(
                 )
                 session.add(root_member)
                 await session.flush()
+
+                # Refresh to ensure members are loaded
+                await session.refresh(hierarchical_team, ["members"])
 
             # Update mcp members of the hierarchical team
             await _aupdate_mcp_members(session, assistant, hierarchical_team, request, x_user_id)

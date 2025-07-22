@@ -1,6 +1,8 @@
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Annotated, Any
 
+import pytz
 from langchain_core.messages import AIMessage, AnyMessage
 from langchain_core.output_parsers.openai_tools import JsonOutputKeyToolsParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -59,6 +61,7 @@ class BaseNode:
         provider: str | None,
         model: str | None,
         temperature: float | None,
+        timezone: str | None = None,
     ):
         try:
             if provider is None or model is None:
@@ -67,6 +70,9 @@ class BaseNode:
 
             if temperature is None:
                 temperature = env_settings.BASIC_MODEL_TEMPERATURE
+
+            # Set timezone with fallback to default
+            self.timezone = timezone or env_settings.DEFAULT_TIMEZONE
 
             self.model_info = model_provider_manager.get_model_info(model)
             self.model = model_provider_manager.init_model(
@@ -86,6 +92,11 @@ class BaseNode:
 
         except ValueError:
             raise ValueError(f"Model {model} is not supported as a chat model.")
+
+    def get_current_time_formatted(self) -> str:
+        """Get current time formatted in the node's timezone"""
+        tz = pytz.timezone(self.timezone)
+        return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S %Z")
 
     def tag_with_name(self, ai_message: AIMessage, name: str) -> AIMessage:
         """Tag a name to the AI message"""
@@ -168,6 +179,8 @@ class WorkerNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are a team member of {team_name} and you are one of the following team members: {team_members_name}.\n"
                     "Your team members (and other teams) will collaborate with you with their own set of skills. "
                     "You are chosen by one of your team member to perform this task. Try your best to perform it using your skills. "
@@ -193,6 +206,7 @@ class WorkerNode(BaseNode):
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
         team_members_name = self.get_team_members_name(state["team"].members)
         prompt = self.worker_prompt.partial(
+            current_time=self.get_current_time_formatted(),
             team_name=state["team"].name,
             team_members_name=team_members_name,
             persona=member.persona,
@@ -234,6 +248,8 @@ class SequentialWorkerNode(WorkerNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "Perform the task given to you.\n"
                     "If you are unable to perform the task, that's OK, another member with different tools "
                     "will help where you left off. Do not attempt to communicate with other members. "
@@ -266,7 +282,11 @@ class SequentialWorkerNode(WorkerNode):
         name = state["next"]
         member = team.members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
-        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
+        prompt = self.worker_prompt.partial(
+            current_time=self.get_current_time_formatted(),
+            persona=member.persona, 
+            history_string=self.get_optimized_context_string(state["history"])
+        )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []
@@ -304,6 +324,8 @@ class LeaderNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are the team leader of {team_name} and this is your role and you have the following team members: {team_members_name}.\n"
                     "Your team is given a task and you have to delegate the work among your team members based on their skills.\n"
                     "Team member info:"
@@ -329,8 +351,9 @@ class LeaderNode(BaseNode):
         model: str | None,
         temperature: float | None,
         team_root: Team | None,
+        timezone: str | None = None,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(provider, model, temperature, timezone)
         self.team_root = team_root
 
     def get_team_members_info(self, team_members: Mapping[str, GraphMember | GraphLeader], scheduler_enabled: bool = False) -> str:
@@ -416,8 +439,12 @@ class LeaderNode(BaseNode):
         else:
             bind_tool = self.model.bind_tools(tools=tools)
 
+        # Get current time in the specified timezone
+        current_time = self.get_current_time_formatted()
+
         delegate_chain: RunnableSerializable[Any, Any] = (
             self.leader_prompt.partial(
+                current_time=current_time,
                 team_name=team.name,
                 team_members_name=team_members_name,
                 team_members_info=team_members_info,
@@ -474,6 +501,8 @@ class SchedulerNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are a scheduler specialist and team member of {team_name} with the following team members: {team_members_name}. "
                     "Your role is to handle scheduling tasks including creating, managing, and executing automated jobs.\n"
                     "You can create jobs that automatically send prompts and execute tasks at scheduled times.\n"
@@ -508,11 +537,10 @@ class SchedulerNode(BaseNode):
         team_id: str | None = None,
         ask_human: bool = False,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(provider, model, temperature, timezone)
 
         self.user_id = user_id
         self.user_role = user_role
-        self.timezone = timezone
         self.assistant_id = assistant_id
         self.team_id = team_id
         self.ask_human = ask_human
@@ -531,7 +559,6 @@ class SchedulerNode(BaseNode):
 
         if self.ask_human:
             from app.core.tools.ask_human.ask_human import ask_human
-
             tools.append(ask_human)
 
         return tools
@@ -547,6 +574,7 @@ class SchedulerNode(BaseNode):
         )
 
         prompt = self.scheduler_prompt.partial(
+            current_time=self.get_current_time_formatted(),
             team_name=state["team"].name,
             team_members_name=team_members_name,
             persona=scheduler_persona,
@@ -586,6 +614,8 @@ class SummariserNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are a team member of {team_name} and you have the following team members: {team_members_name}. "
                     "Your team was given a task and your team members have performed their roles and returned their responses to the team leader.\n\n"
                     "Your role is to interpret the team's conversation and provide the final answer to the team's task.\n"
@@ -609,6 +639,7 @@ class SummariserNode(BaseNode):
 
         summarise_chain: RunnableSerializable[Any, Any] = (
             self.summariser_prompt.partial(
+                current_time=self.get_current_time_formatted(),
                 team_name=team.name,
                 team_members_name=team_members_name,
                 team_task=team_task,
@@ -627,6 +658,8 @@ class ChatBotNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "Execute what you can to make progress. "
                     "Stay true to your persona and role:\n{persona}\n\n"
                 ),
@@ -651,7 +684,11 @@ class ChatBotNode(BaseNode):
         member = state["team"].members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
 
-        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
+        prompt = self.worker_prompt.partial(
+            current_time=self.get_current_time_formatted(),
+            persona=member.persona, 
+            history_string=self.get_optimized_context_string(state["history"])
+        )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []
@@ -685,6 +722,8 @@ class RAGBotNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are an assistant for question-answering tasks. "
                     "Use the following pieces of retrieved context to answer "
                     "the question. If you don't know the answer, say that you "
@@ -712,7 +751,11 @@ class RAGBotNode(BaseNode):
         member = state["team"].members[name]
         assert isinstance(member, GraphMember), "member is unexpectedly not a Member"
 
-        prompt = self.worker_prompt.partial(persona=member.persona, history_string=self.get_optimized_context_string(state["history"]))
+        prompt = self.worker_prompt.partial(
+            current_time=self.get_current_time_formatted(),
+            persona=member.persona, 
+            history_string=self.get_optimized_context_string(state["history"])
+        )
         # If member has no tools, then use a regular model instead of an agent
         if len(member.tools) >= 1:
             tools: list[BaseTool] = []
@@ -748,6 +791,8 @@ class ToolEvaluationNode(BaseNode):
             (
                 "system",
                 (
+                    "Current time: {current_time}"
+                    "\n\n---\n\n"
                     "You are a tool evaluation specialist. Your job is to analyze tool calls and determine if they require human approval or can be executed directly.\n"
                     "Consider the following criteria:\n"
                     "- Information retrieval tools (search, lookup, get data, read files, query databases) can usually be executed directly\n"
@@ -778,9 +823,10 @@ class ToolEvaluationNode(BaseNode):
         provider: str | None,
         model: str | None,
         temperature: float | None,
+        timezone: str | None = None,
         routes: dict[str, str] | None = None,
     ):
-        super().__init__(provider, model, temperature)
+        super().__init__(provider, model, temperature, timezone)
         self.routes = routes or {
             "execute_directly": "run_tool",
             "require_human_approval": "human_review",
@@ -853,6 +899,7 @@ class ToolEvaluationNode(BaseNode):
 
         evaluation_chain: RunnableSerializable[Any, Any] = (
             self.evaluation_prompt.partial(
+                current_time=self.get_current_time_formatted(),
                 tool_name=tool_name,
                 tool_description=tool_description,
                 tool_args=tool_args,

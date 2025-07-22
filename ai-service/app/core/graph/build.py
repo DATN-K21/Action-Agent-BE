@@ -460,12 +460,13 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
     return create_human_review_node(member_name, "output_review", routes)
 
 
-def create_tool_evaluation_node(member_name: str) -> ToolEvaluationNode:
+def create_tool_evaluation_node(member_name: str, timezone: str | None = None) -> ToolEvaluationNode:
     """Create a ToolEvaluationNode for intelligent tool call evaluation"""
     return ToolEvaluationNode(
         provider=env_settings.REASONING_MODEL_PROVIDER,
         model=env_settings.REASONING_MODEL,
         temperature=env_settings.REASONING_MODEL_TEMPERATURE,
+        timezone=timezone,
         routes={
             "execute_directly": f"{member_name}-tools",
             "require_human_approval": f"{member_name}-tool-review",
@@ -506,6 +507,7 @@ async def acreate_hierarchical_graph(
                 provider=teams[leader_name].provider,
                 model=teams[leader_name].model,
                 temperature=teams[leader_name].temperature,
+                timezone=timezone,
                 team_root=team_root,
             ).delegate  # type: ignore[arg-type]
         ),
@@ -551,7 +553,7 @@ async def acreate_hierarchical_graph(
                 if team_root.assistant.interrupt:
                     # Add ToolEvaluationNode for intelligent tool assessment
                     if team_root.assistant.retrieval_interrupt_skip_enabled:
-                        tool_evaluation_node = create_tool_evaluation_node(name)
+                        tool_evaluation_node = create_tool_evaluation_node(name, timezone)
                         build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                     # Add HumanNode for tool review if member.interrupt is True
                     human_tool_review_node = create_human_tool_review_node(name)
@@ -596,6 +598,7 @@ async def acreate_hierarchical_graph(
                 provider=env_settings.BASIC_MODEL_PROVIDER,
                 model=env_settings.BASIC_MODEL,
                 temperature=env_settings.BASIC_MODEL_TEMPERATURE,
+                timezone=timezone,
             ).summarise
         ),
     )
@@ -610,6 +613,7 @@ async def acreate_hierarchical_graph(
                         provider=member.provider,
                         model=member.model,
                         temperature=member.temperature,
+                        timezone=timezone,
                     ).work
                 ),
             )
@@ -633,7 +637,7 @@ async def acreate_hierarchical_graph(
                     if member.interrupt:
                         # Add ToolEvaluationNode for intelligent tool assessment
                         if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
-                            tool_evaluation_node = create_tool_evaluation_node(name)
+                            tool_evaluation_node = create_tool_evaluation_node(name, timezone)
                             build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                         # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
@@ -707,7 +711,7 @@ async def acreate_hierarchical_graph(
     return graph
 
 
-async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
+async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver, timezone: str | None = None) -> CompiledGraph:
     """
     Creates a sequential graph from a list of team members with manual interrupt capabilities.
 
@@ -733,6 +737,7 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
                     provider=member.provider,
                     model=member.model,
                     temperature=member.temperature,
+                    timezone=timezone,
                 ).work
             ),
         )
@@ -812,7 +817,7 @@ async def acreate_sequential_graph(team: Mapping[str, GraphMember], checkpointer
     return graph
 
 
-async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver) -> CompiledGraph:
+async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember], checkpointer: BaseCheckpointSaver, timezone: str | None = None) -> CompiledGraph:
     """
     Creates a simple chatbot graph for a single team member with manual interrupt capabilities.
 
@@ -838,6 +843,7 @@ async def acreate_chatbot_ragbot_searhbot_graph(team: Mapping[str, GraphMember],
                 provider=member.provider,
                 model=member.model,
                 temperature=member.temperature,
+                timezone=timezone,
             ).work
         ),
     )
@@ -972,7 +978,7 @@ async def generator(
         # SEQUENTIAL
         elif team.workflow_type == WorkflowType.SEQUENTIAL:
             member_dict = convert_sequential_team_to_dict(members)
-            root = await acreate_sequential_graph(member_dict, checkpointer)
+            root = await acreate_sequential_graph(member_dict, checkpointer, timezone)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,
@@ -993,7 +999,7 @@ async def generator(
         # CHATBOT, RAGBOT, SEARCHBOT
         elif team.workflow_type == WorkflowType.CHATBOT or team.workflow_type == WorkflowType.RAGBOT or team.workflow_type == WorkflowType.SEARCHBOT:
             member_dict = convert_chatbot_ragbot_searchbot_team_to_dict(members, workflow_type=team.workflow_type)
-            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer)
+            root = await acreate_chatbot_ragbot_searhbot_graph(member_dict, checkpointer, timezone)
             first_member = list(member_dict.values())[0]
             state = {
                 "history": formatted_messages,

@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     SCHEDULER_SERVICE_URL: str = "http://localhost:15400"
     FRONTEND_REDIRECT_URL: str = "http://localhost:3000/callback/extension"
 
+    # Timezone settings
+    DEFAULT_TIMEZONE: str = "Asia/Ho_Chi_Minh"
+
     @property
     def POSTGRES_URL_PATH_WITH_SCHEMA(self) -> str:
         """Construct PostgreSQL URL path with schema for SQLAlchemy."""
