@@ -77,7 +77,7 @@ class JobExecutor:
             logger.info(f"Starting job execution: {job_id}")
             
             # Execute the job
-            thread_id = await self._create_thread_id(job_id, job_data)
+            thread_id = await self._create_thread_id(job_data)
             response = await self._send_prompt_to_ai_service(thread_id, job_data)
             
             # Mark execution as successful
@@ -107,7 +107,7 @@ class JobExecutor:
             # Check if retry is needed
             await self._handle_retry(job_id, job_data, str(e))
 
-    async def _create_thread_id(self, job_id: str, job_data: Dict) -> str:
+    async def _create_thread_id(self, job_data: Dict) -> str:
         """Create a new thread ID from AI service."""
         try:
             url = f"{env_settings.AI_SERVICE_URL}/api/v1/thread/create"
@@ -117,11 +117,10 @@ class JobExecutor:
                 "Accept": "application/json",
                 "X-User-Id": job_data.get("user_id", ""),
                 "X-User-Role": job_data.get("user_role", ""),
-                "X-User-Timezone": job_data.get("user_timezone", ""),
             }
 
             payload = {
-                "title": f"Run the job: {job_id}",
+                "title": f"Run the job: {job_data.get('name', '')}",
                 "assistant_id": job_data.get("assistant_id", ""),
             }
 

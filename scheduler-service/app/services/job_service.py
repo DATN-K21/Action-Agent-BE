@@ -56,6 +56,7 @@ class JobService:
                 # Add job to scheduler if it's a recurring job and active
                 if job.job_type == JobType.RECURRING and job.is_active and job.cron_expression:
                     job_execution_data = {
+                        "name": job.name,
                         "prompt": job.prompt,
                         "user_id": job.user_id,
                         "user_role": job.user_role,
@@ -201,6 +202,7 @@ class JobService:
                 if job.job_type == JobType.RECURRING and job.cron_expression and job.is_active:
                     logger.info(f"Adding job {job_id} to scheduler (now recurring)")
                     job_execution_data = {
+                        "name": job.name,
                         "prompt": job.prompt,
                         "user_id": job.user_id,
                         "user_role": job.user_role,
@@ -276,6 +278,7 @@ class JobService:
                 
                 # Prepare job execution data
                 job_execution_data = {
+                    "name": job.name,
                     "prompt": job.prompt,
                     "user_id": job.user_id,
                     "user_role": job.user_role,
