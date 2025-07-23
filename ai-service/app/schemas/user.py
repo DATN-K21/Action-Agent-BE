@@ -11,10 +11,10 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 ##################################################
 class CreateUserRequest(BaseRequest):
     id: Optional[str] = None
-    username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr = Field(..., max_length=50)
-    first_name: str = Field(..., min_length=0, max_length=50)
-    last_name: str = Field(..., min_length=0, max_length=50)
+    username: str = Field(..., min_length=3, max_length=500)
+    email: EmailStr = Field(..., max_length=500)
+    first_name: str = Field(..., min_length=0, max_length=500)
+    last_name: str = Field(..., min_length=0, max_length=500)
 
     @field_validator("email")
     def normalize_email(cls, v: str) -> str:
@@ -22,10 +22,10 @@ class CreateUserRequest(BaseRequest):
 
 
 class UpdateUserRequest(BaseModel):
-    username: Optional[str] = Field(None, min_length=3, max_length=50)
-    email: Optional[EmailStr] = Field(None, max_length=50)
-    first_name: Optional[str] = Field(None, min_length=0, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=0, max_length=50)
+    username: Optional[str] = Field(None, min_length=3, max_length=500)
+    email: Optional[EmailStr] = Field(None, max_length=500)
+    first_name: Optional[str] = Field(None, min_length=0, max_length=500)
+    last_name: Optional[str] = Field(None, min_length=0, max_length=500)
 
 
 ##################################################

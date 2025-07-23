@@ -12,14 +12,14 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 ########### REQUEST SCHEMAS ######################
 ##################################################
 class CreateConnectedMcpRequest(BaseRequest):
-    mcp_name: str = Field(..., min_length=3, max_length=50, examples=["mcpname"])
-    url: str = Field(..., min_length=3, max_length=200, examples=["url"])
+    mcp_name: str = Field(..., min_length=3, max_length=500, examples=["mcpname"])
+    url: str = Field(..., min_length=3, max_length=500, examples=["url"])
     transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
     description: Optional[str] = Field(None, min_length=3, max_length=1000, examples=["description"])
 
 class UpdateConnectedMcpRequest(BaseRequest):
-    mcp_name: Optional[str] = Field(None, min_length=3, max_length=50, examples=["mcpname"])
-    url: Optional[str] = Field(None, min_length=3, max_length=200, examples=["url"])
+    mcp_name: Optional[str] = Field(None, min_length=3, max_length=500, examples=["mcpname"])
+    url: Optional[str] = Field(None, min_length=3, max_length=500, examples=["url"])
     transport: Optional[McpTransport] = Field(None, examples=[McpTransport.STREAMABLE_HTTP])
     description: Optional[str] = Field(None, min_length=3, max_length=1000, examples=["description"])
 

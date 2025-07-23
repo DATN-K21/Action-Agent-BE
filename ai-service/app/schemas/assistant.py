@@ -8,7 +8,7 @@ from app.schemas.base import BaseRequest, BaseResponse, PagingResponse
 
 
 class AssistantBase(BaseModel):
-    name: str = Field(..., min_length=3, max_length=100)
+    name: str = Field(..., min_length=3, max_length=500)
     description: Optional[str] = Field(None, min_length=3, max_length=5000)
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
 
@@ -49,7 +49,7 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
 
 
 class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
-    name: Optional[str] = Field(None, min_length=3, max_length=100)
+    name: Optional[str] = Field(None, min_length=3, max_length=500)
     description: Optional[str] = Field(None, min_length=3, max_length=5000)
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
     ask_human: Optional[bool] = Field(
