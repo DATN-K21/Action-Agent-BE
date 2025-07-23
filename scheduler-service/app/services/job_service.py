@@ -1,13 +1,13 @@
 from typing import List, Optional
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, select, update, asc, desc
 
 from app.core import logging
 from app.core.database import AsyncSessionLocal
 from app.core.scheduler import scheduler_manager
 from app.core.settings import env_settings
 from app.models.job import JobExecution, JobStatus, JobType, ScheduledJob
-from app.schemas.job import JobCreate, JobExecutionResponse, JobResponse, JobUpdate
+from app.schemas.job import JobCreate, JobExecutionResponse, JobResponse, JobUpdate, JobSortBy, SortOrder
 
 logger = logging.get_logger(__name__)
 
@@ -99,8 +99,10 @@ class JobService:
         user_id: Optional[str] = None,
         assistant_id: Optional[str] = None,
         team_id: Optional[str] = None,
+        sort_by: Optional[JobSortBy] = None,
+        sort_order: Optional[SortOrder] = None,
     ) -> List[JobResponse]:
-        """Get list of jobs with optional filtering."""
+        """Get list of jobs with optional filtering and sorting."""
         try:
             async with AsyncSessionLocal() as session:
                 query = select(ScheduledJob).where(ScheduledJob.is_deleted.is_(False))
@@ -117,13 +119,36 @@ class JobService:
                 if team_id:
                     query = query.where(ScheduledJob.team_id == team_id)
                 
+                # Apply sorting
+                if sort_by and sort_order:
+                    sort_column = None
+                    if sort_by == JobSortBy.ID:
+                        sort_column = ScheduledJob.id
+                    elif sort_by == JobSortBy.NAME:
+                        sort_column = ScheduledJob.name
+                    elif sort_by == JobSortBy.PROMPT:
+                        sort_column = ScheduledJob.prompt
+                    elif sort_by == JobSortBy.NEXT_RUN_AT:
+                        sort_column = ScheduledJob.next_run_at
+                    elif sort_by == JobSortBy.TOTAL_RUNS:
+                        sort_column = ScheduledJob.total_runs
+                    
+                    if sort_column is not None:
+                        if sort_order == SortOrder.ASC:
+                            query = query.order_by(asc(sort_column))
+                        else:
+                            query = query.order_by(desc(sort_column))
+                else:
+                    # Default sorting by created_at descending
+                    query = query.order_by(desc(ScheduledJob.created_at))
+                
                 # Apply pagination
                 query = query.offset(skip).limit(limit)
                 
                 result = await session.execute(query)
                 jobs = result.scalars().all()
                 
-                logger.info(f"Retrieved {len(jobs)} jobs with filters: status={status}, job_type={job_type}, user_id={user_id}")
+                logger.info(f"Retrieved {len(jobs)} jobs with filters: status={status}, job_type={job_type}, user_id={user_id}, sort_by={sort_by}, sort_order={sort_order}")
                 return [JobResponse.from_orm(job) for job in jobs]
         
         except Exception as e:

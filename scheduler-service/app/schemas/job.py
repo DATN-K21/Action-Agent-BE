@@ -1,10 +1,28 @@
 from datetime import datetime
+from enum import Enum
 from typing import Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.job import JobStatus, JobType
 from app.schemas.base import BaseRequest, BaseResponse
+
+
+class JobSortBy(str, Enum):
+    """Enum for job sorting fields."""
+
+    ID = "id"
+    NAME = "name"
+    PROMPT = "prompt"
+    NEXT_RUN_AT = "nextRunAt"
+    TOTAL_RUNS = "totalRuns"
+
+
+class SortOrder(str, Enum):
+    """Enum for sort order."""
+
+    ASC = "asc"
+    DESC = "desc"
 
 
 class JobBase(BaseModel):

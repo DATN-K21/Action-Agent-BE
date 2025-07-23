@@ -15,8 +15,10 @@ from app.schemas.job import (
     JobExecutionsResponse,
     JobRunResponse,
     JobsResponse,
+    JobSortBy,
     JobStats,
     JobUpdate,
+    SortOrder,
 )
 from app.services.job_service import job_service
 
@@ -92,6 +94,8 @@ async def list_jobs(
     job_type: Optional[JobType] = Query(None, description="Filter by job type"),
     assistant_id: Optional[str] = Query(None, description="Filter by assistant ID"),
     team_id: Optional[str] = Query(None, description="Filter by team ID"),
+    sort_by: Optional[JobSortBy] = Query(None, description="Sort jobs by field"),
+    sort_order: Optional[SortOrder] = Query(None, description="Sort order (asc or desc)"),
     x_user_id=Header(None),
     x_user_role=Header(None),
 ):
@@ -104,6 +108,8 @@ async def list_jobs(
     - **job_type**: Filter by job type
     - **assistant_id**: Filter by assistant ID (optional)
     - **team_id**: Filter by team ID (optional)
+    - **sort_by**: Sort jobs by field (id, name, prompt, nextRunAt, totalRuns)
+    - **sort_order**: Sort order (asc or desc)
 
     Users can only see their own jobs unless they are admin or super admin.
     If assistant_id or team_id are provided, jobs will be filtered by these values.
@@ -111,6 +117,10 @@ async def list_jobs(
     """
     try:
         validate_user_headers(x_user_id, x_user_role)
+
+        # Set default sort_order if sort_by is provided but sort_order is not
+        if sort_by and not sort_order:
+            sort_order = SortOrder.ASC
 
         jobs = await job_service.get_jobs(
             skip=skip,
@@ -120,6 +130,8 @@ async def list_jobs(
             user_id=x_user_id,
             assistant_id=assistant_id,
             team_id=team_id,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
         return ResponseWrapper.wrap(
             status=200, data=JobsResponse(jobs=jobs)
