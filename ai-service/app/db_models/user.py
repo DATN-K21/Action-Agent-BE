@@ -23,26 +23,6 @@ class User(BaseEntity):
 
     credits = mapped_column(Integer, nullable=False, default=1000000)
 
-    # User settings -> TODO: refactor into a separate model
-    # =============
-    basic_model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
-    basic_model_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    basic_model_api_key: Mapped[str | None] = mapped_column(String, nullable=True)
-    basic_model_temperature: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
-    basic_model_base_url: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    reasoning_model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
-    reasoning_model_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    reasoning_model_api_key: Mapped[str | None] = mapped_column(String, nullable=True)
-    reasoning_model_temperature: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
-    reasoning_model_base_url: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    embedding_model_provider: Mapped[str | None] = mapped_column(String, nullable=True)
-    embedding_model_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    embedding_model_api_key: Mapped[str | None] = mapped_column(String, nullable=True)
-    embedding_model_base_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    # =============
-
     assistants = relationship("Assistant", back_populates="user")
     teams = relationship("Team", back_populates="user")
     skills = relationship("Skill", back_populates="user")

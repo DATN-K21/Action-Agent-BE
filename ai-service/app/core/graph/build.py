@@ -459,21 +459,13 @@ def create_human_output_review_node(member_name: str) -> HumanNode:
     }
     return create_human_review_node(member_name, "output_review", routes)
 
-def create_tool_evaluation_node(
-    member_name: str,
-    provider: str | None,
-    model: str | None,
-    temperature: float | None,
-    base_url: str | None = None,
-    api_key: str | None = None,
-) -> ToolEvaluationNode:
+
+def create_tool_evaluation_node(member_name: str) -> ToolEvaluationNode:
     """Create a ToolEvaluationNode for intelligent tool call evaluation"""
     return ToolEvaluationNode(
-        provider=provider or env_settings.REASONING_MODEL_PROVIDER,
-        model=model or env_settings.REASONING_MODEL,
-        temperature=temperature or env_settings.REASONING_MODEL_TEMPERATURE,
-        base_url=base_url,
-        api_key=api_key,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         routes={
             "execute_directly": f"{member_name}-tools",
             "require_human_approval": f"{member_name}-tool-review",
@@ -559,14 +551,7 @@ async def acreate_hierarchical_graph(
                 if team_root.assistant.interrupt:
                     # Add ToolEvaluationNode for intelligent tool assessment
                     if team_root.assistant.retrieval_interrupt_skip_enabled:
-                        tool_evaluation_node = create_tool_evaluation_node(
-                            name,
-                            provider=teams[leader_name].provider,
-                            model=teams[leader_name].model,
-                            temperature=teams[leader_name].temperature,
-                            base_url=team_root.user.reasoning_model_base_url if team_root else None,
-                            api_key=team_root.user.reasoning_model_api_key if team_root else None,
-                        )
+                        tool_evaluation_node = create_tool_evaluation_node(name)
                         build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                     # Add HumanNode for tool review if member.interrupt is True
                     human_tool_review_node = create_human_tool_review_node(name)
@@ -648,14 +633,7 @@ async def acreate_hierarchical_graph(
                     if member.interrupt:
                         # Add ToolEvaluationNode for intelligent tool assessment
                         if team_root and team_root.assistant.retrieval_interrupt_skip_enabled:
-                            tool_evaluation_node = create_tool_evaluation_node(
-                                name,
-                                provider=teams[leader_name].provider,
-                                model=teams[leader_name].model,
-                                temperature=teams[leader_name].temperature,
-                                base_url=team_root.user.reasoning_model_base_url if team_root else None,
-                                api_key=team_root.user.reasoning_model_api_key if team_root else None,
-                            )
+                            tool_evaluation_node = create_tool_evaluation_node(name)
                             build.add_node(f"{name}-tool-evaluation", tool_evaluation_node.work)
                         # Add HumanNode for tool review if member.interrupt is True
                         human_tool_review_node = create_human_tool_review_node(name)
@@ -934,7 +912,7 @@ def convert_messages_and_tasks_to_dict(data: Any) -> Any:
 
 async def generator(
     have_enough_credits: bool,
-    usage_callback: UsageMetadataCallbackHandler | None,
+    usage_callback: UsageMetadataCallbackHandler,
     team: Team,
     members: list[Member],
     messages: list[ChatMessage],
@@ -1050,7 +1028,7 @@ async def generator(
         config: RunnableConfig = {
             "configurable": {"thread_id": thread_id},
             "recursion_limit": env_settings.RECURSION_LIMIT,
-            "callbacks": [usage_callback] if usage_callback else None,
+            "callbacks": [usage_callback],
         }
 
         # Handle interrupt logic by overriding state

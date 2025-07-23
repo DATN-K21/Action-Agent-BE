@@ -69,20 +69,6 @@ class ModelProviderManager:
             "api_key": env_settings.BASIC_MODEL_API_KEY,
         }
 
-    # TODO: Refactor this method
-    def get_local_model_info_by_user(
-        self,
-        model_name: str,
-        base_url: str,
-        api_key: str,
-    ) -> dict[str, Any]:
-        return {
-            "provider": "ollama",
-            "model_name": model_name,
-            "base_url": base_url,
-            "api_key": api_key,
-        }
-
     def init_model(
         self,
         provider_name: str,

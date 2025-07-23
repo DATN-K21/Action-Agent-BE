@@ -28,25 +28,6 @@ class UpdateUserRequest(BaseModel):
     last_name: Optional[str] = Field(None, min_length=0, max_length=50)
 
 
-class SetUserSettingsRequest(BaseModel):
-    basic_model_provider: Optional[str] = Field(None, description="Provider for the basic model")
-    basic_model_name: Optional[str] = Field(None, description="Name of the basic model")
-    basic_model_api_key: Optional[str] = Field(None, description="API key for the basic model")
-    basic_model_temperature: float = Field(0.0, ge=0.0, le=1.0, description="Temperature for the basic model")
-    basic_model_base_url: Optional[str] = Field(None, description="Base URL for the basic model")
-
-    reasoning_model_provider: Optional[str] = Field(None, description="Provider for the reasoning model")
-    reasoning_model_name: Optional[str] = Field(None, description="Name of the reasoning model")
-    reasoning_model_api_key: Optional[str] = Field(None, description="API key for the reasoning model")
-    reasoning_model_temperature: float = Field(0.0, ge=0.0, le=1.0, description="Temperature for the reasoning model")
-    reasoning_model_base_url: Optional[str] = Field(None, description="Base URL for the reasoning model")
-
-    embedding_model_provider: Optional[str] = Field(None, description="Provider for the embedding model")
-    embedding_model_name: Optional[str] = Field(None, description="Name of the embedding model")
-    embedding_model_api_key: Optional[str] = Field(None, description="API key for the embedding model")
-    embedding_model_base_url: Optional[str] = Field(None, description="Base URL for the embedding model")
-
-
 ##################################################
 ########### RESPONSE SCHEMAS #####################
 ##################################################
@@ -81,22 +62,3 @@ class UpdateUserResponse(GetUserResponse):
 
 class DeleteUserResponse(BaseResponse):
     id: str = Field(...)
-
-
-class GetUserSettingsResponse(BaseResponse):
-    basic_model_provider: Optional[str] = Field(None)
-    basic_model_name: Optional[str] = Field(None)
-    basic_model_api_key: Optional[str] = Field(None)
-    basic_model_temperature: float = Field(0.0, ge=0.0, le=1.0)
-    basic_model_base_url: Optional[str] = Field(None)
-
-    reasoning_model_provider: Optional[str] = Field(None)
-    reasoning_model_name: Optional[str] = Field(None)
-    reasoning_model_api_key: Optional[str] = Field(None)
-    reasoning_model_temperature: float = Field(0.0, ge=0.0, le=1.0)
-    reasoning_model_base_url: Optional[str] = Field(None)
-
-    embedding_model_provider: Optional[str] = Field(None)
-    embedding_model_name: Optional[str] = Field(None)
-    embedding_model_api_key: Optional[str] = Field(None)
-    embedding_model_base_url: Optional[str] = Field(None)

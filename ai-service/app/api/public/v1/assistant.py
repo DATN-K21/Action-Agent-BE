@@ -320,9 +320,6 @@ async def _acreate_hierarchical_team(
     session.add(hierarchical_team)
 
     # Create root member (leader) for the hierarchical team
-    reasoning_provider = request.reasoning_model.provider if request.reasoning_model else env_settings.REASONING_MODEL_PROVIDER
-    reasoning_model = request.reasoning_model.model if request.reasoning_model else env_settings.REASONING_MODEL
-    reasoning_temperature = request.reasoning_model.temperature if request.reasoning_model else env_settings.REASONING_MODEL_TEMPERATURE
     root_member_id = str(uuid.uuid4())
     root_member_name = create_unique_key(id_=root_member_id, name="Hierarchical-Leader")
     root_member = Member(
@@ -332,9 +329,9 @@ async def _acreate_hierarchical_team(
         backstory="Leader of the hierarchical team for advanced assistant.",
         role="Gather inputs, outputs from your team and answer the question.",
         type="root",
-        provider=reasoning_provider,
-        model=reasoning_model,
-        temperature=reasoning_temperature,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -373,9 +370,6 @@ async def _acreate_main_team(
     session.add(main_team)
 
     # Create root member (chatbot) for the main team
-    basic_provider = request.base_model.provider if request.base_model else env_settings.BASIC_MODEL_PROVIDER
-    basic_model = request.base_model.model if request.base_model else env_settings.BASIC_MODEL
-    basic_temperature = request.base_model.temperature if request.base_model else env_settings.BASIC_MODEL_TEMPERATURE
     root_member_id = str(uuid.uuid4())
     root_member_name = create_unique_key(id_=root_member_id, name="Chatbot")
     root_member = Member(
@@ -385,9 +379,9 @@ async def _acreate_main_team(
         backstory="A friendly chatbot assistant specialized in natural conversation and general assistance. Provides helpful responses to greetings, engages in meaningful small talk, and answers user questions using available tools. Focuses on being conversational and supportive without trying to take over the conversation flow.",
         role="Respond naturally to greetings and small talk. Answer user questions directly using available search and knowledge tools when needed. Provide helpful information and maintain a friendly conversational tone. Do not ask users what they want - simply respond to what they've said.",
         type="chatbot",
-        provider=basic_provider,
-        model=basic_model,
-        temperature=basic_temperature,
+        provider=env_settings.BASIC_MODEL_PROVIDER,
+        model=env_settings.BASIC_MODEL,
+        temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -431,9 +425,6 @@ async def _acreate_mcp_member_with_skills(
     elif assistant is not None:
         interrupt_value = assistant.interrupt
 
-    reasoning_provider = request.reasoning_model.provider if request.reasoning_model else env_settings.REASONING_MODEL_PROVIDER
-    reasoning_model = request.reasoning_model.model if request.reasoning_model else env_settings.REASONING_MODEL
-    reasoning_temperature = request.reasoning_model.temperature if request.reasoning_model else env_settings.REASONING_MODEL_TEMPERATURE
     member = Member(
         id=member_id,
         name=member_name,
@@ -442,9 +433,9 @@ async def _acreate_mcp_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=reasoning_provider,
-        model=reasoning_model,
-        temperature=reasoning_temperature,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=interrupt_value,
         position_x=0.0,
         position_y=0.0,
@@ -536,9 +527,6 @@ async def _acreate_extension_member_with_skills(
     elif assistant is not None:
         interrupt_value = assistant.interrupt
 
-    reasoning_provider = request.reasoning_model.provider if request.reasoning_model else env_settings.REASONING_MODEL_PROVIDER
-    reasoning_model = request.reasoning_model.model if request.reasoning_model else env_settings.REASONING_MODEL
-    reasoning_temperature = request.reasoning_model.temperature if request.reasoning_model else env_settings
     member = Member(
         id=member_id,
         name=member_name,
@@ -547,9 +535,9 @@ async def _acreate_extension_member_with_skills(
         role="Execute actions based on provided tasks using binding tools and return the results",
         type="worker",
         source=root_member_id,
-        provider=reasoning_provider,
-        model=reasoning_model,
-        temperature=reasoning_temperature,
+        provider=env_settings.REASONING_MODEL_PROVIDER,
+        model=env_settings.REASONING_MODEL,
+        temperature=env_settings.REASONING_MODEL_TEMPERATURE,
         interrupt=interrupt_value,
         position_x=0.0,
         position_y=0.0,
@@ -602,7 +590,6 @@ async def _acreate_support_team(
     assistant: Assistant,
     workflow_type: WorkflowType,
     user_id: str,
-    request: CreateAdvancedAssistantRequest,
 ) -> Team:
     """
     Create a support team for specific workflow type.
@@ -632,9 +619,6 @@ async def _acreate_support_team(
     session.add(support_team)
 
     # Create root member for the support team
-    base_provider = request.base_model.provider if request.base_model else env_settings.BASIC_MODEL_PROVIDER
-    base_model = request.base_model.model if request.base_model else env_settings.BASIC_MODEL
-    base_temperature = request.base_model.temperature if request.base_model else env_settings.BASIC_MODEL_TEMPERATURE
     support_root_member_id = str(uuid.uuid4())
     support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{str_workflow_type}")
     support_root_member = Member(
@@ -644,9 +628,9 @@ async def _acreate_support_team(
         backstory=f"Unit for advanced assistant: {str_workflow_type}.",
         role="Answer the user's question.",
         type=f"{str_workflow_type}",
-        provider=base_provider,
-        model=base_model,
-        temperature=base_temperature,
+        provider=env_settings.BASIC_MODEL_PROVIDER,
+        model=env_settings.BASIC_MODEL,
+        temperature=env_settings.BASIC_MODEL_TEMPERATURE,
         interrupt=False,
         position_x=0.0,
         position_y=0.0,
@@ -1578,10 +1562,6 @@ async def acreate_advanced_assistant(
         Response with created assistant data
     """
     try:
-        local_llm_enabled = (request.base_model and request.base_model.provider == "ollama") or (
-            request.reasoning_model and request.reasoning_model.provider == "ollama"
-        )
-
         # Create the main assistant instance
         new_assistant = Assistant(
             id=str(uuid.uuid4()),
@@ -1596,7 +1576,6 @@ async def acreate_advanced_assistant(
             retrieval_interrupt_skip_enabled=request.retrieval_interrupt_skip_enabled
             if request.retrieval_interrupt_skip_enabled is not None
             else False,
-            local_llm_enabled=local_llm_enabled,
         )
         session.add(new_assistant)
         await session.flush()  # Ensure assistant exists before creating teams
@@ -1660,7 +1639,7 @@ async def acreate_advanced_assistant(
             # Create another support teams for each workflow type using helper function
             if request.support_units:
                 for workflow_type in request.support_units:
-                    tg.start_soon(_acreate_support_team, session, new_assistant, workflow_type, x_user_id, request)
+                    tg.start_soon(_acreate_support_team, session, new_assistant, workflow_type, x_user_id)
 
         # Commit all changes
         await session.commit()

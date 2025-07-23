@@ -13,14 +13,6 @@ class AssistantBase(BaseModel):
     system_prompt: Optional[str] = Field(None, min_length=3, max_length=5000)
 
 
-class CreateAdvancedAssistantCustomLLMRequest(BaseModel):
-    provider: str = Field(..., description="The provider of the custom LLM, e.g., 'openai', 'anthropic'")
-    model: str = Field(..., description="The model of the custom LLM, e.g., 'gpt-3.5-turbo', 'claude-2'")
-    temperature: float = Field(0.0, ge=0.0, le=1.0, description="Temperature for the custom LLM's responses")
-    base_url: Optional[str] = Field(None, description="Base URL for the custom LLM API")
-    api_key: Optional[str] = Field(None, description="API key for the custom LLM API")
-
-
 ##################################################
 ########### REQUEST SCHEMAS ######################
 ##################################################
@@ -55,20 +47,6 @@ class CreateAdvancedAssistantRequest(AssistantBase, BaseRequest):
         None, description="List of extension IDs to be used by the assistant. If not provided, the assistant will not use any extensions."
     )  # This is used for hierarchical unit
 
-    # TODO: refactor code
-    base_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the base model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
-    reasoning_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the reasoning model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
-    embedding_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the embedding model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
-
 
 class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     name: Optional[str] = Field(None, min_length=3, max_length=100)
@@ -93,20 +71,6 @@ class UpdateAdvancedAssistantRequest(AssistantBase, BaseRequest):
     support_units: Optional[list[WorkflowType]] = None
     mcp_ids: Optional[list[str]] = None
     extension_ids: Optional[list[str]] = None
-
-    # TODO: refactor code
-    base_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the base model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
-    reasoning_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the reasoning model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
-    embedding_model: Optional[CreateAdvancedAssistantCustomLLMRequest] = Field(
-        None,
-        description="Configuration for the embedding model of the assistant. If not provided, the assistant will use the default model configuration.",
-    )
 
 
 class UpdateAssistantConfigRequest(BaseRequest):
