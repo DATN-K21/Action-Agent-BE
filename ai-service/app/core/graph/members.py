@@ -184,7 +184,8 @@ class WorkerNode(BaseNode):
                     "You are a team member of {team_name} and you are one of the following team members: {team_members_name}.\n"
                     "Your team members (and other teams) will collaborate with you with their own set of skills. "
                     "You are chosen by one of your team member to perform this task. Try your best to perform it using your skills. "
-                    "Stay true to your persona and role:\n{persona}\n"
+                    "Stay true to your persona and role:\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input task for your response.\n"
                 ),
             ),
             (
@@ -255,6 +256,7 @@ class SequentialWorkerNode(WorkerNode):
                     "will help where you left off. Do not attempt to communicate with other members. "
                     "Execute what you can to make progress. "
                     "Stay true to your persona and role:\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input for your response.\n"
                 ),
             ),
             (
@@ -332,6 +334,7 @@ class LeaderNode(BaseNode):
                     "\n\n{team_members_info}\n\n"
                     "Stay true to your persona:"
                     "\n\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input team task for your response.\n\n"
                     "Given the conversation, decide who should act next. Or should we FINISH? Select one of: {options}."
                 ),
             ),
@@ -513,7 +516,8 @@ class SchedulerNode(BaseNode):
                     "- Get job details and status\n"
                     "- Update job schedules and configurations\n"
                     "- Delete jobs when no longer needed\n"
-                    "Stay true to your persona and role:\n{persona}\n"
+                    "Stay true to your persona and role:\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input scheduling task for your response.\n"
                 ),
             ),
             (
@@ -618,7 +622,8 @@ class SummariserNode(BaseNode):
                     "\n\n---\n\n"
                     "You are a team member of {team_name} and you have the following team members: {team_members_name}. "
                     "Your team was given a task and your team members have performed their roles and returned their responses to the team leader.\n\n"
-                    "Your role is to interpret the team's conversation and provide the final answer to the team's task.\n"
+                    "Your role is to interpret the team's conversation and provide the final answer to the team's task.\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input team task for your response.\n"
                 ),
             ),
             (
@@ -662,6 +667,7 @@ class ChatBotNode(BaseNode):
                     "\n\n---\n\n"
                     "Execute what you can to make progress. "
                     "Stay true to your persona and role:\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input from the conversation for your response.\n"
                 ),
             ),
             (
@@ -729,6 +735,7 @@ class RAGBotNode(BaseNode):
                     "the question. If you don't know the answer, say that you "
                     "don't know. Use three sentences maximum and keep the answer concise."
                     "Stay true to your persona and role:\n{persona}\n\n"
+                    "Language Instruction: Prioritize using the same language as the user input from the conversation for your response.\n"
                 ),
             ),
             (
@@ -801,7 +808,8 @@ class ToolEvaluationNode(BaseNode):
                     "- Consider the context and potential impact of the tool call\n\n"
                     "Available options for your decision:\n"
                     "- EXECUTE_DIRECTLY: The tool is safe to execute without human intervention (typically retrieval/read operations)\n"
-                    "- REQUIRE_HUMAN_APPROVAL: The tool requires human review before execution (typically write/modify/send operations)\n"
+                    "- REQUIRE_HUMAN_APPROVAL: The tool requires human review before execution (typically write/modify/send operations)\n\n"
+                    "Language Instruction: Provide your evaluation and reasoning in an appropriate language based on the context.\n"
                 ),
             ),
             (

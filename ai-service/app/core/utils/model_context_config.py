@@ -108,7 +108,7 @@ def create_context_manager_for_model(
     context_limit = int(base_limit * context_ratio)
 
     # Adjust settings based on model capabilities
-    if model_name.startswith(("gpt-4", "claude-3", "gemini-1.5")):
+    if model_name.startswith(("gpt-4", "claude-3", "gemini-1.5", "deepseek")):
         # High-end models can handle more complex context
         return ContextManager(
             max_context_tokens=context_limit,
@@ -124,7 +124,7 @@ def create_context_manager_for_model(
             system_message_priority=True,
             recent_messages_weight=1.8,
             tool_message_weight=1.6,
-            min_context_messages=5,
+            min_context_messages=6,
         )
     else:
         # Lower-end models need very aggressive optimization
@@ -133,7 +133,7 @@ def create_context_manager_for_model(
             system_message_priority=True,
             recent_messages_weight=2.0,
             tool_message_weight=1.8,
-            min_context_messages=3,
+            min_context_messages=5,
         )
 
 

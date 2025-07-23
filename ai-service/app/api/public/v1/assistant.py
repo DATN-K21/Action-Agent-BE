@@ -1074,7 +1074,7 @@ async def _aupdate_support_units(
 
                 # Create root member for the support team
                 support_root_member_id = str(uuid.uuid4())
-                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit}")
+                support_root_member_name = create_unique_key(id_=support_root_member_id, name=f"{unit.value}")
                 support_root_member = Member(
                     id=support_root_member_id,
                     name=support_root_member_name,
