@@ -1,8 +1,10 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy import func, select
 
 from app.api.deps import SessionDep
 from app.core.enums import DateRangeEnum, StatisticsEntity
-from app.core.utils.date_range import get_period_days, get_period_range, get_previous_period_range
+from app.core.utils.date_range import get_period_days
 from app.schemas.statistics import OverviewStatisticsResponse
 from app.services.statistics.base import BaseStatisticsService
 
@@ -20,43 +22,120 @@ class OverviewStatisticsService(BaseStatisticsService):
             return f"{((current - previous) / previous) * 100:.1f}%"
 
     @staticmethod
+    def get_correct_period_range(period: DateRangeEnum, reference_date: datetime = datetime.now()) -> tuple[datetime | None, datetime | None]:
+        """
+        Get the correct current period range without the broken logic.
+        """
+        if reference_date is None:
+            reference_date = datetime.utcnow()
+
+        if period == DateRangeEnum.ALL_TIME:
+            return None, None
+        elif period == DateRangeEnum.DAY:
+            day_start = datetime(reference_date.year, reference_date.month, reference_date.day)
+            return day_start, day_start + timedelta(days=1)
+        elif period == DateRangeEnum.YESTERDAY:
+            day_start = datetime(reference_date.year, reference_date.month, reference_date.day)
+            yesterday = day_start - timedelta(days=1)
+            return yesterday, day_start
+        elif period == DateRangeEnum.WEEK:
+            day_start = datetime(reference_date.year, reference_date.month, reference_date.day)
+            week_start = day_start - timedelta(days=reference_date.weekday())
+            return week_start, week_start + timedelta(days=7)
+        elif period == DateRangeEnum.MONTH:
+            # THIS MONTH - from first day of current month to first day of next month
+            month_start = datetime(reference_date.year, reference_date.month, 1)
+            if reference_date.month == 12:
+                month_end = datetime(reference_date.year + 1, 1, 1)
+            else:
+                month_end = datetime(reference_date.year, reference_date.month + 1, 1)
+            return month_start, month_end
+        elif period == DateRangeEnum.QUARTER:
+            month = reference_date.month
+            quarter_start_month = ((month - 1) // 3) * 3 + 1
+            quarter_start = datetime(reference_date.year, quarter_start_month, 1)
+            if quarter_start_month == 10:
+                quarter_end = datetime(reference_date.year + 1, 1, 1)
+            else:
+                quarter_end = datetime(reference_date.year, quarter_start_month + 3, 1)
+            return quarter_start, quarter_end
+        elif period == DateRangeEnum.YEAR:
+            year_start = datetime(reference_date.year, 1, 1)
+            year_end = datetime(reference_date.year + 1, 1, 1)
+            return year_start, year_end
+        elif period == DateRangeEnum.LAST_7_DAYS:
+            day_start = datetime(reference_date.year, reference_date.month, reference_date.day)
+            return day_start - timedelta(days=6), day_start + timedelta(days=1)
+        elif period == DateRangeEnum.LAST_30_DAYS:
+            day_start = datetime(reference_date.year, reference_date.month, reference_date.day)
+            return day_start - timedelta(days=29), day_start + timedelta(days=1)
+        else:
+            return None, None
+
+    @staticmethod
+    def get_correct_previous_period_range(
+        period: DateRangeEnum, reference_date: datetime = datetime.now()
+    ) -> tuple[datetime | None, datetime | None]:
+        """
+        Get the correct previous period range.
+        """
+        if reference_date is None:
+            reference_date = datetime.utcnow()
+
+        if period == DateRangeEnum.ALL_TIME:
+            return None, None
+        elif period == DateRangeEnum.MONTH:
+            # LAST MONTH
+            if reference_date.month == 1:
+                prev_month_start = datetime(reference_date.year - 1, 12, 1)
+                prev_month_end = datetime(reference_date.year, 1, 1)
+            else:
+                prev_month_start = datetime(reference_date.year, reference_date.month - 1, 1)
+                prev_month_end = datetime(reference_date.year, reference_date.month, 1)
+            return prev_month_start, prev_month_end
+        # Add other periods as needed...
+        else:
+            # For other periods, use a simple offset approach
+            current_start, current_end = OverviewStatisticsService.get_correct_period_range(period, reference_date)
+            if current_start and current_end:
+                period_length = current_end - current_start
+                return current_start - period_length, current_end - period_length
+            return None, None
+
+    @staticmethod
     async def get_statistics_response(entity: StatisticsEntity, session: SessionDep, period: DateRangeEnum) -> OverviewStatisticsResponse:
-        # Get current period range
-        start_date, end_date = get_period_range(period)
+        # Use our corrected date range functions
+        current_reference = datetime.utcnow()
+        start_date, end_date = OverviewStatisticsService.get_correct_period_range(period, current_reference)
+
         # Get actual number of days in the period
-        period_days = get_period_days(period)
+        period_days = get_period_days(period, current_reference)
 
         # Get the appropriate model for the entity
         EntityModel = BaseStatisticsService.get_entity_statistics_model(entity)
 
         if start_date is None or end_date is None:
-            # For "all time" period, count all users
-            stmt = select(func.count(EntityModel.id).filter(EntityModel.is_deleted.is_(False)).label("total"))
+            # For "all time" period, count all entities
+            stmt = select(func.count(EntityModel.id)).where(EntityModel.is_deleted.is_(False))
             result = await session.execute(stmt)
             total_entities = result.scalar() or 0
 
-            # For all time, there's no meaningful previous period comparison
             previous_total = 0
-            avg_per_day = 0.0  # Can't calculate meaningful average for all time
+            avg_per_day = 0.0
         else:
-            # Get previous period range for comparison
-            prev_start_date, prev_end_date = get_previous_period_range(period)
-
-            # Count users in current period
-            current_stmt = select(
-                func.count(EntityModel.id)
-                .filter(EntityModel.is_deleted.is_(False), EntityModel.created_at >= start_date, EntityModel.created_at < end_date)
-                .label("total")
+            # Count entities in current period
+            current_stmt = select(func.count(EntityModel.id)).where(
+                EntityModel.is_deleted.is_(False), EntityModel.created_at >= start_date, EntityModel.created_at < end_date
             )
             current_result = await session.execute(current_stmt)
             total_entities = current_result.scalar() or 0
 
-            # Count users in previous period
+            # Get previous period range for comparison
+            prev_start_date, prev_end_date = OverviewStatisticsService.get_correct_previous_period_range(period, current_reference)
+            # Count entities in previous period
             if prev_start_date is not None and prev_end_date is not None:
-                previous_stmt = select(
-                    func.count(EntityModel.id)
-                    .filter(EntityModel.is_deleted.is_(False), EntityModel.created_at >= prev_start_date, EntityModel.created_at < prev_end_date)
-                    .label("previous_total")
+                previous_stmt = select(func.count(EntityModel.id)).where(
+                    EntityModel.is_deleted.is_(False), EntityModel.created_at >= prev_start_date, EntityModel.created_at < prev_end_date
                 )
                 previous_result = await session.execute(previous_stmt)
                 previous_total = previous_result.scalar() or 0

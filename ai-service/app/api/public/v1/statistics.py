@@ -107,24 +107,24 @@ async def get_statistics_rankings(session: SessionDep, period: DateRangeEnum = D
         return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
 
     # TOP CONNECTED EXTENSIONS STATISTICS
-    # try:
-    #     extension_statistics, weights = await RankingStatisticsService.get_ranking_statistics(
-    #         entity=StatisticsEntity.CONNECTED_EXTENSIONS, session=session, period=period
-    #     )
-    #     if extension_statistics is None:
-    #         raise ValueError("Invalid extension ranking statistics data")
-    #     statistics_data["connected_extensions"] = {
-    #         "data": extension_statistics,
-    #         "weights": weights,
-    #     }
-    # except Exception as e:
-    #     logger.error(f"Error fetching extension rankings: {e}")
-    #     return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
+    try:
+        extension_statistics, weights = await RankingStatisticsService.get_ranking_statistics(
+            entity=StatisticsEntity.CONNECTED_EXTENSIONS, session=session, period=period
+        )
+        if extension_statistics is None:
+            raise ValueError("Invalid extension ranking statistics data")
+        statistics_data["connected_extensions"] = {
+            "data": extension_statistics,
+            "weights": weights,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching extension rankings: {e}")
+        return ResponseWrapper.wrap(status=500, message=f"Internal server error: {e}").to_response()
 
     result = BaseRankingStatisticsResponse(
         users=BaseRankingEntityStatisticsResponse(data=statistics_data["users"]["data"], weights=statistics_data["users"]["weights"]),
-        # connected_extensions=BaseRankingEntityStatisticsResponse(
-        #     data=statistics_data["connected_extensions"]["data"], weights=statistics_data["connected_extensions"]["weights"]
-        # ),
+        connected_extensions=BaseRankingEntityStatisticsResponse(
+            data=statistics_data["connected_extensions"]["data"], weights=statistics_data["connected_extensions"]["weights"]
+        ),
     )
     return ResponseWrapper.wrap(status=200, data=result, message="Success").to_response()
