@@ -32,6 +32,7 @@ class RankingStatisticsService(BaseStatisticsService):
     EXTENSION_ACTIVITY_WEIGHTS = {
         "skills": 5.0,  # Skills show extension utility
         "connection_status": 10.0,  # Successful connections are critical
+        "user_adoption": 2.0,  # User adoption bonus per successful user
     }
 
     @staticmethod
@@ -213,58 +214,112 @@ class RankingStatisticsService(BaseStatisticsService):
     @staticmethod
     async def _get_connected_extension_ranking(session: SessionDep, period: DateRangeEnum) -> Tuple[List[RankingStatisticsResponse], dict]:
         """
-        Get top connected extensions ranked by usage and skill count.
+        Get top extension types ranked by aggregated usage across all users.
 
-        Activity score calculation for extensions:
-        - Number of skills created: 5 points each (shows extension utility)
-        - Success rate: Up to 10 points (connection_status == SUCCESS)
-        - Recency: Recent connections get bonus points
+        Activity score calculation:
+        - Total skills: 5 points each
+        - Success rate: Up to 10 points based on percentage
+        - User adoption: 2 points per successful user
         """
-        # Create skill count subquery using the generic function
-        skills_subq = await RankingStatisticsService._create_activity_subquery(Skill, "extension_id", "skill_count", period)
+        start_date, end_date = get_period_range(period)
 
-        # Calculate composite activity score for extensions
-        score_calculation = func.coalesce(skills_subq.c.skill_count, 0) * RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["skills"] + case(
-            (ConnectedExtension.connection_status == "success", RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["connection_status"]), else_=0.0
+        # Simple aggregation query - group by extension_enum
+        query = (
+            select(
+                ConnectedExtension.extension_enum,
+                func.max(ConnectedExtension.extension_name).label("extension_name"),  # Get any extension_name for the type
+                func.count(ConnectedExtension.id).label("total_connections"),
+                func.sum(case((ConnectedExtension.connection_status == "success", 1), else_=0)).label("successful_connections"),
+                func.count(func.distinct(ConnectedExtension.user_id)).label("unique_users"),
+                func.count(func.distinct(case((ConnectedExtension.connection_status == "success", ConnectedExtension.user_id), else_=None))).label(
+                    "successful_users"
+                ),
+            )
+            .where(ConnectedExtension.is_deleted.is_(False))
+            .group_by(ConnectedExtension.extension_enum)
         )
 
-        # Define select columns
-        select_columns = [
-            ConnectedExtension.id,
-            ConnectedExtension.extension_name,
-            ConnectedExtension.connection_status,
-            func.coalesce(skills_subq.c.skill_count, 0).label("skill_count"),
-            score_calculation.label("activity_score"),
-        ]
+        # Add date filter if specified
+        if start_date and end_date:
+            query = query.where(ConnectedExtension.created_at.between(start_date, end_date))
 
-        # Build the main query using the generic function
-        subqueries_info = [
-            (skills_subq, "extension_id"),
-        ]
-
-        query = await RankingStatisticsService._build_ranking_query(ConnectedExtension, subqueries_info, score_calculation, select_columns)
-
+        # Get basic stats first
         result = await session.execute(query)
-        rows = result.fetchall()
+        extension_stats = result.fetchall()
 
-        # Convert to response objects with ranking and detailed breakdown
+        # Now get skill counts for each extension type
+        skill_query = (
+            select(ConnectedExtension.extension_enum, func.count(Skill.id).label("skill_count"))
+            .select_from(ConnectedExtension)
+            .join(Skill, Skill.extension_id == ConnectedExtension.id)
+            .where(ConnectedExtension.is_deleted.is_(False) & Skill.is_deleted.is_(False))
+            .group_by(ConnectedExtension.extension_enum)
+        )
+
+        # Add date filter for skills if specified
+        if start_date and end_date:
+            skill_query = skill_query.where(Skill.created_at.between(start_date, end_date))
+
+        skill_result = await session.execute(skill_query)
+        skill_counts = {row.extension_enum: row.skill_count for row in skill_result.fetchall()}
+
+        # Calculate scores and create results
         ranking_results = []
-        for rank, row in enumerate(rows, 1):
-            ranking_results.append(
+        for row in extension_stats:
+            skill_count = skill_counts.get(row.extension_enum, 0)
+            success_rate = (row.successful_connections / row.total_connections * 100) if row.total_connections > 0 else 0
+
+            # Calculate composite score
+            activity_score = (
+                skill_count * RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["skills"]
+                + success_rate * (RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["connection_status"] / 10)
+                + row.successful_users * RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["user_adoption"]
+            )
+
+            if activity_score > 0:  # Only include extensions with activity
+                ranking_results.append(
+                    {
+                        "extension_enum": row.extension_enum,
+                        "extension_name": row.extension_name,
+                        "total_connections": row.total_connections,
+                        "successful_connections": row.successful_connections,
+                        "unique_users": row.unique_users,
+                        "successful_users": row.successful_users,
+                        "skill_count": skill_count,
+                        "success_rate": success_rate,
+                        "activity_score": activity_score,
+                    }
+                )
+
+        # Sort by score and limit
+        ranking_results.sort(key=lambda x: x["activity_score"], reverse=True)
+        top_results = ranking_results[: RankingStatisticsService.RANKING_LIMIT]
+
+        # Convert to response format
+        final_results = []
+        for rank, result in enumerate(top_results, 1):
+            final_results.append(
                 RankingStatisticsResponse(
-                    id=row.id,
-                    score=float(row.activity_score),
+                    id=result["extension_enum"],
                     rank=rank,
+                    score=float(result["activity_score"]),
                     display_info={
-                        "extension_name": row.extension_name or f"Extension {row.id[:8]}",
-                        "connection_status": row.connection_status,
-                        "skill_count": str(row.skill_count),
+                        "extension_name": result["extension_name"],
+                        "extension_type": result["extension_enum"],
+                        "total_connections": str(result["total_connections"]),
+                        "successful_connections": str(result["successful_connections"]),
+                        "unique_users": str(result["unique_users"]),
+                        "successful_users": str(result["successful_users"]),
+                        "skill_count": str(result["skill_count"]),
+                        "success_rate": f"{result['success_rate']:.1f}%",
                     },
                 )
             )
 
         score_weights = {
             "skills": RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["skills"],
-            "connection_status": RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["connection_status"],
+            "success_rate": RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["connection_status"],
+            "user_adoption": RankingStatisticsService.EXTENSION_ACTIVITY_WEIGHTS["user_adoption"],
         }
-        return ranking_results, score_weights
+
+        return final_results, score_weights

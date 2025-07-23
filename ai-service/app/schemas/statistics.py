@@ -32,4 +32,4 @@ class BaseRankingEntityStatisticsResponse(BaseResponse):
 
 class BaseRankingStatisticsResponse(BaseResponse):
     users: BaseRankingEntityStatisticsResponse = Field(..., description="User ranking statistics")
-    # connected_extensions: BaseRankingEntityStatisticsResponse = Field(..., description="Connected extensions ranking statistics")
+    connected_extensions: BaseRankingEntityStatisticsResponse = Field(..., description="Connected extensions ranking statistics")
