@@ -120,7 +120,7 @@ class JobExecutor:
             }
 
             payload = {
-                "title": f"Run the job: {job_data.get('name', '')}",
+                "title": f"Run the task: {job_data.get('name', '')}",
                 "assistant_id": job_data.get("assistant_id", ""),
             }
 
